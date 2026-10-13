@@ -17,8 +17,8 @@ const press = async (key, ms = 400) => { await page.keyboard.press(key); await s
 const wake = async () => { await page.mouse.move(700, 450); await page.mouse.move(720, 460); await settle(250); };
 
 await page.goto(url);
-await settle(2500);                                   // the start screen, with the background scene behind it
-await shot('start');
+await settle(2500);                                   // the start screen, cropped to a banner around the title
+await shot('start', { clip: { x: 0, y: 250, width: 1440, height: 400 } });
 
 await page.getByRole('button', { name: 'Play demo beat' }).click();
 await press('2', 3500);                               // Hyper Tunnel
