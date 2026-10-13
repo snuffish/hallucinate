@@ -1,24 +1,51 @@
 // Node types for the visual maker, and the compiler that turns a node graph into GLSL.
 // Every node emits one GLSL variable per output: `<type> n<id>_<output> = <expr>;`
 
-const f = (name, def) => ({ name, type: 'float', def });
-const v2 = (name) => ({ name, type: 'vec2', def: 'uv' });
-const v3 = (name, def = [0, 0, 0]) => ({ name, type: 'vec3', def });
-const out = (name, type) => ({ name, type });
-const select = (name, options, def = options[0]) => ({ name, kind: 'select', options, def });
-const field = (name, kind, def) => ({ name, kind, def });   // kind: text | number | color
-const label = (text) => String(text ?? '').replace(/["\n]/g, '').trim() || 'Value';
+import { z } from 'zod';
 
-export const CATEGORIES = ['Input', 'Coordinates', 'Pattern', 'Math', 'Color'];
+export type PortType = 'float' | 'vec2' | 'vec3';
+export interface NodeInput { name: string; type: PortType; def: number | number[] | string }
+export interface NodeOutput { name: string; type: PortType }
+export type NodeParamDef =
+  | { name: string; kind: 'select'; options: string[]; def: string }
+  | { name: string; kind: 'text' | 'color'; def: string }
+  | { name: string; kind: 'number'; def: number };
+export type NodeParams = Record<string, string | number>;
+type Args = Record<string, string>;
 
-const PALETTES = {
+export interface NodeType {
+  title: string;
+  cat: string;
+  help?: string;
+  lib?: string[];
+  params?: NodeParamDef[];
+  inputs: NodeInput[];
+  outputs: NodeOutput[];
+  emit: (args: Args, params: NodeParams, id: number) => Record<string, string>;
+  uniform?: (id: number, params: NodeParams) => string;
+}
+
+const f = (name: string, def: number): NodeInput => ({ name, type: 'float', def });
+const v2 = (name: string): NodeInput => ({ name, type: 'vec2', def: 'uv' });
+const v3 = (name: string, def: number[] = [0, 0, 0]): NodeInput => ({ name, type: 'vec3', def });
+const out = (name: string, type: PortType): NodeOutput => ({ name, type });
+const select = (name: string, options: string[], def: string = options[0]!): NodeParamDef => ({ name, kind: 'select', options, def });
+const field = (name: string, kind: 'text' | 'color', def: string): NodeParamDef => ({ name, kind, def });
+const numberField = (name: string, def: number): NodeParamDef => ({ name, kind: 'number', def });
+const label = (text: string | number | undefined) => String(text ?? '').replace(/["\n]/g, '').trim() || 'Value';
+
+export const CATEGORIES: readonly string[] = ['Input', 'Coordinates', 'Pattern', 'Math', 'Color'];
+
+type Unary = (x: string) => string;
+type Binary = (a: string, b: string) => string;
+const PALETTES: Record<string, Unary> = {
   rainbow: (t) => `rainbow(${t} + uHue)`,
   neon: (t) => `neon(${t} + uHue)`,
   fire: (t) => `pal(${t} + uHue, vec3(.6, .3, .1), vec3(.5, .35, .2), vec3(1.), vec3(0., .15, .25))`,
   ice: (t) => `pal(${t} + uHue, vec3(.4, .6, .8), vec3(.3), vec3(1.), vec3(.5, .55, .6))`,
   acid: (t) => `pal(${t} + uHue, vec3(.5), vec3(.5), vec3(2., 1., 0.), vec3(.5, .2, .25))`,
 };
-const MATH = {
+const MATH: Record<string, Binary> = {
   add: (a, b) => `${a} + ${b}`,
   subtract: (a, b) => `${a} - ${b}`,
   multiply: (a, b) => `${a} * ${b}`,
@@ -28,7 +55,7 @@ const MATH = {
   power: (a, b) => `pow(abs(${a}), ${b})`,
   modulo: (a, b) => `mod(${a}, ${b})`,
 };
-const FUNCS = {
+const FUNCS: Record<string, Unary> = {
   sin: (x) => `sin(${x})`,
   cos: (x) => `cos(${x})`,
   abs: (x) => `abs(${x})`,
@@ -39,15 +66,16 @@ const FUNCS = {
   'fade (exp)': (x) => `exp(-${x})`,
   'neon glow': (x) => `pow(.01 / max(abs(${x}), 1e-4), 1.2)`,
 };
-const BLENDS = {
+const BLENDS: Record<string, Binary> = {
   add: (a, b) => `${a} + ${b}`,
   multiply: (a, b) => `${a} * ${b}`,
   screen: (a, b) => `1. - (1. - ${a}) * (1. - ${b})`,
   difference: (a, b) => `abs(${a} - ${b})`,
   lighten: (a, b) => `max(${a}, ${b})`,
 };
+const pick = <T>(table: Record<string, T>, key: string | number | undefined): T => table[String(key)] ?? Object.values(table)[0]!;
 
-export const NODE_TYPES = {
+export const NODE_TYPES: Record<string, NodeType> = {
   // ----- Input
   uv: { title: 'UV', cat: 'Input', help: 'Pixel position. (0,0) is the centre.', inputs: [], outputs: [out('p', 'vec2')], emit: () => ({ p: 'centered()' }) },
   time: { title: 'Time', cat: 'Input', help: 'Clock that runs faster when the music is loud.', inputs: [f('speed', 1)], outputs: [out('t', 'float')], emit: (a) => ({ t: `uTime * ${a.speed}` }) },
@@ -57,15 +85,15 @@ export const NODE_TYPES = {
     outputs: ['bass', 'mid', 'high', 'level', 'beat', 'tone', 'mood'].map((n) => out(n, 'float')),
     emit: () => ({ bass: 'uBass', mid: 'uMid', high: 'uHigh', level: 'uLevel', beat: 'uBeat', tone: 'uBright', mood: 'uMood' }),
   },
-  number: { title: 'Number', cat: 'Input', inputs: [f('value', 1)], outputs: [out('out', 'float')], emit: (a) => ({ out: a.value }) },
+  number: { title: 'Number', cat: 'Input', inputs: [f('value', 1)], outputs: [out('out', 'float')], emit: (a) => ({ out: a.value! }) },
   spectrum: { title: 'Spectrum', cat: 'Input', help: 'Loudness at x (0 = bass … 1 = treble).', inputs: [f('x', 0.1)], outputs: [out('out', 'float')], emit: (a) => ({ out: `spec(${a.x})` }) },
   slider: {
     title: 'Slider', cat: 'Input',
     help: 'A value you can tweak live from the Parameters overlay while the scene runs.',
-    params: [field('label', 'text', 'Amount'), field('min', 'number', 0), field('max', 'number', 1), field('value', 'number', 0.5)],
+    params: [field('label', 'text', 'Amount'), numberField('min', 0), numberField('max', 1), numberField('value', 0.5)],
     inputs: [], outputs: [out('out', 'float')],
     uniform: (id, p) => `uniform float p${id}; // @param min=${glslFloat(p.min)} max=${glslFloat(p.max)} default=${glslFloat(p.value)} label="${label(p.label)}"`,
-    emit: (a, p, id) => ({ out: `p${id}` }),
+    emit: (_a, _p, id) => ({ out: `p${id}` }),
   },
   media: {
     title: 'Media', cat: 'Input', help: 'The image or video you dropped in, at position p (a test pattern until you drop one).',
@@ -111,31 +139,31 @@ export const NODE_TYPES = {
   checker: { title: 'Checker', cat: 'Pattern', inputs: [v2('p'), f('scale', 6)], outputs: [out('out', 'float')], emit: (a) => ({ out: `mod(floor(${a.p}.x * ${a.scale}) + floor(${a.p}.y * ${a.scale}), 2.)` }) },
 
   // ----- Math
-  math: { title: 'Math', cat: 'Math', params: [select('op', Object.keys(MATH))], inputs: [f('a', 0), f('b', 1)], outputs: [out('out', 'float')], emit: (a, p) => ({ out: MATH[p.op](a.a, a.b) }) },
-  func: { title: 'Function', cat: 'Math', params: [select('fn', Object.keys(FUNCS))], inputs: [f('x', 0)], outputs: [out('out', 'float')], emit: (a, p) => ({ out: FUNCS[p.fn](a.x) }) },
+  math: { title: 'Math', cat: 'Math', params: [select('op', Object.keys(MATH))], inputs: [f('a', 0), f('b', 1)], outputs: [out('out', 'float')], emit: (a, p) => ({ out: pick(MATH, p.op)(a.a!, a.b!) }) },
+  func: { title: 'Function', cat: 'Math', params: [select('fn', Object.keys(FUNCS))], inputs: [f('x', 0)], outputs: [out('out', 'float')], emit: (a, p) => ({ out: pick(FUNCS, p.fn)(a.x!) }) },
   threshold: { title: 'Smooth step', cat: 'Math', help: 'Soft 0 → 1 as x goes from "from" to "to".', inputs: [f('x', 0), f('from', 0), f('to', 1)], outputs: [out('out', 'float')], emit: (a) => ({ out: `smoothstep(${a.from}, ${a.to}, ${a.x})` }) },
 
   // ----- Color
-  palette: { title: 'Palette', cat: 'Color', params: [select('preset', Object.keys(PALETTES))], help: 'Turns a number into a colour (repeats every 1.0).', inputs: [f('t', 0)], outputs: [out('color', 'vec3')], emit: (a, p) => ({ color: PALETTES[p.preset](a.t) }) },
+  palette: { title: 'Palette', cat: 'Color', params: [select('preset', Object.keys(PALETTES))], help: 'Turns a number into a colour (repeats every 1.0).', inputs: [f('t', 0)], outputs: [out('color', 'vec3')], emit: (a, p) => ({ color: pick(PALETTES, p.preset)(a.t!) }) },
   colorPicker: {
     title: 'Colour picker', cat: 'Color',
     help: 'A colour you can change live from the Parameters overlay while the scene runs.',
     params: [field('label', 'text', 'Colour'), field('color', 'color', '#4fe3ff')],
     inputs: [], outputs: [out('color', 'vec3')],
     uniform: (id, p) => `uniform vec3 p${id}; // @param color default=${p.color} label="${label(p.label)}"`,
-    emit: (a, p, id) => ({ color: `p${id}` }),
+    emit: (_a, _p, id) => ({ color: `p${id}` }),
   },
-  color: { title: 'Colour', cat: 'Color', params: [{ name: 'color', kind: 'color', def: '#ff4fd8' }], inputs: [], outputs: [out('color', 'vec3')], emit: (a, p) => ({ color: hexToVec3(p.color) }) },
+  color: { title: 'Colour', cat: 'Color', params: [field('color', 'color', '#ff4fd8')], inputs: [], outputs: [out('color', 'vec3')], emit: (_a, p) => ({ color: hexToVec3(String(p.color)) }) },
   brightness: { title: 'Brightness', cat: 'Color', inputs: [v3('color', [1, 1, 1]), f('amount', 1)], outputs: [out('color', 'vec3')], emit: (a) => ({ color: `${a.color} * ${a.amount}` }) },
   mixColor: { title: 'Mix colours', cat: 'Color', inputs: [v3('a'), v3('b', [1, 1, 1]), f('t', 0.5)], outputs: [out('color', 'vec3')], emit: (a) => ({ color: `mix(${a.a}, ${a.b}, ${a.t})` }) },
-  blend: { title: 'Blend', cat: 'Color', params: [select('mode', Object.keys(BLENDS))], inputs: [v3('a'), v3('b')], outputs: [out('color', 'vec3')], emit: (a, p) => ({ color: BLENDS[p.mode](a.a, a.b) }) },
+  blend: { title: 'Blend', cat: 'Color', params: [select('mode', Object.keys(BLENDS))], inputs: [v3('a'), v3('b')], outputs: [out('color', 'vec3')], emit: (a, p) => ({ color: pick(BLENDS, p.mode)(a.a!, a.b!) }) },
   hue: { title: 'Hue shift', cat: 'Color', lib: ['hue'], inputs: [v3('color', [1, 0, 0]), f('shift', 0.1)], outputs: [out('color', 'vec3')], emit: (a) => ({ color: `nk_hue(${a.color}, ${a.shift})` }) },
 
   // ----- Output
   output: { title: 'Output', cat: 'Output', help: 'The final colour on screen.', inputs: [v3('color')], outputs: [], emit: () => ({}) },
 };
 
-const LIBS = {
+const LIBS: Record<string, string> = {
   kaleido: `vec2 nk_kaleido(vec2 p, float n) {
   float s = TAU / max(n, 1.);
   float a = mod(atan(p.y, p.x), s);
@@ -179,12 +207,28 @@ const LIBS = {
 }`,
 };
 
-export function defaultParams(type) {
-  return Object.fromEntries((NODE_TYPES[type].params ?? []).map((p) => [p.name, p.def]));
+// ---------- Graph data ----------
+
+export const GraphNodeSchema = z.object({
+  id: z.number(),
+  type: z.string().refine((t) => t in NODE_TYPES, { message: 'unknown node type' }),
+  x: z.number(),
+  y: z.number(),
+  values: z.record(z.string(), z.number()).default({}),
+  params: z.record(z.string(), z.union([z.string(), z.number()])).default({}),
+});
+export const GraphLinkSchema = z.object({ from: z.number(), out: z.string(), to: z.number(), in: z.string() });
+export const GraphSchema = z.object({ nodes: z.array(GraphNodeSchema), links: z.array(GraphLinkSchema) });
+export type GraphNode = z.infer<typeof GraphNodeSchema>;
+export type GraphLink = z.infer<typeof GraphLinkSchema>;
+export type Graph = z.infer<typeof GraphSchema>;
+
+export function defaultParams(type: string): NodeParams {
+  return Object.fromEntries((NODE_TYPES[type]?.params ?? []).map((p) => [p.name, p.def]));
 }
 
 // Mismatched types are converted instead of refused, so any wire "just works".
-const CONVERT = {
+const CONVERT: Record<string, Unary> = {
   'float>vec2': (x) => `vec2(${x})`,
   'float>vec3': (x) => `vec3(${x})`,
   'vec2>float': (x) => `length(${x})`,
@@ -193,54 +237,55 @@ const CONVERT = {
   'vec3>vec2': (x) => `${x}.xy`,
 };
 
-function glslFloat(v) {
+function glslFloat(v: string | number | undefined): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return '0.';
   const s = String(n);
   return /[.e]/.test(s) ? s : `${s}.`;
 }
 
-function hexToVec3(hex) {
+function hexToVec3(hex: string): string {
   const n = parseInt(hex.slice(1), 16);
   return `vec3(${[16, 8, 0].map((sh) => glslFloat(((n >> sh) & 255) / 255).slice(0, 5)).join(', ')})`;
 }
 
-function literal(input, value) {
+function literal(input: NodeInput, value: number | undefined): string {
   if (input.type === 'vec2') return 'centered()';
-  if (input.type === 'vec3') return `vec3(${input.def.map(glslFloat).join(', ')})`;
-  return glslFloat(value ?? input.def);
+  if (input.type === 'vec3') return `vec3(${(input.def as number[]).map(glslFloat).join(', ')})`;
+  return glslFloat(value ?? (input.def as number));
 }
 
 // Wrap anything that isn't a plain identifier/number so operator precedence stays right.
-const wrap = (expr) => (/^[\w.]+$/.test(expr) ? expr : `(${expr})`);
+const wrap = (expr: string) => (/^[\w.]+$/.test(expr) ? expr : `(${expr})`);
 
-export function compileGraph(graph) {
+export function compileGraph(graph: Graph): string {
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   const output = graph.nodes.find((n) => n.type === 'output');
   if (!output) throw new Error('The graph needs an Output node.');
 
-  const lines = [];
-  const uniforms = [];
-  const libs = new Set();
-  const done = new Set();
-  const visiting = new Set();
+  const lines: string[] = [];
+  const uniforms: string[] = [];
+  const libs = new Set<string>();
+  const done = new Set<number>();
+  const visiting = new Set<number>();
 
-  const visit = (node) => {
+  const visit = (node: GraphNode): void => {
     if (done.has(node.id)) return;
-    if (visiting.has(node.id)) throw new Error(`Loop detected at "${NODE_TYPES[node.type].title}". Wires can't go in a circle.`);
-    visiting.add(node.id);
     const def = NODE_TYPES[node.type];
-    const args = {};
+    if (!def) throw new Error(`Unknown block type "${node.type}".`);
+    if (visiting.has(node.id)) throw new Error(`Loop detected at "${def.title}". Wires can't go in a circle.`);
+    visiting.add(node.id);
+    const args: Args = {};
     for (const input of def.inputs) {
       const link = graph.links.find((l) => l.to === node.id && l.in === input.name);
       const src = link && byId.get(link.from);
-      const srcOut = src && NODE_TYPES[src.type].outputs.find((o) => o.name === link.out);
-      if (srcOut) {
+      const srcOut = src && NODE_TYPES[src.type]?.outputs.find((o) => o.name === link.out);
+      if (src && link && srcOut) {
         visit(src);
         const name = `n${src.id}_${link.out}`;
-        args[input.name] = wrap(srcOut.type === input.type ? name : CONVERT[`${srcOut.type}>${input.type}`](name));
+        args[input.name] = wrap(srcOut.type === input.type ? name : CONVERT[`${srcOut.type}>${input.type}`]!(name));
       } else {
-        args[input.name] = wrap(literal(input, node.values?.[input.name]));
+        args[input.name] = wrap(literal(input, node.values[input.name]));
       }
     }
     const params = { ...defaultParams(node.type), ...node.params };
@@ -259,10 +304,24 @@ export function compileGraph(graph) {
   return header + live + [...libs].map((l) => LIBS[l] + '\n\n').join('') + `void main() {\n${lines.join('\n')}\n}\n`;
 }
 
+export function emptyGraph(): Graph {
+  return {
+    nodes: [
+      { id: 1, type: 'uv', x: 0, y: 0, values: {}, params: {} },
+      { id: 2, type: 'output', x: 500, y: 0, values: {}, params: {} },
+    ],
+    links: [],
+  };
+}
+
 // ---------- Example graphs ----------
 // links: [fromId, output, toId, input]
 
-const example = (name, nodes, links) => ({
+type NodeTuple = [id: number, type: string, x: number, y: number, values?: Record<string, number>, params?: NodeParams];
+type LinkTuple = [from: number, out: string, to: number, input: string];
+export interface Example { name: string; graph: Graph }
+
+const example = (name: string, nodes: NodeTuple[], links: LinkTuple[]): Example => ({
   name,
   graph: {
     nodes: nodes.map(([id, type, x, y, values = {}, params = {}]) => ({ id, type, x, y, values, params: { ...defaultParams(type), ...params } })),
@@ -270,7 +329,7 @@ const example = (name, nodes, links) => ({
   },
 });
 
-export const EXAMPLES = [
+export const EXAMPLES: Example[] = [
   example('Kaleido star', [
     [1, 'uv', 0, 0],
     [2, 'kaleido', 220, 0, { segments: 8 }],
