@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="#hallucinate"><img src="docs/screenshots/main.jpg" alt="Hallucinate playing Hyper Tunnel, with the control panel and live parameters" width="100%"></a>
+  <a href="#hallucinate"><img src="docs/screenshots/start.jpg" alt="The Hallucinate start screen: pick an audio source, or drop a file" width="100%"></a>
   <br>
   Hallucinate
 </h1>
@@ -153,6 +153,8 @@ running), and saves automatically in the browser. While it's open the editor fol
   and opens it here.
 
 ## 🎛 Live parameters — press P
+
+<img src="docs/screenshots/main.jpg" alt="Hyper Tunnel playing with the control panel on the left and its live parameters overlay on the right" width="100%">
 
 Expose values and constants as controls in an overlay on the scene, and tweak them while it runs (no recompiling).
 In the code editor, tag a top-level `uniform` or `const` with `// @param`:
