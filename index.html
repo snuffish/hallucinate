@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hallucinate</title>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+
+  <section id="start" class="start">
+    <h1>Hallucinate</h1>
+    <p>Drop an audio file anywhere, or choose a source — drop an image or video (or pick one from YouTube in the panel) to distort it</p>
+    <div class="sources">
+      <button data-source="file">Open audio file</button>
+      <button data-source="mic">Microphone / line-in</button>
+      <button data-source="soundcloud">SoundCloud</button>
+      <button data-source="display">Tab / system audio</button>
+      <button data-source="demo">Play demo beat</button>
+    </div>
+    <p class="hint">Search SoundCloud right here, or use "Tab / system audio" for Spotify, YouTube or anything playing in another tab.</p>
+  </section>
+
+  <aside id="panel" class="panel">
+    <header>
+      <strong>Hallucinate</strong>
+      <button id="collapse" class="icon" title="Hide panel (H)">–</button>
+    </header>
+
+    <div id="downloads" class="downloads"></div>
+
+    <div class="group">
+      <label>Source</label>
+      <div class="sources compact">
+        <button data-source="file">File</button>
+        <button data-source="mic">Mic</button>
+        <button data-source="soundcloud">SoundCloud</button>
+        <button data-source="display">Tab audio</button>
+        <button data-source="demo">Demo</button>
+      </div>
+      <div id="now" class="now">No audio yet</div>
+      <audio id="player" hidden></audio>
+      <div id="transport" class="transport" hidden>
+        <div id="tp-seek-row" class="tp-seek">
+          <time id="tp-cur">0:00</time>
+          <input type="range" id="tp-seek" min="0" max="1000" step="1" value="0" aria-label="Seek">
+          <time id="tp-dur">0:00</time>
+        </div>
+        <div class="tp-buttons">
+          <button id="tp-loop" class="tp-small tp-file" title="Loop this track"></button>
+          <button id="tp-prev" class="tp-file" title="Previous track / restart"></button>
+          <button id="tp-back" class="tp-file" title="Back 10 s (Shift+←)"></button>
+          <button id="tp-play" class="tp-play" title="Play (Space)"></button>
+          <button id="tp-fwd" class="tp-file" title="Forward 10 s (Shift+→)"></button>
+          <button id="tp-next" class="tp-file" title="Next track"></button>
+          <span class="tp-small tp-file"></span>
+        </div>
+        <div class="tp-row">
+          <button id="tp-mute" class="tp-icon" title="Mute (M)"></button>
+          <input type="range" id="tp-volume" min="0" max="1" step="0.01" aria-label="Volume" title="Volume (↑ / ↓)">
+          <output id="tp-vol-val">80%</output>
+        </div>
+        <div class="tp-row">
+          <span class="tp-label">Tempo</span>
+          <input type="range" id="tp-rate" min="0.5" max="2" step="0.01" value="1" aria-label="Tempo" title="Tempo ([ / ]) · double-click to reset">
+          <button id="tp-rate-val" class="tp-rate-val">1.00×</button>
+        </div>
+        <label class="toggle tp-pitch tp-file"><input type="checkbox" id="tp-pitch"> Pitch follows tempo <small>vinyl / nightcore style</small></label>
+      </div>
+    </div>
+
+    <div class="group">
+      <label>Media</label>
+      <div class="media-row">
+        <div id="media-preview" class="media-preview"></div>
+        <span id="media-name" class="media-name">Drop an image or video anywhere</span>
+      </div>
+      <div class="media-buttons">
+        <button id="media-open">Open file</button>
+        <button id="media-youtube">YouTube</button>
+        <button id="media-clear" disabled>Clear</button>
+      </div>
+      <label id="media-sound-row" class="toggle media-sound" hidden><input type="checkbox" id="media-sound"> Use the video's sound as the music</label>
+    </div>
+
+    <div class="group">
+      <label>Audio</label>
+      <div class="meters">
+        <div><span>Bass</span><i id="m-bass"></i></div>
+        <div><span>Mid</span><i id="m-mid"></i></div>
+        <div><span>High</span><i id="m-high"></i></div>
+        <div id="tone-row" title="Timbral brightness (spectral centroid)"><span>Tone</span><b class="tone-track"><i id="m-tone"></i></b></div>
+      </div>
+      <div class="beat-row"><span id="beat" class="beat"></span><span id="bpm">— BPM</span><span id="mood-label"></span></div>
+    </div>
+
+    <div class="group">
+      <label>Scene</label>
+      <div class="scene-now">
+        <button id="scene-prev" class="icon" title="Previous scene (←)">‹</button>
+        <span id="scene-name"></span>
+        <button id="scene-next" class="icon" title="Next scene (→)">›</button>
+      </div>
+      <div class="scene-buttons">
+        <button id="open-library" title="L">Scene library</button>
+        <button id="play-game" title="G">Beat Racer</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="auto" checked> Auto-switch on the beat</label>
+    </div>
+
+    <div class="group sliders">
+      <label>Reactivity <input type="range" id="reactivity" min="0" max="2" step="0.01" value="1"></label>
+      <label>Speed <input type="range" id="speed" min="0" max="2.5" step="0.01" value="1"></label>
+      <label>Trails <input type="range" id="trails" min="0" max="0.97" step="0.01" value="0.86"></label>
+      <label>Colour <input type="range" id="hue" min="0" max="1" step="0.001" value="0"></label>
+      <label>Colour cycling <input type="range" id="cycle" min="0" max="2" step="0.01" value="0.6"></label>
+      <label>Synesthesia <small>dark sound → dim &amp; cool · bright sound → light &amp; warm</small><input type="range" id="synesthesia" min="0" max="1" step="0.01" value="0.7"></label>
+      <label class="toggle"><input type="checkbox" id="mood" checked> Mood from tempo <small>fast → vivid &amp; warm · slow → muted &amp; cool</small></label>
+      <label>Aberration <input type="range" id="aberration" min="0" max="0.04" step="0.001" value="0.012"></label>
+      <label>Resolution <input type="range" id="resolution" min="0.3" max="1" step="0.05" value="0.75"></label>
+    </div>
+
+    <div class="group actions">
+      <button id="randomize" title="R">Randomize</button>
+      <button id="fullscreen" title="F">Fullscreen</button>
+      <button id="record" title="C">Record</button>
+      <button id="code" title="E">Code</button>
+      <button id="visual" title="N">Visual maker</button>
+      <button id="studio-open" title="O">Studio &amp; projector</button>
+      <button id="assistant-open" class="ai-open" title="I">✦ AI assistant</button>
+    </div>
+
+    <p class="keys">Space play/pause · Shift+←/→ seek · ↑/↓ volume · [ ] tempo · M mute · ←/→ scene · 1–0 pick · L library · I assistant · O studio · B blackout · P parameters · G game · E code · N visual maker · A auto · R random · F fullscreen · H hide</p>
+  </aside>
+
+  <aside id="params" class="params" hidden>
+    <header>
+      <strong id="params-title">Parameters</strong>
+      <button id="params-reset" title="Reset every value to the default in the code">Reset</button>
+      <button id="params-collapse" class="icon" title="Collapse / expand (P)">–</button>
+    </header>
+    <div id="params-list" class="params-list"></div>
+  </aside>
+
+  <div id="hud" class="hud" hidden>
+    <div id="hud-score" class="hud-score">0</div>
+    <div id="hud-combo"></div>
+    <div id="hud-lives"></div>
+    <div id="hud-best"></div>
+    <div id="hud-over" class="hud-over" hidden>GAME OVER<small>Press Enter to race again</small></div>
+  </div>
+
+  <aside id="editor" class="editor" hidden>
+    <header>
+      <strong id="ed-title">Shader editor</strong>
+      <select id="ed-template" title="Replace the code with a starting point"><option value="">Start from…</option></select>
+      <button id="ed-revert" title="Undo your edits to this built-in scene" hidden>Revert to original</button>
+      <button id="ed-copy" title="Copy this generated code into My Shader and edit it there" hidden>Edit a copy</button>
+      <button id="ed-save" title="Save this code as a new scene in the library">Save to library</button>
+      <button id="ed-close" class="icon" title="Close (Esc)">×</button>
+    </header>
+    <details>
+      <summary>Cheat sheet</summary>
+      <dl>
+        <dt><code>centered()</code></dt><dd>pixel position, (0,0) = centre, y from −0.5 to 0.5</dd>
+        <dt><code>uTime</code></dt><dd>clock that runs faster when the music is loud</dd>
+        <dt><code>uBass uMid uHigh uLevel</code></dt><dd>band loudness, 0 → ~1</dd>
+        <dt><code>uBeat</code></dt><dd>1 on each beat, fading to 0</dd>
+        <dt><code>uHue</code></dt><dd>colour slider + cycling</dd>
+        <dt><code>uBright uMood</code></dt><dd>tone of the sound (0 dark … 1 bright) and mood (0 calm … 1 energetic); slow-moving</dd>
+        <dt><code>spec(x) wave(x)</code></dt><dd>spectrum (0…1, bass→treble) and waveform (−1…1) at x</dd>
+        <dt><code>rainbow(t) neon(t)</code></dt><dd>colour palettes, repeat every 1.0</dd>
+        <dt><code>rot(a) noise(p) fbm(p) hash(p)</code></dt><dd>rotate a vec2, smooth noise, layered noise, random</dd>
+        <dt><code>fragColor</code></dt><dd>write your final colour here</dd>
+        <dt><code>media(p) luma(c) untone(c)</code></dt><dd>the dropped image / video at p (fills the screen, mirrored beyond its edges); the brightness of a colour; wrap your final colour in <code>untone()</code> to show a picture in its true colours</dd>
+        <dt><code>// @param</code></dt><dd>put after a top-level <code>uniform</code> or <code>const</code> to get a live control in the Parameters overlay:<br>
+          <code>uniform float uGlow; // @param min=0 max=3 default=1</code><br>
+          <code>const vec3 TINT = vec3(1., .3, .8); // @param color</code><br>
+          types float · bool · vec2 · vec3 · vec4; options min max step default label int color</dd>
+      </dl>
+    </details>
+    <textarea id="ed-code" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+    <div id="ed-status" class="ed-status"></div>
+  </aside>
+
+  <section id="nodes" class="nodes" hidden>
+    <header class="ne-bar">
+      <strong>Visual maker</strong>
+      <select class="ne-examples" title="Load an example graph"><option value="">Examples…</option></select>
+      <button class="ne-clear">New</button>
+      <button class="ne-tocode" title="Open the generated GLSL in the code editor">Send to code</button>
+      <button class="ne-peek" title="Hide the graph to see the result">Peek</button>
+      <span class="ne-status"></span>
+      <button class="ne-close icon" title="Close (Esc)">×</button>
+    </header>
+    <nav class="ne-palette"></nav>
+    <div class="ne-viewport">
+      <div class="ne-world"><svg class="ne-wires"></svg></div>
+      <p class="ne-help">Click a block on the left to add it · drag from ● to ● to wire · drag an input's wire off to remove it · drag empty space to pan · scroll to zoom · Delete removes the selected block</p>
+    </div>
+  </section>
+
+  <aside id="ai" class="ai" hidden>
+    <header>
+      <strong>✦ Assistant</strong>
+      <button id="ai-undo" title="Undo the assistant's last change" disabled>Undo</button>
+      <button id="ai-new" title="Start a new conversation">New chat</button>
+      <button id="ai-close" class="icon" title="Close (Esc)">×</button>
+    </header>
+    <div id="ai-log" class="ai-log">
+      <div class="ai-welcome">
+        <p>I can create and edit scenes, tweak their parameters and the look, and explain how things work. I see the result and fix my own compile errors.</p>
+        <div class="ai-examples">
+          <button data-prompt="Create a new scene: a slowly rotating field of glowing jellyfish that pulse with the bass.">Create a jellyfish scene</button>
+          <button data-prompt="Make the scene on screen more intense on the beat, without making it jumpy.">Punch up this scene on the beat</button>
+          <button data-prompt="Add a few useful live parameters to the scene on screen.">Add parameters to this scene</button>
+          <button data-prompt="Explain how the scene on screen works, briefly.">Explain this scene</button>
+        </div>
+      </div>
+    </div>
+    <p id="ai-status" class="ai-status"></p>
+    <div class="ai-composer">
+      <textarea id="ai-input" rows="2" placeholder="Ask for a scene, a change, or an explanation…  (Enter to send, Shift+Enter for a new line)"></textarea>
+      <button id="ai-send">Send</button>
+    </div>
+  </aside>
+
+  <section id="studio" class="studio" hidden>
+    <header class="studio-bar">
+      <strong>Studio</strong>
+      <span class="studio-hint">Click a show scene to preview it · <kbd>T</kbd> take it live · <kbd>B</kbd> blackout · <kbd>1</kbd>–<kbd>9</kbd> / <kbd>←</kbd><kbd>→</kbd> pick</span>
+      <button id="st-close" class="icon" title="Close (O / Esc)">×</button>
+    </header>
+    <div class="studio-monitors">
+      <figure class="monitor preview">
+        <div class="screen-fit"><div class="screen"><canvas id="preview-gl"></canvas></div></div>
+        <figcaption><b>Preview</b><span id="st-preview-name"></span></figcaption>
+      </figure>
+      <div class="studio-take">
+        <button id="st-take" class="take" title="Transition Preview to Program (T)">Take ▸</button>
+        <div class="seg"><button id="st-cut">Cut</button><button id="st-fade">Fade</button></div>
+        <label>Fade <output id="st-dur-val"></output><input type="range" id="st-dur" min="0.2" max="8" step="0.1"></label>
+      </div>
+      <figure class="monitor program">
+        <div class="screen-fit"><div class="screen" id="st-program"></div></div>
+        <figcaption><b>Program</b><span id="st-program-name"></span></figcaption>
+      </figure>
+    </div>
+    <div class="studio-docks">
+      <section class="dock">
+        <header><strong>Show scenes</strong><select id="st-add"></select></header>
+        <ol id="st-cues" class="cues"></ol>
+        <footer>
+          <label class="toggle"><input type="checkbox" id="st-auto"> Autopilot: next every
+            <select id="st-auto-beats"><option value="16">16</option><option value="32">32</option><option value="64">64</option><option value="128">128</option></select> beats</label>
+        </footer>
+      </section>
+      <section class="dock">
+        <header>
+          <strong>Parameters</strong>
+          <div class="seg" title="Which scene the controls edit">
+            <button id="st-pp-preview" title="The selected show scene (green) — Take sends your changes live">Preview</button>
+            <button id="st-pp-program" title="What's live now (red)">Program</button>
+          </div>
+        </header>
+        <div id="st-params-dock" class="params-dock"><p class="dock-empty">This scene has no live parameters.</p></div>
+      </section>
+      <section class="dock">
+        <header><strong>Projector</strong></header>
+        <label class="dock-field">Display <select id="st-screen"><option value="">New window — drag it to the projector</option></select></label>
+        <div class="dock-row">
+          <button id="st-detect" title="List displays (asks for permission once)">Detect displays</button>
+          <button id="st-open" class="primary">Open projector</button>
+          <button id="st-identify" title="Show the resolution on every projector">Identify</button>
+        </div>
+        <p id="st-out-status" class="out-status"></p>
+        <label class="dock-field">Master <output id="st-master-val"></output><input type="range" id="st-master" min="0" max="1" step="0.01"></label>
+        <button id="st-blackout" class="blackout" title="Fade Program to black (B)">Blackout</button>
+        <p class="dock-hint">On the projector: double-click or press F for fullscreen. To stream or record, capture the projector window in OBS (Window Capture).</p>
+      </section>
+    </div>
+  </section>
+
+  <section id="library" class="library" hidden>
+    <header>
+      <strong>Scene library</strong>
+      <input id="lib-search" type="search" placeholder="Search scenes…" autocomplete="off">
+      <button id="lib-close" class="icon" title="Close (Esc)">×</button>
+    </header>
+    <nav id="lib-filters" class="lib-filters"></nav>
+    <p id="lib-count" class="lib-count"></p>
+    <ul id="lib-grid" class="lib-grid"></ul>
+  </section>
+
+  <section id="yt" class="sc yt" hidden>
+    <header>
+      <strong>YouTube</strong>
+      <button id="yt-close" class="icon" title="Close (Esc)">×</button>
+    </header>
+    <form id="yt-form">
+      <input id="yt-query" type="search" placeholder="Search videos, or paste a video / playlist / Shorts link" autocomplete="off">
+      <button type="submit">Search</button>
+      <button type="button" id="yt-recent" title="Show the videos you used recently">Recent</button>
+    </form>
+    <div class="sc-status-row">
+      <p id="yt-status" class="sc-status"></p>
+      <button type="button" id="yt-clear-recent" class="sc-clear" title="Forget the recent videos">Clear history</button>
+    </div>
+    <div id="yt-progress" class="dl-bar" hidden><i></i></div>
+    <ul id="yt-results" class="sc-results"></ul>
+    <footer class="yt-footer">
+      <label class="toggle"><input type="checkbox" id="yt-sound"> Use the video's sound as the music</label>
+      <span>Videos are fetched at up to 720p into a local cache — long ones take a moment the first time.</span>
+    </footer>
+  </section>
+
+  <section id="sc" class="sc" hidden>
+    <header>
+      <strong>SoundCloud</strong>
+      <button id="sc-close" class="icon" title="Close (Esc)">×</button>
+    </header>
+    <form id="sc-form">
+      <input id="sc-query" type="search" placeholder="Search tracks, or paste a track / playlist / artist link" autocomplete="off">
+      <button type="submit">Search</button>
+      <button type="button" id="sc-recent" title="Show the tracks you played recently">Recent</button>
+    </form>
+    <div class="sc-status-row">
+      <p id="sc-status" class="sc-status">Results play in order — the next one starts when a track ends.</p>
+      <button type="button" id="sc-clear-recent" class="sc-clear" title="Forget the recently played tracks">Clear history</button>
+    </div>
+    <div id="sc-progress" class="dl-bar" hidden><i></i></div>
+    <ul id="sc-results" class="sc-results"></ul>
+  </section>
+
+  <div id="toast" class="toast"></div>
+  <input type="file" id="file" accept="audio/*" hidden>
+  <input type="file" id="media-file" accept="image/*,video/*" hidden>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
