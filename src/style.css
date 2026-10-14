@@ -784,14 +784,14 @@ body.idle .params-dock .params { opacity: 1; pointer-events: auto; }
 .editor button[hidden] { display: none; }
 .editor.read-only textarea { opacity: 0.7; }
 
-/* AI assistant (replaces the control panel on the left while open) */
+/* AI assistant: a chat bubble at the bottom, just right of the control panel (bottom-left when the panel is hidden) */
 .ai {
   position: fixed;
-  top: 16px;
-  left: 16px;
-  bottom: 16px;
+  left: 322px;
+  bottom: 86px;
   z-index: 13;
-  width: min(400px, calc(100vw - 32px));
+  width: min(400px, calc(100vw - 36px));
+  height: min(640px, calc(100vh - 110px));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -802,7 +802,6 @@ body.idle .params-dock .params { opacity: 1; pointer-events: auto; }
   border-radius: 14px;
 }
 .ai[hidden] { display: none; }
-body:has(#ai:not([hidden])) .panel { display: none; }
 .ai header { display: flex; align-items: center; gap: 6px; }
 .ai header strong { flex: 1; font-size: 15px; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .ai header button { padding: 3px 9px; font-size: 12px; }
@@ -873,4 +872,15 @@ body:has(#ai:not([hidden])) .panel { display: none; }
 /* Studio: the main canvas stays in place and is pinned over the Live monitor box (above the studio's z-index 11). */
 body.studio-open #gl { z-index: 12; pointer-events: none; }
 /* Suggested next requests under a finished assistant reply (same chips as the welcome examples). */
-.ai-followups { margin-top: 8px; }
+.ai-followups { margin-top: 8px; width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.ai-followups button { text-align: left; }
+
+/* The assistant bubble (toggle) */
+.ai-bubble { position: fixed; left: 322px; bottom: 18px; z-index: 14; width: 54px; height: 54px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.25); background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; box-shadow: 0 6px 24px rgba(255, 79, 216, 0.35), 0 2px 8px rgba(0, 0, 0, 0.4); display: grid; place-items: center; transition: transform 0.15s, box-shadow 0.15s, opacity 0.3s; }
+.ai-bubble:hover { transform: scale(1.06); box-shadow: 0 8px 28px rgba(79, 227, 255, 0.4), 0 2px 8px rgba(0, 0, 0, 0.4); }
+.ai-bubble.open { background: rgba(14, 10, 24, 0.9); color: var(--text); }
+.ai-bubble-icon { font-size: 24px; line-height: 1; }
+.ai-bubble .kbd { position: absolute; right: -4px; top: -6px; margin: 0; font-size: 9px; padding: 1px 4px; background: rgba(14, 10, 24, 0.9); }
+body.idle .ai-bubble:not(.open) { opacity: 0; pointer-events: none; }
+body:has(#panel.collapsed) .ai, body:has(#panel.collapsed) .ai-bubble, body:not(.started) .ai { left: 18px; }
+@media (max-width: 600px) { .ai { left: 8px; bottom: 76px; width: calc(100vw - 16px); height: calc(100vh - 92px); } .ai-bubble { left: 10px; bottom: 10px; } }

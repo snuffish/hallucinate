@@ -36,9 +36,23 @@ function imagesOf(output: unknown): string[] {
   return parts.success ? parts.data.filter((p): p is Extract<typeof p, { type: 'image' }> => p.type === 'image').map((p) => `data:${p.source.mimeType};base64,${p.source.value}`) : [];
 }
 
+// The floating bubble that opens and closes the assistant, in the corner, detached from the panel.
+export function AssistantBubble() {
+  const app = useApp();
+  const open = useUI((ui) => ui.assistantOpen);
+  const started = useUI((ui) => ui.started);
+  if (!started) return null;
+  return (
+    <button id="assistant-bubble" className={`ai-bubble${open ? ' open' : ''}`} title={open ? 'Close the assistant (I)' : 'AI assistant (I)'} aria-expanded={open} aria-controls="ai" onClick={() => app.toggleAssistant()}>
+      <span className="ai-bubble-icon" aria-hidden="true">{open ? '×' : '✦'}</span>
+      <Kbd hotkey={HOTKEYS.assistant} />
+    </button>
+  );
+}
+
 export function Assistant() {
   const app = useApp();
-  const open = useUI((ui) => ui.overlay === 'assistant');
+  const open = useUI((ui) => ui.assistantOpen);
   const [undo] = useState(() => new UndoStack());
   const undoLabels = useStore(undo.store, (s) => s.labels);
   const [threadId, setThreadId] = useState(() => crypto.randomUUID());
@@ -117,7 +131,7 @@ export function Assistant() {
         <strong>✦ Assistant</strong>
         <button id="ai-undo" title={undoLabels.length ? `Undo: ${undoLabels.at(-1)}` : 'Nothing to undo'} disabled={!undoLabels.length || isLoading} onClick={doUndo}>Undo</button>
         <button id="ai-new" title="Start a new conversation" onClick={reset}>New chat</button>
-        <button id="ai-close" className="icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
+        <button id="ai-close" className="icon" title="Close (Esc)" onClick={() => app.toggleAssistant(false)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
       </header>
       <div id="ai-log" className="ai-log" ref={log}>
         {!messages.length && (
@@ -166,12 +180,12 @@ export function Assistant() {
                   }
                   return null;
                 })}
+                {isLast && !isLoading && followUps.length > 0 && (
+                  <div className="ai-examples ai-followups" aria-label="Suggested next requests">
+                    {followUps.map((q) => <button key={q} onClick={() => { setNote(null); void sendMessage(q); }}>{q}</button>)}
+                  </div>
+                )}
               </div>
-              {isLast && !isLoading && followUps.length > 0 && (
-                <div className="ai-examples ai-followups" aria-label="Suggested next requests">
-                  {followUps.map((q) => <button key={q} onClick={() => { setNote(null); void sendMessage(q); }}>{q}</button>)}
-                </div>
-              )}
             </div>
           );
         })}

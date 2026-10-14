@@ -17,6 +17,7 @@ export interface HotkeyActions {
 export function useAppHotkeys(actions: HotkeyActions): void {
   const app = useApp();
   const overlay = useUI((ui) => ui.overlay);
+  const assistantOpen = useUI((ui) => ui.assistantOpen);
   const paramsVisible = useUI((ui) => ui.paramsVisible);
   const sceneIndex = useUI((ui) => ui.sceneIndex);
   const inGame = sceneIndex === app.state.gameIndex;
@@ -34,7 +35,7 @@ export function useAppHotkeys(actions: HotkeyActions): void {
       case 'notStudio': return !studioOpen && !nodesOpen;
       case 'nodesOpen': return nodesOpen;
       case 'paramsVisible': return paramsVisible && !nodesOpen;
-      case 'overlayOpen': return overlay !== null;
+      case 'overlayOpen': return overlay !== null || assistantOpen;
       case 'library': return overlay === 'library';
       case 'noLibrary': return overlay !== 'library' && !nodesOpen;
     }
