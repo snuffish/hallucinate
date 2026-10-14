@@ -81,6 +81,7 @@ function WidgetsMenu() {
   const bubbleShown = useLayout((l) => l.bubbleShown);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
+  const settingsFile = useRef<HTMLInputElement>(null);
   // Native popover: light dismiss and Esc for free. Placed under its button when it opens.
   useLayoutEffect(() => {
     const el = menu.current;
@@ -97,7 +98,7 @@ function WidgetsMenu() {
   }, []);
   return (
     <>
-      <button ref={button} id="widgets-menu-btn" className="icon" title="Show or hide widgets, reset the layout" aria-label="Widgets" popoverTarget="widgets-menu">☰</button>
+      <button ref={button} id="widgets-menu-btn" className="icon" title="Show or hide widgets, reset the layout, export or import your setup" aria-label="Widgets" popoverTarget="widgets-menu">☰</button>
       <div ref={menu} id="widgets-menu" className="widgets-menu" popover="auto" role="menu" aria-label="Widgets">
         <strong>Widgets</strong>
         {WIDGET_IDS.filter((id) => id !== 'hub').map((id) => (
@@ -110,6 +111,11 @@ function WidgetsMenu() {
         </label>
         <button id="reset-layout" onClick={() => { menu.current?.hidePopover(); app.resetLayout(); }}>Reset layout<Kbd hotkey={HOTKEYS.resetLayout} /></button>
         <small>Drag a widget by its title bar. Drop it on an edge of the screen to dock it there.</small>
+        <strong>Your setup</strong>
+        <button id="export-settings" title="Save your scenes, show, parameters, favourites and layout to a file" onClick={() => { menu.current?.hidePopover(); app.exportSettings(); }}>Export scenes &amp; settings</button>
+        <button id="import-settings" title="Replace them with an exported file (your current setup is downloaded first)" onClick={() => { menu.current?.hidePopover(); settingsFile.current?.click(); }}>Import…</button>
+        <input type="file" id="settings-file" accept="application/json,.json" hidden ref={settingsFile}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) void app.importSettings(f); e.target.value = ''; }} />
       </div>
     </>
   );

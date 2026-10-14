@@ -20,6 +20,13 @@ async function centreColour(page: Page): Promise<[number, number, number]> {
     return sum.map((v) => v / (d.length / 4)) as [number, number, number];
   }, png.toString('base64'));
 }
+// The controls fade out after 3 s without the mouse while music plays; moving it brings them back,
+// as it does for a user reaching for a button.
+async function clickWidget(page: Page, selector: string) {
+  await page.mouse.move(640, 360);
+  await page.mouse.move(650, 370);
+  await page.locator(selector).click();
+}
 const reddish = ([r, , b]: [number, number, number]) => r > b + 40;
 const bluish = ([r, , b]: [number, number, number]) => b > r + 40;
 
@@ -53,13 +60,13 @@ test('screen widget: the screen switches between your preview and the pinned Liv
   await expect.poll(() => centreColour(page).then(bluish), { timeout: 10_000 }).toBe(true);
 
   // Live: the screen shows what the projectors get (Red); the scene you browsed to stays the preview.
-  await page.locator('#screen-live').click();
+  await clickWidget(page, '#screen-live');
   await expect(page.locator('#screen-live')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#live-pin')).toContainText('on screen');
   await expect(page.locator('#screen-status')).toContainText('Showing Live: Red');
   await expect.poll(() => centreColour(page).then(reddish), { timeout: 10_000 }).toBe(true);
   await expect(page.locator('#scene-name')).toContainText('Blue');
 
-  await page.locator('#screen-preview').click();
+  await clickWidget(page, '#screen-preview');
   await expect.poll(() => centreColour(page).then(bluish), { timeout: 10_000 }).toBe(true);
 });

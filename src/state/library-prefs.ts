@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { Scene } from '../engine/scenes';
 import { KEYS, readJSON, writeJSON } from './persistence';
 
-const PrefsSchema = z.object({ favs: z.array(z.string()).default([]), off: z.array(z.string()).default([]) });
+export const PrefsSchema = z.object({ favs: z.array(z.string()).default([]), off: z.array(z.string()).default([]) });
 export type LibraryPrefs = z.infer<typeof PrefsSchema>;
 
 export const loadLibraryPrefs = (): LibraryPrefs => readJSON(KEYS.library, PrefsSchema, { favs: [], off: [] });

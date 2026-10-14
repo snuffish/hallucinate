@@ -12,11 +12,13 @@ import type { Scene } from '../engine/scenes';
 import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, type AppState, type LookKey, type SourceButton } from '../state/app-state';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
-import { KEYS, debouncedWriter, readString, writeJSON, writeString } from '../state/persistence';
-import { buildSceneList, paramKey, saveUserScenes, userScene } from '../state/scene-list';
+import { KEYS, debouncedWriter, flushAll, freeze, readString, remove, unfreeze, writeJSON, writeString } from '../state/persistence';
+import { buildSceneList, discardParked, paramKey, saveUserScenes, userScene, type ParkedScenes } from '../state/scene-list';
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type ScreenMode, type UIState } from '../state/ui-state';
+import { applyWrites, buildBundle, parseBundle } from './bundle';
+import { downloadFile, fileStamp } from './download';
 import { EditorCore } from './editor';
 import type { StudioSession } from './studio';
 import { Transport } from './transport';
@@ -86,6 +88,8 @@ export class AppController {
   readonly player: HTMLAudioElement;
   readonly transport: Transport;
   readonly sceneParams: ParamSpec[][] = [];
+  // Saved scenes / edits that didn't compile on this device; kept stored, listed in the library.
+  readonly parked: ParkedScenes;
   readonly tempo = new TempoClock();
   readonly editor: EditorCore;
   readonly pickers: Partial<Record<'sc' | 'yt', PickerApi>> = {};
@@ -105,6 +109,12 @@ export class AppController {
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly program: ProgramState;
   private readonly liveParams: Record<number, SceneUniforms> = {};
+  // Another tab imported settings: this one's state is stale, so it must not write, and reloads.
+  private readonly onStorage = (e: StorageEvent) => {
+    if (e.key !== KEYS.importedAt) return;
+    freeze();
+    location.reload();
+  };
   private readonly wake = () => {
     document.body.classList.remove('idle');
     clearTimeout(this.idleTimer);
@@ -118,6 +128,7 @@ export class AppController {
     this.renderer = new Renderer(canvas, []);   // the scene list is attached right below (same array)
     const list = buildSceneList(this.renderer);
     (this.renderer as unknown as { scenes: Scene[] }).scenes = list.scenes;
+    this.parked = list.parked;
     this.state = {
       scenes: list.scenes, gameIndex: list.gameIndex, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
       look: defaultLook(), clock: defaultClock(), activeSource: null,
@@ -158,7 +169,20 @@ export class AppController {
     this.wake();
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
-    if (this.ui.get().startupErrors.length) setTimeout(() => this.toast(`Couldn't compile your saved scene(s): ${this.ui.get().startupErrors.join(', ')}`, 6000), 500);
+    window.addEventListener('storage', this.onStorage);
+    setTimeout(() => { if (!this.disposed) this.startupNotice(); }, 500);
+  }
+
+  // What happened at startup: an import that just finished (its report is shown once) and saved
+  // scenes that don't compile here. Read late, so a controller disposed right away (StrictMode)
+  // doesn't swallow the report.
+  private startupNotice(): void {
+    const imported = readString(KEYS.importReport);
+    if (imported !== null) remove(KEYS.importReport);
+    const errors = this.ui.get().startupErrors;
+    const broken = errors.length ? `Couldn't compile your saved scene(s): ${errors.join(', ')} — kept in the library under "Doesn't compile here"` : '';
+    if (imported !== null) this.toast(`Imported ${imported}.${broken ? ` ${broken}.` : ''}`, broken ? 9000 : 5000);
+    else if (broken) this.toast(broken, 6000);
   }
 
   dispose(): void {
@@ -166,6 +190,7 @@ export class AppController {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
     for (const ev of ['mousemove', 'mousedown', 'keydown', 'touchstart']) window.removeEventListener(ev, this.wake);
+    window.removeEventListener('storage', this.onStorage);
     clearTimeout(this.idleTimer);
     clearTimeout(this.toastTimer);
     this.recorder?.stop();
@@ -369,12 +394,13 @@ export class AppController {
   // Appends a saved scene (editor "Save to library", assistant create_scene). Returns the index or an error.
   addUserScene(name: string, body: string): { index: number } | { error: string } {
     if (this.sceneByName(name) >= 0) return { error: `A scene called "${name}" already exists.` };
+    if (this.parked.userScenes.some((p) => p.name === name)) return { error: `A scene called "${name}" already exists (it doesn't compile on this device).` };
     const scene = userScene(name, body);
     const error = this.renderer.check(scene.frag, name);
     if (error) return { error };
     const index = this.state.scenes.push(scene) - 1;
     this.setSceneParams(index, scene.params);
-    saveUserScenes(this.state.scenes);
+    saveUserScenes(this.state.scenes, this.parked);
     this.bumpScenes();
     return { index };
   }
@@ -383,9 +409,26 @@ export class AppController {
     const s = this.state.scenes[index];
     if (!s?.user) return;
     s.removed = true;
-    saveUserScenes(this.state.scenes);
+    saveUserScenes(this.state.scenes, this.parked);
     if (this.state.clock.scene === index) this.setScene(0);
     this.bumpScenes();
+  }
+
+  // A parked scene or edit (didn't compile here) is deleted for good.
+  discardParked(kind: 'scene' | 'edit', name: string): void {
+    discardParked(this.parked, kind, name, this.state.scenes);
+    this.bumpScenes();
+  }
+
+  // Loads a parked scene into "My Shader" so it can be fixed; "Save to library" under the same name
+  // then replaces the parked copy. Nothing is stored until it compiles.
+  openParkedInEditor(name: string): void {
+    const p = this.parked.userScenes.find((x) => x.name === name);
+    if (!p) return;
+    this.editor.customCode = p.body;
+    this.editor.libraryName = name;
+    this.setScene(this.state.customIndex);
+    this.setOverlay('editor');
   }
 
   // ---------- Screen: preview or Live ----------
@@ -564,9 +607,10 @@ export class AppController {
     this.tempo.reset();
   }
 
-  // Dropped anywhere: audio plays, pictures and videos become the media.
+  // Dropped anywhere: audio plays, pictures and videos become the media, a settings export is imported.
   drop(file: File | undefined): void {
     if (!file) return;
+    if (file.type === 'application/json' || file.name.toLowerCase().endsWith('.json')) return void this.importSettings(file);
     if (isMediaFile(file) && !file.type.startsWith('audio/')) void this.loadMedia(file);
     else void this.playFile(file);
   }
@@ -661,6 +705,40 @@ export class AppController {
     if (this.tempo.onDetectedBeat(c.clock)) this.hooks.onTempoBeat?.();
   }
 
+  // ---------- Settings export / import (src/app/bundle.ts) ----------
+
+  exportSettings(): void {
+    this.downloadSettings(`hallucinate-${fileStamp()}.json`);
+    this.toast('Exported your scenes & settings');
+  }
+
+  private downloadSettings(name: string): void {
+    flushAll();   // the latest slider drag / graph edit belongs in the file
+    downloadFile(new Blob([JSON.stringify(buildBundle(), null, 2)], { type: 'application/json' }), name);
+  }
+
+  // Replaces the stored state with the file's and reloads, so every panel starts from it. The
+  // current state is downloaded first as a backup. Nothing is written unless the whole file is
+  // valid, and while it is written nothing else may write (a stale debounced writer would
+  // overwrite it on the way out).
+  async importSettings(file: File): Promise<void> {
+    let text: string;
+    try { text = await file.text(); } catch { return this.toast(`Couldn't read "${file.name}".`); }
+    const parsed = parseBundle(text);
+    if (!parsed.ok) return this.toast(parsed.error, 7000);
+    const { writes, summary } = parsed.bundle;
+    if (!confirm(`Import "${file.name}"?\n\nIt replaces your ${summary}.\n\nYour current setup is downloaded first as a backup. The app reloads, and other open Hallucinate tabs reload too.`)) return;
+    this.downloadSettings(`hallucinate-before-import-${fileStamp()}.json`);
+    freeze();
+    try {
+      applyWrites([...writes, [KEYS.importReport, summary], [KEYS.importedAt, String(Date.now())]]);
+    } catch (err) {
+      unfreeze();
+      return this.toast(`Import failed: ${(err as Error).message} Nothing was changed.`, 7000);
+    }
+    location.reload();
+  }
+
   // ---------- Recording ----------
 
   toggleRecording(): void {
@@ -674,11 +752,7 @@ export class AppController {
     recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     recorder.onstop = () => {
       const blob = new Blob(chunks, { type: recorder.mimeType });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `hallucinate-${new Date().toISOString().replace(/[:.]/g, '-')}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+      downloadFile(blob, `hallucinate-${fileStamp()}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`);
       this.recorder = null;
       this.ui.set({ recording: false });
       if (!this.disposed) this.toast('Recording saved');

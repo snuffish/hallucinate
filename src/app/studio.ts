@@ -25,7 +25,7 @@ const CueSchema = z.object({
   values: z.record(z.string(), ParamValueSchema).default({}),
   look: z.record(z.string(), z.number()).default({}),
 });
-const ShowSchema = z.object({
+export const ShowSchema = z.object({
   cues: z.array(CueSchema).default([]),
   mode: z.enum(['cut', 'fade']).default('fade'),
   seconds: z.number().default(1.5),

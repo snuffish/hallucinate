@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Renderer } from '../engine/renderer';
 import { SCENES } from '../engine/scenes';
 import { KEYS } from './persistence';
-import { buildSceneList, loadUserScenes, paramKey, saveSceneEdit, saveUserScenes, sceneByName, userScene } from './scene-list';
+import { buildSceneList, discardParked, loadUserScenes, paramKey, saveSceneEdit, saveUserScenes, sceneByName, userScene, type ParkedScenes } from './scene-list';
 
 // The scene list is the cross-window contract: indices must stay stable, so removal is a flag.
 describe('scene list', () => {
@@ -13,6 +13,8 @@ describe('scene list', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
   const renderer = { check: () => null } as unknown as Renderer;   // every shader "compiles"
+  const failing = { check: (frag: string) => (frag.includes('nope') ? 'ERROR: 0:1: bad' : null) } as unknown as Renderer;
+  const noParked = (): ParkedScenes => ({ userScenes: [], sceneEdits: {} });
 
   it('appends built-ins, the two editor slots, then saved scenes, and keys the first ten visuals', () => {
     store.set(KEYS.userScenes, JSON.stringify([{ name: 'Mine One', body: 'void main() { fragColor = vec4(1.); }' }]));
@@ -29,16 +31,54 @@ describe('scene list', () => {
 
   it('reports saved scenes that no longer compile instead of failing', () => {
     store.set(KEYS.userScenes, JSON.stringify([{ name: 'Broken', body: 'nope' }]));
-    const failing = { check: (frag: string) => (frag.includes('nope') ? 'ERROR: 0:1: bad' : null) } as unknown as Renderer;
     const list = buildSceneList(failing);
     expect(list.errors).toEqual(['Broken']);
     expect(list.scenes.some((s) => s.name === 'Broken')).toBe(false);
+    expect(list.parked.userScenes).toEqual([{ name: 'Broken', body: 'nope' }]);
+  });
+
+  // An import from another GPU or app version must not lose scenes the first time anything is saved.
+  it('keeps a scene that failed to compile stored when another scene is saved', () => {
+    store.set(KEYS.userScenes, JSON.stringify([{ name: 'Broken', body: 'nope' }, { name: 'Fine', body: 'void main(){}' }]));
+    const list = buildSceneList(failing);
+    list.scenes.push(userScene('New', 'void main(){}'));
+    saveUserScenes(list.scenes, list.parked);
+    expect(loadUserScenes().map((s) => s.name)).toEqual(['Fine', 'New', 'Broken']);
+  });
+
+  it('un-parks a scene saved again under its name, and deletes one on request', () => {
+    store.set(KEYS.userScenes, JSON.stringify([{ name: 'Broken', body: 'nope' }, { name: 'Other', body: 'nope too' }]));
+    const list = buildSceneList(failing);
+    list.scenes.push(userScene('Broken', 'void main(){}'));   // fixed in the editor, saved under the same name
+    saveUserScenes(list.scenes, list.parked);
+    expect(list.parked.userScenes.map((p) => p.name)).toEqual(['Other']);
+    expect(loadUserScenes()).toEqual([{ name: 'Broken', body: 'void main(){}' }, { name: 'Other', body: 'nope too' }]);
+    discardParked(list.parked, 'scene', 'Other', list.scenes);
+    expect(loadUserScenes().map((s) => s.name)).toEqual(['Broken']);
+  });
+
+  it('keeps a built-in edit that failed to compile until that built-in is edited or the edit is discarded', () => {
+    const [a, b] = [SCENES[0]!.name, SCENES[1]!.name];
+    store.set(KEYS.sceneEdits, JSON.stringify({ [a]: 'nope', [b]: 'nope' }));
+    const list = buildSceneList(failing);
+    expect(list.parked.sceneEdits).toEqual({ [a]: 'nope', [b]: 'nope' });
+    const other = list.scenes[2]!;
+    other.body = 'changed';
+    saveSceneEdit(other, list.scenes, list.parked);      // editing a third scene keeps both
+    expect(JSON.parse(store.get(KEYS.sceneEdits)!)).toEqual({ [a]: 'nope', [b]: 'nope', [other.name]: 'changed' });
+    const sa = list.scenes[0]!;
+    sa.body = 'mine now';
+    saveSceneEdit(sa, list.scenes, list.parked);          // a new edit of A supersedes the parked one
+    expect(JSON.parse(store.get(KEYS.sceneEdits)!)).toMatchObject({ [a]: 'mine now', [b]: 'nope' });
+    discardParked(list.parked, 'edit', b, list.scenes);
+    expect(JSON.parse(store.get(KEYS.sceneEdits)!)).not.toHaveProperty(b);
+    for (const s of [other, sa]) { s.body = s.original!; saveSceneEdit(s, list.scenes, list.parked); }   // SCENES is shared module state
   });
 
   it('soft-removes user scenes so every other index keeps its meaning', () => {
     const scenes = [userScene('A', 'void main(){}'), userScene('B', 'void main(){}'), userScene('C', 'void main(){}')];
     scenes[1]!.removed = true;
-    saveUserScenes(scenes);
+    saveUserScenes(scenes, noParked());
     expect(loadUserScenes().map((s) => s.name)).toEqual(['A', 'C']);
     expect(scenes[2]!.name).toBe('C');                 // index 2 still means C
     expect(sceneByName(scenes, 'B')).toBe(-1);         // removed scenes are not found by name
@@ -49,11 +89,11 @@ describe('scene list', () => {
     const list = buildSceneList(renderer);
     const s = list.scenes[0]!;
     s.body = 'changed';
-    saveSceneEdit(s, list.scenes);
+    saveSceneEdit(s, list.scenes, list.parked);
     expect(s.edited).toBe(true);
     expect(JSON.parse(store.get(KEYS.sceneEdits)!)).toEqual({ [s.name]: 'changed' });
     s.body = s.original!;
-    saveSceneEdit(s, list.scenes);
+    saveSceneEdit(s, list.scenes, list.parked);
     expect(s.edited).toBe(false);
     expect(JSON.parse(store.get(KEYS.sceneEdits)!)).toEqual({});
   });
