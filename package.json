@@ -2,8 +2,37 @@
   "name": "hallucinate",
   "version": "1.0.0",
   "description": "Psychedelic, audio-reactive WebGL visuals for your music",
+  "keywords": [
+    "webgl2",
+    "glsl",
+    "shaders",
+    "audio-visualizer",
+    "music-visualizer",
+    "audio-reactive",
+    "vj",
+    "generative-art",
+    "creative-coding",
+    "live-coding",
+    "web-audio-api",
+    "react",
+    "typescript",
+    "vite"
+  ],
+  "homepage": "https://github.com/snuffish/hallucinate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/snuffish/hallucinate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/snuffish/hallucinate/issues"
+  },
+  "license": "MIT",
+  "author": "Snuffish",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "dev": "vite",
     "start": "vite",

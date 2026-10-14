@@ -3,3 +3,8 @@ dist/
 perf/results/
 playwright-report/
 test-results/
+.env
+.env.*
+!.env.example
+*.local
+.DS_Store
