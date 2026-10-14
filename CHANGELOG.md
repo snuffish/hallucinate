@@ -4,6 +4,8 @@
 
 ### Changed
 
+- The assistant is a detached chat bubble at the bottom next to the panel, toggled with the bubble or `I`; it no
+  longer replaces the control panel and can stay open next to the other panels.
 - The assistant suggests three follow-up requests after every reply, shown as chips under it (the model ends its
   reply with a `FOLLOW-UPS:` line that the panel turns into buttons).
 - The whole UI is now React 19 + TypeScript. No vanilla JavaScript remains in `src/`; the engines kept their

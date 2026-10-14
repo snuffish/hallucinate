@@ -6,7 +6,7 @@ import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
 import type { Look, SourceButton } from './app-state';
 
-export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'assistant' | 'soundcloud' | 'youtube' | null;
+export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | null;
 
 export interface Meters { bass: number; mid: number; high: number; bright: number; centroid: number; beat: number }
 export type MoodLabel = '' | 'mood: calm' | 'mood: groovy' | 'mood: energetic';
@@ -44,6 +44,7 @@ export interface UIState {
   moodLabel: MoodLabel;
   toneTitle: string;
   overlay: Overlay;
+  assistantOpen: boolean;   // the chat bubble; independent of the overlays
   panelCollapsed: boolean;
   paramsVisible: boolean;
   paramsCollapsed: boolean;
@@ -72,6 +73,7 @@ export const initialUIState = (look: Look): UIState => ({
   moodLabel: '',
   toneTitle: '',
   overlay: null,
+  assistantOpen: false,
   panelCollapsed: false,
   paramsVisible: false,
   paramsCollapsed: false,

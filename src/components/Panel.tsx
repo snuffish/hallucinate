@@ -16,7 +16,6 @@ export interface PanelActions {
   onOpenEditor: () => void;
   onOpenVisualMaker: () => void;
   onOpenStudio: () => void;
-  onOpenAssistant: () => void;
 }
 
 export function Panel(a: PanelActions) {
@@ -182,7 +181,6 @@ function ActionsGroup(a: PanelActions) {
       <button id="code" onClick={a.onOpenEditor}>Code<Kbd hotkey={HOTKEYS.editor} /></button>
       <button id="visual" onClick={a.onOpenVisualMaker}>Visual maker<Kbd hotkey={HOTKEYS.visualMaker} /></button>
       <button id="studio-open" onClick={a.onOpenStudio}>Studio &amp; projector<Kbd hotkey={HOTKEYS.studio} /></button>
-      <button id="assistant-open" className="ai-open" onClick={a.onOpenAssistant}>✦ AI assistant<Kbd hotkey={HOTKEYS.assistant} /></button>
     </div>
   );
 }

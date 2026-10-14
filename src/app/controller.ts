@@ -96,7 +96,7 @@ export class AppController {
     clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
       const ui = this.ui.get();
-      if (this.audio.kind && !ui.overlay && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
+      if (this.audio.kind && !ui.overlay && !ui.assistantOpen && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
     }, 3000);
   };
 
@@ -191,6 +191,14 @@ export class AppController {
 
   toggleOverlay(overlay: Exclude<Overlay, null>): void {
     this.setOverlay(this.overlay === overlay ? null : overlay);
+  }
+
+  // The assistant floats in its own bubble and can stay open next to any overlay.
+  toggleAssistant(open = !this.ui.get().assistantOpen): void {
+    if (this.ui.get().assistantOpen === open) return;
+    if (!open && document.activeElement instanceof HTMLElement && document.activeElement.closest('#ai')) document.activeElement.blur();
+    this.ui.set({ assistantOpen: open });
+    this.wake();
   }
 
   togglePanel(): void {

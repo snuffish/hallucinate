@@ -39,6 +39,16 @@ test('every panel opens with its key, shows key badges, and closes with Escape',
     await page.keyboard.press('Escape');
     await expect(page.locator(id)).toBeHidden();
   }
+  // The assistant is a detached bubble: it opens next to the panel and closes with Escape or the bubble.
+  await page.keyboard.press('i');
+  await expect(page.locator('#ai')).toBeVisible();
+  await expect(page.locator('#panel')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#ai')).toBeHidden();
+  await page.locator('#assistant-bubble').click();
+  await expect(page.locator('#ai')).toBeVisible();
+  await page.locator('#assistant-bubble').click();
+  await expect(page.locator('#ai')).toBeHidden();
   // The studio pins the main canvas over its Live monitor instead of moving it.
   await page.keyboard.press('o');
   await expect(page.locator('#studio')).toBeVisible();
@@ -46,7 +56,7 @@ test('every panel opens with its key, shows key badges, and closes with Escape',
   await page.keyboard.press('Escape');
   await expect(page.locator('#gl')).not.toHaveAttribute('style', /width: \d/);
   // Badges on the panel's bound buttons.
-  for (const id of ['#open-library', '#play-game', '#code', '#visual', '#studio-open', '#assistant-open', '#randomize', '#fullscreen', '#record']) {
+  for (const id of ['#open-library', '#play-game', '#code', '#visual', '#studio-open', '#assistant-bubble', '#randomize', '#fullscreen', '#record']) {
     await expect(page.locator(`${id} .kbd`)).toHaveCount(1);
   }
 });

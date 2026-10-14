@@ -6,7 +6,7 @@ import { HotkeysProvider } from '@tanstack/react-hotkeys';
 import { useEffect, useRef } from 'react';
 import { AppProvider, useApp, useUI } from './AppContext';
 import type { AppController } from './controller';
-import { Assistant } from '../components/Assistant';
+import { Assistant, AssistantBubble } from '../components/Assistant';
 import { Editor } from '../components/Editor';
 import { Hud } from '../components/Hud';
 import { Library } from '../components/Library';
@@ -72,8 +72,8 @@ function Shell({ app }: { app: AppController }) {
         onOpenEditor={() => app.toggleOverlay('editor')}
         onOpenVisualMaker={() => app.toggleOverlay('nodes')}
         onOpenStudio={() => app.toggleOverlay('studio')}
-        onOpenAssistant={() => app.toggleOverlay('assistant')}
       />
+      <AssistantBubble />
       <ParamOverlay />
       <Library onEdit={(i) => { app.setScene(i); app.setOverlay('editor'); }} />
       <Editor />
@@ -106,7 +106,7 @@ function Hotkeys() {
     restartGame: () => app.game.reset(),
     game: () => app.setScene(app.state.gameIndex),
     toggleLibrary: () => app.toggleOverlay('library'),
-    toggleAssistant: () => app.toggleOverlay('assistant'),
+    toggleAssistant: () => app.toggleAssistant(),
     toggleEditor: () => app.toggleOverlay('editor'),
     toggleVisualMaker: () => app.toggleOverlay('nodes'),
     toggleStudio: () => app.toggleOverlay('studio'),
@@ -116,7 +116,15 @@ function Hotkeys() {
     toggleRecording: () => app.toggleRecording(),
     toggleAuto: () => app.toggleAuto(),
     randomize: () => app.randomize(),
-    closeOverlay: () => { if (!app.hooks.escape?.()) app.setOverlay(null); },
+    // Esc: leave a text field first, then close the open overlay, then the assistant bubble.
+    closeOverlay: () => {
+      if (app.hooks.escape?.()) return;
+      const active = document.activeElement;
+      // A draft in the assistant's composer is protected: Esc leaves the field first, a second Esc closes.
+      if (active instanceof HTMLTextAreaElement && active.closest('#ai') && active.value.trim()) { active.blur(); return; }
+      if (app.overlay) app.setOverlay(null);
+      else app.toggleAssistant(false);
+    },
     take: () => app.hooks.take?.(),
     blackout: () => app.hooks.blackout?.(),
     studioStep: (dir) => app.hooks.studioStep?.(dir),

@@ -234,7 +234,7 @@ in OBS (*Window Capture*), or use *Record* here.
 
 <img src="docs/screenshots/assistant.jpg" alt="The assistant panel over a running scene, with example prompts and the subscription backend connected" width="100%">
 
-A chat panel (✦ AI assistant, or I) where Claude creates and edits scenes for you, right in the app: it reads a scene's
+A chat bubble at the bottom, next to the panel (✦, or I) that opens a panel where Claude creates and edits scenes for you, right in the app, while everything else stays where it is: it reads a scene's
 code, writes or fixes it (and sees its own compile errors), creates new scenes in your library, sets live parameters
 and the look sliders, switches scenes, and looks at a rendered frame to check its work. Every change shows up live, and
 **Undo** in the panel reverts the assistant's last change (edits, new scenes, parameters, look); built-in scenes can also
