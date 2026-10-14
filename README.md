@@ -44,7 +44,7 @@ modifier. The full list is at the bottom of the panel and in [Keys](#%EF%B8%8F-k
 - [Scenes](#-scenes) · [Scene library](#-scene-library--press-l) · [Beat Racer](#-beat-racer-game--press-g)
 - [Code your own](#-code-your-own--press-e) · [Live parameters](#-live-parameters--press-p) · [Visual maker](#-visual-maker--press-n)
 - [Media](#%EF%B8%8F-media--drop-an-image-or-video) · [Studio & projector](#-studio--projector--press-o) · [AI assistant](#-ai-assistant--press-i)
-- [Keys](#%EF%B8%8F-keys) · [How it works](#%EF%B8%8F-how-it-works) · [Development](#%EF%B8%8F-development) · [Web demo](#-web-demo) · [License](#-license)
+- [Back up & move your setup](#-back-up--move-your-setup) · [Keys](#%EF%B8%8F-keys) · [How it works](#%EF%B8%8F-how-it-works) · [Development](#%EF%B8%8F-development) · [Web demo](#-web-demo) · [License](#-license)
 
 ## ✨ At a glance
 
@@ -305,6 +305,24 @@ numbers straight into unconnected inputs. The result renders live behind the gra
 Wires are colour-coded by type (white = number, cyan = position, pink = colour); mismatched types are converted
 automatically. *Examples…* loads ready-made graphs, and *Send to code* turns the graph into GLSL in the code editor
 so you can keep going by hand. Graphs save automatically. `Delete` removes the selected block.
+
+## 💾 Back up & move your setup
+
+**☰ → Export scenes & settings** saves everything you made and set up to one `.json` file: your saved scenes, your
+edits to built-in scenes, *My Shader*, the visual maker graph, live parameter values, the Studio show (cues, plan,
+autopilot and director settings), favourites and the auto-switch rotation, volume and *pitch follows tempo*, the
+widget layout and *Use the video's sound*. It doesn't include recently played tracks, the Beat Racer high score, the
+loaded media, or the Look sliders, which aren't saved between sessions anyway.
+
+**☰ → Import…** (or drop the `.json` file on the page) replaces those with the file's and reloads the app. Before
+anything changes, your current setup is downloaded as `hallucinate-before-import-….json`, so an import can always be
+undone by importing that file. Sections missing from the file stay as they are. A file that doesn't check out (made by a
+newer version, or edited by hand into something invalid) is refused and nothing is changed. Other open Hallucinate tabs
+reload with the import, so they can't write their old state back.
+
+Shaders that don't compile on this computer (another GPU or driver, or a different app version) aren't lost: the
+library lists them under **Doesn't compile here**, where *Fix in editor* loads one into *My Shader*; save it to the
+library under the same name once it works. They stay saved, and in your exports, until you delete them.
 
 ## ⌨️ Keys
 
