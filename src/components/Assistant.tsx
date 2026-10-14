@@ -5,9 +5,9 @@
 import { createChatClientOptions } from '@tanstack/ai-client';
 import { fetchServerSentEvents, useChat } from '@tanstack/ai-react';
 import { Markdown } from '@tanstack/markdown/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createRef, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
-import { useApp, useUI } from '../app/AppContext';
+import { useApp, useLayout, useUI } from '../app/AppContext';
 import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
 import { clientTools } from '../assistant/client-tools';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
@@ -17,8 +17,12 @@ import { ContentPartsSchema, DONE_VERBS, VERBS, type ToolName } from '../assista
 import { UndoStack } from '../assistant/undo';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
+import { chatPlacement, effective } from '../state/layout';
 import { useStore } from '../state/store';
 import { HelpButton } from './Help';
+import { rectOf } from './widgets/drop';
+import { usePointerDrag } from './widgets/usePointerDrag';
+import { useFloatPlacement, useNarrow } from './widgets/Widget';
 
 const InfoSchema = z.object({ backend: z.enum(['api', 'claude-code', 'none']), model: z.string().nullable().optional(), setup: z.string().optional() });
 const UNDO_NOTE = '(The user pressed Undo and reverted your change: ';
@@ -38,14 +42,81 @@ function imagesOf(output: unknown): string[] {
   return parts.success ? parts.data.filter((p): p is Extract<typeof p, { type: 'image' }> => p.type === 'image').map((p) => `data:${p.source.mimeType};base64,${p.source.value}`) : [];
 }
 
-// The floating bubble that opens and closes the assistant, in the corner, detached from the panel.
+// A moved bubble opens the chat beside itself, toward the side with more room. With the bubble in
+// its default spot (beside the left dock) the stylesheet places both.
+const chatBox = createRef<HTMLElement>();
+
+function placeChat(bubble: HTMLElement | null): void {
+  const chat = chatBox.current;
+  if (!chat || !bubble || chat.hidden) return;
+  const p = chatPlacement(rectOf(bubble), { width: chat.offsetWidth, height: Math.min(640, window.innerHeight - 32) }, { width: window.innerWidth, height: window.innerHeight });
+  Object.assign(chat.style, { left: `${p.left}px`, top: `${p.top}px`, bottom: 'auto', height: `${p.maxHeight}px` });
+}
+function unplaceChat(): void {
+  const chat = chatBox.current;
+  if (chat) chat.style.left = chat.style.top = chat.style.bottom = chat.style.height = '';
+}
+
+// The floating bubble that opens and closes the assistant. Drag it anywhere to get it out of the way;
+// a click (not a drag) toggles the chat.
 export function AssistantBubble() {
   const app = useApp();
   const open = useUI((ui) => ui.assistantOpen);
   const started = useUI((ui) => ui.started);
-  if (!started) return null;
+  const narrow = useNarrow();
+  const place = useLayout((l) => effective(l, narrow).bubble);
+  const dragging = useUI((ui) => ui.dragging === 'bubble');
+  const shown = useLayout((l) => l.bubbleShown);
+  const root = useRef<HTMLButtonElement>(null);
+  useFloatPlacement(root, started && shown && place.kind === 'float' ? place : null);   // the bubble mounts once a source plays
+  const drag = useRef<{ dx: number; dy: number; style: string } | null>(null);
+  const restore = () => {
+    const el = root.current;
+    if (el && drag.current) el.style.cssText = drag.current.style;
+    drag.current = null;
+    app.setDragging(null);
+  };
+  const handlers = usePointerDrag({
+    onStart: (_e, grab) => {
+      const el = root.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      drag.current = { dx: grab.x, dy: grab.y, style: el.style.cssText };
+      Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, bottom: 'auto' });
+      app.setDragging('bubble');
+    },
+    onMove: (e) => {
+      const el = root.current, d = drag.current;
+      if (!el || !d) return;
+      el.style.left = `${Math.min(Math.max(0, e.clientX - d.dx), window.innerWidth - el.offsetWidth)}px`;
+      el.style.top = `${Math.min(Math.max(0, e.clientY - d.dy), window.innerHeight - el.offsetHeight)}px`;
+      placeChat(el);   // an open chat moves along
+    },
+    onEnd: () => {
+      const el = root.current;
+      if (!el || !drag.current) return restore();
+      const rect = rectOf(el);
+      restore();
+      app.moveBubble(rect);
+    },
+    onCancel: () => { restore(); if (place.kind === 'auto') unplaceChat(); else placeChat(root.current); },
+  }, { enabled: !narrow, ignoreButtons: false });
+
+  // The chat follows a moved bubble: on open, after a move, on resize.
+  useLayoutEffect(() => {
+    if (place.kind !== 'float' || !open || !started || !shown) { unplaceChat(); return; }
+    const fit = () => placeChat(root.current);
+    fit();
+    window.addEventListener('resize', fit);
+    document.addEventListener('fullscreenchange', fit);
+    return () => { window.removeEventListener('resize', fit); document.removeEventListener('fullscreenchange', fit); };
+  }, [place, open, started, shown]);
+
+  if (!started || !shown) return null;
   return (
-    <button id="assistant-bubble" className={`ai-bubble${open ? ' open' : ''}`} title={open ? 'Close the assistant (I)' : 'AI assistant (I)'} aria-expanded={open} aria-controls="ai" onClick={() => app.toggleAssistant()}>
+    <button ref={root} id="assistant-bubble" className={`ai-bubble${open ? ' open' : ''}${place.kind === 'float' ? ' moved' : ''}${dragging ? ' dragging' : ''}`}
+      title={`${open ? 'Close the assistant (I)' : 'AI assistant (I)'}${narrow ? '' : ' · drag to move'}`} aria-expanded={open} aria-controls="ai"
+      onPointerDown={handlers.onPointerDown} onClickCapture={handlers.onClickCapture} onClick={() => app.toggleAssistant()}>
       <span className="ai-bubble-icon" aria-hidden="true">{open ? '×' : '✦'}</span>
       <Kbd hotkey={HOTKEYS.assistant} />
     </button>
@@ -114,7 +185,7 @@ export function Assistant() {
   const status = isLoading ? 'Working…' : idle;
 
   return (
-    <aside id="ai" className="ai" hidden={!open}>
+    <aside id="ai" ref={chatBox} className="ai" hidden={!open}>
       <header>
         <strong>✦ Assistant</strong>
         <button id="ai-undo" title={undoLabels.length ? `Undo: ${undoLabels.at(-1)}` : 'Nothing to undo'} disabled={!undoLabels.length || isLoading} onClick={doUndo}>Undo</button>

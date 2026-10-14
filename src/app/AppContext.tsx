@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { AppController } from './controller';
 import { useStore } from '../state/store';
+import type { Layout } from '../state/layout';
 import type { UIState } from '../state/ui-state';
 
 const AppContext = createContext<AppController | null>(null);
@@ -15,4 +16,9 @@ export function useApp(): AppController {
 // Subscribe to one slice of the UI state. Components re-render only when their slice changes.
 export function useUI<S>(selector: (ui: UIState) => S): S {
   return useStore(useApp().ui, selector);
+}
+
+// Subscribe to one slice of the widget layout.
+export function useLayout<S>(selector: (layout: Layout) => S): S {
+  return useStore(useApp().layout, selector);
 }

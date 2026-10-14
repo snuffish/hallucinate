@@ -9,7 +9,7 @@ import { Director, DIRECTOR_BEATS, DIRECTOR_SECONDS } from '../director/director
 import { HOTKEYS, CUE_DIGITS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { useStore } from '../state/store';
-import { ParamOverlay } from './ParamOverlay';
+import { StudioParams } from './ParamOverlay';
 import { HelpButton } from './Help';
 
 export function Studio() {
@@ -203,7 +203,7 @@ export function Studio() {
             </div>
           </header>
           <div id="st-params-dock" className="params-dock">
-            {open && <ParamOverlay docked />}
+            {open && <StudioParams />}
             <p className="dock-empty">This scene has no live parameters.</p>
           </div>
         </section>

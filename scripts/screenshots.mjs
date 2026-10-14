@@ -13,7 +13,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, dev
 const shot = (name, opts = {}) => page.screenshot({ path: `${out}/${name}.jpg`, type: 'jpeg', quality: 86, ...opts });
 const settle = (ms) => page.waitForTimeout(ms);
 const press = async (key, ms = 400) => { await page.keyboard.press(key); await settle(ms); };
-// The panel auto-hides after 3 s without mouse movement: wake it before UI shots.
+// The controls auto-hide after 3 s without mouse movement: wake them before UI shots.
 const wake = async () => { await page.mouse.move(700, 450); await page.mouse.move(720, 460); await settle(250); };
 
 await page.goto(url);
@@ -23,15 +23,15 @@ await shot('start', { clip: { x: 0, y: 250, width: 1440, height: 400 } });
 await page.getByRole('button', { name: 'Play demo beat' }).click();
 await press('2', 3500);                               // Hyper Tunnel
 await wake();
-await shot('main');                                   // panel + scene + parameters overlay
+await shot('main');                                   // widgets + scene + parameters
 
 // Gallery: a few scenes, controls hidden, trails built up.
-await page.addStyleTag({ content: '#params, .panel, #toast { display: none !important; }' });
+await page.addStyleTag({ content: '#widgets, #toast { display: none !important; }' });
 const gallery = [['2', 'hyper-tunnel'], ['3', 'mandala-bloom'], ['8', 'voronoi-glass'], ['0', 'neon-loop']];
 for (const [key, name] of gallery) { await press(key, 3500); await shot(name); }
 await press('ArrowRight', 4500); await shot('star-nest');   // index 10, after Neon Loop
 await press('ArrowRight', 300); await press('ArrowRight', 3500); await shot('liquid-blobs');
-await page.addStyleTag({ content: '#params, .panel, #toast { display: revert !important; }' });
+await page.addStyleTag({ content: '#widgets, #toast { display: revert !important; }' });
 
 await press('2', 2500);
 await wake();

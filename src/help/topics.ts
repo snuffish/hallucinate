@@ -16,13 +16,16 @@ const NEEDS_SERVER = STATIC_DEMO ? [STATIC_DEMO_NOTE] : [];
 export const HELP_TOPICS = {
   panel: {
     id: 'panel',
-    title: 'The control panel',
+    title: 'Controls & layout',
     body: [
       'Pick a sound source, then shape the visuals: every scene reacts to the bass, mids and highs of whatever is playing.',
-      'The panel fades away while the music plays and you leave the mouse alone; move it to bring the controls back.',
+      'Each group of controls is its own widget. Drag one by its title bar: drop it on an edge of the screen to dock it there, or anywhere else to let it float. Double-click a title bar to put that widget back. The layout is remembered.',
+      'Resize a widget by its corner, or in a side dock by its bottom edge; drag the inner edge of a side dock to make the whole dock wider. Double-click a grip for the natural size.',
+      'Close widgets you don\'t need with ×; bring them back (and the AI assistant\'s bubble) from the ☰ Widgets menu, which also resets the layout.',
+      'The controls fade away while the music plays and you leave the mouse alone; move it to bring them back.',
       'Every button with a shortcut shows its key. Hold a modifier to see which badges light up.',
     ],
-    hotkeys: ['help', 'hidePanel', 'fullscreen', 'randomize', 'record'],
+    hotkeys: ['help', 'hidePanel', 'resetLayout', 'fullscreen', 'randomize', 'record'],
   },
   sources: {
     id: 'sources',
@@ -100,7 +103,7 @@ export const HELP_TOPICS = {
     title: 'Live parameters',
     body: [
       'The controls this scene exposes. Changes apply instantly and are remembered per scene.',
-      'Double-click a slider to reset it; Reset resets them all. Drag the title bar to move the overlay, double-click it to send it back.',
+      'Double-click a slider to reset it; Reset resets them all. Drag the title bar to move or dock the widget, double-click it to send it back.',
     ],
     hotkeys: ['params'],
   },

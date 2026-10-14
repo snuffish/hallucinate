@@ -42,7 +42,7 @@ test('every panel opens with its key, shows key badges, and closes with Escape',
   // The assistant is a detached bubble: it opens next to the panel and closes with Escape or the bubble.
   await page.keyboard.press('i');
   await expect(page.locator('#ai')).toBeVisible();
-  await expect(page.locator('#panel')).toBeVisible();
+  await expect(page.locator('#w-source')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#ai')).toBeHidden();
   await page.locator('#assistant-bubble').click();

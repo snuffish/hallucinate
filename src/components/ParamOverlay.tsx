@@ -1,19 +1,17 @@
-// The Parameters overlay: one control per `@param` of the scene on screen. Sliders for numbers
-// (with an editable value), checkboxes for bools, colour pickers for colours. Drag it by its header;
-// it remembers the spot. Inside the studio it's a dock and stays put.
+// The Parameters: one control per `@param` of the scene on screen. Sliders for numbers (with an
+// editable value), checkboxes for bools, colour pickers for colours. Outside the studio it is a
+// widget (drag it, dock it, collapse it with P); inside the studio the same list sits in the
+// studio's parameters dock.
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import { z } from 'zod';
+import { useState, type CSSProperties } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import type { ParamSpec, ParamValue, VecParamSpec, FloatParamSpec } from '../engine/params';
 import { HOTKEYS } from '../hotkeys/registry';
-import { Kbd } from '../hotkeys/Kbd';
-import { KEYS, readJSON, remove, writeJSON } from '../state/persistence';
+import type { WidgetLayout } from '../state/layout';
 import { HelpButton } from './Help';
+import { Widget } from './widgets/Widget';
 
 const AXES = ['x', 'y', 'z', 'w'];
-const PosSchema = z.object({ x: z.number(), y: z.number() });
-type Pos = z.infer<typeof PosSchema>;
 
 const fmt = (v: number, spec: { int: boolean; step: number }) => {
   if (spec.int) return String(Math.round(v));
@@ -23,68 +21,46 @@ const fmt = (v: number, spec: { int: boolean; step: number }) => {
 const toHex = (rgb: number[]) => '#' + rgb.slice(0, 3).map((c) => Math.round(Math.min(1, Math.max(0, c)) * 255).toString(16).padStart(2, '0')).join('');
 const fromHex = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
 
-// Keeps at least the header on screen.
-function clampPos(x: number, y: number, width: number): Pos {
-  return {
-    x: Math.min(Math.max(0, x), window.innerWidth - Math.min(width, 120)),
-    y: Math.min(Math.max(0, y), window.innerHeight - 40),
-  };
+function ParamsList() {
+  const app = useApp();
+  const params = useUI((ui) => ui.params);
+  return (
+    <div id="params-list" className="params-list">
+      {params.specs.map((spec) => <ParamRow key={spec.name} spec={spec} value={params.values[spec.name] ?? spec.def} onChange={(v) => app.setParam(spec, v)} />)}
+    </div>
+  );
 }
 
-export function ParamOverlay({ docked }: { docked?: boolean }) {
+const ResetButton = () => {
   const app = useApp();
+  return <button id="params-reset" title="Reset every value to the default in the code" onClick={() => app.resetParams()}>Reset</button>;
+};
+
+// Only once a source plays (not over the start screen) and not while the studio shows its own copy.
+export function ParamsWidget({ entry }: { entry: WidgetLayout }) {
   const paramsVisible = useUI((ui) => ui.paramsVisible);
-  const started = useUI((ui) => ui.started);
   const studioOpen = useUI((ui) => ui.overlay === 'studio');
-  // Only once a source plays (not over the start screen); while the studio is open the dock
-  // instance shows the controls and the floating one hides.
-  const visible = paramsVisible && started && (docked ? studioOpen : !studioOpen);
-  const collapsed = useUI((ui) => ui.paramsCollapsed);
-  const params = useUI((ui) => ui.params);
-  const root = useRef<HTMLElement>(null);
-  const [pos, setPos] = useState<Pos | null>(() => readJSON<Pos | null>(KEYS.paramsPos, PosSchema.nullable(), null));
-  const [dragging, setDragging] = useState(false);
-  const isDocked = docked ?? params.docked;
-
-  useEffect(() => {
-    if (!pos) return;
-    const onResize = () => setPos((p) => (p ? clampPos(p.x, p.y, root.current?.offsetWidth || 270) : p));
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [pos]);
-
-  const startDrag = (e: ReactPointerEvent<HTMLElement>) => {
-    if (e.button !== 0 || (e.target as HTMLElement).closest('button') || isDocked || !root.current) return;
-    const r = root.current.getBoundingClientRect();
-    const dx = e.clientX - r.left, dy = e.clientY - r.top;
-    const header = e.currentTarget;
-    header.setPointerCapture(e.pointerId);
-    setDragging(true);
-    let last: Pos | null = null;
-    const move = (ev: PointerEvent) => { last = clampPos(ev.clientX - dx, ev.clientY - dy, root.current?.offsetWidth || 270); setPos(last); };
-    const up = () => {
-      header.removeEventListener('pointermove', move);
-      header.removeEventListener('pointerup', up);
-      setDragging(false);
-      if (last) writeJSON(KEYS.paramsPos, last);
-    };
-    header.addEventListener('pointermove', move);
-    header.addEventListener('pointerup', up);
-  };
-  const resetPosition = () => { setPos(null); remove(KEYS.paramsPos); };
-
-  const style: CSSProperties | undefined = pos && !isDocked ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' } : undefined;
+  const title = useUI((ui) => ui.params.title);
   return (
-    <aside id={docked ? undefined : 'params'} ref={root} className={`params${collapsed && !isDocked ? ' collapsed' : ''}${pos && !isDocked ? ' moved' : ''}${dragging ? ' dragging' : ''}`} hidden={!visible} style={style}>
-      <header title="Drag to move · double-click to put it back" onPointerDown={startDrag} onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button') && !isDocked) resetPosition(); }}>
-        <strong id="params-title">{params.title}</strong>
-        <button id="params-reset" title="Reset every value to the default in the code" onClick={() => app.resetParams()}>Reset</button>
+    <Widget id="params" domId="params" entry={entry} title={<span id="params-title">{title}</span>} help="params"
+      tools={<ResetButton />} collapse={{ id: 'params-collapse', hotkey: HOTKEYS.params }} hidden={!paramsVisible || studioOpen}>
+      <ParamsList />
+    </Widget>
+  );
+}
+
+// The studio's parameters dock.
+export function StudioParams() {
+  const paramsVisible = useUI((ui) => ui.paramsVisible);
+  const title = useUI((ui) => ui.params.title);
+  return (
+    <aside className="params" hidden={!paramsVisible}>
+      <header>
+        <strong>{title}</strong>
+        <ResetButton />
         <HelpButton topic="params" />
-        <button id="params-collapse" className="icon" title="Collapse / expand (P)" onClick={() => app.toggleParamsCollapsed()}>–<Kbd hotkey={HOTKEYS.params} /></button>
       </header>
-      <div id="params-list" className="params-list">
-        {params.specs.map((spec) => <ParamRow key={spec.name} spec={spec} value={params.values[spec.name] ?? spec.def} onChange={(v) => app.setParam(spec, v)} />)}
-      </div>
+      <ParamsList />
     </aside>
   );
 }

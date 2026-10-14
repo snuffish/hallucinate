@@ -6,11 +6,15 @@ import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
 import type { HelpTopicId } from '../help/topics';
 import type { Look, SourceButton } from './app-state';
+import type { WidgetId } from './layout';
 
 export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | null;
 
 // A panel's help popover, or the sheet with every shortcut.
 export type HelpId = HelpTopicId | 'sheet';
+
+// What is being dragged around the screen ('resize': a widget's or a dock's resize grip).
+export type DragId = WidgetId | 'bubble' | 'resize';
 
 export interface Meters { bass: number; mid: number; high: number; bright: number; centroid: number; beat: number }
 export type MoodLabel = '' | 'mood: calm' | 'mood: groovy' | 'mood: energetic';
@@ -32,7 +36,7 @@ export interface ParamsView {
   title: string;
   specs: ParamSpec[];
   values: ParamValues;
-  docked: boolean;
+  inStudio: boolean;        // shown in the studio's parameters dock (and editing the Preview slot there)
 }
 
 export interface UIState {
@@ -52,9 +56,9 @@ export interface UIState {
   assistantBusy: boolean;   // a chat run is in flight (the director waits for it)
   help: HelpId | null;      // the open help popover; closed whenever an overlay, the panel or the assistant changes
   liveName: string | null;  // the pinned Live slot (studio closed after a take); projectors follow it, not the screen
-  panelCollapsed: boolean;
+  widgetsHidden: boolean;   // H: every control widget hidden for this session (not persisted)
+  dragging: DragId | null;
   paramsVisible: boolean;
-  paramsCollapsed: boolean;
   params: ParamsView;
   hud: GameHud | null;
   recording: boolean;
@@ -84,10 +88,10 @@ export const initialUIState = (look: Look): UIState => ({
   assistantBusy: false,
   help: null,
   liveName: null,
-  panelCollapsed: false,
+  widgetsHidden: false,
+  dragging: null,
   paramsVisible: false,
-  paramsCollapsed: false,
-  params: { title: 'Parameters', specs: [], values: {}, docked: false },
+  params: { title: 'Parameters', specs: [], values: {}, inStudio: false },
   hud: null,
   recording: false,
   transport: { mode: null, hasQueue: false, playing: false, currentTime: 0, duration: 0, loop: false },

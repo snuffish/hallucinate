@@ -11,11 +11,12 @@ import { Renderer, type ProgramState, type SceneUniforms } from '../engine/rende
 import type { Scene } from '../engine/scenes';
 import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, type AppState, type LookKey, type SourceButton } from '../state/app-state';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
-import { KEYS, readString, writeString } from '../state/persistence';
+import * as L from '../state/layout';
+import { KEYS, debouncedWriter, readString, writeJSON, writeString } from '../state/persistence';
 import { buildSceneList, paramKey, saveUserScenes, userScene } from '../state/scene-list';
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
-import { initialUIState, type DownloadView, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
+import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { EditorCore } from './editor';
 import type { StudioSession } from './studio';
 import { Transport } from './transport';
@@ -25,6 +26,7 @@ const COOL = [0.7, 0.85, 1.35];
 const WARM = [1.3, 1.05, 0.7];
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const smoothstep = (x: number) => { x = clamp01(x); return x * x * (3 - 2 * x); };
+const viewport = (): L.Size => ({ width: window.innerWidth, height: window.innerHeight });
 
 // Hooks other panels plug in. All optional; the controller works without them.
 export interface ControllerHooks {
@@ -79,6 +81,8 @@ export class AppController {
   readonly output: OutputLink;
   readonly state: AppState;
   readonly ui: Store<UIState>;
+  // Where every control widget and the assistant bubble sit; persisted, see src/state/layout.ts.
+  readonly layout = new Store<L.Layout>(this.initialLayout());
   readonly player: HTMLAudioElement;
   readonly transport: Transport;
   readonly sceneParams: ParamSpec[][] = [];
@@ -98,6 +102,7 @@ export class AppController {
   private toastKey = 0;
   private readonly downloads = new Map<'sc' | 'yt', DownloadView>();
   private disposed = false;
+  private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly program: ProgramState;
   private readonly liveParams: Record<number, SceneUniforms> = {};
   private readonly wake = () => {
@@ -105,7 +110,7 @@ export class AppController {
     clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
       const ui = this.ui.get();
-      if (this.audio.kind && !ui.overlay && !ui.assistantOpen && !ui.help && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
+      if (this.audio.kind && !ui.overlay && !ui.assistantOpen && !ui.help && !ui.dragging && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
     }, 3000);
   };
 
@@ -118,7 +123,7 @@ export class AppController {
       look: defaultLook(), clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
-    this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, paramsCollapsed: readString(KEYS.paramsCollapsed) === '1' });
+    this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound });
     this.renderer.setMedia(this.media);
     this.renderer.setScale(this.state.look.resolution);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }));
@@ -164,6 +169,7 @@ export class AppController {
     clearTimeout(this.idleTimer);
     clearTimeout(this.toastTimer);
     this.recorder?.stop();
+    this.layoutWriter.dispose();
     this.transport.dispose();
     this.output.dispose();
     this.paramStore.dispose();
@@ -214,7 +220,8 @@ export class AppController {
   }
 
   // Help lives in the store, not in the popover's own state: every action that shows or hides an area
-  // (setOverlay, toggleAssistant, togglePanel) closes it, so it can't outlive the panel it explains.
+  // (setOverlay, toggleAssistant, toggleWidgets, any layout change) closes it, so it can't outlive the
+  // panel it explains.
   setHelp(help: HelpId | null): void {
     this.ui.set({ help });
     this.wake();
@@ -224,16 +231,64 @@ export class AppController {
     this.setHelp(this.ui.get().help === help ? null : help);
   }
 
-  togglePanel(): void {
-    const collapsed = !this.ui.get().panelCollapsed;
-    this.ui.set({ panelCollapsed: collapsed, help: null });
-    if (collapsed) this.toast('Press H to show the controls again', 2000);
+  // H: hides every widget for this session. Deliberately not persisted, so a new session never
+  // starts with all the controls invisible.
+  toggleWidgets(): void {
+    const hidden = !this.ui.get().widgetsHidden;
+    this.ui.set({ widgetsHidden: hidden, help: null });
+    if (hidden) this.toast('Press H to show the controls again', 2000);
   }
 
-  toggleParamsCollapsed(): void {
-    const collapsed = !this.ui.get().paramsCollapsed;
-    this.ui.set({ paramsCollapsed: collapsed });
-    writeString(KEYS.paramsCollapsed, collapsed ? '1' : '0');
+  // ---------- Layout ----------
+
+  private initialLayout(): L.Layout {
+    const { layout, migrated } = L.loadLayout();
+    if (migrated) writeJSON(KEYS.layout, layout);
+    return layout;
+  }
+
+  private setLayout(next: L.Layout): void {
+    if (!this.layout.set(next)) return;
+    this.ui.set({ help: null });
+    this.layoutWriter.schedule();
+  }
+
+  dockWidget(id: L.WidgetId, zone: L.Zone, index: number): void { this.setLayout(L.dock(this.layout.get(), id, zone, index)); }
+  floatWidget(id: L.WidgetId, rect: L.Rect): void { this.setLayout(L.float(this.layout.get(), id, rect, viewport())); }
+  resetWidget(id: L.WidgetId): void { this.setLayout(L.resetWidget(this.layout.get(), id)); }
+  setWidgetOpen(id: L.WidgetId, open: boolean): void { this.setLayout(L.setOpen(this.layout.get(), id, open)); }
+  moveBubble(rect: L.Rect): void { this.setLayout(L.moveBubble(this.layout.get(), rect, viewport())); }
+  // Hiding the assistant's bubble closes the chat too (I still opens it).
+  setBubbleShown(shown: boolean): void {
+    this.setLayout(L.setBubbleShown(this.layout.get(), shown));
+    if (!shown) this.toggleAssistant(false);
+  }
+
+  setDockWidth(zone: L.SideZone, width: number): void { this.setLayout(L.setDockWidth(this.layout.get(), zone, width)); }
+
+  // A resized floating widget is re-anchored from its new rectangle, so the corner it was dragged by
+  // stays where it was let go.
+  resizeWidget(id: L.WidgetId, size: Partial<L.WidgetSize>, rect?: L.Rect): void {
+    let next = L.resize(this.layout.get(), id, size);
+    if (rect && next.widgets[id].place.kind === 'float') next = L.float(next, id, rect, viewport());
+    this.setLayout(next);
+  }
+
+  toggleWidgetCollapsed(id: L.WidgetId): void {
+    const layout = this.layout.get();
+    this.setLayout(L.setCollapsed(layout, id, !layout.widgets[id].collapsed));
+  }
+
+  resetLayout(): void {
+    this.setLayout(L.resetLayout());
+    this.ui.set({ widgetsHidden: false });
+    this.toast('Layout reset', 1500);
+  }
+
+  // A widget or the bubble is being dragged (or a widget resized): the controls don't go idle.
+  setDragging(dragging: DragId | null): void {
+    this.ui.set({ dragging, ...(dragging && { help: null }) });
+    this.wake();
   }
 
   toggleFullscreen(): void {
@@ -358,13 +413,13 @@ export class AppController {
   showParams(): void {
     const override = this.hooks.paramsOverride?.();
     if (override) {
-      this.ui.set({ params: { title: override.title, specs: override.specs, values: override.values, docked: true }, paramsVisible: override.specs.length > 0 });
+      this.ui.set({ params: { title: override.title, specs: override.specs, values: override.values, inStudio: true }, paramsVisible: override.specs.length > 0 });
       return;
     }
     const i = this.state.clock.scene;
     const specs = this.sceneParams[i] ?? [];
-    const docked = this.overlay === 'studio';
-    this.ui.set({ params: { title: docked ? `${this.currentScene.name} — live` : this.currentScene.name, specs, values: this.paramValues(i), docked }, paramsVisible: specs.length > 0 });
+    const inStudio = this.overlay === 'studio';
+    this.ui.set({ params: { title: inStudio ? `${this.currentScene.name} — live` : this.currentScene.name, specs, values: this.paramValues(i), inStudio }, paramsVisible: specs.length > 0 });
   }
 
   setParam(spec: ParamSpec, value: ParamValue): void {

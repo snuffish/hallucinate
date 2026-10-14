@@ -1,5 +1,5 @@
-// The shell: one canvas that never moves, the start screen, the panel, the parameters overlay and
-// every other overlay. Overlays stay mounted and toggle with `hidden`, which keeps the stylesheet's
+// The shell: one canvas that never moves, the start screen, the control widgets (incl. parameters)
+// and every other overlay. Overlays stay mounted and toggle with `hidden`, which keeps the stylesheet's
 // `body:has(#x:not([hidden]))` rules, the canvases and focus handling exactly as they were.
 
 import { HotkeysProvider } from '@tanstack/react-hotkeys';
@@ -11,13 +11,12 @@ import { Editor } from '../components/Editor';
 import { HelpLayer } from '../components/Help';
 import { Hud } from '../components/Hud';
 import { Library } from '../components/Library';
-import { Panel } from '../components/Panel';
 import { SoundCloudPicker, YouTubePicker } from '../components/Pickers';
-import { ParamOverlay } from '../components/ParamOverlay';
 import { StartScreen } from '../components/StartScreen';
 import { Studio } from '../components/Studio';
 import { Toast } from '../components/Toast';
 import { VisualMaker } from '../components/VisualMaker';
+import { Widgets } from '../components/widgets/Widgets';
 import { useAppHotkeys } from '../hooks/useAppHotkeys';
 import { useEngines } from '../hooks/useEngines';
 import type { SourceButton } from '../state/app-state';
@@ -65,7 +64,7 @@ function Shell({ app }: { app: AppController }) {
   return (
     <>
       <StartScreen onSource={onSource} />
-      <Panel
+      <Widgets
         onSource={onSource}
         onOpenMediaFile={() => mediaInput.current?.click()}
         onOpenYouTube={() => app.setOverlay('youtube')}
@@ -75,7 +74,6 @@ function Shell({ app }: { app: AppController }) {
         onOpenStudio={() => app.toggleOverlay('studio')}
       />
       <AssistantBubble />
-      <ParamOverlay />
       <Library onEdit={(i) => { app.setScene(i); app.setOverlay('editor'); }} />
       <Editor />
       <VisualMaker />
@@ -113,8 +111,9 @@ function Hotkeys() {
     toggleEditor: () => app.toggleOverlay('editor'),
     toggleVisualMaker: () => app.toggleOverlay('nodes'),
     toggleStudio: () => app.toggleOverlay('studio'),
-    toggleParams: () => app.toggleParamsCollapsed(),
-    togglePanel: () => app.togglePanel(),
+    toggleParams: () => app.toggleWidgetCollapsed('params'),
+    togglePanel: () => app.toggleWidgets(),
+    resetLayout: () => app.resetLayout(),
     toggleFullscreen: () => app.toggleFullscreen(),
     toggleRecording: () => app.toggleRecording(),
     toggleAuto: () => app.toggleAuto(),
