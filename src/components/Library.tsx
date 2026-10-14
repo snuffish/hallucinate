@@ -134,6 +134,7 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
         {shown.length} of {all.length} scenes · {rotating} in auto-switch rotation
         <span className="lib-nav"><Kbd hotkey={HOTKEYS.libraryLeft} /><Kbd hotkey={HOTKEYS.libraryUp} /><Kbd hotkey={HOTKEYS.libraryDown} /><Kbd hotkey={HOTKEYS.libraryRight} /> move · <Kbd hotkey={HOTKEYS.libraryPick} /> play · <Kbd hotkey={HOTKEYS.libraryTabNext} /> category</span>
       </p>
+      <Parked />
       <ul id="lib-grid" className="lib-grid" ref={grid}>
         {shown.map(({ s, i }, n) => (
           <li key={s.id} className={`lib-card${i === current ? ' active' : ''}${n === focused ? ' focused' : ''}${!s.kind && !inRotation(prefs, s) ? ' off' : ''}`} data-index={i}
@@ -165,6 +166,37 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
           </li>
         ))}
         {!shown.length && <p className="lib-empty">No scenes match.</p>}
+      </ul>
+    </section>
+  );
+}
+
+// Saved scenes and edits that didn't compile on this device (another GPU or app version). They stay
+// stored until deleted here; a scene can be loaded into "My Shader" to fix it.
+function Parked() {
+  const app = useApp();
+  useUI((ui) => ui.sceneVersion);   // re-render when the parked set changes
+  const { userScenes, sceneEdits } = app.parked;
+  const edits = Object.keys(sceneEdits);
+  if (!userScenes.length && !edits.length) return null;
+  return (
+    <section id="lib-parked" className="lib-parked" aria-label="Doesn't compile here">
+      <strong>Doesn't compile here</strong>
+      <p>These were saved elsewhere or by an older version. They're kept until you delete them.</p>
+      <ul>
+        {userScenes.map(({ name }) => (
+          <li key={`scene:${name}`} data-parked-scene={name}>
+            <span>{name}</span>
+            <button title="Load it into My Shader to fix it, then Save to library under the same name" onClick={() => app.openParkedInEditor(name)}>Fix in editor</button>
+            <button onClick={() => { if (confirm(`Delete "${name}" for good?`)) app.discardParked('scene', name); }}>Delete</button>
+          </li>
+        ))}
+        {edits.map((name) => (
+          <li key={`edit:${name}`} data-parked-edit={name}>
+            <span>Your edit of {name}</span>
+            <button onClick={() => { if (confirm(`Discard your edit of "${name}"?`)) app.discardParked('edit', name); }}>Discard edit</button>
+          </li>
+        ))}
       </ul>
     </section>
   );

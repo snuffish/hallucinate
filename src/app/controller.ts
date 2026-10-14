@@ -13,7 +13,7 @@ import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_RANGES, MAX_SECONDS_PER_SCENE,
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, readString, writeJSON, writeString } from '../state/persistence';
-import { buildSceneList, paramKey, saveUserScenes, userScene } from '../state/scene-list';
+import { buildSceneList, discardParked, paramKey, saveUserScenes, userScene, type ParkedScenes } from '../state/scene-list';
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
@@ -86,6 +86,8 @@ export class AppController {
   readonly player: HTMLAudioElement;
   readonly transport: Transport;
   readonly sceneParams: ParamSpec[][] = [];
+  // Saved scenes / edits that didn't compile on this device; kept stored, listed in the library.
+  readonly parked: ParkedScenes;
   readonly tempo = new TempoClock();
   readonly editor: EditorCore;
   readonly pickers: Partial<Record<'sc' | 'yt', PickerApi>> = {};
@@ -118,6 +120,7 @@ export class AppController {
     this.renderer = new Renderer(canvas, []);   // the scene list is attached right below (same array)
     const list = buildSceneList(this.renderer);
     (this.renderer as unknown as { scenes: Scene[] }).scenes = list.scenes;
+    this.parked = list.parked;
     this.state = {
       scenes: list.scenes, gameIndex: list.gameIndex, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
       look: defaultLook(), clock: defaultClock(), activeSource: null,
@@ -158,7 +161,7 @@ export class AppController {
     this.wake();
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
-    if (this.ui.get().startupErrors.length) setTimeout(() => this.toast(`Couldn't compile your saved scene(s): ${this.ui.get().startupErrors.join(', ')}`, 6000), 500);
+    if (this.ui.get().startupErrors.length) setTimeout(() => this.toast(`Couldn't compile your saved scene(s): ${this.ui.get().startupErrors.join(', ')} — kept in the library under "Doesn't compile here"`, 6000), 500);
   }
 
   dispose(): void {
@@ -369,12 +372,13 @@ export class AppController {
   // Appends a saved scene (editor "Save to library", assistant create_scene). Returns the index or an error.
   addUserScene(name: string, body: string): { index: number } | { error: string } {
     if (this.sceneByName(name) >= 0) return { error: `A scene called "${name}" already exists.` };
+    if (this.parked.userScenes.some((p) => p.name === name)) return { error: `A scene called "${name}" already exists (it doesn't compile on this device).` };
     const scene = userScene(name, body);
     const error = this.renderer.check(scene.frag, name);
     if (error) return { error };
     const index = this.state.scenes.push(scene) - 1;
     this.setSceneParams(index, scene.params);
-    saveUserScenes(this.state.scenes);
+    saveUserScenes(this.state.scenes, this.parked);
     this.bumpScenes();
     return { index };
   }
@@ -383,9 +387,26 @@ export class AppController {
     const s = this.state.scenes[index];
     if (!s?.user) return;
     s.removed = true;
-    saveUserScenes(this.state.scenes);
+    saveUserScenes(this.state.scenes, this.parked);
     if (this.state.clock.scene === index) this.setScene(0);
     this.bumpScenes();
+  }
+
+  // A parked scene or edit (didn't compile here) is deleted for good.
+  discardParked(kind: 'scene' | 'edit', name: string): void {
+    discardParked(this.parked, kind, name, this.state.scenes);
+    this.bumpScenes();
+  }
+
+  // Loads a parked scene into "My Shader" so it can be fixed; "Save to library" under the same name
+  // then replaces the parked copy. Nothing is stored until it compiles.
+  openParkedInEditor(name: string): void {
+    const p = this.parked.userScenes.find((x) => x.name === name);
+    if (!p) return;
+    this.editor.customCode = p.body;
+    this.editor.libraryName = name;
+    this.setScene(this.state.customIndex);
+    this.setOverlay('editor');
   }
 
   // ---------- Live parameters ----------

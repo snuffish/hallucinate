@@ -67,8 +67,8 @@ export class EditorCore {
     scene.params = params;
     scene.body = source;
     if (target.kind === 'custom') { this.customCode = source; writeString(KEYS.customShader, source); }
-    else if (target.kind === 'builtin') saveSceneEdit(scene, this.app.state.scenes);
-    else if (target.kind === 'user') saveUserScenes(this.app.state.scenes);
+    else if (target.kind === 'builtin') saveSceneEdit(scene, this.app.state.scenes, this.app.parked);
+    else if (target.kind === 'user') saveUserScenes(this.app.state.scenes, this.app.parked);
     this.app.setSceneParams(target.index, params);
     this.app.bumpScenes();
     return null;
@@ -90,6 +90,7 @@ export class EditorCore {
     const existing = app.sceneByName(name);
     if (existing >= 0 && !scenes[existing]!.user) { app.toast(`"${name}" is a built-in scene — pick another name.`); return; }
     if (existing >= 0 && !confirm(`Overwrite your scene "${name}"?`)) return;
+    if (existing < 0 && app.parked.userScenes.some((p) => p.name === name) && !confirm(`Replace your scene "${name}" (it doesn't compile on this device) with this code?`)) return;
     const scene = userScene(name, body);
     let index = existing;
     if (existing >= 0) {
@@ -103,7 +104,7 @@ export class EditorCore {
     if (from.index !== index) app.paramStore.copy(paramKey(scenes[from.index]!), paramKey(scenes[index]!));   // keep the values you tweaked
     app.setSceneParams(index, scene.params);
     this.libraryName = name;
-    saveUserScenes(scenes);
+    saveUserScenes(scenes, app.parked);
     app.bumpScenes();
     app.toast(`Saved "${name}" to the library — it's now in the auto-switch rotation`);
     return index;
