@@ -170,12 +170,19 @@ export class AppController {
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
     window.addEventListener('storage', this.onStorage);
+    setTimeout(() => { if (!this.disposed) this.startupNotice(); }, 500);
+  }
+
+  // What happened at startup: an import that just finished (its report is shown once) and saved
+  // scenes that don't compile here. Read late, so a controller disposed right away (StrictMode)
+  // doesn't swallow the report.
+  private startupNotice(): void {
     const imported = readString(KEYS.importReport);
     if (imported !== null) remove(KEYS.importReport);
     const errors = this.ui.get().startupErrors;
     const broken = errors.length ? `Couldn't compile your saved scene(s): ${errors.join(', ')} — kept in the library under "Doesn't compile here"` : '';
-    if (imported !== null) setTimeout(() => this.toast(`Imported ${imported}.${broken ? ` ${broken}.` : ''}`, broken ? 9000 : 5000), 500);
-    else if (broken) setTimeout(() => this.toast(broken, 6000), 500);
+    if (imported !== null) this.toast(`Imported ${imported}.${broken ? ` ${broken}.` : ''}`, broken ? 9000 : 5000);
+    else if (broken) this.toast(broken, 6000);
   }
 
   dispose(): void {
