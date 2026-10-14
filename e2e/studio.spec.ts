@@ -50,6 +50,7 @@ test('studio: the autopilot follows a saved plan instead of list order', async (
   await page.keyboard.press('o');
   await expect(page.locator('#st-plan li')).toHaveCount(3);   // two steps and the tools chip
   await expect(page.locator('#st-director-status')).toContainText('tunnel, then space');
+  await expect(page.locator('#st-director')).toBeVisible();   // the footer stays in view at 720p; the list scrolls instead
   await page.locator('#st-auto').check();
   // The plan starts at the next take (16 beats on the dial), then its own counts: Hyper Tunnel, then Star Nest.
   await expect(page.locator('#st-live-name')).toHaveText('Hyper Tunnel', { timeout: 30_000 });

@@ -708,7 +708,8 @@ body:has(#panel.collapsed) .studio { left: 16px; }
 .blackout { font-weight: 600; }
 .blackout.active { border-color: #ff3b3b; background: #ff3b3b; color: #fff; }
 
-.cues { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.cues { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; }
+.dock footer { flex-shrink: 0; }   /* the list scrolls; the autopilot and director rows stay in view */
 .cue { display: grid; grid-template-columns: 22px 10px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; user-select: none; }
 .cue:hover { background: rgba(255, 255, 255, 0.06); }
 .cue.preview { border-color: #50dc78; background: rgba(80, 220, 120, 0.1); }
