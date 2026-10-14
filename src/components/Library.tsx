@@ -9,6 +9,7 @@ import { CATEGORIES, type Scene } from '../engine/scenes';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { inRotation, isFav, listedScenes, togglePref } from '../state/library-prefs';
+import { HelpButton } from './Help';
 
 // Stand-in audio for the previews, so they look like the scene mid-song rather than silent.
 const THUMB_UNIFORMS: SnapshotUniforms = { uTime: 14, uBass: 0.5, uMid: 0.5, uHigh: 0.5, uLevel: 0.6, uBeat: 0.4, uHue: 0, uBright: 0.5, uMood: 0.5 };
@@ -123,6 +124,7 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
         <input id="lib-search" ref={search} type="search" placeholder="Search scenes…" autoComplete="off" value={query}
           onChange={(e) => { setQuery(e.target.value); setFocused(-1); if (e.target.value.trim()) setFilter('All'); }} />
         <Kbd hotkey={HOTKEYS.librarySearch} />
+        <HelpButton topic="library" />
         <button id="lib-close" className="icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
       </header>
       <nav id="lib-filters" className="lib-filters">

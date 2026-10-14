@@ -8,6 +8,7 @@ import { AppProvider, useApp, useUI } from './AppContext';
 import type { AppController } from './controller';
 import { Assistant, AssistantBubble } from '../components/Assistant';
 import { Editor } from '../components/Editor';
+import { HelpLayer } from '../components/Help';
 import { Hud } from '../components/Hud';
 import { Library } from '../components/Library';
 import { Panel } from '../components/Panel';
@@ -84,6 +85,7 @@ function Shell({ app }: { app: AppController }) {
       <YouTubePicker />
       <Hud />
       <Toast />
+      <HelpLayer />
       <Hotkeys />
       <input type="file" id="file" accept="audio/*" hidden ref={fileInput} onChange={(e) => { void app.playFile(e.target.files?.[0]); e.target.value = ''; }} />
       <input type="file" id="media-file" accept="image/*,video/*" hidden ref={mediaInput} onChange={(e) => { const f = e.target.files?.[0]; if (f) void app.loadMedia(f); e.target.value = ''; }} />
@@ -107,6 +109,7 @@ function Hotkeys() {
     game: () => app.setScene(app.state.gameIndex),
     toggleLibrary: () => app.toggleOverlay('library'),
     toggleAssistant: () => app.toggleAssistant(),
+    toggleHelp: () => app.toggleHelp('sheet'),
     toggleEditor: () => app.toggleOverlay('editor'),
     toggleVisualMaker: () => app.toggleOverlay('nodes'),
     toggleStudio: () => app.toggleOverlay('studio'),
@@ -116,8 +119,9 @@ function Hotkeys() {
     toggleRecording: () => app.toggleRecording(),
     toggleAuto: () => app.toggleAuto(),
     randomize: () => app.randomize(),
-    // Esc: leave a text field first, then close the open overlay, then the assistant bubble.
+    // Esc: close help first (it sits on top), then leave a text field, then close the open overlay, then the assistant bubble.
     closeOverlay: () => {
+      if (app.ui.get().help) { app.setHelp(null); return; }
       if (app.hooks.escape?.()) return;
       const active = document.activeElement;
       // A draft in the assistant's composer is protected: Esc leaves the field first, a second Esc closes.

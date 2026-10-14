@@ -8,6 +8,7 @@ import { CATEGORIES, EXAMPLES, GraphSchema, NODE_TYPES, compileGraph, defaultPar
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { KEYS, debouncedWriter, readJSON } from '../state/persistence';
+import { HelpButton } from './Help';
 
 interface View { x: number; y: number; s: number }
 interface Pt { x: number; y: number }
@@ -253,6 +254,7 @@ export function VisualMaker() {
         <button className="ne-tocode" title="Open the generated GLSL in the code editor" onClick={() => void sendToCode()}>Send to code</button>
         <button className="ne-peek" title="Hide the graph to see the result" onClick={() => setPeek((p) => !p)}>Peek</button>
         <span className={`ne-status ${status.error ? 'error' : 'ok'}`}>{status.text}</span>
+        <HelpButton topic="nodes" />
         <button className="ne-close icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
       </header>
       <nav className="ne-palette">

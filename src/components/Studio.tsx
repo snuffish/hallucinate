@@ -10,6 +10,7 @@ import { HOTKEYS, CUE_DIGITS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { useStore } from '../state/store';
 import { ParamOverlay } from './ParamOverlay';
+import { HelpButton } from './Help';
 
 export function Studio() {
   const app = useApp();
@@ -79,6 +80,7 @@ export function Studio() {
       <header className="studio-bar">
         <strong>Studio</strong>
         <span className="studio-hint">Click a show scene to preview it · <Kbd hotkey={HOTKEYS.take} /> take it live · <Kbd hotkey={HOTKEYS.blackout} /> blackout · <Kbd hotkey="1" />–<Kbd hotkey="9" /> / <Kbd hotkey={HOTKEYS.studioPrev} /><Kbd hotkey={HOTKEYS.studioNext} /> pick</span>
+        <HelpButton topic="studio" />
         <button id="st-close" className="icon" title="Close (O / Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
       </header>
       <div className="studio-monitors">

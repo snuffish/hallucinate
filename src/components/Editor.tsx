@@ -8,6 +8,7 @@ import type { EditorTarget } from '../app/editor';
 import { SCENES, TEMPLATE } from '../engine/scenes';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
+import { HelpButton } from './Help';
 
 const TITLES: Record<EditorTarget['kind'], string> = {
   custom: 'Your own scene',
@@ -123,6 +124,7 @@ export function Editor() {
         <button id="ed-revert" title="Undo your edits to this built-in scene" hidden={!edited} onClick={revert}>Revert to original</button>
         <button id="ed-copy" title="Copy this generated code into My Shader and edit it there" hidden={!readOnly} onClick={() => void copyGenerated()}>Edit a copy</button>
         <button id="ed-save" title="Save this code as a new scene in the library" onClick={save}>Save to library</button>
+        <HelpButton topic="editor" />
         <button id="ed-close" className="icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
       </header>
       <details>

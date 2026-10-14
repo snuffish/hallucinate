@@ -4,9 +4,13 @@
 import type { GameHud } from '../engine/game';
 import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
+import type { HelpTopicId } from '../help/topics';
 import type { Look, SourceButton } from './app-state';
 
 export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | null;
+
+// A panel's help popover, or the sheet with every shortcut.
+export type HelpId = HelpTopicId | 'sheet';
 
 export interface Meters { bass: number; mid: number; high: number; bright: number; centroid: number; beat: number }
 export type MoodLabel = '' | 'mood: calm' | 'mood: groovy' | 'mood: energetic';
@@ -46,6 +50,7 @@ export interface UIState {
   overlay: Overlay;
   assistantOpen: boolean;   // the chat bubble; independent of the overlays
   assistantBusy: boolean;   // a chat run is in flight (the director waits for it)
+  help: HelpId | null;      // the open help popover; closed whenever an overlay, the panel or the assistant changes
   liveName: string | null;  // the pinned Live slot (studio closed after a take); projectors follow it, not the screen
   panelCollapsed: boolean;
   paramsVisible: boolean;
@@ -77,6 +82,7 @@ export const initialUIState = (look: Look): UIState => ({
   overlay: null,
   assistantOpen: false,
   assistantBusy: false,
+  help: null,
   liveName: null,
   panelCollapsed: false,
   paramsVisible: false,

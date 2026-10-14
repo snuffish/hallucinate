@@ -19,6 +19,7 @@ export const KEYS = {
   paramsCollapsed: 'hallucinate.paramsCollapsed',
   paramsPos: 'hallucinate.paramsPos',
   best: 'hallucinate.best',
+  helpHint: 'hallucinate.helpHint',
 } as const;
 
 export function readString(key: string): string | null {
