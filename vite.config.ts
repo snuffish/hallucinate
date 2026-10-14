@@ -16,8 +16,11 @@ function apiMiddleware() {
 // Listens on localhost only; set HOST=0.0.0.0 to open it to your network.
 const host = process.env.HOST || 'localhost';
 const port = Number(process.env.PORT) || 5173;
+// The GitHub Pages build is served from /hallucinate/.
+const base = process.env.BASE_PATH || '/';
 
 export default defineConfig({
+  base,
   plugins: [react(), apiMiddleware()],
   server: { host, port },
   preview: { host, port },

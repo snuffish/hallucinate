@@ -3,6 +3,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
+import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
 import { AUTO_BEATS, AUTO_SECONDS, StudioSession, type AutoUnit, type Cue } from '../app/studio';
 import { Director, DIRECTOR_BEATS, DIRECTOR_SECONDS } from '../director/director';
 import { HOTKEYS, CUE_DIGITS } from '../hotkeys/registry';
@@ -65,7 +66,8 @@ export function Studio() {
   const timer = studio.autopilot.unit === 'seconds';
   const directorTimer = studio.directorUnit === 'seconds';
   const tokens = dir.tokens.prompt + dir.tokens.completion;
-  const directorStatus = dir.error ? dir.error
+  const directorStatus = STATIC_DEMO ? STATIC_DEMO_NOTE
+    : dir.error ? dir.error
     : !dir.on ? (plan?.note ? `Plan: ${plan.note}` : 'Off — Claude plans the show for you; the autopilot follows the plan on the beat')
     : dir.cycling ? 'Planning…'
     : !app.audio.kind ? 'Waiting for the music'
@@ -173,7 +175,7 @@ export function Studio() {
               </ol>
             )}
             <label className="toggle" title="Claude plans the show from the music: every cycle it reads a digest of the tempo, mood and energy and writes the next steps. Needs the assistant backend.">
-              <input type="checkbox" id="st-director" checked={dir.on} onChange={(e) => director.setOn(e.target.checked)} /> Director: plan every
+              <input type="checkbox" id="st-director" checked={dir.on} disabled={STATIC_DEMO} onChange={(e) => director.setOn(e.target.checked)} /> Director: plan every
               {directorTimer
                 ? <select id="st-director-seconds" value={studio.directorSeconds} onChange={(e) => studio.setDirectorSeconds(Number(e.target.value))}>
                     {DIRECTOR_SECONDS.map((n) => <option key={n} value={n}>{n}</option>)}
