@@ -86,6 +86,16 @@ test('layout: reorder inside a dock, close a widget and bring it back from the m
   await page.locator('#widgets-menu-btn').click();
   await page.locator('[data-widget-toggle="assistant"]').check();
   await expect(page.locator('#assistant-bubble')).toBeVisible();
+
+  // The assistant's bubble is switched off and on from the same menu, and stays off after a reload.
+  await page.locator('[data-widget-toggle="assistant"]').uncheck();
+  await expect(page.locator('#assistant-bubble')).toHaveCount(0);
+  await page.reload();
+  await start(page);
+  await expect(page.locator('#assistant-bubble')).toHaveCount(0);
+  await page.locator('#widgets-menu-btn').click();
+  await page.locator('[data-widget-toggle="assistant"]').check();
+  await expect(page.locator('#assistant-bubble')).toBeVisible();
 });
 
 test('layout: a floating widget stays on screen when the window shrinks', async ({ page }) => {

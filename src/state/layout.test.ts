@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KEYS } from './persistence';
 import {
   DEFAULT_LAYOUT, WIDGET_IDS, chatPlacement, dock, effective, float, floatToPx, loadLayout, moveBubble, parseLayout,
-  DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetLayout, resetWidget, resize, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
+  DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetLayout, resetWidget, resize, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
 } from './layout';
 
 const VIEW = { width: 1280, height: 720 };
@@ -71,6 +71,13 @@ describe('layout', () => {
     expect(setDockWidth(resetLayout(), 'right', 5000).dockWidth.right).toBe(DOCK_MAX);
   });
 
+  it('switches the assistant bubble off and on; a reset brings it back', () => {
+    const off = setBubbleShown(resetLayout(), false);
+    expect(off.bubbleShown).toBe(false);
+    expect(setBubbleShown(off, true).bubbleShown).toBe(true);
+    expect(resetLayout().bubbleShown).toBe(true);
+  });
+
   it('never closes the Hallucinate widget', () => {
     expect(() => setOpen(resetLayout(), 'hub', false)).toThrow();
     expect(setOpen(resetLayout(), 'audio', false).widgets.audio.open).toBe(false);
@@ -136,6 +143,8 @@ describe('layout storage', () => {
     expect(l.dockWidth.left).toBe(350);
     stored.dockWidth = 'wide';
     expect(parseLayout(stored).dockWidth).toEqual(DEFAULT_LAYOUT.dockWidth);
+    expect(parseLayout({ ...stored, bubbleShown: false }).bubbleShown).toBe(false);
+    expect(parseLayout({ ...stored, bubbleShown: 'no' }).bubbleShown).toBe(true);
     expect(parseLayout({ ...stored, bubbleShown: false }).bubbleShown).toBe(false);
     expect(parseLayout({ ...stored, bubbleShown: 'no' }).bubbleShown).toBe(true);
   });
