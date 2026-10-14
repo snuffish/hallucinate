@@ -36,7 +36,7 @@ test('help: a panel ? opens its topic and closes with the panel (H)', async ({ p
   await expect(page.getByRole('button', { name: 'Help: Sound sources' })).toHaveAttribute('aria-expanded', 'true');
 
   await page.keyboard.press('h');
-  await expect(page.locator('#panel')).toHaveClass(/collapsed/);
+  await expect(page.locator('#widgets')).toHaveClass(/collapsed/);
   await expect(openPopovers(page)).toHaveCount(0);
 });
 

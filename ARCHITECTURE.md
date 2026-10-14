@@ -33,6 +33,11 @@ browser                                              dev server (Vite middleware
   subscribe with selectors (`useUI(ui => ui.sceneName)`), so nothing per-frame goes through React state.
 - **Panels** (`src/components/`) stay mounted and toggle with the `hidden` attribute. That keeps the
   stylesheet's `body:has(#x:not([hidden]))` rules, the canvases and focus handling as they were.
+- **Widgets** (`src/components/widgets/`): every group of controls (and the Parameters) is a `<Widget>` docked to
+  an edge or floating. Where each one sits lives in a second store, `app.layout`, built from the pure functions in
+  `src/state/layout.ts` and persisted (validated per widget) under `KEYS.layout`. The widgets publish
+  `--dock-left/right/top/bottom` (how far each dock reaches into the screen) and `body[data-widgets]`; the overlays
+  inset themselves from those. Stacking uses the named `--z-*` scale in `:root`.
 - **Sessions** for the bigger panels live outside React state: `EditorCore` (compiling and saving code),
   `StudioSession` (cues, Preview/Live, master), the visual maker's `GraphSession`. They mutate themselves and
   bump a version the component re-renders on.
@@ -55,7 +60,10 @@ browser                                              dev server (Vite middleware
    renders the badge. A unit test proves no two bindings can be live on the same key at once.
 6. **The assistant's tools run in the browser**, defined once with zod in `src/assistant/tools.ts`. Errors are
    thrown and become error tool results; changes register an undo.
-7. **The subscription backend is locked down.** `server/claude-cli-adapter.ts` spawns `claude -p` with
+7. **Overlays lay out around the widgets through one contract.** They read `--dock-*` and `body[data-widgets]`
+   only, never a widget's selector, and stack with the `--z-*` scale; the studio's pinned Live canvas (`--z-live`)
+   stays above every floating widget.
+8. **The subscription backend is locked down.** `server/claude-cli-adapter.ts` spawns `claude -p` with
    `--tools ''` (no files, no shell), `--strict-mcp-config` (only this app's MCP server),
    `--setting-sources ''` (none of the user's CLAUDE.md, hooks or plugins), `--disable-slash-commands`, and a
    throw-away working directory. Do not add `--safe-mode`: it silently disables MCP servers, which is how

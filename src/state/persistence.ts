@@ -16,6 +16,8 @@ export const KEYS = {
   scRecent: 'hallucinate.scRecent',
   ytRecent: 'hallucinate.ytRecent',
   mediaSound: 'hallucinate.mediaSound',
+  layout: 'hallucinate.layout',
+  // Migrated into `layout` (src/state/layout.ts) on first load, then removed.
   paramsCollapsed: 'hallucinate.paramsCollapsed',
   paramsPos: 'hallucinate.paramsPos',
   best: 'hallucinate.best',
