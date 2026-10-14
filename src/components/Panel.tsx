@@ -3,7 +3,7 @@
 import type { CSSProperties } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import { STATIC_DEMO } from '../app/static-demo';
-import { HELP_ROW, HOTKEYS } from '../hotkeys/registry';
+import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { LOOK_RANGES, type LookKey, type SourceButton } from '../state/app-state';
 import { HelpButton } from './Help';
@@ -32,7 +32,6 @@ export function Panel(a: PanelActions) {
       <SceneGroup onOpenLibrary={a.onOpenLibrary} />
       <LookGroup />
       <ActionsGroup {...a} />
-      <HelpRow />
     </aside>
   );
 }
@@ -188,14 +187,5 @@ function ActionsGroup(a: PanelActions) {
       <button id="visual" onClick={a.onOpenVisualMaker}>Visual maker<Kbd hotkey={HOTKEYS.visualMaker} /></button>
       <button id="studio-open" onClick={a.onOpenStudio}>Studio &amp; projector<Kbd hotkey={HOTKEYS.studio} /></button>
     </div>
-  );
-}
-
-// Every shortcut, generated from the registry so it can't drift from what the keys do.
-function HelpRow() {
-  return (
-    <p className="keys">
-      {HELP_ROW.map((id) => <span key={id} className="key-help"><Kbd hotkey={HOTKEYS[id]} /> {HOTKEYS[id].label}</span>)}
-    </p>
   );
 }

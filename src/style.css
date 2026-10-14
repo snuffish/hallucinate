@@ -171,7 +171,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 .actions { flex-direction: row; flex-wrap: wrap; }
 .actions button { flex: 1; }
-.keys { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
 
 .toast {
   z-index: 20;
@@ -860,9 +859,6 @@ body.idle .params-dock .params { opacity: 1; pointer-events: auto; }
 .kbd[data-hint] { border-color: var(--accent); color: var(--text); }
 .icon, .tp-buttons button, .tp-icon { position: relative; }
 .icon .kbd, .tp-buttons .kbd, .tp-icon .kbd { position: absolute; right: -6px; bottom: -7px; margin: 0; font-size: 8px; padding: 1px 3px; }
-.keys { display: flex; flex-wrap: wrap; gap: 4px 10px; }
-.key-help { white-space: nowrap; }
-.key-help .kbd { margin: 0 3px 0 0; }
 
 /* Help: the `?` buttons and the one popover they open (top layer, positioned from the button). */
 .icon.help-btn { width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 12px; font-weight: 700; line-height: 1; color: var(--muted); flex: none; }
