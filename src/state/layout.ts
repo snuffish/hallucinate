@@ -198,12 +198,12 @@ const SizeSchema = z.object({ w: z.number().nullable(), h: z.number().nullable()
 const WidgetLayoutSchema = z.object({ open: z.boolean(), collapsed: z.boolean(), place: z.discriminatedUnion('kind', [DockSchema, FloatSchema]), size: SizeSchema.optional() });
 const DockWidthSchema = z.object({ left: z.number(), right: z.number() });
 const BubbleSchema = z.discriminatedUnion('kind', [z.object({ kind: z.literal('auto') }), FloatSchema]);
-const StoredSchema = z.object({ v: z.literal(1), widgets: z.record(z.string(), z.unknown()), bubble: z.unknown().optional(), bubbleShown: z.unknown().optional(), dockWidth: z.unknown().optional() });
+export const StoredLayoutSchema = z.object({ v: z.literal(1), widgets: z.record(z.string(), z.unknown()), bubble: z.unknown().optional(), bubbleShown: z.unknown().optional(), dockWidth: z.unknown().optional() });
 
 // Every entry is checked on its own: an unknown widget is dropped and a missing or broken one falls
 // back to its default, so adding a widget in a later version never resets the rest of the layout.
 export function parseLayout(raw: unknown): Layout {
-  const stored = StoredSchema.safeParse(raw);
+  const stored = StoredLayoutSchema.safeParse(raw);
   if (!stored.success) return resetLayout();
   const layout = resetLayout();
   for (const id of WIDGET_IDS) {
