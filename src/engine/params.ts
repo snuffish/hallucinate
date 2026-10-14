@@ -130,15 +130,15 @@ export function valueSchema(spec: ParamSpec): z.ZodType<ParamValue> {
 // Remembers tweaked values per scene. When the code changes a parameter's default, the new default wins.
 // Writes are coalesced (a slider drag is hundreds of events) and flushed when the page hides.
 const EntrySchema = z.object({ v: ParamValueSchema, def: ParamValueSchema });
-const DataSchema = z.record(z.string(), z.record(z.string(), EntrySchema));
-type Data = z.infer<typeof DataSchema>;
+export const ParamDataSchema = z.record(z.string(), z.record(z.string(), EntrySchema));
+type Data = z.infer<typeof ParamDataSchema>;
 
 export class ParamStore {
   private data: Data;
   private readonly writer: DebouncedWriter;
 
   constructor() {
-    this.data = readJSON(KEYS.params, DataSchema, {});
+    this.data = readJSON(KEYS.params, ParamDataSchema, {});
     this.writer = debouncedWriter(KEYS.params, () => this.data);
   }
 

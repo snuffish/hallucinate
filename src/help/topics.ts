@@ -22,6 +22,7 @@ export const HELP_TOPICS = {
       'Each group of controls is its own widget. Drag one by its title bar: drop it on an edge of the screen to dock it there, or anywhere else to let it float. Double-click a title bar to put that widget back. The layout is remembered.',
       'Resize a widget by its corner, or in a side dock by its bottom edge; drag the inner edge of a side dock to make the whole dock wider. Double-click a grip for the natural size.',
       'Close widgets you don\'t need with ×; bring them back (and the AI assistant\'s bubble) from the ☰ Widgets menu, which also resets the layout.',
+      'Export scenes & settings (☰ menu) saves your scenes, edits to built-ins, My Shader, the visual maker graph, parameter values, the Studio show, favourites, player settings and layout to one file. Import… (or drop the file on the page) replaces them and reloads; your current setup is downloaded first as a backup.',
       'The controls fade away while the music plays and you leave the mouse alone; move it to bring them back.',
       'Every button with a shortcut shows its key. Hold a modifier to see which badges light up.',
     ],

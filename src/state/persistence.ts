@@ -22,18 +22,39 @@ export const KEYS = {
   paramsPos: 'hallucinate.paramsPos',
   best: 'hallucinate.best',
   helpHint: 'hallucinate.helpHint',
+  // Settings import (src/state/bundle.ts): other tabs reload when this changes; the report is shown
+  // once after the reload.
+  importedAt: 'hallucinate.importedAt',
+  importReport: 'hallucinate.importReport',
 } as const;
+
+// While an import replaces the stored state, nothing else may write: a stale in-memory value
+// (a debounced writer flushing on pagehide, a panel saving on unmount) would overwrite what was
+// just imported. Only `commitRaw` writes while frozen.
+let frozen = false;
+export const freeze = (): void => { frozen = true; };
+export const unfreeze = (): void => { frozen = false; };
 
 export function readString(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 
 export function writeString(key: string, value: string): void {
+  if (frozen) return;
   try { localStorage.setItem(key, value); } catch { /* storage unavailable */ }
 }
 
 export function remove(key: string): void {
+  if (frozen) return;
   try { localStorage.removeItem(key); } catch { /* storage unavailable */ }
+}
+
+// The import's write path: ignores the freeze, throws when the write fails (quota), and throws when
+// the value doesn't read back. `null` removes the key.
+export function commitRaw(key: string, value: string | null): void {
+  if (value === null) localStorage.removeItem(key);
+  else localStorage.setItem(key, value);
+  if (localStorage.getItem(key) !== value) throw new Error(`Couldn't store ${key}.`);
 }
 
 // Parses the stored JSON against `schema`; returns `fallback` when the key is missing, unreadable
@@ -60,6 +81,10 @@ export interface DebouncedWriter {
   dispose(): void;
 }
 
+// Every live writer, so an export or import can store pending changes first.
+const writers = new Set<DebouncedWriter>();
+export function flushAll(): void { for (const w of writers) w.flush(); }
+
 export function debouncedWriter(key: string, read: () => unknown, delay = 500): DebouncedWriter {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let dirty = false;
@@ -75,7 +100,7 @@ export function debouncedWriter(key: string, read: () => unknown, delay = 500): 
     document.addEventListener('visibilitychange', onHide);
     window.addEventListener('pagehide', flush);
   }
-  return {
+  const writer: DebouncedWriter = {
     schedule() {
       dirty = true;
       if (timer) clearTimeout(timer);
@@ -84,10 +109,13 @@ export function debouncedWriter(key: string, read: () => unknown, delay = 500): 
     flush,
     dispose() {
       flush();
+      writers.delete(writer);
       if (hasDom) {
         document.removeEventListener('visibilitychange', onHide);
         window.removeEventListener('pagehide', flush);
       }
     },
   };
+  writers.add(writer);
+  return writer;
 }

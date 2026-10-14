@@ -8,8 +8,17 @@ import { parseParams } from '../engine/params';
 import type { Renderer } from '../engine/renderer';
 import { KEYS, readJSON, writeJSON } from './persistence';
 
-const UserScenesSchema = z.array(z.object({ name: z.string(), body: z.string() }));
-const SceneEditsSchema = z.record(z.string(), z.string());
+export const UserScenesSchema = z.array(z.object({ name: z.string(), body: z.string() }));
+export const SceneEditsSchema = z.record(z.string(), z.string());
+export type StoredScene = z.infer<typeof UserScenesSchema>[number];
+
+// Saved scenes and edits to built-ins that didn't compile at startup (another GPU, an older app).
+// They stay stored until you delete them: every save writes them back, so saving something else
+// never erases them. Saving a scene under the same name, or editing that built-in, supersedes them.
+export interface ParkedScenes {
+  userScenes: StoredScene[];
+  sceneEdits: Record<string, string>;
+}
 
 export const loadUserScenes = () => readJSON(KEYS.userScenes, UserScenesSchema, []);
 export const loadSceneEdits = () => readJSON(KEYS.sceneEdits, SceneEditsSchema, {});
@@ -26,6 +35,7 @@ export interface SceneListInit {
   nodesIndex: number;
   keyedScenes: number[];   // keys 1–0
   errors: string[];        // saved scenes / edits that no longer compile
+  parked: ParkedScenes;    // the same, kept stored
 }
 
 // Built-ins, the two editor slots, then your saved scenes (compiled after the built-ins, so a broken
@@ -37,9 +47,10 @@ export function buildSceneList(renderer: Renderer): SceneListInit {
     { id: 'nodes', name: 'Node Scene', kind: 'nodes', cat: '', desc: '', body: TEMPLATE, frag: COMMON + TEMPLATE, params: [] },
   ];
   const errors: string[] = [];
+  const parked: ParkedScenes = { userScenes: [], sceneEdits: {} };
   for (const { name, body } of loadUserScenes()) {
     const scene = userScene(name, body);
-    if (renderer.check(scene.frag, name)) errors.push(name);
+    if (renderer.check(scene.frag, name)) { errors.push(name); parked.userScenes.push({ name, body }); }
     else scenes.push(scene);
   }
   for (const s of SCENES) s.original = s.body;
@@ -47,7 +58,7 @@ export function buildSceneList(renderer: Renderer): SceneListInit {
     const s = SCENES.find((x) => x.name === name);
     if (!s) continue;
     const { code, params } = parseParams(body);
-    if (renderer.check(COMMON + code, name)) { errors.push(`${name} (your edit)`); continue; }
+    if (renderer.check(COMMON + code, name)) { errors.push(`${name} (your edit)`); parked.sceneEdits[name] = body; continue; }
     Object.assign(s, { body, frag: COMMON + code, params, edited: true });
   }
   return {
@@ -57,19 +68,41 @@ export function buildSceneList(renderer: Renderer): SceneListInit {
     nodesIndex: scenes.findIndex((s) => s.kind === 'nodes'),
     keyedScenes: scenes.map((s, i) => (s.kind ? -1 : i)).filter((i) => i >= 0).slice(0, 10),
     errors,
+    parked,
   };
 }
 
-export function saveUserScenes(scenes: readonly Scene[]): void {
-  writeJSON(KEYS.userScenes, scenes.filter((s) => s.user && !s.removed).map(({ name, body }) => ({ name, body })));
+// Your scenes plus the parked ones. A parked scene whose name is now in the list was saved again
+// (fixed in the editor), so it leaves the parked set.
+export function saveUserScenes(scenes: readonly Scene[], parked: ParkedScenes): void {
+  const mine = scenes.filter((s) => s.user && !s.removed).map(({ name, body }) => ({ name, body }));
+  parked.userScenes = parked.userScenes.filter((p) => !mine.some((s) => s.name === p.name));
+  writeJSON(KEYS.userScenes, [...mine, ...parked.userScenes]);
 }
 
-// Your edits to built-in scenes replace their code; Revert restores `original`.
-export function saveSceneEdit(scene: Scene, scenes: readonly Scene[]): void {
+// Your edits to built-in scenes replace their code; Revert restores `original`. Editing or reverting
+// a built-in supersedes its parked edit.
+export function saveSceneEdit(scene: Scene, scenes: readonly Scene[], parked: ParkedScenes): void {
   scene.edited = scene.body.trim() !== (scene.original ?? '').trim();
-  const edits: Record<string, string> = {};
+  delete parked.sceneEdits[scene.name];
+  writeSceneEdits(scenes, parked);
+}
+
+function writeSceneEdits(scenes: readonly Scene[], parked: ParkedScenes): void {
+  const edits: Record<string, string> = { ...parked.sceneEdits };
   for (const s of scenes) if (!s.user && !s.kind && s.edited) edits[s.name] = s.body;
   writeJSON(KEYS.sceneEdits, edits);
+}
+
+// Deletes a parked scene or edit for good (Library → "Doesn't compile here").
+export function discardParked(parked: ParkedScenes, kind: 'scene' | 'edit', name: string, scenes: readonly Scene[]): void {
+  if (kind === 'scene') {
+    parked.userScenes = parked.userScenes.filter((p) => p.name !== name);
+    saveUserScenes(scenes, parked);
+  } else {
+    delete parked.sceneEdits[name];
+    writeSceneEdits(scenes, parked);
+  }
 }
 
 export const sceneByName = (scenes: readonly Scene[], name: string): number => scenes.findIndex((s) => s.name === name && !s.removed);
