@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { useApp, useUI } from '../app/AppContext';
+import { STATIC_DEMO } from '../app/static-demo';
 import { HELP_ROW, HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { LOOK_RANGES, type LookKey, type SourceButton } from '../state/app-state';
@@ -88,12 +89,12 @@ function MediaGroup({ onOpenMediaFile, onOpenYouTube }: { onOpenMediaFile: () =>
       <div className="media-row">
         <div id="media-preview" className="media-preview" ref={(el) => { if (!el) return; el.replaceChildren(...(app.media.el && media.loaded ? [app.media.el] : [])); }} />
         <span id="media-name" className="media-name">
-          {media.loaded ? `${media.name} · ${media.width}×${media.height}${media.kind === 'video' ? ' · video' : ''}` : 'Drop an image or video anywhere, or pick one from YouTube'}
+          {media.loaded ? `${media.name} · ${media.width}×${media.height}${media.kind === 'video' ? ' · video' : ''}` : `Drop an image or video anywhere${STATIC_DEMO ? '' : ', or pick one from YouTube'}`}
         </span>
       </div>
       <div className="media-buttons">
         <button id="media-open" onClick={onOpenMediaFile}>Open file</button>
-        <button id="media-youtube" onClick={onOpenYouTube}>YouTube</button>
+        {!STATIC_DEMO && <button id="media-youtube" onClick={onOpenYouTube}>YouTube</button>}
         <button id="media-clear" disabled={!media.loaded} onClick={() => app.clearMedia()}>Clear</button>
       </div>
       <label id="media-sound-row" className="toggle media-sound" hidden={media.kind !== 'video'}>

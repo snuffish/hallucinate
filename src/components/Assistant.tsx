@@ -8,6 +8,7 @@ import { Markdown } from '@tanstack/markdown/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import { useApp, useUI } from '../app/AppContext';
+import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
 import { clientTools } from '../assistant/client-tools';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
 import { splitFollowUps } from '../assistant/follow-ups';
@@ -57,13 +58,14 @@ export function Assistant() {
   const undoLabels = useStore(undo.store, (s) => s.labels);
   const [threadId, setThreadId] = useState(() => crypto.randomUUID());
   const [input, setInput] = useState('');
-  const [info, setInfo] = useState<z.infer<typeof InfoSchema> | null>(null);
+  const [info, setInfo] = useState<z.infer<typeof InfoSchema> | null>(STATIC_DEMO ? { backend: 'none', setup: STATIC_DEMO_NOTE } : null);
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
   const log = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const runner = useMemo<ToolRunner>(() => createToolRunner(app, undo), [app, undo]);
 
   useEffect(() => {
+    if (STATIC_DEMO) return;
     fetch('/api/assistant/info').then((r) => r.json()).then((j) => { const p = InfoSchema.safeParse(j); if (p.success) setInfo(p.data); }).catch(() => {});
   }, []);
 
