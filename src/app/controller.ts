@@ -17,6 +17,7 @@ import { buildSceneList, discardParked, paramKey, saveUserScenes, userScene, typ
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
+import { downloadFile, fileStamp } from './download';
 import { EditorCore } from './editor';
 import type { StudioSession } from './studio';
 import { Transport } from './transport';
@@ -686,11 +687,7 @@ export class AppController {
     recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     recorder.onstop = () => {
       const blob = new Blob(chunks, { type: recorder.mimeType });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `hallucinate-${new Date().toISOString().replace(/[:.]/g, '-')}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+      downloadFile(blob, `hallucinate-${fileStamp()}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`);
       this.recorder = null;
       this.ui.set({ recording: false });
       if (!this.disposed) this.toast('Recording saved');
