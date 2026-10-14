@@ -8,7 +8,7 @@ import { CUE_DIGITS, HOTKEYS, SCENE_DIGITS, type HotkeyDef, type HotkeyWhen } fr
 export interface HotkeyActions {
   playPause(): void; seek(seconds: number): void; changeVolume(delta: number): void; changeRate(delta: number): void; toggleMute(): void;
   stepScene(dir: number): void; pickScene(digit: number): void; steer(dir: number): void; restartGame(): void;
-  toggleLibrary(): void; toggleAssistant(): void; toggleEditor(): void; toggleVisualMaker(): void; toggleStudio(): void;
+  toggleLibrary(): void; toggleAssistant(): void; toggleHelp(): void; toggleEditor(): void; toggleVisualMaker(): void; toggleStudio(): void;
   toggleParams(): void; togglePanel(): void; toggleFullscreen(): void; toggleRecording(): void; toggleAuto(): void; randomize(): void;
   closeOverlay(): void; take(): void; blackout(): void; studioStep(dir: number): void; studioCue(n: number): void; game(): void;
   librarySearch(): void; libraryMove(dx: number, dy: number): void; libraryPick(): void; libraryTab(dir: number): void; deleteNode(): void;
@@ -18,6 +18,7 @@ export function useAppHotkeys(actions: HotkeyActions): void {
   const app = useApp();
   const overlay = useUI((ui) => ui.overlay);
   const assistantOpen = useUI((ui) => ui.assistantOpen);
+  const helpOpen = useUI((ui) => ui.help !== null);
   const paramsVisible = useUI((ui) => ui.paramsVisible);
   const sceneIndex = useUI((ui) => ui.sceneIndex);
   const inGame = sceneIndex === app.state.gameIndex;
@@ -35,7 +36,7 @@ export function useAppHotkeys(actions: HotkeyActions): void {
       case 'notStudio': return !studioOpen && !nodesOpen;
       case 'nodesOpen': return nodesOpen;
       case 'paramsVisible': return paramsVisible && !nodesOpen;
-      case 'overlayOpen': return overlay !== null || assistantOpen;
+      case 'overlayOpen': return overlay !== null || assistantOpen || helpOpen;
       case 'library': return overlay === 'library';
       case 'noLibrary': return overlay !== 'library' && !nodesOpen;
     }
@@ -69,6 +70,7 @@ export function useAppHotkeys(actions: HotkeyActions): void {
     fire(HOTKEYS.studioNext, () => actions.studioStep(1)),
     fire(HOTKEYS.library, actions.toggleLibrary),
     fire(HOTKEYS.assistant, actions.toggleAssistant),
+    fire(HOTKEYS.help, actions.toggleHelp),
     fire(HOTKEYS.editor, actions.toggleEditor),
     fire(HOTKEYS.visualMaker, actions.toggleVisualMaker),
     fire(HOTKEYS.studio, actions.toggleStudio),

@@ -1,7 +1,7 @@
 import type { Hotkey } from '@tanstack/react-hotkeys';
 
 // Every keyboard shortcut in the app, in one place: the hooks register them, the badges display them
-// and the help row lists them. `when` encodes the old overlay rules (src/main.js keydown handler).
+// and the help sheet lists them. `when` encodes the old overlay rules (src/main.js keydown handler).
 
 export type HotkeyWhen =
   | 'always'
@@ -62,6 +62,7 @@ export const HOTKEYS = {
   hidePanel: { id: 'hidePanel', keys: 'H', label: 'Hide panel', group: 'Panels', when: 'noNodes' },
   fullscreen: { id: 'fullscreen', keys: 'F', label: 'Fullscreen', group: 'Panels', when: 'always' },
   record: { id: 'record', keys: 'C', label: 'Record', group: 'Panels', when: 'noNodes' },
+  help: { id: 'help', keys: '?', label: 'Help & shortcuts', group: 'Panels', when: 'always' },
   closeOverlay: { id: 'closeOverlay', keys: 'Escape', label: 'Close', group: 'Panels', when: 'overlayOpen', inInputs: true },
   deleteNode: { id: 'deleteNode', keys: 'Delete', label: 'Delete block', group: 'Panels', when: 'nodesOpen' },
   deleteNodeBackspace: { id: 'deleteNodeBackspace', keys: 'Backspace', label: 'Delete block', group: 'Panels', when: 'nodesOpen' },
@@ -78,9 +79,3 @@ export type HotkeyId = keyof typeof HOTKEYS;
 // Scene number keys: 1–9 and 0 outside the studio, cue keys 1–9 inside it.
 export const SCENE_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'] as const;
 export const CUE_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
-
-// The help row at the bottom of the panel, in reading order.
-export const HELP_ROW: HotkeyId[] = [
-  'playPause', 'seekBack', 'volumeUp', 'tempoDown', 'mute', 'scenePrev', 'library', 'assistant', 'studio', 'blackout',
-  'params', 'game', 'editor', 'visualMaker', 'auto', 'randomize', 'fullscreen', 'hidePanel',
-];

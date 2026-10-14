@@ -3,9 +3,10 @@
 import type { CSSProperties } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import { STATIC_DEMO } from '../app/static-demo';
-import { HELP_ROW, HOTKEYS } from '../hotkeys/registry';
+import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { LOOK_RANGES, type LookKey, type SourceButton } from '../state/app-state';
+import { HelpButton } from './Help';
 import { SOURCES } from './StartScreen';
 import { TransportPanel } from './Transport';
 
@@ -31,7 +32,6 @@ export function Panel(a: PanelActions) {
       <SceneGroup onOpenLibrary={a.onOpenLibrary} />
       <LookGroup />
       <ActionsGroup {...a} />
-      <HelpRow />
     </aside>
   );
 }
@@ -41,6 +41,7 @@ function PanelHeader() {
   return (
     <header>
       <strong>Hallucinate</strong>
+      <HelpButton topic="sheet" />
       <button id="collapse" className="icon" title="Hide panel (H)" onClick={() => app.togglePanel()}>–<Kbd hotkey={HOTKEYS.hidePanel} /></button>
     </header>
   );
@@ -69,7 +70,7 @@ function SourceGroup({ onSource }: { onSource: (kind: SourceButton) => void }) {
   const now = useUI((ui) => ui.nowText);
   return (
     <div className="group">
-      <label>Source</label>
+      <div className="group-head"><label>Source</label><HelpButton topic="sources" /></div>
       <div className="sources compact">
         {SOURCES.map((s) => <button key={s.kind} data-source={s.kind} className={active === s.kind ? 'active' : undefined} onClick={() => onSource(s.kind)}>{s.short}</button>)}
       </div>
@@ -165,6 +166,7 @@ function LookGroup() {
   };
   return (
     <div className="group sliders">
+      <div className="group-head"><label>Look</label><HelpButton topic="look" /></div>
       {SLIDERS.map((s) => <label key={s.key}>{s.label} {s.hint && <small>{s.hint}</small>}{slider(s.key)}</label>)}
       <label className="toggle"><input type="checkbox" id="mood" checked={look.mood} onChange={(e) => app.setLookFlag('mood', e.target.checked)} /> Mood from tempo <small>fast → vivid & warm · slow → muted & cool</small></label>
       <label>Aberration {slider('aberration')}</label>
@@ -185,14 +187,5 @@ function ActionsGroup(a: PanelActions) {
       <button id="visual" onClick={a.onOpenVisualMaker}>Visual maker<Kbd hotkey={HOTKEYS.visualMaker} /></button>
       <button id="studio-open" onClick={a.onOpenStudio}>Studio &amp; projector<Kbd hotkey={HOTKEYS.studio} /></button>
     </div>
-  );
-}
-
-// Every shortcut, generated from the registry so it can't drift from what the keys do.
-function HelpRow() {
-  return (
-    <p className="keys">
-      {HELP_ROW.map((id) => <span key={id} className="key-help"><Kbd hotkey={HOTKEYS[id]} /> {HOTKEYS[id].label}</span>)}
-    </p>
   );
 }

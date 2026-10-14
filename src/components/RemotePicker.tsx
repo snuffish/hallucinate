@@ -10,6 +10,7 @@ import type { PickerApi } from '../app/controller';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { readJSON, writeJSON, remove as removeKey } from '../state/persistence';
+import { HelpButton } from './Help';
 
 const RECENT_MAX = 25;
 
@@ -167,6 +168,7 @@ export function RemotePicker({ id, site, title, noun = 'track', recentKey, fetch
     <section id={id} className={`sc${id === 'yt' ? ' yt' : ''}${view === 'recent' ? ' recent-view' : ''}${recent.length ? ' has-recent' : ''}`} hidden={!open}>
       <header>
         <strong>{title}</strong>
+        <HelpButton topic={site} />
         <button id={`${id}-close`} className="icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
       </header>
       <form id={`${id}-form`} onSubmit={(e) => { e.preventDefault(); void search(query); }}>

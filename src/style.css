@@ -92,7 +92,8 @@ body.idle { cursor: none; }
 .icon { padding: 2px 10px; }
 
 .group { border-top: 1px solid var(--line); padding: 10px 0; display: flex; flex-direction: column; gap: 8px; }
-.group > label:first-child { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.group > label:first-child, .group-head > label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.group-head { display: flex; align-items: center; justify-content: space-between; }
 .compact { justify-content: flex-start; }
 .compact button { padding: 5px 9px; }
 .now { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -170,7 +171,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 .actions { flex-direction: row; flex-wrap: wrap; }
 .actions button { flex: 1; }
-.keys { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
 
 .toast {
   z-index: 20;
@@ -424,8 +424,8 @@ body:has(#nodes:not([hidden])) .panel { display: none; }
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 .sc[hidden] { display: none; }
-.sc header { display: flex; justify-content: space-between; align-items: center; }
-.sc header strong { font-size: 16px; color: #ff7a2f; }
+.sc header { display: flex; align-items: center; gap: 8px; }
+.sc header strong { flex: 1; font-size: 16px; color: #ff7a2f; }
 .sc form { display: flex; gap: 8px; }
 .sc input[type="search"] {
   flex: 1;
@@ -859,9 +859,30 @@ body.idle .params-dock .params { opacity: 1; pointer-events: auto; }
 .kbd[data-hint] { border-color: var(--accent); color: var(--text); }
 .icon, .tp-buttons button, .tp-icon { position: relative; }
 .icon .kbd, .tp-buttons .kbd, .tp-icon .kbd { position: absolute; right: -6px; bottom: -7px; margin: 0; font-size: 8px; padding: 1px 3px; }
-.keys { display: flex; flex-wrap: wrap; gap: 4px 10px; }
-.key-help { white-space: nowrap; }
-.key-help .kbd { margin: 0 3px 0 0; }
+
+/* Help: the `?` buttons and the one popover they open (top layer, positioned from the button). */
+.icon.help-btn { width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 12px; font-weight: 700; line-height: 1; color: var(--muted); flex: none; }
+.help-btn:hover, .help-btn.active { color: var(--text); border-color: var(--accent); }
+.panel header .help-btn { margin-left: auto; margin-right: 8px; }
+.group-head .icon.help-btn { width: 18px; height: 18px; font-size: 10.5px; }
+.help-pop { position: fixed; inset: auto; margin: 0; left: 50%; top: 50%; width: min(340px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(14, 10, 24, 0.94); backdrop-filter: blur(14px); color: var(--text); font-size: 12.5px; line-height: 1.45; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.help-pop { transform: translate(-50%, -50%); }
+.help-pop.anchored { transform: none; }
+.help-pop.sheet { width: min(760px, calc(100vw - 32px)); max-height: min(80vh, calc(100vh - 32px)); }
+.help-pop header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.help-pop header strong { font-size: 14px; }
+.help-pop p { margin: 0 0 8px; color: var(--muted); }
+.help-pop .help-more { color: var(--text); }
+.help-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 20px; margin-top: 10px; }
+.help-groups h3 { margin: 8px 0 4px; font-size: 11px; font-weight: 600; color: var(--accent2); text-transform: uppercase; letter-spacing: 0.08em; }
+.help-keys { margin: 4px 0 0; display: flex; flex-direction: column; gap: 4px; }
+.help-keys > div { display: flex; align-items: baseline; gap: 10px; }
+.help-keys dt { flex: none; min-width: 64px; white-space: nowrap; color: var(--muted); }
+.help-keys dt .kbd { margin: 0 3px 0 0; }
+.help-keys dd { margin: 0; }
+.help-keys dd small { color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 600px) { .help-pop, .help-pop.sheet { inset: auto 8px 8px 8px; width: auto; transform: none; max-height: calc(100vh - 80px); } }
 /* Meters animate on the compositor instead of re-laying out the panel. */
 .meters i { width: 100%; transform-origin: left center; transform: scaleX(0); will-change: transform; }
 

@@ -15,7 +15,7 @@ import { KEYS, readString, writeString } from '../state/persistence';
 import { buildSceneList, paramKey, saveUserScenes, userScene } from '../state/scene-list';
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
-import { initialUIState, type DownloadView, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
+import { initialUIState, type DownloadView, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { EditorCore } from './editor';
 import type { StudioSession } from './studio';
 import { Transport } from './transport';
@@ -105,7 +105,7 @@ export class AppController {
     clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
       const ui = this.ui.get();
-      if (this.audio.kind && !ui.overlay && !ui.assistantOpen && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
+      if (this.audio.kind && !ui.overlay && !ui.assistantOpen && !ui.help && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
     }, 3000);
   };
 
@@ -196,7 +196,7 @@ export class AppController {
     // Hand the keyboard back to the shortcuts: a text field inside the closing overlay keeps focus
     // otherwise (overlays slide out, they are not display:none).
     if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur();
-    this.ui.set({ overlay });
+    this.ui.set({ overlay, help: null });
     this.showParams();
     this.wake();
   }
@@ -209,13 +209,24 @@ export class AppController {
   toggleAssistant(open = !this.ui.get().assistantOpen): void {
     if (this.ui.get().assistantOpen === open) return;
     if (!open && document.activeElement instanceof HTMLElement && document.activeElement.closest('#ai')) document.activeElement.blur();
-    this.ui.set({ assistantOpen: open });
+    this.ui.set({ assistantOpen: open, help: null });
     this.wake();
+  }
+
+  // Help lives in the store, not in the popover's own state: every action that shows or hides an area
+  // (setOverlay, toggleAssistant, togglePanel) closes it, so it can't outlive the panel it explains.
+  setHelp(help: HelpId | null): void {
+    this.ui.set({ help });
+    this.wake();
+  }
+
+  toggleHelp(help: HelpId): void {
+    this.setHelp(this.ui.get().help === help ? null : help);
   }
 
   togglePanel(): void {
     const collapsed = !this.ui.get().panelCollapsed;
-    this.ui.set({ panelCollapsed: collapsed });
+    this.ui.set({ panelCollapsed: collapsed, help: null });
     if (collapsed) this.toast('Press H to show the controls again', 2000);
   }
 
@@ -483,6 +494,7 @@ export class AppController {
     if (sourceButton !== 'media' && this.mediaSound) this.setMediaSound(false, { quiet: true });   // another source is the music now
     this.ui.set({ nowText: `▶ ${label}`, started: true, activeSource: sourceButton });
     document.body.classList.add('started');
+    if (readString(KEYS.helpHint) !== '1') { writeString(KEYS.helpHint, '1'); this.toast('Press ? for help & shortcuts', 4000); }
     this.state.clock.beatTimes = [];
     this.state.clock.bpm = null;
     this.tempo.reset();

@@ -9,6 +9,7 @@ import type { ParamSpec, ParamValue, VecParamSpec, FloatParamSpec } from '../eng
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { KEYS, readJSON, remove, writeJSON } from '../state/persistence';
+import { HelpButton } from './Help';
 
 const AXES = ['x', 'y', 'z', 'w'];
 const PosSchema = z.object({ x: z.number(), y: z.number() });
@@ -78,6 +79,7 @@ export function ParamOverlay({ docked }: { docked?: boolean }) {
       <header title="Drag to move · double-click to put it back" onPointerDown={startDrag} onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button') && !isDocked) resetPosition(); }}>
         <strong id="params-title">{params.title}</strong>
         <button id="params-reset" title="Reset every value to the default in the code" onClick={() => app.resetParams()}>Reset</button>
+        <HelpButton topic="params" />
         <button id="params-collapse" className="icon" title="Collapse / expand (P)" onClick={() => app.toggleParamsCollapsed()}>–<Kbd hotkey={HOTKEYS.params} /></button>
       </header>
       <div id="params-list" className="params-list">

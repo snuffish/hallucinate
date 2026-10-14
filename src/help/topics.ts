@@ -1,0 +1,161 @@
+import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
+import { HOTKEYS, type HotkeyDef, type HotkeyId, type HotkeyWhen } from '../hotkeys/registry';
+
+// What the `?` buttons explain, one entry per area. Kept short on purpose: the README is the long
+// reference. Shortcut lists come from the hotkey registry, so they can't drift from what the keys do.
+
+export interface HelpTopic {
+  id: string;
+  title: string;
+  body: string[];          // paragraphs
+  hotkeys: HotkeyId[];     // the shortcuts that matter here, in display order
+}
+
+const NEEDS_SERVER = STATIC_DEMO ? [STATIC_DEMO_NOTE] : [];
+
+export const HELP_TOPICS = {
+  panel: {
+    id: 'panel',
+    title: 'The control panel',
+    body: [
+      'Pick a sound source, then shape the visuals: every scene reacts to the bass, mids and highs of whatever is playing.',
+      'The panel fades away while the music plays and you leave the mouse alone; move it to bring the controls back.',
+      'Every button with a shortcut shows its key. Hold a modifier to see which badges light up.',
+    ],
+    hotkeys: ['help', 'hidePanel', 'fullscreen', 'randomize', 'record'],
+  },
+  sources: {
+    id: 'sources',
+    title: 'Sound sources',
+    body: [
+      STATIC_DEMO
+        ? 'Open an audio file (or drop one anywhere), use the microphone, share a tab\'s audio, or play the built-in demo beat.'
+        : 'Open an audio file (or drop one anywhere), use the microphone, search SoundCloud, share a tab\'s audio, or play the built-in demo beat.',
+      '"Tab / system audio" works for Spotify, YouTube or anything playing in another tab: tick "Share audio" when the browser asks.',
+      'The visuals react the same at any volume, even when muted.',
+    ],
+    hotkeys: ['playPause', 'seekBack', 'seekFwd', 'volumeUp', 'volumeDown', 'tempoDown', 'tempoUp', 'mute'],
+  },
+  look: {
+    id: 'look',
+    title: 'The look',
+    body: [
+      'These sliders apply to every scene: how strongly it reacts, how fast it moves, how long its trails are, and its colour.',
+      'Synesthesia grades the picture by the sound: dark sound goes dim and cool, bright sound light and warm. Mood from tempo makes fast music more vivid.',
+      'Lower the resolution if the frame rate drops.',
+    ],
+    hotkeys: ['randomize', 'auto'],
+  },
+  library: {
+    id: 'library',
+    title: 'Scene library',
+    body: [
+      'Every scene with a live preview. Click a preview to play it, or filter by category and search.',
+      '★ makes a scene come up twice as often in auto-switch; the checkbox takes it out of the rotation. "Edit code" opens it in the code editor.',
+    ],
+    hotkeys: ['librarySearch', 'libraryTabNext', 'libraryRight', 'libraryDown', 'libraryPick', 'closeOverlay'],
+  },
+  editor: {
+    id: 'editor',
+    title: 'Code editor',
+    body: [
+      'The GLSL code of the scene on screen. It recompiles as you type; an error keeps the last working version running.',
+      'Edits to built-in scenes are kept as your version ("Revert to original" undoes them). "Save to library" stores the code as a new scene.',
+      'Tag a uniform or const with // @param to get a live control. The cheat sheet lists the audio inputs and helpers.',
+    ],
+    hotkeys: ['editor', 'scenePrev', 'sceneNext', 'closeOverlay'],
+  },
+  nodes: {
+    id: 'nodes',
+    title: 'Visual maker',
+    body: [
+      'Build a scene by wiring blocks instead of writing code. Click a block on the left to add it, then drag from an output ● to an input ● to connect them.',
+      'Type numbers into unconnected inputs. "Peek" hides the graph, "Examples…" loads ready-made graphs, and "Send to code" turns the graph into GLSL.',
+    ],
+    hotkeys: ['visualMaker', 'deleteNode', 'closeOverlay'],
+  },
+  studio: {
+    id: 'studio',
+    title: 'Studio & projector',
+    body: [
+      'Run a show: click a show scene to put it in Preview (green), then Take sends it to Live (red) with a cut or a fade.',
+      'Open a projector window on another display: it renders the show itself at its own resolution. Blackout fades Live to black.',
+      'Autopilot takes the next scene every few beats (or seconds).',
+      ...(STATIC_DEMO ? ['The Director, which plans the show with Claude, needs the local server.'] : ['The Director lets Claude plan the show from the music.']),
+    ],
+    hotkeys: ['take', 'blackout', 'studioPrev', 'studioNext', 'studio', 'closeOverlay'],
+  },
+  assistant: {
+    id: 'assistant',
+    title: 'AI assistant',
+    body: [
+      'Ask Claude to create or change scenes, set parameters and the look, or build and plan a studio show. Changes show up live.',
+      'Undo reverts the assistant\'s last change; New chat starts over.',
+      ...NEEDS_SERVER,
+    ],
+    hotkeys: ['assistant', 'closeOverlay'],
+  },
+  params: {
+    id: 'params',
+    title: 'Live parameters',
+    body: [
+      'The controls this scene exposes. Changes apply instantly and are remembered per scene.',
+      'Double-click a slider to reset it; Reset resets them all. Drag the title bar to move the overlay, double-click it to send it back.',
+    ],
+    hotkeys: ['params'],
+  },
+  soundcloud: {
+    id: 'soundcloud',
+    title: 'SoundCloud',
+    body: [
+      'Search, or paste a track, playlist or artist link, and click a result. The results play in order like a queue.',
+      'The local server fetches tracks with yt-dlp; some (Go+ or region-locked) can\'t be fetched. "Recent" lists what you played.',
+      ...NEEDS_SERVER,
+    ],
+    hotkeys: ['closeOverlay'],
+  },
+  youtube: {
+    id: 'youtube',
+    title: 'YouTube',
+    body: [
+      'Search, or paste a video, playlist or Shorts link. The video becomes the picture the Media scenes distort.',
+      'Tick "Use the video\'s sound as the music" to make it the audio source too. The first load of a long video takes a moment.',
+      ...NEEDS_SERVER,
+    ],
+    hotkeys: ['closeOverlay'],
+  },
+} as const satisfies Record<string, HelpTopic>;
+
+export type HelpTopicId = keyof typeof HELP_TOPICS;
+
+// The sheet's group order.
+export const SHEET_GROUPS: HotkeyDef['group'][] = ['Playback', 'Scenes', 'Look', 'Panels', 'Studio', 'Game'];
+
+// Where a shortcut works, for keys that only apply in one place.
+const WHEN_NOTES: Partial<Record<HotkeyWhen, string>> = {
+  library: 'in the library',
+  game: 'in Beat Racer',
+  studio: 'in the studio',
+  nodesOpen: 'in the visual maker',
+  paramsVisible: 'while parameters show',
+};
+
+export interface ShortcutRow { label: string; note?: string; keys: HotkeyDef[] }
+
+// One row per label: entries that share a label (Delete / Backspace) are shown together.
+export function shortcutRows(ids: readonly HotkeyId[]): ShortcutRow[] {
+  const rows: ShortcutRow[] = [];
+  for (const id of ids) {
+    const def: HotkeyDef = HOTKEYS[id];
+    const note = WHEN_NOTES[def.when];
+    const row = rows.find((r) => r.label === def.label && r.note === note);
+    if (row) row.keys.push(def);
+    else rows.push({ label: def.label, note, keys: [def] });
+  }
+  return rows;
+}
+
+// Every shortcut in a group, in registry order.
+export function groupRows(group: HotkeyDef['group']): ShortcutRow[] {
+  return shortcutRows((Object.keys(HOTKEYS) as HotkeyId[]).filter((id) => HOTKEYS[id].group === group));
+}

@@ -18,6 +18,7 @@ import { UndoStack } from '../assistant/undo';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { useStore } from '../state/store';
+import { HelpButton } from './Help';
 
 const InfoSchema = z.object({ backend: z.enum(['api', 'claude-code', 'none']), model: z.string().nullable().optional(), setup: z.string().optional() });
 const UNDO_NOTE = '(The user pressed Undo and reverted your change: ';
@@ -118,6 +119,7 @@ export function Assistant() {
         <strong>✦ Assistant</strong>
         <button id="ai-undo" title={undoLabels.length ? `Undo: ${undoLabels.at(-1)}` : 'Nothing to undo'} disabled={!undoLabels.length || isLoading} onClick={doUndo}>Undo</button>
         <button id="ai-new" title="Start a new conversation" onClick={reset}>New chat</button>
+        <HelpButton topic="assistant" />
         <button id="ai-close" className="icon" title="Close (Esc)" onClick={() => app.toggleAssistant(false)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
       </header>
       <div id="ai-log" className="ai-log" ref={log}>

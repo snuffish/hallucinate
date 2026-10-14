@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HELP_ROW, HOTKEYS, type HotkeyWhen } from './registry';
+import { HOTKEYS, type HotkeyWhen } from './registry';
 
 // Two bindings on the same key may coexist only when their `when` conditions can't both hold.
 const EXCLUSIVE: [HotkeyWhen, HotkeyWhen][] = [
@@ -17,11 +17,6 @@ describe('hotkey registry', () => {
       if (a === b || a.keys !== b.keys) continue;
       expect(exclusive(a.when, b.when), `${a.id} and ${b.id} both bind ${a.keys}`).toBe(true);
     }
-  });
-
-  it('lists only known entries in the help row, each once', () => {
-    expect(new Set(HELP_ROW).size).toBe(HELP_ROW.length);
-    for (const id of HELP_ROW) expect(HOTKEYS[id]).toBeDefined();
   });
 
   it('uses ids that match their keys in the table', () => {
