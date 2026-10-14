@@ -225,11 +225,25 @@ Run a show like OBS's Studio Mode and put it on a projector. The two monitors ar
    A bar under it counts the beats gone and left until the next take. These beats come from a tempo clock: it takes
    its speed from the BPM detected on the kick drum, re-anchors on every real kick, and keeps counting through
    breakdowns and silence, so the show moves on even when the bass stops. (Everything else that reacts "on the beat",
-   the `uBeat` uniform, auto-switch and Beat Racer, follows the detected kicks themselves.)
+   the `uBeat` uniform, auto-switch and Beat Racer, follows the detected kicks themselves.) For music without a usable
+   beat (ambient, a talk, a film), switch the unit box from *beats* to *seconds*: the autopilot then runs on a plain
+   timer, every 10 s … 5 min, with or without music, and every plan step gets the same time.
 6. **Close the studio and keep browsing.** Once a show scene is Live, closing the studio pins it: projectors keep
    rendering the Live scene while whatever you do on screen (switch scenes, tweak sliders) is only a preview. The panel
    shows *● LIVE · name* meanwhile; `T` still takes the next Preview scene straight to Live. Reopening the studio puts
    Live back on screen.
+7. **Plans and the Director.** Instead of list order, the autopilot can follow a **plan**: an ordered queue of show
+   scenes, each with its own beat count and transition. Plans come from the [AI assistant](#-ai-assistant--press-i)
+   ("build a 30-minute set that starts calm and peaks at the end") or from **Director** mode: tick *Director: plan
+   every 64 / 128 / 256 beats* (or, with the unit box on *seconds*, every 30 s … 10 min on a timer) and Claude reads a
+   short digest of the music (tempo, mood, tone, the energy of the last few cycles) and the show, writes the next
+   steps, and the autopilot takes them on the bar. On beats it also plans at least every two minutes, tempo or not. The plan shows as chips
+   under the beat bar (the red one is playing; click one to preview it, ↶ brings the previous plan back, × drops it);
+   the line below says what the director last decided and how many beats until its next cycle. Every step also has a
+   wall-clock ceiling (90 s by default) so the show moves on even when no tempo has been detected yet. A take or an edit
+   by hand is reported to the director in its next cycle and it respects it; the director never takes Live by itself and
+   never edits scene code. Each cycle is a fresh, short conversation (the app remembers the recent decisions), so a long
+   set costs the same per cycle at the end as at the start; the token count so far is in the status line.
 
 While the studio is open the main canvas is the Live monitor and the Parameters overlay becomes a dock. Like OBS's
 Studio Mode, the dock edits the **selected (Preview) show scene** by default — tweaks show on the Preview monitor, are
@@ -244,8 +258,11 @@ in OBS (*Window Capture*), or use *Record* here.
 
 A chat bubble at the bottom, next to the panel (✦, or I) that opens a panel where Claude creates and edits scenes for you, right in the app, while everything else stays where it is: it reads a scene's
 code, writes or fixes it (and sees its own compile errors), creates new scenes in your library, sets live parameters
-and the look sliders, switches scenes, and looks at a rendered frame to check its work. Every change shows up live, and
-**Undo** in the panel reverts the assistant's last change (edits, new scenes, parameters, look); built-in scenes can also
+and the look sliders, switches scenes, and looks at a rendered frame to check its work. It also runs the
+[studio](#-studio--projector--press-o): it adds, changes, reorders and removes show scenes, sets the transition and the
+autopilot, writes a plan for the autopilot and takes show scenes live ("build a show from the Space scenes and plan an
+hour", "swap the next two scenes", "longer fades"). Every change shows up live, and
+**Undo** in the panel reverts the assistant's last change (edits, new scenes, parameters, look, show); built-in scenes can also
 be reverted to their original in the code editor. **Stop** interrupts it; **New chat** starts over.
 After each reply the assistant suggests three things you could ask next, as buttons under the reply, like the
 examples on an empty chat.
@@ -262,9 +279,13 @@ npm run dev
 ```
 
 On the subscription backend Claude Code runs with **no built-in tools, none of your settings and a throw-away working
-directory**: it can only use this app's eight tools. Optional: `ASSISTANT_MODEL` (default `claude-opus-5-5` on the API;
-the CLI's default otherwise), `ASSISTANT_EFFORT` (`low` … `max`, default `high`; lower is faster and cheaper),
-`ASSISTANT_BACKEND=api|claude-code` to force one, `ASSISTANT_DEBUG=1` to log the CLI arguments and tool traffic.
+directory**: it can only use this app's tools (eight for scenes, nine for the studio). Optional: `ASSISTANT_MODEL`
+(default `claude-opus-5-5` on the API; the CLI's default otherwise), `ASSISTANT_EFFORT` (`low` … `max`, default `high`;
+lower is faster and cheaper), `ASSISTANT_DIRECTOR_EFFORT` (the effort of the studio director's cycles; same as
+`ASSISTANT_EFFORT` unless set), `ASSISTANT_BACKEND=api|claude-code` to force one, `ASSISTANT_DEBUG=1` to log the CLI
+arguments and tool traffic. The director's cycles get only the show tools (read the show, write the plan, tweak a show
+scene's look); on the subscription backend each cycle is one short `claude` run and its session is dropped afterwards.
+On the API backend the system prompt and tool list are cached between runs.
 
 ## 🧩 Visual maker — press N
 

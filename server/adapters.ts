@@ -9,6 +9,8 @@ import { ClaudeCliAdapter, CLAUDE_BIN } from './claude-cli-adapter';
 export type Backend = 'api' | 'claude-code' | 'none';
 export const MODEL = process.env.ASSISTANT_MODEL || 'claude-opus-5-5';
 export const EFFORT = process.env.ASSISTANT_EFFORT || 'high';
+// The director's cycles may run at a lower effort than the chat; same as the chat unless set.
+export const DIRECTOR_EFFORT = process.env.ASSISTANT_DIRECTOR_EFFORT || EFFORT;
 
 export const NO_BACKEND = 'The assistant needs Claude. With a Claude subscription: install Claude Code (the `claude` command), sign in once, and restart the dev server. With an API key: export ANTHROPIC_API_KEY=sk-ant-… and restart the dev server.';
 
@@ -23,8 +25,8 @@ export async function detectBackend(): Promise<Backend> {
   return (await claudeCodeAvailable()) ? 'claude-code' : 'none';
 }
 
-export function createAdapter(backend: Backend) {
+export function createAdapter(backend: Backend, effort = EFFORT) {
   if (backend === 'api') return anthropicText(MODEL as 'claude-opus-5-5');
-  if (backend === 'claude-code') return new ClaudeCliAdapter(process.env.ASSISTANT_MODEL, EFFORT);
+  if (backend === 'claude-code') return new ClaudeCliAdapter(process.env.ASSISTANT_MODEL, effort);
   return null;
 }

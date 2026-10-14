@@ -17,6 +17,7 @@ import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
 import { initialUIState, type DownloadView, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { EditorCore } from './editor';
+import type { StudioSession } from './studio';
 import { Transport } from './transport';
 
 const SOURCE_LABELS: Record<string, string> = { mic: 'Microphone / line-in', display: 'Tab / system audio', demo: 'Demo beat (124 BPM)' };
@@ -47,6 +48,8 @@ export interface ControllerHooks {
   blackout?: () => void;
   studioStep?: (dir: number) => void;
   studioCue?: (n: number) => void;
+  // The studio session itself, for the assistant's show tools and the director.
+  studio?: () => StudioSession;
   // Scene library keyboard navigation.
   librarySearch?: () => void;
   libraryMove?: (dx: number, dy: number) => void;
@@ -174,6 +177,9 @@ export class AppController {
     Object.assign(this.hooks, hooks);
     return () => { for (const k of Object.keys(hooks) as (keyof ControllerHooks)[]) if (this.hooks[k] === hooks[k]) delete this.hooks[k]; };
   }
+
+  // The studio session (null until the Studio panel has mounted).
+  studio(): StudioSession | null { return this.hooks.studio?.() ?? null; }
 
   // ---------- UI helpers ----------
 

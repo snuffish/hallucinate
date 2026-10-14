@@ -11,6 +11,7 @@ import { useApp, useUI } from '../app/AppContext';
 import { clientTools } from '../assistant/client-tools';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
 import { splitFollowUps } from '../assistant/follow-ups';
+import { relayToolCalls } from '../assistant/relay';
 import { ContentPartsSchema, DONE_VERBS, VERBS, type ToolName } from '../assistant/tools';
 import { UndoStack } from '../assistant/undo';
 import { HOTKEYS } from '../hotkeys/registry';
@@ -18,7 +19,6 @@ import { Kbd } from '../hotkeys/Kbd';
 import { useStore } from '../state/store';
 
 const InfoSchema = z.object({ backend: z.enum(['api', 'claude-code', 'none']), model: z.string().nullable().optional(), setup: z.string().optional() });
-const ToolCallEventSchema = z.object({ threadId: z.string(), callId: z.string(), toolCallId: z.string(), name: z.string(), input: z.unknown() });
 const UNDO_NOTE = '(The user pressed Undo and reverted your change: ';
 
 const EXAMPLES: [label: string, prompt: string][] = [
@@ -73,29 +73,14 @@ export function Assistant() {
     context: { run: runner },
     threadId,
     // Subscription backend: the server relays each tool call as a custom event; run it here and answer.
-    onCustomEvent: (type, data) => {
-      if (type !== 'hallucinate.tool_call') return;
-      const ev = ToolCallEventSchema.safeParse(data);
-      if (!ev.success) return;
-      const { callId, name, input } = ev.data;
-      runner(name, (input ?? {}) as Record<string, unknown>)
-        .then((out) => {
-          const parts = ContentPartsSchema.safeParse(out);
-          const content = parts.success
-            ? parts.data.map((p) => (p.type === 'image' ? { type: 'image' as const, data: p.source.value, mimeType: p.source.mimeType } : { type: 'text' as const, text: p.content }))
-            : [{ type: 'text' as const, text: typeof out === 'string' ? out : JSON.stringify(out ?? { ok: true }) }];
-          return { content, isError: false };
-        })
-        .catch((err: Error) => ({ content: [{ type: 'text' as const, text: err.message }], isError: true }))
-        .then((result) => fetch('/api/assistant/tool-result', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId: ev.data.threadId, callId, result }) }))
-        .catch(() => {});
-    },
+    onCustomEvent: relayToolCalls(runner),
     onError: (err) => setNote({ text: err.message, error: true }),
   }), [runner, threadId]);
 
   const { messages, sendMessage, isLoading, stop, clear, append } = useChat(options);
 
   useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [messages, note]);
+  useEffect(() => { app.ui.set({ assistantBusy: isLoading }); }, [app, isLoading]);   // the director waits for the chat
   useEffect(() => { if (open) composer.current?.focus(); }, [open]);
 
   const submit = () => {

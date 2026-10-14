@@ -3,9 +3,11 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
-import { StudioSession, type Cue } from '../app/studio';
+import { AUTO_BEATS, AUTO_SECONDS, StudioSession, type AutoUnit, type Cue } from '../app/studio';
+import { Director, DIRECTOR_BEATS, DIRECTOR_SECONDS } from '../director/director';
 import { HOTKEYS, CUE_DIGITS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
+import { useStore } from '../state/store';
 import { ParamOverlay } from './ParamOverlay';
 
 export function Studio() {
@@ -16,12 +18,15 @@ export function Studio() {
   const sceneName = useUI((ui) => ui.sceneName);
   const [, setVersion] = useState(0);
   const [studio] = useState(() => new StudioSession(app, () => setVersion((v) => v + 1)));
+  const [director] = useState(() => new Director(app, studio));
+  const dir = useStore(director.store, (s) => s);
   const [screen, setScreen] = useState('');
   const previewCanvas = useRef<HTMLCanvasElement>(null);
   const liveBox = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLElement>(null);
 
   useEffect(() => { const detach = studio.attach(); return () => { detach(); studio.dispose(); }; }, [studio]);
+  useEffect(() => director.attach(), [director]);
   useEffect(() => { studio.setOpen(open, previewCanvas.current); }, [open, studio]);
 
   // Pin the main canvas over the Live monitor box while the studio is open.
@@ -56,6 +61,16 @@ export function Studio() {
   const missing = (cue: Cue) => studio.sceneIndex(cue) < 0;
   const scenes = studio.listScenes();
   void sceneVersion;
+  const plan = studio.plan;
+  const timer = studio.autopilot.unit === 'seconds';
+  const directorTimer = studio.directorUnit === 'seconds';
+  const tokens = dir.tokens.prompt + dir.tokens.completion;
+  const directorStatus = dir.error ? dir.error
+    : !dir.on ? (plan?.note ? `Plan: ${plan.note}` : 'Off — Claude plans the show for you; the autopilot follows the plan on the beat')
+    : dir.cycling ? 'Planning…'
+    : !app.audio.kind ? 'Waiting for the music'
+    : studio.cues.length < 2 ? 'Add at least two show scenes'
+    : `${dir.lastNote || 'Waiting for the first plan'} · next in ${directorTimer ? `${dir.secondsToCycle} s` : `${dir.beatsToCycle} beats`}${tokens ? ` · ${Math.round(tokens / 1000)}k tokens` : ''}`;
 
   return (
     <section id="studio" className="studio" hidden={!open} ref={root}>
@@ -120,15 +135,59 @@ export function Studio() {
           </ol>
           <footer>
             <label className="toggle"><input type="checkbox" id="st-auto" checked={studio.autopilot.on} onChange={(e) => studio.setAutopilot(e.target.checked)} /> Autopilot: next every
-              <select id="st-auto-beats" value={studio.autopilot.beats} onChange={(e) => studio.setAutoBeats(Number(e.target.value))}>
-                {[16, 32, 64, 128].map((b) => <option key={b} value={b}>{b}</option>)}
-              </select> beats</label>
-            <div id="st-beats" className={`st-beats${studio.autopilot.on ? ' on' : ''}`} title={studio.autopilot.on ? 'Beats follow the detected tempo and keep counting through breakdowns' : 'Autopilot is off'}>
-              <i style={{ transform: `scaleX(${studio.autopilot.on ? studio.beatsElapsed / studio.autopilot.beats : 0})` }} />
-              <b>{!studio.autopilot.on ? `— / ${studio.autopilot.beats} beats`
+              {timer
+                ? <select id="st-auto-seconds" value={studio.autopilot.seconds} onChange={(e) => studio.setAutoSeconds(Number(e.target.value))}>
+                    {AUTO_SECONDS.map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                : <select id="st-auto-beats" value={studio.autopilot.beats} onChange={(e) => studio.setAutoBeats(Number(e.target.value))}>
+                    {AUTO_BEATS.map((b) => <option key={b} value={b}>{b}</option>)}
+                  </select>}
+              <select id="st-auto-unit" value={studio.autopilot.unit} title="Count beats of the tempo clock, or run a plain timer (for music without a usable beat)" onChange={(e) => studio.setAutoUnit(e.target.value as AutoUnit)}>
+                <option value="beats">beats</option>
+                <option value="seconds">seconds</option>
+              </select>
+            </label>
+            <div id="st-beats" className={`st-beats${studio.autopilot.on ? ' on' : ''}`} title={!studio.autopilot.on ? 'Autopilot is off' : timer ? 'A plain timer: every show scene (and every plan step) gets this many seconds' : 'Beats follow the detected tempo and keep counting through breakdowns'}>
+              <i style={{ transform: `scaleX(${!studio.autopilot.on ? 0 : timer ? Math.min(1, studio.secondsElapsed / studio.autopilot.seconds) : studio.beatsElapsed / studio.beatsTarget})` }} />
+              <b>{timer
+                ? (!studio.autopilot.on ? `— / ${studio.autopilot.seconds} s` : `${Math.floor(studio.secondsElapsed)} / ${studio.autopilot.seconds} s · ${Math.max(0, Math.ceil(studio.autopilot.seconds - studio.secondsElapsed))} s to go`)
+                : !studio.autopilot.on ? `— / ${studio.beatsTarget} beats`
                 : !tempo ? 'waiting for a tempo — a few kicks are enough'
-                : `${studio.beatsElapsed} / ${studio.autopilot.beats} beats · ${studio.autopilot.beats - studio.beatsElapsed} to go · ${tempo} BPM`}</b>
+                : `${studio.beatsElapsed} / ${studio.beatsTarget} beats · ${studio.beatsTarget - studio.beatsElapsed} to go · ${tempo} BPM`}</b>
             </div>
+            {plan && (
+              <ol id="st-plan" className="plan" title={plan.note || 'The plan the autopilot follows'}>
+                {plan.steps.map((step, i) => {
+                  const cue = studio.cueByRef(step.cue);
+                  return (
+                    <li key={i} className={`${i === studio.planIndex ? 'playing' : ''}${!cue || missing(cue) ? ' missing' : ''}`} title={`${step.beats} beats${step.mode ? ` · ${step.mode}` : ''}${step.seconds !== undefined ? ` ${step.seconds} s` : ''}`}
+                      onClick={() => { if (cue) studio.setPreview(cue); }}>
+                      <b>{cue?.name ?? step.cue}</b><span>{step.beats}</span>
+                    </li>
+                  );
+                })}
+                <li className="plan-tools">
+                  {studio.lastPlan && <button id="st-plan-restore" title="Bring the previous plan back" onClick={() => studio.restoreLastPlan()}>↶ previous</button>}
+                  <button id="st-plan-clear" title="Drop the plan and follow the list again" onClick={() => studio.setPlan(null)}>×</button>
+                </li>
+              </ol>
+            )}
+            <label className="toggle" title="Claude plans the show from the music: every cycle it reads a digest of the tempo, mood and energy and writes the next steps. Needs the assistant backend.">
+              <input type="checkbox" id="st-director" checked={dir.on} onChange={(e) => director.setOn(e.target.checked)} /> Director: plan every
+              {directorTimer
+                ? <select id="st-director-seconds" value={studio.directorSeconds} onChange={(e) => studio.setDirectorSeconds(Number(e.target.value))}>
+                    {DIRECTOR_SECONDS.map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                : <select id="st-director-beats" value={studio.directorBeats} onChange={(e) => studio.setDirectorBeats(Number(e.target.value))}>
+                    {DIRECTOR_BEATS.map((b) => <option key={b} value={b}>{b}</option>)}
+                  </select>}
+              <select id="st-director-unit" value={studio.directorUnit} title="Plan every N beats of the tempo clock (and at least every 2 minutes), or every N seconds on a timer" onChange={(e) => studio.setDirectorUnit(e.target.value as AutoUnit)}>
+                <option value="beats">beats</option>
+                <option value="seconds">seconds</option>
+              </select>
+            </label>
+            <p id="st-director-status" className={`st-director${dir.error ? ' error' : ''}${dir.on ? ' on' : ''}`}>{directorStatus}</p>
+            {dir.hidden && <p className="st-director error">The show stands still while this window is hidden — keep it visible.</p>}
           </footer>
         </section>
         <section className="dock">

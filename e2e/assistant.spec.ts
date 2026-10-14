@@ -22,3 +22,31 @@ test('assistant: a tool call changes the scene and shows as a chip', async ({ pa
   await expect(page.locator('#ai-log .ai-followups button').first()).toBeVisible();
   await expect(page.locator('#ai-log .ai-text')).not.toContainText('FOLLOW-UPS');
 });
+
+test('assistant builds a show and plans it; the director runs a cycle', async ({ page }) => {
+  test.setTimeout(420_000);
+  await page.addInitScript(() => localStorage.removeItem('hallucinate.show'));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Play demo beat' }).click();
+  await page.keyboard.press('i');
+  await expect(page.locator('#ai-status')).not.toHaveText('', { timeout: 15_000 });
+
+  await page.locator('#ai-input').fill('Add "Hyper Tunnel" and "Star Nest" to the studio show and plan them at 16 beats each. Do nothing else and reply with one word.');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#ai-log .ai-tool.ok', { hasText: 'Planned 2 steps' })).toBeVisible({ timeout: 240_000 });
+  await expect(page.locator('#ai-send')).toHaveText('Send', { timeout: 120_000 });
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('o');
+  await expect(page.locator('#st-cues .cue')).toHaveCount(2);
+  await expect(page.locator('#st-plan li')).toHaveCount(3);     // two steps and the tools chip
+  await expect(page.locator('#st-auto')).toBeChecked();         // the plan turned the autopilot on
+
+  // One director cycle on a fresh thread: it ends with a plan and a note, and counts its tokens.
+  await page.locator('#st-director').check();
+  await expect(page.locator('#st-director-status')).toContainText('Planning', { timeout: 15_000 });
+  await expect(page.locator('#st-director-status')).not.toContainText('Planning', { timeout: 240_000 });
+  await expect(page.locator('#st-director-status')).not.toHaveClass(/error/);
+  await expect(page.locator('#st-director-status')).toContainText('next in');
+  await expect(page.locator('#st-plan li')).not.toHaveCount(0);
+  await page.locator('#st-director').uncheck();
+});

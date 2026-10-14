@@ -3,6 +3,9 @@
 // scene library): with an API key they are TanStack client tools; on the subscription backend the
 // CLI adapter relays each call as a stream event. The credentials stay here, on the server.
 //
+// Two run modes, chosen by `forwardedProps.mode` in the body: `chat` (the panel: every tool, up to
+// 30 turns) and `director` (a show-planning cycle: the show tools only, a few turns).
+//
 // Routes:  GET  /info            backend and model
 //          POST /                one chat run (AG-UI body from useChat)
 //          POST /new             forget a conversation (subscription backend)
@@ -12,12 +15,26 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { chat, chatParamsFromRequestBody, maxIterations, toServerSentEventsResponse } from '@tanstack/ai';
 import { z } from 'zod';
-import { TOOL_DEFINITIONS } from '../src/assistant/tools';
-import { createAdapter, detectBackend, EFFORT, MODEL, NO_BACKEND, type Backend } from './adapters';
+import { DIRECTOR_TOOLS, TOOL_DEFINITIONS } from '../src/assistant/tools';
+import { createAdapter, detectBackend, DIRECTOR_EFFORT, EFFORT, MODEL, NO_BACKEND, type Backend } from './adapters';
 import { ClaudeCliAdapter, type McpResult } from './claude-cli-adapter';
 import { SYSTEM } from './system-prompt';
 
 const MAX_BODY = 30 * 1024 * 1024;   // screenshots travel back as base64 images
+export type RunMode = 'chat' | 'director';
+
+// What a run gets, by mode. Exported for the route test.
+export function runConfig(mode: RunMode, backend: Backend) {
+  const director = mode === 'director';
+  return {
+    tools: director ? [...DIRECTOR_TOOLS] : [...TOOL_DEFINITIONS],
+    maxTurns: director ? 6 : 30,
+    effort: director ? DIRECTOR_EFFORT : EFFORT,
+    // The system prompt and the tool list are the same every run: cache them (Anthropic adds no markers by itself).
+    ...(backend === 'api' && { promptCache: 'short' as const }),
+  };
+}
+export const modeOf = (forwardedProps: Record<string, unknown> | undefined): RunMode => (forwardedProps?.mode === 'director' ? 'director' : 'chat');
 
 const ToolResultSchema = z.object({
   threadId: z.string(),
@@ -59,9 +76,6 @@ export function createAssistant() {
       return json(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'No such tool call (it may have timed out).' });
     }
     if (route !== '/') return json(res, 404, { error: 'Unknown endpoint' });
-    const adapter = createAdapter(b);
-    if (!adapter) return json(res, 503, { error: NO_BACKEND });
-    if (adapter instanceof ClaudeCliAdapter && req.headers.host) adapter.host = req.headers.host;
 
     let params: Awaited<ReturnType<typeof chatParamsFromRequestBody>>;
     try {
@@ -69,6 +83,10 @@ export function createAssistant() {
     } catch (err) {
       return json(res, 400, { error: `Bad request: ${err instanceof Response ? await err.text() : (err as Error).message}` });
     }
+    const config = runConfig(modeOf(params.forwardedProps), b);
+    const adapter = createAdapter(b, config.effort);
+    if (!adapter) return json(res, 503, { error: NO_BACKEND });
+    if (adapter instanceof ClaudeCliAdapter && req.headers.host) adapter.host = req.headers.host;
 
     // Stop in the panel closes the connection: abort the run (and the CLI process) with it.
     const abortController = new AbortController();
@@ -79,10 +97,11 @@ export function createAssistant() {
       threadId: params.threadId,
       runId: params.runId,
       systemPrompts: [SYSTEM],
-      tools: [...TOOL_DEFINITIONS],
-      agentLoopStrategy: maxIterations(30),
+      tools: config.tools,
+      agentLoopStrategy: maxIterations(config.maxTurns),
       abortController,
-      ...(b === 'api' ? { reasoning: EFFORT as 'high' } : { modelOptions: { host: req.headers.host } }),
+      ...(config.promptCache && { promptCache: config.promptCache }),
+      ...(b === 'api' ? { reasoning: config.effort as 'high' } : { modelOptions: { host: req.headers.host } }),
     });
     const response = toServerSentEventsResponse(stream, { abortController });
     res.writeHead(response.status, Object.fromEntries(response.headers));

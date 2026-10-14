@@ -3,9 +3,13 @@
 
 import { toolDefinition } from '@tanstack/ai';
 import { z } from 'zod';
+import { PlanSchema } from '../state/show-plan';
 
 const sceneName = z.string().describe('Exact scene name. Omit for the scene on screen.');
 const record = z.record(z.string(), z.unknown());
+const cueRef = z.string().describe('A show scene: its id, or its exact name (get_show lists both).');
+const cueValues = z.record(z.string(), z.unknown()).describe('Parameter values for the show scene\'s scene (name or label → number, true/false, "#rrggbb", or an array). Omitted parameters keep the scene\'s defaults.');
+const cueLook = z.record(z.string(), z.number()).describe('Look sliders stored with the show scene: hue 0-1, cycle 0-2, trails 0-0.97, speed 0-2.5, reactivity 0-2, aberration 0-0.04.');
 
 // A picture the tool hands back to the model, in TanStack's content-part shape.
 export const ImagePartSchema = z.object({
@@ -82,8 +86,97 @@ export const lookAtScene = toolDefinition({
   outputSchema: ContentPartsSchema,
 });
 
-export const TOOL_DEFINITIONS = [getAppState, readSceneCode, writeSceneCode, createScene, setParameters, setLook, switchScene, lookAtScene] as const;
+// ---------- The Studio (show scenes, Take, autopilot) ----------
+
+export const getShow = toolDefinition({
+  name: 'get_show',
+  description: 'Get the show in the studio: every show scene (id, name, which scene, category, whether its scene still exists), which one is in Preview and which is Live, the transition (cut/fade, seconds), the autopilot (on/off, beats per scene, beats gone and to go) and the current plan, plus whether the user changed the show by hand recently. Call this before editing the show or writing a plan.',
+  inputSchema: z.object({}),
+  outputSchema: record,
+});
+
+export const addShowScene = toolDefinition({
+  name: 'add_show_scene',
+  description: 'Add a show scene to the show: a library scene plus optional parameter values and look sliders. It becomes the Preview. Returns the new show scene with its id.',
+  inputSchema: z.object({
+    scene: z.string().describe('Exact library scene name (get_app_state lists them).'),
+    name: z.string().optional().describe('Name shown in the show list; defaults to the scene name.'),
+    values: cueValues.optional(),
+    look: cueLook.optional(),
+  }),
+  outputSchema: record,
+});
+
+export const updateShowScene = toolDefinition({
+  name: 'update_show_scene',
+  description: 'Change a show scene: its name, which library scene it plays, its parameter values (merged into the stored ones) or its look sliders (merged). What is Live changes at the next take, not immediately.',
+  inputSchema: z.object({
+    cue: cueRef,
+    name: z.string().optional(),
+    scene: z.string().optional().describe('Exact library scene name.'),
+    values: cueValues.optional(),
+    look: cueLook.optional(),
+  }),
+  outputSchema: record,
+});
+
+export const reorderShow = toolDefinition({
+  name: 'reorder_show',
+  description: 'Put the show scenes in a new order. List every show scene id exactly once, in the order they should play. The list-order autopilot follows this order; a plan does not need it.',
+  inputSchema: z.object({ order: z.array(z.string()).min(1).describe('All show scene ids, in the new order.') }),
+  outputSchema: record,
+});
+
+export const removeShowScene = toolDefinition({
+  name: 'remove_show_scene',
+  description: 'Remove a show scene from the show (the library scene itself stays).',
+  inputSchema: z.object({ cue: cueRef }),
+  outputSchema: record,
+});
+
+export const setTransition = toolDefinition({
+  name: 'set_transition',
+  description: 'Set how takes transition: a cut or a fade, and the fade length in seconds (0.2-8).',
+  inputSchema: z.object({ mode: z.enum(['cut', 'fade']).optional(), seconds: z.number().min(0.2).max(8).optional() }),
+  outputSchema: record,
+});
+
+export const setAutopilot = toolDefinition({
+  name: 'set_autopilot',
+  description: 'Turn the autopilot on or off, and set its clock: "beats" counts tempo beats (16, 32, 64 or 128 per show scene when there is no plan; plan steps bring their own counts) on a tempo clock that keeps going through breakdowns; "seconds" is a plain timer (every N seconds per show scene, plan steps included), for music without a usable beat. The autopilot needs at least two show scenes.',
+  inputSchema: z.object({
+    on: z.boolean().optional(),
+    unit: z.enum(['beats', 'seconds']).optional().describe('What the autopilot counts.'),
+    beats: z.union([z.literal(16), z.literal(32), z.literal(64), z.literal(128)]).optional().describe('Beats per show scene in list order (unit "beats").'),
+    seconds: z.number().min(5).max(600).optional().describe('Seconds per show scene on the timer (unit "seconds").'),
+  }),
+  outputSchema: record,
+});
+
+export const setAutopilotPlan = toolDefinition({
+  name: 'set_autopilot_plan',
+  description: 'Replace the autopilot\'s plan: the ordered steps it plays next, each a show scene with how many beats it gets and optionally its own transition. The whole plan is replaced (never appended); if the first step is the show scene that is Live, that step is already playing and its beats count from now, otherwise the plan starts at the next take. The autopilot is turned on. Pass null to drop the plan and follow list order again. Steps whose show scene no longer exists are skipped.',
+  inputSchema: z.object({ plan: PlanSchema.nullable() }),
+  outputSchema: record,
+});
+
+export const takeShowScene = toolDefinition({
+  name: 'take_show_scene',
+  description: 'Take a show scene live now (Preview → Live with the show\'s transition). Omit the show scene to take what is in Preview. If it is a step of the current plan, the plan continues from there.',
+  inputSchema: z.object({ cue: cueRef.optional() }),
+  outputSchema: record,
+});
+
+export const TOOL_DEFINITIONS = [
+  getAppState, readSceneCode, writeSceneCode, createScene, setParameters, setLook, switchScene, lookAtScene,
+  getShow, addShowScene, updateShowScene, reorderShow, removeShowScene, setTransition, setAutopilot, setAutopilotPlan, takeShowScene,
+] as const;
+// What the director gets in its cycles: read the show, write the plan, tweak a show scene's look. It
+// never edits code, creates scenes or takes Live by itself.
+export const DIRECTOR_TOOLS = [getShow, setAutopilotPlan, updateShowScene] as const;
 export type ToolName = (typeof TOOL_DEFINITIONS)[number]['name'];
+
+const cueLabel = (i: Record<string, unknown>) => (typeof i.cue === 'string' ? `"${i.cue}"` : 'a show scene');
 
 // What the panel shows once a tool has run.
 export const DONE_VERBS: Record<ToolName, (input: Record<string, unknown>) => string> = {
@@ -95,6 +188,15 @@ export const DONE_VERBS: Record<ToolName, (input: Record<string, unknown>) => st
   set_look: () => 'Adjusted the look',
   switch_scene: (i) => `Switched to ${(i.scene as string | undefined) ?? 'a scene'}`,
   look_at_scene: (i) => `Looked at ${(i.scene as string | undefined) ?? 'the scene'}`,
+  get_show: () => 'Read the show',
+  add_show_scene: (i) => `Added ${(i.name as string | undefined) ?? (i.scene as string | undefined) ?? 'a show scene'} to the show`,
+  update_show_scene: (i) => `Changed ${cueLabel(i)}`,
+  reorder_show: () => 'Reordered the show',
+  remove_show_scene: (i) => `Removed ${cueLabel(i)}`,
+  set_transition: (i) => `Transition: ${(i.mode as string | undefined) ?? 'fade'}${typeof i.seconds === 'number' ? ` ${i.seconds} s` : ''}`,
+  set_autopilot: (i) => (i.on === false ? 'Autopilot off' : `Autopilot on${i.unit === 'seconds' || typeof i.seconds === 'number' ? `, every ${typeof i.seconds === 'number' ? i.seconds : '…'} s` : typeof i.beats === 'number' ? `, every ${i.beats} beats` : ''}`),
+  set_autopilot_plan: (i) => (i.plan ? `Planned ${((i.plan as { steps?: unknown[] }).steps?.length ?? 0)} steps` : 'Dropped the plan'),
+  take_show_scene: (i) => `Took ${typeof i.cue === 'string' ? `"${i.cue}"` : 'Preview'} live`,
 };
 
 // What the panel shows while a tool runs.
@@ -107,4 +209,13 @@ export const VERBS: Record<ToolName, (input: Record<string, unknown>) => string>
   set_look: () => 'Adjusting the look',
   switch_scene: (i) => `Switching to ${(i.scene as string | undefined) ?? 'a scene'}`,
   look_at_scene: (i) => `Looking at ${(i.scene as string | undefined) ?? 'the scene'}`,
+  get_show: () => 'Reading the show',
+  add_show_scene: () => 'Adding a show scene',
+  update_show_scene: (i) => `Changing ${cueLabel(i)}`,
+  reorder_show: () => 'Reordering the show',
+  remove_show_scene: (i) => `Removing ${cueLabel(i)}`,
+  set_transition: () => 'Setting the transition',
+  set_autopilot: () => 'Setting the autopilot',
+  set_autopilot_plan: () => 'Planning the show',
+  take_show_scene: () => 'Taking',
 };
