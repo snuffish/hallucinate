@@ -16,6 +16,7 @@
 </p>
 
 <p align="center">
+  <a href="https://snuffish.github.io/hallucinate/"><img alt="Live demo" src="https://img.shields.io/badge/demo-snuffish.github.io%2Fhallucinate-ff4fd8?logo=githubpages&logoColor=white"></a>
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white">
   <img alt="Vite 8" src="https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white">
@@ -43,7 +44,7 @@ modifier. The full list is at the bottom of the panel and in [Keys](#%EF%B8%8F-k
 - [Scenes](#-scenes) · [Scene library](#-scene-library--press-l) · [Beat Racer](#-beat-racer-game--press-g)
 - [Code your own](#-code-your-own--press-e) · [Live parameters](#-live-parameters--press-p) · [Visual maker](#-visual-maker--press-n)
 - [Media](#%EF%B8%8F-media--drop-an-image-or-video) · [Studio & projector](#-studio--projector--press-o) · [AI assistant](#-ai-assistant--press-i)
-- [Keys](#%EF%B8%8F-keys) · [How it works](#%EF%B8%8F-how-it-works) · [Development](#%EF%B8%8F-development) · [License](#-license)
+- [Keys](#%EF%B8%8F-keys) · [How it works](#%EF%B8%8F-how-it-works) · [Development](#%EF%B8%8F-development) · [Web demo](#-web-demo) · [License](#-license)
 
 ## ✨ At a glance
 
@@ -357,6 +358,20 @@ npm test            # Vitest unit tests (parameters, node compiler, scene list, 
 npm run test:e2e    # Playwright: boot, scenes, every panel, library keyboard navigation
 ASSISTANT_E2E=1 npx playwright test e2e/assistant.spec.ts   # one real assistant round-trip (uses your Claude backend)
 node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json   # performance probe, with the dev server running
+```
+
+## 🌐 Web demo
+
+**[https://snuffish.github.io/hallucinate/](https://snuffish.github.io/hallucinate/)** runs the app straight from GitHub Pages. Everything that runs in the
+browser works: audio files, mic, tab audio, the demo beat, all scenes, the editor, the visual maker, the studio with
+projector windows, and Beat Racer. SoundCloud, YouTube, the AI assistant and the studio director need the local server, so
+the demo hides them or points you to `npm run dev`.
+
+It is deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on every push to `main`. To build the same
+thing locally:
+
+```sh
+VITE_STATIC_DEMO=1 BASE_PATH=/hallucinate/ npm run build   # → dist/, served from /hallucinate/
 ```
 
 ## 📄 License
