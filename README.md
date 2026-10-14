@@ -239,6 +239,8 @@ code, writes or fixes it (and sees its own compile errors), creates new scenes i
 and the look sliders, switches scenes, and looks at a rendered frame to check its work. Every change shows up live, and
 **Undo** in the panel reverts the assistant's last change (edits, new scenes, parameters, look); built-in scenes can also
 be reverted to their original in the code editor. **Stop** interrupts it; **New chat** starts over.
+After each reply the assistant suggests three things you could ask next, as buttons under the reply, like the
+examples on an empty chat.
 
 Two ways to reach Claude, picked automatically — the credentials never reach the browser:
 

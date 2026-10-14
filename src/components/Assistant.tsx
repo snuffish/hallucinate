@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { useApp, useUI } from '../app/AppContext';
 import { clientTools } from '../assistant/client-tools';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
+import { splitFollowUps } from '../assistant/follow-ups';
 import { ContentPartsSchema, DONE_VERBS, VERBS, type ToolName } from '../assistant/tools';
 import { UndoStack } from '../assistant/undo';
 import { HOTKEYS } from '../hotkeys/registry';
@@ -128,19 +129,27 @@ export function Assistant() {
             {info?.backend === 'none' && <p className="ai-note error">{info.setup}</p>}
           </div>
         )}
-        {messages.map((m) => {
+        {messages.map((m, mi) => {
           if (m.role === 'user') {
             const text = m.parts.map((p) => (p.type === 'text' ? p.content : '')).join('');
             if (text.startsWith(UNDO_NOTE)) return <p key={m.id} className="ai-note">{text.slice(1, -1)}</p>;
             return <div key={m.id} className="ai-msg user"><div className="ai-body">{text}</div></div>;
           }
           if (m.role !== 'assistant') return null;
+          // The reply's last text part carries the suggested next requests; they show once the run is done.
+          const lastText = m.parts.reduce((last, p, i) => (p.type === 'text' ? i : last), -1);
+          const isLast = mi === messages.length - 1;
+          let followUps: string[] = [];
           return (
             <div key={m.id} className="ai-msg assistant">
               <div className="ai-body">
                 {m.parts.map((p, i) => {
                   if (p.type === 'thinking') return <details key={i} className="ai-thinking"><summary>{isLoading && i === m.parts.length - 1 ? 'Thinking' : 'Thought about it'}</summary><p>{p.content}</p></details>;
-                  if (p.type === 'text') return <div key={i} className="ai-text"><Markdown>{p.content}</Markdown></div>;
+                  if (p.type === 'text') {
+                    const split = i === lastText ? splitFollowUps(p.content) : { text: p.content, followUps: [] };
+                    if (i === lastText) followUps = split.followUps;
+                    return split.text ? <div key={i} className="ai-text"><Markdown>{split.text}</Markdown></div> : null;
+                  }
                   if (p.type === 'tool-call') {
                     const input = (p.input ?? {}) as Record<string, unknown>;
                     const result = m.parts.find((q) => q.type === 'tool-result' && q.toolCallId === p.id);
@@ -158,6 +167,11 @@ export function Assistant() {
                   return null;
                 })}
               </div>
+              {isLast && !isLoading && followUps.length > 0 && (
+                <div className="ai-examples ai-followups" aria-label="Suggested next requests">
+                  {followUps.map((q) => <button key={q} onClick={() => { setNote(null); void sendMessage(q); }}>{q}</button>)}
+                </div>
+              )}
             </div>
           );
         })}
