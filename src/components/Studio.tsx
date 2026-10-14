@@ -122,6 +122,10 @@ export function Studio() {
               <select id="st-auto-beats" value={studio.autopilot.beats} onChange={(e) => studio.setAutoBeats(Number(e.target.value))}>
                 {[16, 32, 64, 128].map((b) => <option key={b} value={b}>{b}</option>)}
               </select> beats</label>
+            <div id="st-beats" className={`st-beats${studio.autopilot.on ? ' on' : ''}`} title={studio.autopilot.on ? `${studio.autopilot.beats - studio.beatsElapsed} beats until the next take` : 'Autopilot is off'}>
+              <i style={{ transform: `scaleX(${studio.autopilot.on ? studio.beatsElapsed / studio.autopilot.beats : 0})` }} />
+              <b>{studio.autopilot.on ? `${studio.beatsElapsed} / ${studio.autopilot.beats} beats · ${studio.autopilot.beats - studio.beatsElapsed} to go` : `— / ${studio.autopilot.beats} beats`}</b>
+            </div>
           </footer>
         </section>
         <section className="dock">

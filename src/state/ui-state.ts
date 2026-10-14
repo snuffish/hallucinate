@@ -45,6 +45,7 @@ export interface UIState {
   toneTitle: string;
   overlay: Overlay;
   assistantOpen: boolean;   // the chat bubble; independent of the overlays
+  liveName: string | null;  // the pinned Live slot (studio closed after a take); projectors follow it, not the screen
   panelCollapsed: boolean;
   paramsVisible: boolean;
   paramsCollapsed: boolean;
@@ -74,6 +75,7 @@ export const initialUIState = (look: Look): UIState => ({
   toneTitle: '',
   overlay: null,
   assistantOpen: false,
+  liveName: null,
   panelCollapsed: false,
   paramsVisible: false,
   paramsCollapsed: false,

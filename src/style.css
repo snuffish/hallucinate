@@ -884,3 +884,12 @@ body.studio-open #gl { z-index: 12; pointer-events: none; }
 body.idle .ai-bubble:not(.open) { opacity: 0; pointer-events: none; }
 body:has(#panel.collapsed) .ai, body:has(#panel.collapsed) .ai-bubble, body:not(.started) .ai { left: 18px; }
 @media (max-width: 600px) { .ai { left: 8px; bottom: 76px; width: calc(100vw - 16px); height: calc(100vh - 92px); } .ai-bubble { left: 10px; bottom: 10px; } }
+
+/* Studio: autopilot beat indicator */
+.st-beats { position: relative; height: 18px; margin-top: 6px; border-radius: 9px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.st-beats i { position: absolute; inset: 0; transform-origin: left center; transform: scaleX(0); background: linear-gradient(90deg, var(--accent), var(--accent2)); opacity: 0.55; transition: transform 0.12s; }
+.st-beats b { position: relative; display: block; text-align: center; font-size: 11px; line-height: 18px; font-weight: 500; color: var(--text); }
+.st-beats:not(.on) b { color: var(--muted); }
+/* Live pinned while the studio is closed: the screen is a preview */
+.live-pin { font-size: 11px; color: #ff5b5b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-pin span { color: var(--muted); font-weight: 400; }

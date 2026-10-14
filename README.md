@@ -222,6 +222,11 @@ Run a show like OBS's Studio Mode and put it on a projector. The two monitors ar
    as a normal window and drag it onto the projector.
 4. **Master / Blackout** (B) fades Live and every projector to black and back, over the fade time.
 5. **Autopilot** steps through the show every 16 / 32 / 64 / 128 beats (random auto-switch pauses while it's on).
+   A bar under it counts the beats gone and left until the next take.
+6. **Close the studio and keep browsing.** Once a show scene is Live, closing the studio pins it: projectors keep
+   rendering the Live scene while whatever you do on screen (switch scenes, tweak sliders) is only a preview. The panel
+   shows *● LIVE · name* meanwhile; `T` still takes the next Preview scene straight to Live. Reopening the studio puts
+   Live back on screen.
 
 While the studio is open the main canvas is the Live monitor and the Parameters overlay becomes a dock. Like OBS's
 Studio Mode, the dock edits the **selected (Preview) show scene** by default — tweaks show on the Preview monitor, are
