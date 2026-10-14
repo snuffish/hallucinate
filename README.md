@@ -17,6 +17,8 @@
   <img alt="WebGL2" src="https://img.shields.io/badge/WebGL2-GLSL%20ES%203.00-990000?logo=webgl&logoColor=white">
   <img alt="TanStack AI" src="https://img.shields.io/badge/TanStack-AI%20%C2%B7%20Hotkeys%20%C2%B7%20Markdown-ff4154">
   <img alt="Tests" src="https://img.shields.io/badge/tests-vitest%20%2B%20playwright-6e9f18">
+  <a href="https://github.com/snuffish/hallucinate/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/snuffish/hallucinate/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
 ```sh
@@ -36,7 +38,7 @@ modifier. The full list is at the bottom of the panel and in [Keys](#%EF%B8%8F-k
 - [Scenes](#-scenes) · [Scene library](#-scene-library--press-l) · [Beat Racer](#-beat-racer-game--press-g)
 - [Code your own](#-code-your-own--press-e) · [Live parameters](#-live-parameters--press-p) · [Visual maker](#-visual-maker--press-n)
 - [Media](#%EF%B8%8F-media--drop-an-image-or-video) · [Studio & projector](#-studio--projector--press-o) · [AI assistant](#-ai-assistant--press-i)
-- [Keys](#%EF%B8%8F-keys) · [How it works](#%EF%B8%8F-how-it-works) · [Development](#%EF%B8%8F-development)
+- [Keys](#%EF%B8%8F-keys) · [How it works](#%EF%B8%8F-how-it-works) · [Development](#%EF%B8%8F-development) · [License](#-license)
 
 ## ✨ At a glance
 
@@ -351,3 +353,7 @@ npm run test:e2e    # Playwright: boot, scenes, every panel, library keyboard na
 ASSISTANT_E2E=1 npx playwright test e2e/assistant.spec.ts   # one real assistant round-trip (uses your Claude backend)
 node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json   # performance probe, with the dev server running
 ```
+
+## 📄 License
+
+[MIT](LICENSE). Audio and video fetched through yt-dlp stay under their owners' terms; see [Audio sources](#-audio-sources).
