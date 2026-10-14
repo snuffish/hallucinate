@@ -88,6 +88,16 @@ export const HELP_TOPICS = {
     ],
     hotkeys: ['take', 'blackout', 'studioPrev', 'studioNext', 'studio', 'closeOverlay'],
   },
+  screen: {
+    id: 'screen',
+    title: 'Screen: preview or Live',
+    body: [
+      'After you take a show scene in the studio and close it, Live stays pinned: the projectors keep showing it while this screen is free to browse other scenes. That is the preview.',
+      'Switch to Live to watch exactly what the projectors get, with Live\'s parameters and look; switch back to Preview to line up the next scene. Take (T) still sends the studio\'s next scene Live either way.',
+      'With nothing pinned the screen already is Live, and with the studio open the screen is its Live monitor, so the switch only matters while Live is pinned.',
+    ],
+    hotkeys: ['take', 'blackout', 'studio'],
+  },
   assistant: {
     id: 'assistant',
     title: 'AI assistant',

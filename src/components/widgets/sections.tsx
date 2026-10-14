@@ -101,6 +101,7 @@ export function SceneBody({ onOpenLibrary }: { onOpenLibrary: () => void }) {
   const name = useUI((ui) => ui.sceneName);
   const auto = useUI((ui) => ui.look.auto);
   const liveName = useUI((ui) => ui.liveName);
+  const screenMode = useUI((ui) => ui.screenMode);
   return (
     <>
       <div className="scene-now">
@@ -108,12 +109,36 @@ export function SceneBody({ onOpenLibrary }: { onOpenLibrary: () => void }) {
         <span id="scene-name">{name}</span>
         <button id="scene-next" className="icon" title="Next scene (→)" onClick={() => app.stepScene(1)}>›</button>
       </div>
-      {liveName && <div id="live-pin" className="live-pin" title="The projector shows the Live show scene; what you see here is a preview. Open the studio (O) to put Live back on screen.">● LIVE · {liveName} <span>· screen is a preview</span></div>}
+      {liveName && <div id="live-pin" className="live-pin" title="The projector shows the Live show scene. The Screen widget switches this screen between your preview and Live; the studio (O) puts Live back on screen too.">● LIVE · {liveName} <span>· {screenMode === 'live' ? 'on screen' : 'screen is a preview'}</span></div>}
       <div className="scene-buttons">
         <button id="open-library" onClick={onOpenLibrary}>Scene library<Kbd hotkey={HOTKEYS.library} /></button>
         <button id="play-game" onClick={() => app.setScene(app.state.gameIndex)}>Beat Racer<Kbd hotkey={HOTKEYS.game} /></button>
       </div>
       <label className="toggle"><input type="checkbox" id="auto" checked={auto} onChange={(e) => app.setLookFlag('auto', e.target.checked)} /> Auto-switch on the beat <Kbd hotkey={HOTKEYS.auto} /></label>
+    </>
+  );
+}
+
+// The main screen while the studio is closed: your preview (browse freely, Live keeps playing on
+// the projectors) or Live itself. With the studio open the screen is always the Live monitor.
+export function ScreenBody() {
+  const app = useApp();
+  const mode = useUI((ui) => ui.screenMode);
+  const liveName = useUI((ui) => ui.liveName);
+  const studioOpen = useUI((ui) => ui.overlay === 'studio');
+  const status = studioOpen ? 'The studio is open: the screen is the Live monitor.'
+    : !liveName ? 'Nothing is pinned Live: the screen and the projectors show the same. Take a show scene (T) to split them.'
+    : mode === 'live' ? `Showing Live: ${liveName}. Scene changes you make go to the preview.`
+    : `Showing your preview. Live: ${liveName}.`;
+  return (
+    <>
+      <div className="seg" role="group" aria-label="What the screen shows">
+        {(['preview', 'live'] as const).map((m) => (
+          <button key={m} id={`screen-${m}`} className={mode === m ? 'active' : undefined} aria-pressed={mode === m} disabled={studioOpen}
+            onClick={() => app.setScreenMode(m)}>{m === 'live' ? '● Live' : 'Preview'}</button>
+        ))}
+      </div>
+      <small id="screen-status" className="screen-status">{status}</small>
     </>
   );
 }

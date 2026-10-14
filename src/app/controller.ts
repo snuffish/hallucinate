@@ -16,7 +16,7 @@ import { KEYS, debouncedWriter, readString, writeJSON, writeString } from '../st
 import { buildSceneList, paramKey, saveUserScenes, userScene } from '../state/scene-list';
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
-import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
+import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type ScreenMode, type UIState } from '../state/ui-state';
 import { EditorCore } from './editor';
 import type { StudioSession } from './studio';
 import { Transport } from './transport';
@@ -388,6 +388,15 @@ export class AppController {
     this.bumpScenes();
   }
 
+  // ---------- Screen: preview or Live ----------
+
+  // Only matters while Live is pinned; with nothing pinned the screen is Live anyway.
+  setScreenMode(mode: ScreenMode): void {
+    if (mode === this.ui.get().screenMode) return;
+    this.ui.set({ screenMode: mode });
+    if (this.ui.get().liveName) this.toast(mode === 'live' ? `Screen shows Live: ${this.ui.get().liveName}` : 'Screen shows your preview', 1500);
+  }
+
   // ---------- Live parameters ----------
 
   setSceneParams(i: number, specs: ParamSpec[]): void {
@@ -728,9 +737,13 @@ export class AppController {
     p.aberration = look.aberration * (1 + beat * 1.5) * (1 + look.synesthesia * (f.bright - 0.5) * 1.2);
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
-    this.renderer.render(p);
+    // Live is pinned (studio closed after a take): projectors get it; the screen shows it too when
+    // the Screen widget is set to Live, otherwise it stays your preview.
+    const showLive = this.ui.get().screenMode === 'live';
+    const pinned = this.output.connected || showLive ? this.hooks.liveProgram?.(p) : null;
+    if (pinned && showLive) this.renderer.render(pinned.program, pinned.params);
+    else this.renderer.render(p);
     if (this.output.connected) {
-      const pinned = this.hooks.liveProgram?.(p);
       if (pinned) this.output.sendFrame(pinned.program, pinned.params, look.resolution);
       else {
         const live = this.liveParams;

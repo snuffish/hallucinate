@@ -965,3 +965,4 @@ body:not(.started) .ai { left: 18px; }
 /* Live pinned while the studio is closed: the screen is a preview */
 .live-pin { font-size: 11px; color: #ff5b5b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .live-pin span { color: var(--muted); font-weight: 400; }
+.screen-status { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.4; }

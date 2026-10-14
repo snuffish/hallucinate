@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import { KEYS, readJSON, readString, remove } from './persistence';
 
-export const WIDGET_IDS = ['hub', 'source', 'media', 'audio', 'scene', 'look', 'actions', 'params'] as const;
+export const WIDGET_IDS = ['hub', 'source', 'media', 'audio', 'scene', 'look', 'actions', 'screen', 'params'] as const;
 export type WidgetId = (typeof WIDGET_IDS)[number];
 export const ZONES = ['left', 'right', 'top', 'bottom'] as const;
 export type Zone = (typeof ZONES)[number];
@@ -52,6 +52,7 @@ export const DEFAULT_LAYOUT: Layout = {
     scene: { open: true, collapsed: false, place: dockAt('left', 4), size: AUTO },
     look: { open: true, collapsed: false, place: dockAt('left', 5), size: AUTO },
     actions: { open: true, collapsed: false, place: dockAt('left', 6), size: AUTO },
+    screen: { open: true, collapsed: false, place: dockAt('left', 7), size: AUTO },
     params: { open: true, collapsed: false, place: { kind: 'float', ax: 'r', ay: 't', dx: 16, dy: 16 }, size: AUTO },
   },
   bubble: { kind: 'auto' },
