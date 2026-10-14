@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="https://snuffish.github.io/hallucinate/"><img src="docs/screenshots/start.jpg" alt="The Hallucinate start screen: pick an audio source, or drop a file" width="100%"></a>
+  <a href="https://snuffish.github.io/hallucinate/"><img src="docs/screenshots/hallucinate-social-preview.jpg" alt="The Hallucinate start screen: pick an audio source, or drop a file" width="100%"></a>
   <br>
   Hallucinate
 </h1>
