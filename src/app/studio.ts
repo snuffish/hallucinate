@@ -90,7 +90,7 @@ export class StudioSession {
   attach(): () => void {
     return this.app.setHooks({
       onFrame: (dt, program) => { this.update(dt); this.renderPreview(program); },
-      onBeat: () => this.onBeat(),
+      onTempoBeat: () => this.onBeat(),   // the autopilot follows the tempo clock, not raw kicks
       // Changing scene by hand inside the studio means Live no longer shows a show scene. Outside the
       // studio the screen is a preview and Live stays pinned.
       onManualSceneChange: () => { if (this.open && this.liveId) { this.liveId = null; this.changed(false); } },
@@ -296,6 +296,7 @@ export class StudioSession {
     this.changed(false);
   }
 
+  // One tempo beat towards the next autopilot take.
   onBeat(): void {
     if (!this.autopilot.on || this.cues.length < 2) return;
     if (++this.beatCount >= this.autopilot.beats) {

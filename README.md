@@ -222,7 +222,10 @@ Run a show like OBS's Studio Mode and put it on a projector. The two monitors ar
    as a normal window and drag it onto the projector.
 4. **Master / Blackout** (B) fades Live and every projector to black and back, over the fade time.
 5. **Autopilot** steps through the show every 16 / 32 / 64 / 128 beats (random auto-switch pauses while it's on).
-   A bar under it counts the beats gone and left until the next take.
+   A bar under it counts the beats gone and left until the next take. These beats come from a tempo clock: it takes
+   its speed from the BPM detected on the kick drum, re-anchors on every real kick, and keeps counting through
+   breakdowns and silence, so the show moves on even when the bass stops. (Everything else that reacts "on the beat",
+   the `uBeat` uniform, auto-switch and Beat Racer, follows the detected kicks themselves.)
 6. **Close the studio and keep browsing.** Once a show scene is Live, closing the studio pins it: projectors keep
    rendering the Live scene while whatever you do on screen (switch scenes, tweak sliders) is only a preview. The panel
    shows *● LIVE · name* meanwhile; `T` still takes the next Preview scene straight to Live. Reopening the studio puts

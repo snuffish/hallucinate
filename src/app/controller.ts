@@ -14,6 +14,7 @@ import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from 
 import { KEYS, readString, writeString } from '../state/persistence';
 import { buildSceneList, paramKey, saveUserScenes, userScene } from '../state/scene-list';
 import { Store } from '../state/store';
+import { TempoClock } from '../state/tempo-clock';
 import { initialUIState, type DownloadView, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { EditorCore } from './editor';
 import { Transport } from './transport';
@@ -30,7 +31,8 @@ export interface ControllerHooks {
   onSceneChanged?: (index: number) => void;
   // The studio draws its Preview monitor and glides its master fader every frame.
   onFrame?: (dt: number, program: ProgramState) => void;
-  onBeat?: () => void;
+  onBeat?: () => void;          // a detected bass hit
+  onTempoBeat?: () => void;     // a tick of the tempo clock (keeps going through breakdowns)
   // Studio mode: Program no longer shows a show scene after a manual switch.
   onManualSceneChange?: () => void;
   // Studio dock: which parameters the overlay edits.
@@ -77,6 +79,7 @@ export class AppController {
   readonly player: HTMLAudioElement;
   readonly transport: Transport;
   readonly sceneParams: ParamSpec[][] = [];
+  readonly tempo = new TempoClock();
   readonly editor: EditorCore;
   readonly pickers: Partial<Record<'sc' | 'yt', PickerApi>> = {};
   libraryPrefs: LibraryPrefs = loadLibraryPrefs();
@@ -476,6 +479,7 @@ export class AppController {
     document.body.classList.add('started');
     this.state.clock.beatTimes = [];
     this.state.clock.bpm = null;
+    this.tempo.reset();
   }
 
   // Dropped anywhere: audio plays, pictures and videos become the media.
@@ -566,10 +570,13 @@ export class AppController {
     c.beatsInScene++;
     c.beatTimes.push(c.clock);
     if (c.beatTimes.length > 12) c.beatTimes.shift();
-    c.bpm = estimateBpm(c.beatTimes, c.clock);
+    // The tempo is held once known (the raw estimate expires two seconds after the last hit).
+    const bpm = estimateBpm(c.beatTimes, c.clock);
+    if (bpm) { c.bpm = bpm; this.tempo.setBpm(bpm); }
     if (c.scene === this.state.gameIndex) this.game.onBeat();
     if (this.autoSwitching() && c.beatsInScene >= BEATS_PER_SCENE) this.nextRandomScene();
     this.hooks.onBeat?.();
+    if (this.tempo.onDetectedBeat(c.clock)) this.hooks.onTempoBeat?.();
   }
 
   // ---------- Recording ----------
@@ -626,6 +633,7 @@ export class AppController {
     if (this.state.activeSource === 'media') this.media.follow(this.player);
 
     if (this.autoSwitching() && this.audio.kind && c.clock - c.sceneStart > MAX_SECONDS_PER_SCENE) this.nextRandomScene();
+    if (this.audio.kind && this.tempo.advance(c.clock)) this.hooks.onTempoBeat?.();   // scheduled tick (no kick needed)
     const inGame = c.scene === this.state.gameIndex;
     if (inGame) this.game.update(dt, level);
     const mix = c.fade > 0 ? smoothstep((c.clock - c.transitionStart) / c.fade) : 1;

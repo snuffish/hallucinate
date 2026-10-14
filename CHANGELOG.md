@@ -4,6 +4,8 @@
 
 ### Changed
 
+- The studio autopilot counts beats on a tempo clock (BPM from the detected kicks, re-anchored on each kick) instead of
+  raw bass hits, so the show keeps moving through breakdowns; the indicator shows the tempo in use.
 - Studio: closing it with a show scene Live pins the Live slot, so projectors keep that scene while the screen is
   only a preview (the panel shows *● LIVE · name*); reopening restores Live to the screen. The autopilot shows a
   beat indicator (beats gone / to go until the next take).
