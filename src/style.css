@@ -872,3 +872,5 @@ body:has(#ai:not([hidden])) .panel { display: none; }
 .library header .kbd { margin-left: -4px; }
 /* Studio: the main canvas stays in place and is pinned over the Live monitor box (above the studio's z-index 11). */
 body.studio-open #gl { z-index: 12; pointer-events: none; }
+/* Suggested next requests under a finished assistant reply (same chips as the welcome examples). */
+.ai-followups { margin-top: 8px; }

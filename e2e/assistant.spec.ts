@@ -18,4 +18,7 @@ test('assistant: a tool call changes the scene and shows as a chip', async ({ pa
   await expect(page.locator('#scene-name')).toContainText('Hyper Tunnel');
   await expect(page.locator('#ai-send')).toHaveText('Send', { timeout: 120_000 });   // the run finished
   await expect(page.locator('#ai-log .ai-note.error')).toHaveCount(0);
+  // The reply ends with suggested next requests, shown as chips (and not as text).
+  await expect(page.locator('#ai-log .ai-followups button').first()).toBeVisible();
+  await expect(page.locator('#ai-log .ai-text')).not.toContainText('FOLLOW-UPS');
 });

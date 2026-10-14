@@ -4,6 +4,8 @@
 
 ### Changed
 
+- The assistant suggests three follow-up requests after every reply, shown as chips under it (the model ends its
+  reply with a `FOLLOW-UPS:` line that the panel turns into buttons).
 - The whole UI is now React 19 + TypeScript. No vanilla JavaScript remains in `src/`; the engines kept their
   behaviour and moved to `src/engine/`. See `ARCHITECTURE.md`.
 - The AI assistant runs on [TanStack AI](https://tanstack.com/ai): the agent loop lives on the server, the tools

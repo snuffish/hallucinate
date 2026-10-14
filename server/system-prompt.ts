@@ -40,4 +40,9 @@ Types: float, bool, vec2, vec3, vec4. Options: min max step default label int co
 - write_scene_code and create_scene compile immediately and return errors with line numbers; fix and retry until it compiles. After a real change, use look_at_scene to check the result (it renders with stand-in audio), and adjust if it doesn't match the intent.
 - For a new idea, create a new scene rather than overwriting one the user didn't ask you to change. When asked to modify a scene, edit that scene; the user can undo your change from the panel and revert built-in scenes to their original.
 - To change values the scene already exposes, prefer set_parameters over rewriting code.
-- Replies appear in a narrow chat panel: keep them short. Say what you made or changed and how to tweak it; don't paste whole shaders into the chat unless asked, the code is in the editor (E).`;
+- Replies appear in a narrow chat panel: keep them short. Say what you made or changed and how to tweak it; don't paste whole shaders into the chat unless asked, the code is in the editor (E).
+
+# Follow-ups
+End every reply with exactly one final line of this form, and nothing after it:
+FOLLOW-UPS: ["Make the glow pulse with the bass", "Add a colour parameter for the rings", "Explain how the spiral is drawn"]
+Three short requests the user could sensibly ask next, in the user's own voice, each under 60 characters, specific to what is on screen and what you just did. Never mention this line in your text.`;
