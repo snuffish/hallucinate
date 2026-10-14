@@ -12,11 +12,11 @@ import type { Overlay } from '../../state/ui-state';
 import { HelpButton } from '../Help';
 import { ParamsWidget } from '../ParamOverlay';
 import { dockInsets, dropStore, zoneEls } from './drop';
-import { ActionsBody, AudioBody, LookBody, MediaBody, SceneBody, SourceBody, type PanelActions } from './sections';
+import { ActionsBody, AudioBody, LookBody, MediaBody, SceneBody, ScreenBody, SourceBody, type PanelActions } from './sections';
 import { Widget, useNarrow } from './Widget';
 
 export const WIDGET_LABELS: Record<WidgetId, string> = {
-  hub: 'Hallucinate', source: 'Source', media: 'Media', audio: 'Audio', scene: 'Scene', look: 'Look', actions: 'Actions', params: 'Parameters',
+  hub: 'Hallucinate', source: 'Source', media: 'Media', audio: 'Audio', scene: 'Scene', look: 'Look', actions: 'Actions', screen: 'Screen', params: 'Parameters',
 };
 
 // Space kept between a dock and a floating widget pushed out of it.
@@ -56,6 +56,7 @@ function WidgetFor({ id, entry, actions: a }: { id: WidgetId; entry: WidgetLayou
     case 'scene': return <Widget id={id} entry={entry} title="Scene"><SceneBody onOpenLibrary={a.onOpenLibrary} /></Widget>;
     case 'look': return <Widget id={id} entry={entry} title="Look" help="look" bodyClass="sliders"><LookBody /></Widget>;
     case 'actions': return <Widget id={id} entry={entry} title="Actions" bodyClass="actions"><ActionsBody {...a} /></Widget>;
+    case 'screen': return <Widget id={id} entry={entry} title="Screen" help="screen"><ScreenBody /></Widget>;
     case 'params': return <ParamsWidget entry={entry} />;
   }
 }

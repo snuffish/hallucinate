@@ -132,6 +132,7 @@ export class Renderer {
   scale = 0.75;
   size: [number, number] = [0, 0];
   readonly sceneParams: SceneUniforms[] = [];   // per scene index: live @param values as uniforms
+  private paramsOverride: Record<number, SceneUniforms> | null = null;   // see render()
 
   private floatTargets: boolean;
   private readonly parallel: { COMPLETION_STATUS_KHR: number } | null;
@@ -621,7 +622,7 @@ export class Renderer {
   private drawScene(index: number, target: Target, ...sets: (SceneUniforms | undefined)[]): void {
     const prog = this.program(index);
     if (prog) {
-      this.use(prog, ...sets, this.sceneParams[index]);
+      this.use(prog, ...sets, this.paramsOverride?.[index] ?? this.sceneParams[index]);
       this.draw(target);
       return;
     }
@@ -638,8 +639,15 @@ export class Renderer {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  render(s: ProgramState): void {
+  // `params` replaces the stored @param values of the scenes it lists, for this frame only: the main
+  // window showing the Studio's Live slot draws it with Live's values, like a projector does.
+  render(s: ProgramState, params?: Record<number, SceneUniforms>): void {
     if (this.lost || this.disposed) return;
+    this.paramsOverride = params ?? null;
+    try { this.renderFrame(s); } finally { this.paramsOverride = null; }
+  }
+
+  private renderFrame(s: ProgramState): void {
     const gl = this.gl;
     this.resize();
     const t = this.targets!;

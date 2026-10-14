@@ -39,6 +39,9 @@ export interface ParamsView {
   inStudio: boolean;        // shown in the studio's parameters dock (and editing the Preview slot there)
 }
 
+// What the main screen shows while the studio is closed and a show scene is Live.
+export type ScreenMode = 'preview' | 'live';
+
 export interface UIState {
   started: boolean;
   nowText: string;
@@ -56,6 +59,7 @@ export interface UIState {
   assistantBusy: boolean;   // a chat run is in flight (the director waits for it)
   help: HelpId | null;      // the open help popover; closed whenever an overlay, the panel or the assistant changes
   liveName: string | null;  // the pinned Live slot (studio closed after a take); projectors follow it, not the screen
+  screenMode: ScreenMode;   // while Live is pinned: the screen shows your preview (browse freely) or Live (what projectors get)
   widgetsHidden: boolean;   // H: every control widget hidden for this session (not persisted)
   dragging: DragId | null;
   paramsVisible: boolean;
@@ -88,6 +92,7 @@ export const initialUIState = (look: Look): UIState => ({
   assistantBusy: false,
   help: null,
   liveName: null,
+  screenMode: 'preview',
   widgetsHidden: false,
   dragging: null,
   paramsVisible: false,

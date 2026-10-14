@@ -240,6 +240,9 @@ Run a show like OBS's Studio Mode and put it on a projector. The two monitors ar
    rendering the Live scene while whatever you do on screen (switch scenes, tweak sliders) is only a preview. The panel
    shows *● LIVE · name* meanwhile; `T` still takes the next Preview scene straight to Live. Reopening the studio puts
    Live back on screen.
+   The **Screen** widget switches this screen between your **Preview** and **● Live** without opening the studio: Live
+   shows exactly what the projectors get (Live's scene, parameters and look), and the scene you browsed to stays the
+   preview for when you switch back.
 7. **Plans and the Director.** Instead of list order, the autopilot can follow a **plan**: an ordered queue of show
    scenes, each with its own beat count and transition. Plans come from the [AI assistant](#-ai-assistant--press-i)
    ("build a 30-minute set that starts calm and peaks at the end") or from **Director** mode: tick *Director: plan
