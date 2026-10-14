@@ -37,6 +37,9 @@ export interface ControllerHooks {
   paramsOverride?: () => { title: string; specs: ParamSpec[]; values: ParamValues; onChange: (spec: ParamSpec, v: ParamValue) => void; onReset: () => void } | null;
   master?: () => number;
   autopilot?: () => boolean;
+  // Studio: while the Live slot is pinned (studio closed after a take), projectors get this instead
+  // of what the main window shows.
+  liveProgram?: (base: ProgramState) => { program: ProgramState; params: Record<number, SceneUniforms> } | null;
   // Studio actions reached from the global shortcuts.
   take?: () => void;
   blackout?: () => void;
@@ -646,11 +649,15 @@ export class AppController {
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
     this.renderer.render(p);
     if (this.output.connected) {
-      const live = this.liveParams;
-      for (const k in live) delete live[k];
-      live[c.scene] = this.renderer.sceneParams[c.scene] ?? {};
-      if (c.prevScene >= 0) live[c.prevScene] = this.renderer.sceneParams[c.prevScene] ?? {};
-      this.output.sendFrame(p, live, look.resolution);
+      const pinned = this.hooks.liveProgram?.(p);
+      if (pinned) this.output.sendFrame(pinned.program, pinned.params, look.resolution);
+      else {
+        const live = this.liveParams;
+        for (const k in live) delete live[k];
+        live[c.scene] = this.renderer.sceneParams[c.scene] ?? {};
+        if (c.prevScene >= 0) live[c.prevScene] = this.renderer.sceneParams[c.prevScene] ?? {};
+        this.output.sendFrame(p, live, look.resolution);
+      }
     }
     this.hooks.onFrame?.(dt, p);
 

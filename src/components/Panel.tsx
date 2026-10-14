@@ -127,6 +127,7 @@ function SceneGroup({ onOpenLibrary }: { onOpenLibrary: () => void }) {
   const app = useApp();
   const name = useUI((ui) => ui.sceneName);
   const auto = useUI((ui) => ui.look.auto);
+  const liveName = useUI((ui) => ui.liveName);
   return (
     <div className="group">
       <label>Scene</label>
@@ -135,6 +136,7 @@ function SceneGroup({ onOpenLibrary }: { onOpenLibrary: () => void }) {
         <span id="scene-name">{name}</span>
         <button id="scene-next" className="icon" title="Next scene (→)" onClick={() => app.stepScene(1)}>›</button>
       </div>
+      {liveName && <div id="live-pin" className="live-pin" title="The projector shows the Live show scene; what you see here is a preview. Open the studio (O) to put Live back on screen.">● LIVE · {liveName} <span>· screen is a preview</span></div>}
       <div className="scene-buttons">
         <button id="open-library" onClick={onOpenLibrary}>Scene library<Kbd hotkey={HOTKEYS.library} /></button>
         <button id="play-game" onClick={() => app.setScene(app.state.gameIndex)}>Beat Racer<Kbd hotkey={HOTKEYS.game} /></button>

@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Studio: closing it with a show scene Live pins the Live slot, so projectors keep that scene while the screen is
+  only a preview (the panel shows *● LIVE · name*); reopening restores Live to the screen. The autopilot shows a
+  beat indicator (beats gone / to go until the next take).
 - The assistant is a detached chat bubble at the bottom next to the panel, toggled with the bubble or `I`; it no
   longer replaces the control panel and can stay open next to the other panels.
 - The assistant suggests three follow-up requests after every reply, shown as chips under it (the model ends its
