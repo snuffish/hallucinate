@@ -39,7 +39,7 @@ export const writeSceneCode = toolDefinition({
   description: 'Replace the code of an existing scene and show it. The code compiles immediately: on success it runs live and is saved (edits to built-in scenes are kept as the user\'s version and can be reverted; the user can also undo your change from the assistant panel); on failure the previous version keeps running and the compile errors are returned with line numbers so you can fix them. Send the complete code, never a fragment. Scenes made in the visual maker are read-only here.',
   inputSchema: z.object({
     scene: sceneName.optional(),
-    code: z.string().describe('The complete scene code: optional top-level declarations (constants, @param lines, functions), then void main() writing fragColor.'),
+    code: z.string().describe('The complete scene code: optional top-level declarations (constants, @param and // @group lines, functions), then void main() writing fragColor.'),
   }),
   outputSchema: record,
 });
@@ -56,8 +56,8 @@ export const createScene = toolDefinition({
 
 export const setParameters = toolDefinition({
   name: 'set_parameters',
-  description: 'Set live parameters (the scene\'s @param controls) of the scene on screen. Keys are parameter names or labels. Numbers for sliders, true/false for checkboxes, "#rrggbb" for colours, arrays of numbers for vec2/vec3/vec4. Returns the values now in effect.',
-  inputSchema: z.object({ values: z.record(z.string(), z.unknown()).describe('Map of parameter name (or label) to value.') }),
+  description: 'Set live parameters (the scene\'s @param controls) of the scene on screen. Keys are parameter names, labels, or "Group/Label" when a label repeats across groups. Numbers for sliders, true/false for checkboxes, "#rrggbb" for colours, arrays of numbers for vec2/vec3/vec4. Returns the values now in effect.',
+  inputSchema: z.object({ values: z.record(z.string(), z.unknown()).describe('Map of parameter name (or label, or "Group/Label") to value.') }),
   outputSchema: record,
 });
 

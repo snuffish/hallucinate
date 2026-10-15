@@ -9,7 +9,8 @@ import { OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { Renderer, type ProgramState, type SceneUniforms } from '../engine/renderer';
 import type { Scene } from '../engine/scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, type AppState, type LookKey, type SourceButton } from '../state/app-state';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
+import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readString, remove, unfreeze, writeJSON, writeString } from '../state/persistence';
@@ -22,6 +23,9 @@ import { downloadFile, fileStamp } from './download';
 import { EditorCore } from './editor';
 import type { StudioSession } from './studio';
 import { Transport } from './transport';
+
+const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
+const DRIFT_PUBLISH_FRAMES = 6;
 
 const SOURCE_LABELS: Record<string, string> = { mic: 'Microphone / line-in', display: 'Tab / system audio', demo: 'Demo beat (124 BPM)' };
 const COOL = [0.7, 0.85, 1.35];
@@ -41,7 +45,7 @@ export interface ControllerHooks {
   // Studio mode: Program no longer shows a show scene after a manual switch.
   onManualSceneChange?: () => void;
   // Studio dock: which parameters the overlay edits.
-  paramsOverride?: () => { title: string; specs: ParamSpec[]; values: ParamValues; onChange: (spec: ParamSpec, v: ParamValue) => void; onReset: () => void } | null;
+  paramsOverride?: () => { title: string; key: string; specs: ParamSpec[]; values: ParamValues; onChange: (spec: ParamSpec, v: ParamValue) => void; onReset: () => void } | null;
   master?: () => number;
   autopilot?: () => boolean;
   // Studio: while the Live slot is pinned (studio closed after a take), projectors get this instead
@@ -103,6 +107,9 @@ export class AppController {
   private recorder: MediaRecorder | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly drift = new LookDrift();
+  private driftFrames = 0;
+  private readonly beforeRandom: { look: Partial<Look>; scene: number }[] = [];   // Shift+R steps back through these
   private toastKey = 0;
   private readonly downloads = new Map<'sc' | 'yt', DownloadView>();
   private disposed = false;
@@ -150,11 +157,12 @@ export class AppController {
       onNext: () => !!this.queueFor(this.state.activeSource)?.playNext(),
     });
 
+    this.state.clock.scene = this.lastScene();   // before the params below, which publish the scene on screen's
     list.scenes.forEach((s, i) => this.setSceneParams(i, s.params ?? []));
     this.editor = new EditorCore(this);
     this.audio.onBeat = () => this.beat();
     this.program = {
-      scene: 0, prevScene: -1, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, hue: 0,
+      scene: this.state.clock.scene, prevScene: -1, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, hue: 0,
       spectrum: this.audio.spectrum, extra: {}, bright: 0.5, mood: 0.5,
       grade: { exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] },
       feedback: 0.86, zoom: 1, rotation: 0, hueDrift: 0, warp: 0, aberration: 0, master: 1,
@@ -369,12 +377,21 @@ export class AppController {
     if (i === this.state.gameIndex) { this.game.reset(); this.toast('Beat Racer: walls drop on the beat. ← → to steer, Enter to restart', 4500); }
     c.prevScene = c.scene;
     c.scene = i;
+    if (i !== this.state.gameIndex) writeString(KEYS.lastScene, paramKey(scene));
     c.transitionStart = c.clock;
     c.sceneStart = c.clock;
     c.beatsInScene = 0;
     this.publishScene();
     this.showParams();
     this.hooks.onSceneChanged?.(i);
+  }
+
+  // The scene that was on screen when the page closed (by name, not index: the list can change in
+  // between), or the first one. Never the game, which needs a fresh start.
+  private lastScene(): number {
+    const key = readString(KEYS.lastScene);
+    const i = key ? this.state.scenes.findIndex((s) => !s.removed && paramKey(s) === key) : -1;
+    return i >= 0 && i !== this.state.gameIndex ? i : 0;
   }
 
   nextRandomScene(): void {
@@ -468,13 +485,13 @@ export class AppController {
   showParams(): void {
     const override = this.hooks.paramsOverride?.();
     if (override) {
-      this.ui.set({ params: { title: override.title, specs: override.specs, values: override.values, inStudio: true }, paramsVisible: override.specs.length > 0 });
+      this.ui.set({ params: { title: override.title, key: override.key, specs: override.specs, values: override.values, inStudio: true }, paramsVisible: override.specs.length > 0 });
       return;
     }
     const i = this.state.clock.scene;
     const specs = this.sceneParams[i] ?? [];
     const inStudio = this.overlay === 'studio';
-    this.ui.set({ params: { title: inStudio ? `${this.currentScene.name} — live` : this.currentScene.name, specs, values: this.paramValues(i), inStudio }, paramsVisible: specs.length > 0 });
+    this.ui.set({ params: { title: inStudio ? `${this.currentScene.name} — live` : this.currentScene.name, key: paramKey(this.currentScene), specs, values: this.paramValues(i), inStudio }, paramsVisible: specs.length > 0 });
   }
 
   setParam(spec: ParamSpec, value: ParamValue): void {
@@ -505,7 +522,8 @@ export class AppController {
     this.ui.set({ look: { ...this.state.look } });
   }
 
-  setLookFlag(key: 'mood' | 'auto', value: boolean): void {
+  setLookFlag(key: 'mood' | 'auto' | 'randomScene' | 'drift', value: boolean): void {
+    if (key === 'drift' && value) this.drift.reset();   // start from the sliders as they are
     this.state.look[key] = value;
     this.ui.set({ look: { ...this.state.look } });
   }
@@ -516,13 +534,29 @@ export class AppController {
     return this.state.look.auto;
   }
 
+  // Rolls the Look widget's values (not Resolution: that's a performance setting), within ranges that
+  // stay watchable. The scene only changes when "Also pick a random scene" is on.
   randomize(): void {
-    this.setLook('hue', Math.random());
-    this.setLook('trails', 0.75 + Math.random() * 0.2);
-    this.setLook('cycle', Math.random() * 1.5);
-    this.setLook('aberration', Math.random() * 0.025);
+    const { reactivity, speed, trails, hue, cycle, synesthesia, aberration, mood, spin } = this.state.look;
+    this.beforeRandom.push({ look: { reactivity, speed, trails, hue, cycle, synesthesia, aberration, mood, spin }, scene: this.state.clock.scene });
+    if (this.beforeRandom.length > RANDOM_HISTORY) this.beforeRandom.shift();
+    for (const [key, [min, max]] of Object.entries(RANDOM_RANGES)) this.setLook(key as DriftKey, min + Math.random() * (max - min));
+    this.setLookFlag('mood', Math.random() < 0.5);
     this.state.look.spin = Math.random() < 0.5 ? -1 : 1;
-    this.nextRandomScene();
+    if (this.state.look.randomScene) this.nextRandomScene();
+  }
+
+  // Shift+R: the look (and scene, if Randomize changed it) from before the last Randomize. Again for
+  // the one before that.
+  randomizeBack(): void {
+    const prev = this.beforeRandom.pop();
+    if (!prev) { this.toast('No earlier random look to go back to', 1500); return; }
+    for (const key of ['reactivity', 'speed', 'trails', 'hue', 'cycle', 'synesthesia', 'aberration'] as const) this.setLook(key, prev.look[key]!);
+    this.setLookFlag('mood', prev.look.mood!);
+    this.state.look.spin = prev.look.spin!;
+    if (prev.scene !== this.state.clock.scene) this.setScene(prev.scene);
+    const left = this.beforeRandom.length;
+    this.toast(`Back to the previous look${left ? ` (${left} more)` : ''}`, 1500);
   }
 
   // Crossmodal correspondences: dark/muffled sound reads as dim, cool and soft; bright/crisp sound
@@ -789,6 +823,10 @@ export class AppController {
     c.time += dt * c.timeRate;
     c.huePhase += dt * look.cycle * 0.06;
     this.updateMood(dt);
+    if (look.drift) {
+      this.drift.step(look, dt, look.driftSpeed);
+      if (++this.driftFrames % DRIFT_PUBLISH_FRAMES === 0) this.ui.set({ look: { ...look } });   // the sliders follow at ~10 Hz
+    }
     if (this.state.activeSource === 'media') this.media.follow(this.player);
 
     if (this.autoSwitching() && this.audio.kind && c.clock - c.sceneStart > MAX_SECONDS_PER_SCENE) this.nextRandomScene();

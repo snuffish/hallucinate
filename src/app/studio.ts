@@ -529,6 +529,7 @@ export class StudioSession {
     const values: ParamValues = Object.fromEntries(specs.map((s) => [s.name, cue?.values[s.name] ?? s.def]));
     return {
       title: cue ? `${cue.name} — preview` : 'Preview',
+      key: i >= 0 ? paramKey(this.app.state.scenes[i]!) : '',
       specs,
       values,
       onChange: (spec: ParamSpec, v: ParamValue) => { if (cue) this.replace(cue, { ...cue, values: { ...cue.values, [spec.name]: v } }); },

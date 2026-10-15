@@ -34,6 +34,7 @@ export interface DownloadView { id: 'sc' | 'yt'; title: string; percent: number;
 
 export interface ParamsView {
   title: string;
+  key: string;              // the scene's `paramKey`: which scene's folded groups apply
   specs: ParamSpec[];
   values: ParamValues;
   inStudio: boolean;        // shown in the studio's parameters dock (and editing the Preview slot there)
@@ -107,7 +108,7 @@ export const initialUIState = (look: Look): UIState => ({
   widgetsHidden: false,
   dragging: null,
   paramsVisible: false,
-  params: { title: 'Parameters', specs: [], values: {}, inStudio: false },
+  params: { title: 'Parameters', key: '', specs: [], values: {}, inStudio: false },
   hud: null,
   recording: false,
   transport: { mode: null, hasQueue: false, playing: false, currentTime: 0, duration: 0, loop: false },

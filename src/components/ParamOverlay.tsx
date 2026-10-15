@@ -1,13 +1,15 @@
 // The Parameters: one control per `@param` of the scene on screen. Sliders for numbers (with an
-// editable value), checkboxes for bools, colour pickers for colours. Outside the studio it is a
+// editable value), checkboxes for bools, colour pickers for colours. Params under a `// @group`
+// sit in a section that starts folded; which ones you open is remembered per scene. Outside the studio it is a
 // widget (drag it, dock it, collapse it with P); inside the studio the same list sits in the
 // studio's parameters dock.
 
 import { useState, type CSSProperties } from 'react';
 import { useApp, useUI } from '../app/AppContext';
-import type { ParamSpec, ParamValue, VecParamSpec, FloatParamSpec } from '../engine/params';
+import { groupParams, type ParamSpec, type ParamValue, type ParamValues, type VecParamSpec, type FloatParamSpec } from '../engine/params';
 import { HOTKEYS } from '../hotkeys/registry';
 import type { WidgetLayout } from '../state/layout';
+import { setOpen, toggleGroup, useOpenGroups } from '../state/param-groups';
 import { HelpButton } from './Help';
 import { Widget } from './widgets/Widget';
 
@@ -24,9 +26,26 @@ const fromHex = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 
 function ParamsList() {
   const app = useApp();
   const params = useUI((ui) => ui.params);
+  const opened = useOpenGroups(params.key);
+  const groups = groupParams(params.specs);
+  const names = groups.map((g) => g.name).filter(Boolean);
+  const rows = (specs: ParamSpec[], values: ParamValues) =>
+    specs.map((spec) => <ParamRow key={spec.name} spec={spec} value={values[spec.name] ?? spec.def} onChange={(v) => app.setParam(spec, v)} />);
   return (
     <div id="params-list" className="params-list">
-      {params.specs.map((spec) => <ParamRow key={spec.name} spec={spec} value={params.values[spec.name] ?? spec.def} onChange={(v) => app.setParam(spec, v)} />)}
+      {groups.map(({ name, specs }) => {
+        if (!name) return rows(specs, params.values);
+        const open = opened.includes(name);
+        return (
+          <section key={`group:${name}`} className="param-group" data-group={name}>
+            <button type="button" className="param-group-head" aria-expanded={open} title={open ? 'Fold this group' : 'Show this group'}
+              onClick={() => toggleGroup(params.key, name, names)}>
+              <span className="chevron" aria-hidden="true">▸</span>{name}<em>{specs.length}</em>
+            </button>
+            {open && <div className="param-group-body">{rows(specs, params.values)}</div>}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -36,6 +55,20 @@ const ResetButton = () => {
   return <button id="params-reset" title="Reset every value to the default in the code" onClick={() => app.resetParams()}>Reset</button>;
 };
 
+// Opens every group while they're all folded, otherwise folds them all. Only for scenes with groups.
+function FoldAllButton() {
+  const key = useUI((ui) => ui.params.key);
+  const specs = useUI((ui) => ui.params.specs);
+  const open = useOpenGroups(key);
+  const names = groupParams(specs).map((g) => g.name).filter(Boolean);
+  if (!names.length) return null;
+  const allFolded = !names.some((n) => open.includes(n));
+  return (
+    <button className="params-fold-all" aria-label={allFolded ? 'Expand all groups' : 'Collapse all groups'} title={allFolded ? 'Expand all groups' : 'Collapse all groups'}
+      onClick={() => setOpen(key, allFolded ? names : [])}>{allFolded ? '⊞' : '⊟'}</button>
+  );
+}
+
 // Only once a source plays (not over the start screen) and not while the studio shows its own copy.
 export function ParamsWidget({ entry }: { entry: WidgetLayout }) {
   const paramsVisible = useUI((ui) => ui.paramsVisible);
@@ -43,7 +76,7 @@ export function ParamsWidget({ entry }: { entry: WidgetLayout }) {
   const title = useUI((ui) => ui.params.title);
   return (
     <Widget id="params" domId="params" entry={entry} title={<span id="params-title">{title}</span>} help="params"
-      tools={<ResetButton />} collapse={{ id: 'params-collapse', hotkey: HOTKEYS.params }} hidden={!paramsVisible || studioOpen}>
+      tools={<><FoldAllButton /><ResetButton /></>} collapse={{ id: 'params-collapse', hotkey: HOTKEYS.params }} hidden={!paramsVisible || studioOpen}>
       <ParamsList />
     </Widget>
   );
@@ -57,6 +90,7 @@ export function StudioParams() {
     <aside className="params" hidden={!paramsVisible}>
       <header>
         <strong>{title}</strong>
+        <FoldAllButton />
         <ResetButton />
         <HelpButton topic="params" />
       </header>

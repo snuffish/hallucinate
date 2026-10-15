@@ -51,6 +51,7 @@ export const HOTKEYS = {
   libraryPick: { id: 'libraryPick', keys: 'Enter', label: 'Play the highlighted scene', group: 'Scenes', when: 'library', inInputs: true },
   auto: { id: 'auto', keys: 'A', label: 'Auto-switch', group: 'Scenes', when: 'noNodes' },
   randomize: { id: 'randomize', keys: 'R', label: 'Randomize', group: 'Look', when: 'noNodes' },
+  randomizeBack: { id: 'randomizeBack', keys: 'Shift+R', label: 'Back to the previous random look', group: 'Look', when: 'noNodes' },
   game: { id: 'game', keys: 'G', label: 'Beat Racer', group: 'Game', when: 'noNodes' },
   steerLeft: { id: 'steerLeft', keys: 'ArrowLeft', label: 'Steer left', group: 'Game', when: 'game' },
   steerRight: { id: 'steerRight', keys: 'ArrowRight', label: 'Steer right', group: 'Game', when: 'game' },

@@ -127,6 +127,9 @@ body.idle { cursor: none; }
 .widget-close, .widget-collapse { opacity: 0.55; }
 .widget > header:hover .widget-close, .widget > header:hover .widget-collapse { opacity: 1; }
 .widget-body { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+/* The scrollbar sits in the widget's right padding with a gap before the content; when nothing scrolls the
+   negative margin and the padding cancel out, so the content is as wide as before. */
+.widget-body { margin-right: -8px; padding-right: 8px; }
 .widget.sized > .widget-body { flex: 1 1 auto; }
 .widget.resizing { transition: none; user-select: none; }
 
@@ -237,6 +240,7 @@ body.idle { cursor: none; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 .actions button { flex: 1; }
+.actions .random-scene { flex-basis: 100%; font-size: 12px; }
 
 .toast {
   z-index: var(--z-toast);
@@ -681,6 +685,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .param input[type="color"] { width: 34px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: none; cursor: pointer; }
 .param.param-bool { flex-direction: row; align-items: center; gap: 8px; }
 .param.param-bool .param-label { color: var(--text); }
+.param-group { display: flex; flex-direction: column; gap: 10px; }
+.param-group + .param-group, .param + .param-group { border-top: 1px solid var(--line); padding-top: 8px; }
+.param-group-head {
+  display: flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; cursor: pointer;
+  color: var(--text); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; text-align: left;
+}
+.param-group-head:hover { background: none; color: var(--accent); }
+.param-group-head em { margin-left: auto; font-style: normal; font-weight: 400; color: var(--muted); }
+.param-group-head .chevron { display: inline-block; width: 10px; color: var(--muted); transition: transform .15s; }
+.param-group-head[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+.param-group-body { display: flex; flex-direction: column; gap: 10px; }
 
 /* Studio */
 .studio {

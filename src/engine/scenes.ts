@@ -401,9 +401,11 @@ void main() {
 
 // Kali's "Star Nest": volumetric march through a tiled 3D Kali fractal (p = abs(p)/dot(p,p) - c).
 const STAR_NEST = /* glsl */ `
+// @group Flight
 const float FORM = .53;                  // @param min=.4 max=.7 label="Fractal form"
 const float SPEED = 1.;                  // @param min=0 max=5 label="Travel speed"
 const float TURN = 1.;                   // @param min=0 max=5 label="Turn speed"
+// @group Colour
 const float GLOW = 1.;                   // @param min=.2 max=3 label="Brightness"
 const float SATURATION = .85;            // @param min=0 max=1.5 label="Colour saturation"
 const float TINT = .45;                  // @param min=0 max=1 label="Colour tint"
@@ -448,12 +450,14 @@ void main() {
 // "Phantom star" / "Octagrams" style: march through repeated shapes and accumulate
 // exp(-distance) as neon glow instead of shading a surface.
 const NEON_JACKS = /* glsl */ `
+// @group Flight
 const float SPEED = 3.;                  // @param min=0 max=10 label="Flight speed"
 const float SPACING = 4.;                // @param min=2 max=8 label="Spacing"
+// @group Jacks
 const float SIZE = .45;                  // @param min=.2 max=1.2 label="Jack size"
 const float THICKNESS = .14;             // @param min=.05 max=.4 label="Arm thickness"
 const float SPIN = 1.;                   // @param min=0 max=4 label="Spin speed"
-const float TWIST = .12;                 // @param min=0 max=.5 label="Tunnel twist"
+const float TWIST = .12;                 // @param min=0 max=.5 label="Tunnel twist" group="Flight"
 
 float sdBox(vec3 p, vec3 b) { vec3 q = abs(p) - b; return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.); }
 float map(vec3 p) {
@@ -488,12 +492,14 @@ void main() {
 // "Audio Reactive Liquid Blobs": smooth-min metaballs; bass melts them together,
 // each blob's size follows its own slice of the spectrum.
 const BLOBS = /* glsl */ `
+// @group Blobs
 const float COUNT = 6.;                  // @param min=1 max=10 int label="Blobs"
 const float SIZE = .32;                  // @param min=.1 max=.6 label="Blob size"
 const float GOO = .2;                    // @param min=.02 max=1 label="Gooiness"
+// @group Motion
 const float SPEED = 1.;                  // @param min=0 max=3 label="Speed"
 const float SPREAD = .95;                // @param min=.3 max=1.6 label="Spread"
-uniform bool uHalo;                      // @param default=true label="Halo"
+uniform bool uHalo;                      // @param default=true label="Halo" group="Blobs"
 
 float smin(float a, float b, float k) { float h = clamp(.5 + .5 * (b - a) / k, 0., 1.); return mix(b, a, h) - k * h * (1. - h); }
 float map(vec3 p) {
@@ -539,13 +545,16 @@ void main() {
 
 // Curtains of light over a mountain ridge. Each curtain glows with its own slice of the spectrum.
 const AURORA = /* glsl */ `
+// @group Curtains
 const float CURTAINS = 5.;               // @param min=1 max=8 int label="Curtains"
 const float SPEED = 1.;                  // @param min=0 max=5 label="Flow speed"
 const float HEIGHT = .55;                // @param min=0 max=1.2 label="Wave height"
+// @group Scenery
 const float STARS = .007;                // @param min=0 max=.05 label="Star density"
+// @group Colour
 uniform vec3 uLowColour;                 // @param color default=#1aff8c label="Lower colour"
 uniform vec3 uTopColour;                 // @param color default=#bf40ff label="Upper colour"
-uniform bool uMountains;                 // @param default=true label="Mountains"
+uniform bool uMountains;                 // @param default=true label="Mountains" group="Scenery"
 
 void main() {
   vec2 p = centered();
@@ -606,8 +615,10 @@ void main() {
 
 // Phosphor oscilloscope: waveform trace, spectrum trace and an XY Lissajous figure.
 const SCOPE = /* glsl */ `
+// @group Trace
 const float GAIN = .8;                   // @param min=.2 max=2 label="Gain"
 uniform vec3 uPhosphor;                  // @param color default=#40ff73 label="Phosphor colour"
+// @group Layers
 uniform bool uGrid;                      // @param default=true label="Graticule"
 uniform bool uSpectrumTrace;             // @param default=true label="Spectrum trace"
 uniform bool uLissajous;                 // @param default=true label="XY figure"
@@ -799,8 +810,10 @@ void main() {
 
 // The Flower of Life: 19 overlapping circles. Petal colour comes from how many circles overlap.
 const FLOWER = /* glsl */ `
+// @group View
 const float ZOOM = 5.2;                  // @param min=2 max=12 label="Zoom out"
 const float SPIN = .04;                  // @param min=-.5 max=.5 label="Spin speed"
+// @group Pattern
 const float RINGS = 2.;                  // @param min=0 max=2 int label="Flower rings"
 const float FILL = 1.;                   // @param min=0 max=3 label="Petal fill"
 uniform bool uOuter;                     // @param default=true label="Outer circle"
@@ -859,12 +872,14 @@ void main() {
 
 // Tumbling blocks: the classic isometric cube tiling. Cubes flip inside-out in slow waves.
 const BLOCKS = /* glsl */ `
+// @group Cubes
 const float SCALE = 6.;                  // @param min=2 max=16 label="Cube density"
 const float DRIFT = 1.;                  // @param min=0 max=4 label="Drift speed"
 const float DEPTH = 1.;                  // @param min=0 max=1.3 label="3D shading"
+// @group Flip
 const float FLIP_SPEED = .6;             // @param min=0 max=3 label="Flip wave speed"
 uniform bool uFlip;                      // @param default=true label="Cubes flip inside-out"
-uniform bool uEdges;                     // @param default=true label="Glowing edges"
+uniform bool uEdges;                     // @param default=true label="Glowing edges" group="Cubes"
 
 void main() {
   vec2 p = centered() * SCALE;
@@ -897,12 +912,14 @@ void main() {
 
 // Endless zoom through nested, twisting squares and triangles (log-polar repetition).
 const POLY_TUNNEL = /* glsl */ `
+// @group Shapes
 const float SIDES_A = 4.;                // @param min=3 max=8 int label="Shape 1 sides"
 const float SIDES_B = 3.;                // @param min=3 max=8 int label="Shape 2 sides"
+// @group Motion
 const float SPEED = 1.;                  // @param min=0 max=4 label="Zoom speed"
 const float DENSITY = 3.;                // @param min=1 max=8 label="Ring density"
 const float TWIST = .6;                  // @param min=-2 max=2 label="Twist"
-uniform bool uSecond;                    // @param default=true label="Second shape"
+uniform bool uSecond;                    // @param default=true label="Second shape" group="Shapes"
 
 float polyRadius(vec2 p, float n, float twist) {
   float a = atan(p.y, p.x) + twist;
@@ -966,15 +983,20 @@ void main() {
 
 // A tesseract (4D hypercube) turning through the fourth dimension, drawn as glowing edges.
 const TESSERACT = /* glsl */ `
+// @group Motion
 const float SPIN_4D = 1.;                // @param min=0 max=3 label="Spin through 4D"
 const float SPIN_3D = 1.;                // @param min=0 max=3 label="Spin in 3D"
+// @group Shape
 const float DEPTH_4D = 3.;               // @param min=1.6 max=8 label="4D depth (low = deep inner cube)"
 const float SIZE = 1.25;                 // @param min=.4 max=3 label="Size"
+// @group Glow
 const float EDGE_GLOW = 1.;              // @param min=.2 max=4 label="Edge glow"
 const float CORNER_GLOW = 1.;            // @param min=0 max=4 label="Corner glow"
+// @group Colour
 uniform bool uAxisColours;               // @param default=true label="Colour each axis"
 uniform vec3 uEdgeColour;                // @param color default=#4fe3ff label="Single edge colour"
-uniform bool uCornerFlash;               // @param default=true label="Corners flash on the beat"
+uniform bool uCornerFlash;               // @param default=true label="Corners flash on the beat" group="Glow"
+// @group Travelling dots
 const float DOTS = 2.;                   // @param min=0 max=6 int label="Dots per edge"
 const float DOT_SPEED = .3;              // @param min=0 max=2 label="Dot speed"
 const float DOT_SIZE = 1.;               // @param min=.2 max=3 label="Dot size"
@@ -1020,13 +1042,15 @@ void main() {
 
 // Spirograph: a hypotrochoid whose pen distance slowly morphs, coloured along its path.
 const SPIRO = /* glsl */ `
+// @group Shape
 const float R_OUTER = 7.;                // @param min=2 max=15 int label="Ring size (sets the lobes)"
 const float R_INNER = 3.;                // @param min=1 max=6 int label="Wheel size"
 const float PEN = 3.5;                   // @param min=0 max=6 label="Pen distance"
+// @group Motion
 const float MORPH = 1.5;                 // @param min=0 max=3 label="Pen morph"
 const float MORPH_SPEED = .09;           // @param min=0 max=.5 label="Morph speed"
 const float SPIN = .05;                  // @param min=-1 max=1 label="Spin speed"
-uniform bool uCircle;                    // @param default=true label="Outer circle"
+uniform bool uCircle;                    // @param default=true label="Outer circle" group="Shape"
 
 float seg(vec2 p, vec2 a, vec2 b) { vec2 pa = p - a, ba = b - a; return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0., 1.)); }
 // Hypotrochoid: a wheel of size r rolling inside a ring of size R (R = 7, r = 3: seven lobes, 3 turns).
@@ -1059,9 +1083,11 @@ void main() {
 
 // Lissajous figure: two sine waves at a whole-number ratio trace a closed knot.
 const LISSAJOUS = /* glsl */ `
+// @group Figure
 const float FREQ_X = 3.;                 // @param min=1 max=9 int label="X frequency"
 const float FREQ_Y = 2.;                 // @param min=1 max=9 int label="Y frequency"
 const float DRIFT = .15;                 // @param min=0 max=1 label="Phase drift"
+// @group Colour
 const float GLOW = 1.;                   // @param min=.2 max=3 label="Glow"
 const vec3 COLOR_A = vec3(.3, .9, 1.);   // @param color label="Colour A"
 const vec3 COLOR_B = vec3(1., .3, .8);   // @param color label="Colour B"
@@ -1088,11 +1114,14 @@ void main() {
 
 // Kaleidoscope over flowing noise, with control over the mirror itself.
 const MIRROR_KALEIDO = /* glsl */ `
+// @group Mirror
 const float SEGMENTS = 8.;               // @param min=2 max=24 int label="Mirror segments"
+// @group Motion
 const float ZOOM = 3.;                   // @param min=.5 max=10 label="Zoom"
 const float TWIST = .5;                  // @param min=-3 max=3 label="Twist"
 const float SPIN = .1;                   // @param min=-1 max=1 label="Spin speed"
-uniform bool uFlip;                      // @param default=true label="Mirror each segment"
+uniform bool uFlip;                      // @param default=true label="Mirror each segment" group="Mirror"
+// @group Colour
 uniform vec3 uTint;                      // @param color default=#ffffff label="Tint"
 
 void main() {
@@ -1112,9 +1141,11 @@ void main() {
 
 // The demoscene classic: summed sine waves through your own three-colour gradient.
 const RETRO_PLASMA = /* glsl */ `
+// @group Pattern
 const float SCALE = 6.;                  // @param min=1 max=20 label="Scale"
 const float SPEED = 1.;                  // @param min=0 max=4 label="Speed"
 const float BANDS = 0.;                  // @param min=0 max=16 int label="Posterize (0 = smooth)"
+// @group Colours
 uniform vec3 uColA;                      // @param color default=#ff2fa0 label="Colour 1"
 uniform vec3 uColB;                      // @param color default=#2fd8ff label="Colour 2"
 uniform vec3 uColC;                      // @param color default=#ffe14f label="Colour 3"
@@ -1135,10 +1166,12 @@ void main() {
 
 // Layered starfield flying towards a movable vanishing point.
 const STARFIELD = /* glsl */ `
+// @group Stars
 const float DENSITY = .5;                // @param min=.05 max=1 label="Density"
 const float SPEED = 1.;                  // @param min=0 max=5 label="Warp speed"
 const float SIZE = 1.;                   // @param min=.3 max=3 label="Star size"
 uniform vec2 uCentre;                    // @param min=-.4 max=.4 label="Vanishing point"
+// @group Colour
 uniform vec3 uStarColor;                 // @param color default=#cfe4ff label="Star colour"
 uniform bool uRainbow;                   // @param default=false label="Rainbow stars"
 
@@ -1165,10 +1198,12 @@ void main() {
 
 // Rotating rays from a movable centre.
 const SUNBURST = /* glsl */ `
+// @group Rays
 const float RAYS = 16.;                  // @param min=3 max=48 int label="Rays"
 const float SPIN = .2;                   // @param min=-2 max=2 label="Spin speed"
 const float SHARPNESS = .5;              // @param min=0 max=1 label="Edge sharpness"
 uniform vec2 uCentre;                    // @param min=-.5 max=.5 label="Centre"
+// @group Colour
 uniform vec3 uColA;                      // @param color default=#ff7a18 label="Ray colour"
 uniform vec3 uColB;                      // @param color default=#3a0a5a label="Gap colour"
 uniform bool uPulse;                     // @param default=true label="Glow on the beat"
@@ -1187,10 +1222,12 @@ void main() {
 
 // 2D metaballs: blobs drift and merge like wax in a lava lamp.
 const LAVA_LAMP = /* glsl */ `
+// @group Blobs
 const float BLOBS = 6.;                  // @param min=1 max=12 int label="Blobs"
 const float SIZE = .12;                  // @param min=.03 max=.3 label="Blob size"
 const float GOO = .5;                    // @param min=0 max=1 label="Gooiness"
 const float SPEED = .5;                  // @param min=0 max=2 label="Speed"
+// @group Colour
 uniform vec3 uBlob;                      // @param color default=#ff5a1f label="Lava colour"
 uniform vec3 uBack;                      // @param color default=#2a0838 label="Glass colour"
 
@@ -1429,10 +1466,13 @@ void main() {
 export const TEMPLATE = /* glsl */ `// Your own scene. Edit me — it recompiles as you type.
 // Available: uTime uBass uMid uHigh uLevel uBeat uHue uBright uMood uRes
 //            spec(x) wave(x) rainbow(t) neon(t) rot(a) noise(p) fbm(p) centered()
-// Lines tagged // @param get a live control in the Parameters overlay (P).
+// Lines tagged // @param get a live control in the Parameters overlay (P);
+// a // @group line gives the ones after it a heading that folds.
 
+// @group Shape
 const float RINGS = 30.;                    // @param min=5 max=80 int
 const float PETALS = 6.;                    // @param min=1 max=16 int label="Petals"
+// @group Look
 uniform float uGlow;                        // @param min=0 max=3 default=1 label="Glow"
 uniform vec3 uTint;                         // @param color default=#ffffff label="Tint"
 uniform bool uCore;                         // @param default=true label="Beat flash in the centre"
