@@ -26,9 +26,11 @@ const FORBIDDEN = 'YouTube refused the download (HTTP 403). Update yt-dlp (e.g. 
 // YouTube only hands out working video URLs to clients that solve its JavaScript challenge; without a
 // JS runtime yt-dlp gets intermittent "HTTP Error 403: Forbidden". Lend it the Node that runs this server
 // (needs a yt-dlp with --js-runtimes, plus its yt-dlp-ejs solver scripts).
+// Inside the desktop app execPath is the Electron binary; the app passes ELECTRON_RUN_AS_NODE=1 in `env`
+// so that binary behaves as plain Node for yt-dlp.
 let jsRuntimeArgs;
-async function jsRuntime() {
-  jsRuntimeArgs ??= ytdlp(['--help'], 15_000)
+async function jsRuntime(env) {
+  jsRuntimeArgs ??= ytdlp(['--help'], 15_000, { env })
     .then((help) => (help.includes('--js-runtimes') ? ['--js-runtimes', `node:${process.execPath}`] : []))
     .catch(() => []);
   return jsRuntimeArgs;
@@ -52,7 +54,8 @@ export const SITES = {
   },
 };
 
-export function createBridge(name) {
+// `env` is added to yt-dlp's environment (the desktop app uses it, see jsRuntime()).
+export function createBridge(name, { env } = {}) {
   const site = SITES[name];
   const cache = join(tmpdir(), `hallucinate-${name}`);
   const prefix = `/api/${name}/`;
@@ -61,7 +64,7 @@ export function createBridge(name) {
     query = query.trim();
     if (!query) return [];
     const target = /^https?:\/\//i.test(query) ? siteUrl(query) : site.search(query);
-    const data = JSON.parse(await ytdlp([...(site.jsRuntime ? await jsRuntime() : []), '-J', '--flat-playlist', '--no-warnings', '--', target], 30_000));
+    const data = JSON.parse(await ytdlp([...(site.jsRuntime ? await jsRuntime(env) : []), '-J', '--flat-playlist', '--no-warnings', '--', target], 30_000, { env }));
     return (data.entries ?? [data]).filter(Boolean).map((e) => ({
       url: e.webpage_url ?? e.url,
       title: e.title ?? 'Untitled',
@@ -78,7 +81,7 @@ export function createBridge(name) {
     await mkdir(cache, { recursive: true });
     // yt-dlp skips the download when the file is already cached, and still prints its path.
     const args = [
-      ...(site.jsRuntime ? await jsRuntime() : []),
+      ...(site.jsRuntime ? await jsRuntime(env) : []),
       '--no-playlist', '--no-warnings', '-q', '-N', '4', ...site.download,
       '-o', join(cache, '%(id)s.%(ext)s'),
       '--progress', '--newline', '--progress-template', `download:${PROGRESS}`,
@@ -91,6 +94,7 @@ export function createBridge(name) {
       let file = null;
       return ytdlp(args, 60 * 60_000, {
         signal,
+        env,
         onLine: (line) => {
           if (line.startsWith('@@D|')) file = line.slice(4);
           else progress(line);
@@ -212,9 +216,9 @@ export function createBridge(name) {
 }
 
 // Runs yt-dlp; `onLine` sees every output line as it arrives. Resolves with stdout.
-function ytdlp(args, timeoutMs, { onLine, signal } = {}) {
+function ytdlp(args, timeoutMs, { onLine, signal, env } = {}) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(YTDLP, args, { stdio: ['ignore', 'pipe', 'pipe'], signal });
+    const proc = spawn(YTDLP, args, { stdio: ['ignore', 'pipe', 'pipe'], signal, env: env ? { ...process.env, ...env } : process.env });
     let stdout = '', stderr = '';
     const lines = (stream, append) => {
       let rest = '';

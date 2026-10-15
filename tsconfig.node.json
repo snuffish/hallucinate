@@ -22,9 +22,11 @@
   },
   "include": [
     "vite.config.ts",
+    "vite.desktop.config.ts",
     "vitest.config.ts",
     "playwright.config.ts",
     "server",
+    "desktop",
     "perf"
   ]
 }
