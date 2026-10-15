@@ -120,7 +120,7 @@ export class AppController {
     clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
       const ui = this.ui.get();
-      if (this.audio.kind && !ui.overlay && !ui.assistantOpen && !ui.help && !ui.dragging && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
+      if (this.audio.kind && !ui.overlay && !ui.assistantOpen && !ui.assistantPeek && !ui.help && !ui.dragging && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
     }, 3000);
   };
 
@@ -236,11 +236,13 @@ export class AppController {
     this.setOverlay(this.overlay === overlay ? null : overlay);
   }
 
-  // The assistant floats in its own bubble and can stay open next to any overlay.
-  toggleAssistant(open = !this.ui.get().assistantOpen): void {
+  // The assistant floats in its own bubble and can stay open next to any overlay. `chatId` opens it on
+  // that conversation (the bubble's peek card was clicked).
+  toggleAssistant(open = !this.ui.get().assistantOpen, chatId?: string): void {
+    if (chatId) this.ui.set({ assistantFocus: chatId, assistantPeek: null });
     if (this.ui.get().assistantOpen === open) return;
     if (!open && document.activeElement instanceof HTMLElement && document.activeElement.closest('#ai')) document.activeElement.blur();
-    this.ui.set({ assistantOpen: open, help: null });
+    this.ui.set({ assistantOpen: open, help: null, ...(open && { assistantPeek: null }) });
     this.wake();
   }
 
@@ -290,6 +292,7 @@ export class AppController {
   }
 
   setDockWidth(zone: L.SideZone, width: number): void { this.setLayout(L.setDockWidth(this.layout.get(), zone, width)); }
+  resizeChat(size: Partial<L.WidgetSize>): void { this.setLayout(L.resizeChat(this.layout.get(), size)); }
 
   // A resized floating widget is re-anchored from its new rectangle, so the corner it was dragged by
   // stays where it was let go.

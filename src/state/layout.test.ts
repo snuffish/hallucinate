@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KEYS } from './persistence';
 import {
   DEFAULT_LAYOUT, WIDGET_IDS, chatPlacement, dock, effective, float, floatToPx, loadLayout, moveBubble, parseLayout,
-  DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetLayout, resetWidget, resize, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
+  CHAT_MIN_H, CHAT_MIN_W, DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetLayout, resetWidget, resize, resizeChat, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
 } from './layout';
 
 const VIEW = { width: 1280, height: 720 };
@@ -195,5 +195,33 @@ describe('layout storage', () => {
     it('starts from the default on a fresh browser', () => {
       expect(loadLayout()).toEqual({ layout: DEFAULT_LAYOUT, migrated: false });
     });
+  });
+});
+
+describe('the chat window size', () => {
+  it('stores a dragged size, clamped to a usable minimum; null goes back to the stylesheet\'s', () => {
+    let l = resizeChat(resetLayout(), { w: 520, h: 700 });
+    expect(l.chatSize).toEqual({ w: 520, h: 700 });
+    l = resizeChat(l, { w: 10 });
+    expect(l.chatSize).toEqual({ w: CHAT_MIN_W, h: 700 });
+    l = resizeChat(l, { h: 5 });
+    expect(l.chatSize.h).toBe(CHAT_MIN_H);
+    expect(resizeChat(l, { w: null, h: null }).chatSize).toEqual({ w: null, h: null });
+    expect(resetLayout().chatSize).toEqual({ w: null, h: null });
+  });
+
+  it('is kept across a reload, falls back when broken, and phones use the natural size', () => {
+    const stored = JSON.parse(JSON.stringify(resizeChat(resetLayout(), { w: 480, h: 600 })));
+    expect(parseLayout(stored).chatSize).toEqual({ w: 480, h: 600 });
+    expect(parseLayout({ ...stored, chatSize: { w: 'wide' } }).chatSize).toEqual({ w: null, h: null });
+    const { chatSize: _gone, ...older } = stored;
+    expect(parseLayout(older).chatSize).toEqual({ w: null, h: null });   // written before the chat could be resized
+    expect(effective(parseLayout(stored), true).chatSize).toEqual({ w: null, h: null });
+  });
+
+  it('grows away from a moved bubble, so the grip sits on that corner', () => {
+    const chat = { width: 400, height: 500 };
+    expect(chatPlacement({ left: 20, top: 640, width: 54, height: 54 }, chat, VIEW)).toMatchObject({ growX: 'right', growY: 'up' });
+    expect(chatPlacement({ left: 1200, top: 20, width: 54, height: 54 }, chat, VIEW)).toMatchObject({ growX: 'left', growY: 'down' });
   });
 });

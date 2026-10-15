@@ -39,6 +39,7 @@ export function useAppHotkeys(actions: HotkeyActions): void {
       case 'overlayOpen': return overlay !== null || assistantOpen || helpOpen;
       case 'library': return overlay === 'library';
       case 'noLibrary': return overlay !== 'library' && !nodesOpen;
+      case 'assistantOpen': return assistantOpen;
     }
   };
 

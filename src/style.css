@@ -844,7 +844,40 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 .ai[hidden] { display: none; }
 .ai header { display: flex; align-items: center; gap: 6px; }
-.ai header strong { flex: 1; font-size: 15px; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ai { max-width: calc(100vw - 16px); max-height: calc(100vh - var(--dock-bottom) - 94px); }   /* beside the bubble's default spot it grows upward */
+.ai.sized { min-width: 300px; min-height: 260px; }
+.ai header strong { font-size: 15px; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai header .ai-switcher { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 3px 8px; background: transparent; border-color: transparent; text-align: left; }
+.ai header .ai-switcher:hover, .ai header .ai-switcher.active { border-color: var(--line); background: rgba(255, 255, 255, 0.05); }
+.ai-switcher strong { flex: 1; min-width: 0; }
+.ai-switcher-count { font-size: 10px; min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: #fff; text-align: center; }
+.ai header .icon.on { border-color: var(--accent2); background: rgba(79, 227, 255, 0.15); }
+/* A conversation's state: working (pulsing), waiting for a slot, a new reply, a failed run. */
+.ai-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: transparent; }
+.ai-dot.running { background: var(--accent2); animation: ai-pulse 0.8s ease-in-out infinite alternate; }
+.ai-dot.waiting { border: 1px solid var(--accent2); }
+.ai-dot.unread { background: var(--accent); }
+.ai-dot.error { background: #ff5a6e; }
+/* The conversation drawer */
+.ai-chats { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.ai-chats input[type="search"] { width: 100%; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.35); color: var(--text); font: inherit; }
+.ai-chats h4 { margin: 4px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.ai-chats ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ai-chat-row { display: flex; align-items: center; gap: 4px; border-radius: 8px; }
+.ai-chat-row:hover, .ai-chat-row.active { background: rgba(255, 255, 255, 0.06); }
+.ai-chat-row.active { outline: 1px solid rgba(255, 79, 216, 0.35); }
+.ai-chat-pick { flex: 1; min-width: 0; display: grid; grid-template-columns: 8px 1fr; column-gap: 8px; align-items: center; padding: 6px 8px; border: 0; background: none; color: var(--text); text-align: left; }
+.ai-chat-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-chat-meta { grid-column: 2; font-size: 11px; color: var(--muted); }
+.ai-chat-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.ai-chat-row:hover .ai-chat-actions, .ai-chat-row:focus-within .ai-chat-actions { opacity: 1; }
+.ai-chat-actions button { padding: 2px 6px; font-size: 12px; }
+.ai-chat-actions .on { border-color: var(--accent); }
+.ai-chat-row.renaming input { flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--accent2); background: rgba(0, 0, 0, 0.4); color: var(--text); font: inherit; }
+.ai-chats button.danger, .ai-chats-foot .danger { border-color: #ff5a6e; background: rgba(255, 59, 59, 0.25); }
+.ai-chats-foot { margin: 6px 0 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+.ai-chats-foot button { font-size: 12px; padding: 3px 9px; }
+@media (hover: none) { .ai-chat-actions { opacity: 1; } }
 .ai header button { padding: 3px 9px; font-size: 12px; }
 .ai header button:disabled { opacity: 0.35; cursor: default; }
 .ai-open { border-color: rgba(255, 79, 216, 0.5); }
@@ -863,9 +896,39 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .ai-text pre { margin: 4px 0; padding: 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.45); overflow-x: auto; }
 .ai-text pre code { background: none; padding: 0; color: var(--text); white-space: pre; }
 .ai-text ul { margin: 2px 0; padding-left: 18px; }
-.ai-thinking { font-size: 12px; color: var(--muted); }
+/* The assistant's reasoning: folded unless "Show reasoning" (💭) is on. */
+.ai-thinking { font-size: 12px; color: var(--muted); border-left: 2px solid rgba(79, 227, 255, 0.35); padding-left: 8px; }
 .ai-thinking summary { cursor: pointer; }
-.ai-thinking p { margin: 4px 0 0; white-space: pre-wrap; max-height: 160px; overflow-y: auto; }
+.ai-thinking.live summary { animation: ai-pulse 1s ease-in-out infinite alternate; }
+.ai-thinking-count { opacity: 0.7; }
+.ai-thinking-body { position: relative; margin-top: 4px; max-height: min(320px, 40vh); overflow-y: auto; line-height: 1.45; }
+.ai-thinking-body p { margin: 0 0 6px; }
+.ai-thinking.private { margin: 0; font-style: italic; }
+p.ai-thinking { border-left-color: var(--line); }
+.ai-copy { padding: 1px 7px; font-size: 11px; color: var(--muted); background: rgba(255, 255, 255, 0.04); }
+.ai-copy-thinking { display: block; margin-top: 4px; }
+.ai-code { position: relative; }
+.ai-code .ai-copy { position: absolute; top: 6px; right: 6px; opacity: 0; transition: opacity 0.15s; }
+.ai-code:hover .ai-copy, .ai-code .ai-copy:focus-visible { opacity: 1; }
+.ai-msg-foot { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.ai-msg-foot .ai-copy { opacity: 0; transition: opacity 0.15s; }
+.ai-msg.assistant:hover .ai-msg-foot .ai-copy, .ai-msg-foot .ai-copy:focus-visible { opacity: 1; }
+.ai-reply-usage { cursor: help; }
+.ai-turn-user { display: flex; flex-direction: column; gap: 6px; }
+.ai-msg.user.queued { opacity: 0.55; align-items: center; gap: 4px; }
+.ai-msg.user.queued .ai-body { border-style: dashed; }
+.ai-unqueue { padding: 0 6px; font-size: 14px; }
+.ai-note.pending { font-style: italic; }
+.ai-note.error button { margin-left: 8px; padding: 2px 9px; font-size: 12px; }
+.ai-hint { text-align: left; padding: 6px 8px; border-radius: 8px; background: rgba(255, 216, 79, 0.08); border: 1px solid rgba(255, 216, 79, 0.25); }
+.ai-hint button { padding: 2px 8px; font-size: 12px; }
+/* The panel's resize grip, on the corner facing away from the bubble. */
+.ai > .grip.ai-grip { width: 14px; height: 14px; opacity: 0.35; transition: opacity 0.15s; border: 2px solid var(--accent2); border-radius: 0; }
+.ai:hover > .grip.ai-grip { opacity: 0.85; }
+.grip.ai-grip.tr { top: 2px; right: 2px; border-width: 2px 2px 0 0; border-top-right-radius: 10px; cursor: nesw-resize; }
+.grip.ai-grip.br { bottom: 2px; right: 2px; border-width: 0 2px 2px 0; border-bottom-right-radius: 10px; cursor: nwse-resize; }
+.grip.ai-grip.tl { top: 2px; left: 2px; border-width: 2px 0 0 2px; border-top-left-radius: 10px; cursor: nwse-resize; }
+.grip.ai-grip.bl { bottom: 2px; left: 2px; border-width: 0 0 2px 2px; border-bottom-left-radius: 10px; cursor: nesw-resize; }
 .ai-tool { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; padding: 5px 9px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); color: var(--muted); }
 .ai-tool.running span { animation: ai-pulse 1s ease-in-out infinite alternate; }
 .ai-tool.ok { color: #9ee6b0; }
@@ -875,7 +938,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 @keyframes ai-pulse { from { opacity: 0.5; } to { opacity: 1; } }
 .ai-note { margin: 0; font-size: 12px; color: var(--muted); text-align: center; }
 .ai-note.error { color: #ff9aa9; text-align: left; white-space: pre-wrap; }
-.ai-status { margin: 0; min-height: 16px; font-size: 11px; color: var(--muted); }
+.ai-status { margin: 0; min-height: 16px; font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+#ai-usage { cursor: help; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-composer { display: flex; gap: 6px; align-items: flex-end; }
 .ai-composer textarea {
   flex: 1;
@@ -942,7 +1006,20 @@ body.studio-open #gl { z-index: var(--z-live); pointer-events: none; }
 .ai-bubble.open { background: rgba(14, 10, 24, 0.9); color: var(--text); }
 .ai-bubble-icon { font-size: 24px; line-height: 1; }
 .ai-bubble .kbd { position: absolute; right: -4px; top: -6px; margin: 0; font-size: 9px; padding: 1px 4px; background: rgba(14, 10, 24, 0.9); }
-body.idle .ai-bubble:not(.open) { opacity: 0; pointer-events: none; }
+body.idle .ai-bubble:not(.open):not(.unread):not(.busy) { opacity: 0; pointer-events: none; }
+/* A reply is waiting: a badge; a conversation works while the panel is closed: a turning ring. */
+.ai-bubble-badge { position: absolute; right: -4px; bottom: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #fff; color: #b0128f; font: 700 11px/18px system-ui, sans-serif; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.ai-bubble.busy::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--accent2); border-right-color: var(--accent); animation: ai-spin 1.1s linear infinite; pointer-events: none; }
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ai-bubble.busy::after { animation-duration: 4s; } .ai-dot.running, .ai-thinking.live summary { animation: none; } }
+/* The peek: a reply that landed while the panel was closed. */
+.ai-peek { position: fixed; z-index: var(--z-ai-bubble); width: min(280px, calc(100vw - 16px)); display: flex; align-items: flex-start; gap: 4px; padding: 8px 6px 8px 10px; border-radius: 12px; background: rgba(14, 10, 24, 0.94); border: 1px solid rgba(255, 79, 216, 0.45); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); animation: ai-peek-in 0.2s ease-out; }
+.ai-peek.error { border-color: rgba(255, 90, 110, 0.6); }
+.ai-peek-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 0; border: 0; background: none; color: var(--text); text-align: left; font-size: 12px; cursor: pointer; }
+.ai-peek-open strong { font-size: 12px; color: var(--accent2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-peek.error .ai-peek-open strong { color: #ff9aa9; }
+.ai-peek .icon { padding: 0 6px; }
+@keyframes ai-peek-in { from { opacity: 0; transform: translateY(6px); } }
 body:not(.started) .ai { left: 18px; }
 .ai-bubble.moved { bottom: auto; }
 .ai-bubble.dragging { cursor: grabbing; transition: none; transform: scale(1.06); }

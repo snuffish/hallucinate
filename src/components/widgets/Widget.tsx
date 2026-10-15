@@ -49,7 +49,7 @@ export function useFloatPlacement(ref: RefObject<HTMLElement | null>, place: Flo
 }
 
 // A resize grip. `onMove` gets the pointer's offset from where the press started.
-function Grip({ className, title, onStart, onMove, onEnd, onCancel, onReset }: {
+export function Grip({ className, title, onStart, onMove, onEnd, onCancel, onReset }: {
   className: string; title: string; onStart: () => void; onMove: (dx: number, dy: number) => void; onEnd: () => void; onCancel: () => void; onReset: () => void;
 }) {
   const from = useRef({ x: 0, y: 0 });

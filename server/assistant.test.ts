@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { chat, EventType, maxIterations, type AdapterYieldChunk, type DefaultMessageMetadataByModality, type TextOptions } from '@tanstack/ai';
 import { BaseTextAdapter, type StructuredOutputOptions } from '@tanstack/ai/adapters';
 import { DIRECTOR_TOOLS, TOOL_DEFINITIONS } from '../src/assistant/tools';
-import { modeOf, runConfig } from './assistant';
+import { continuedOf, modeOf, runConfig } from './assistant';
+import { cliUsage, sessionRetry, withTranscript } from './claude-cli-adapter';
 
 // What does chat() hand a custom adapter when the tools are bare definitions (client-executed)?
 class SpyAdapter extends BaseTextAdapter<string, Record<string, never>, readonly ['text'], DefaultMessageMetadataByModality> {
@@ -60,5 +61,44 @@ describe('run modes', () => {
     expect(modeOf({ mode: 'director' })).toBe('director');
     expect(modeOf({ mode: 'anything' })).toBe('chat');
     expect(modeOf(undefined)).toBe('chat');
+  });
+});
+
+describe('the subscription backend: usage and lost sessions', () => {
+  it('reports the CLI result usage like the Anthropic adapter does, with the conversation size and the cost', () => {
+    const u = cliUsage({ input_tokens: 40, output_tokens: 300, cache_read_input_tokens: 9000, cache_creation_input_tokens: 600 }, 0.031, 4200);
+    expect(u).toEqual({ promptTokens: 9640, completionTokens: 300, totalTokens: 9940, promptTokensDetails: { cachedTokens: 9000, cacheWriteTokens: 600 }, cost: 0.031, providerUsageDetails: { contextTokens: 4200 } });
+    expect(cliUsage(undefined, 1, 0)).toBeUndefined();
+    expect(cliUsage({ input_tokens: 5, output_tokens: 1 }, undefined, 0)).toEqual({ promptTokens: 5, completionTokens: 1, totalTokens: 6, providerUsageDetails: { contextTokens: 5 } });
+  });
+
+  it('retries a session that already exists by resuming it, and a vanished one as a new session', () => {
+    expect(sessionRetry(false, 'Error: Session ID 1234 is already in use.')).toBe('resume');
+    expect(sessionRetry(true, 'No conversation found with session ID: 1234')).toBe('new');
+    expect(sessionRetry(true, 'Invalid API key')).toBeNull();
+    expect(sessionRetry(false, 'No conversation found')).toBeNull();
+  });
+
+  it('continues a lost session from the conversation as text, newest turns kept', () => {
+    const messages = [
+      { role: 'user' as const, content: 'make a jellyfish scene' },
+      { role: 'assistant' as const, content: 'Created "Jelly".', toolCalls: [] },
+      { role: 'tool' as const, content: '{"ok":true}', toolCallId: 'x' },
+      { role: 'user' as const, content: 'now slower' },
+    ];
+    const prompt = withTranscript(messages, 'now slower');
+    expect(prompt).toContain('User: make a jellyfish scene');
+    expect(prompt).toContain('You: Created "Jelly".');
+    expect(prompt).not.toContain('"ok":true');
+    expect(prompt.endsWith("(The user's new message:)\nnow slower")).toBe(true);
+    expect(withTranscript([{ role: 'user', content: 'hi' }], 'hi')).toBe('hi');
+    const long = withTranscript([{ role: 'user', content: 'x'.repeat(20_000) }, { role: 'user', content: 'q' }], 'q');
+    expect(long.length).toBeLessThan(8300);
+  });
+
+  it('reads `continued` from forwardedProps', () => {
+    expect(continuedOf({ continued: true })).toBe(true);
+    expect(continuedOf({ continued: 'yes' })).toBe(false);
+    expect(continuedOf(undefined)).toBe(false);
   });
 });

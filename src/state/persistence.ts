@@ -17,6 +17,9 @@ export const KEYS = {
   ytRecent: 'hallucinate.ytRecent',
   mediaSound: 'hallucinate.mediaSound',
   layout: 'hallucinate.layout',
+  // The assistant's conversations: this index; the transcripts live in IndexedDB (src/assistant/history-store.ts).
+  assistantChats: 'hallucinate.assistantChats',
+  assistantThinking: 'hallucinate.assistantThinking',   // the panel's "Show reasoning" toggle
   // Migrated into `layout` (src/state/layout.ts) on first load, then removed.
   paramsCollapsed: 'hallucinate.paramsCollapsed',
   paramsPos: 'hallucinate.paramsPos',

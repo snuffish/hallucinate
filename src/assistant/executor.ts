@@ -58,7 +58,7 @@ function coerceLook(raw: unknown): Record<string, number> {
   return look;
 }
 
-export function createToolRunner(app: AppController, undo: UndoStack): ToolRunner {
+export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push'>): ToolRunner {
   const scenes = () => app.state.scenes;
   const findScene = (name: unknown): number => (name == null ? app.sceneIndex : app.sceneByName(String(name)));
   const noScene = (name: unknown) => new Error(`There's no scene called "${String(name)}". Call get_app_state for the exact names.`);
