@@ -126,7 +126,6 @@ type Locations = Map<string, WebGLUniformLocation | null>;
 interface Pending { prog: WebGLProgram; fs: WebGLShader; name: string; promise: Promise<string | null>; resolve: (error: string | null) => void; settled: boolean }
 
 const ONE_ONE = [1, 1];
-const MAX_REMEMBERED = 64;   // failed sources kept, so a broken scene isn't recompiled every frame
 
 export class Renderer {
   readonly gl: WebGL2RenderingContext;
@@ -274,20 +273,12 @@ export class Renderer {
     return null;
   }
 
-  // Remembers a source that doesn't compile (so a scene using it isn't recompiled every frame). Typing
-  // produces a broken source per keystroke, so only the newest few are kept.
-  private markFailed(fragSrc: string): void {
-    this.failed.delete(fragSrc);
-    this.failed.add(fragSrc);
-    if (this.failed.size > MAX_REMEMBERED) this.failed.delete(this.failed.values().next().value!);
-  }
-
   private settle(fragSrc: string, p: Pending): string | null {
     if (p.settled) return null;
     p.settled = true;
     this.pending.delete(fragSrc);
     const error = this.finishLink(p.prog, p.fs, p.name);
-    if (error) this.markFailed(fragSrc);
+    if (error) this.failed.add(fragSrc);
     else { this.programs.set(fragSrc, p.prog); this.failed.delete(fragSrc); }
     p.resolve(error);
     return error;
@@ -326,7 +317,7 @@ export class Renderer {
     if (existing) return this.settle(fragSrc, existing);
     const { prog, fs } = this.link(fragSrc);
     const error = this.finishLink(prog, fs, name);
-    if (error) this.markFailed(fragSrc);
+    if (error) this.failed.add(fragSrc);
     else this.programs.set(fragSrc, prog);
     return error;
   }
@@ -365,18 +356,12 @@ export class Renderer {
     return this.programs.get(frag) ?? null;
   }
 
-  // Frees a program compiled for code that never went live (a superseded editor compile).
-  release(frag: string): void {
-    if (!this.inUse.includes(frag)) this.drop(frag);
-  }
-
   private drop(frag: string): void {
     const prog = this.programs.get(frag);
     if (!prog) return;
     this.gl.deleteProgram(prog);
     this.uniformCache.delete(prog);
     this.programs.delete(frag);
-    this.mediaUse.delete(frag);
   }
 
   // ---------- Media ----------

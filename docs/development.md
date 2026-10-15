@@ -6,7 +6,7 @@
 
 ```sh
 npm install
-npm run dev      # → http://localhost:5173 (localhost only; PORT changes the port, HOST=0.0.0.0 exposes it, see below)
+npm run dev      # → http://localhost:5173 (localhost only; HOST=0.0.0.0 exposes it, PORT changes the port)
 npm run build    # → dist/
 npm run preview  # serve the built app (the SoundCloud / YouTube bridges and the assistant work here too)
 npm run desktop  # the same app as a desktop window (Electron); see desktop.md
@@ -15,11 +15,6 @@ npm run desktop  # the same app as a desktop window (Electron); see desktop.md
 Needs Node 22.12 or newer. SoundCloud and YouTube need [yt-dlp](https://github.com/yt-dlp/yt-dlp) (and ffmpeg for
 YouTube); the assistant needs a [Claude backend](assistant.md#setup).
 
-`HOST=0.0.0.0` opens the app, its SoundCloud / YouTube downloads and the assistant (on your Claude account) to
-everyone on your network, so use it only on a network you trust. Open it by IP address (`http://192.168.1.20:5173`);
-to use a host name, list it in `ALLOWED_HOSTS` (comma-separated). The `/api` routes only answer the app's own
-pages, never another website.
-
 ## Checks
 
 ```sh
@@ -27,7 +22,7 @@ npm run lint        # ESLint (TypeScript + React hooks rules)
 npm run typecheck   # tsc for the app and the server
 npm test            # Vitest unit tests (parameters, node compiler, scene list, hotkeys, persistence, assistant plumbing)
 npm run test:e2e    # Playwright: boot, scenes, every panel, library keys, widgets & layout, help, params, randomize, backup, studio, assistant chats
-npm run test:e2e:desktop   # builds the desktop app and drives it (needs a GPU, so not in CI; lint, typecheck, unit and e2e are)
+npm run test:e2e:desktop   # builds the desktop app and drives it (needs a GPU, so not in CI)
 ASSISTANT_E2E=1 npx playwright test e2e/assistant.spec.ts   # one real assistant round-trip (uses your Claude backend)
 node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json   # performance probe, with the dev server running
 ```

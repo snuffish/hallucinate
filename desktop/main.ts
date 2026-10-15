@@ -9,7 +9,7 @@
 
 import { app, BrowserWindow, desktopCapturer, dialog, session, shell, systemPreferences, type WebContents } from 'electron';
 import { join } from 'node:path';
-import { fixEnv } from './env';
+import { fixPath } from './env';
 import { PREFERRED_PORT, startServer, type AppServer } from './server';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -44,7 +44,7 @@ async function start(): Promise<void> {
   if (DEV_URL) {
     appUrl = new URL(DEV_URL).origin;
   } else {
-    await fixEnv();   // so `claude`, `yt-dlp` and the shell's API key are found when the app was started from the Dock / a menu
+    await fixPath();   // so `claude` and `yt-dlp` are found when the app was started from the Dock / a menu
     // yt-dlp borrows this process as its JavaScript runtime (node:<execPath>); make the Electron binary act as Node.
     server = await startServer({ dist: join(ROOT, 'dist'), preferredPort: PORT, env: { ELECTRON_RUN_AS_NODE: '1' } });
     appUrl = `http://127.0.0.1:${server.port}`;

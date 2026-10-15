@@ -4,15 +4,17 @@
 // The port is fixed on purpose: localStorage and IndexedDB belong to the origin, and the origin includes the
 // port, so a different port would open with an empty library. Another port is only used when this one is busy.
 
-import { createServer, type Server, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
-import type { Handler } from '../server/guard';
-import { apiRoutes } from '../server/routes';
+import { createBridge, SITES } from '../server/ytdlp-bridge.js';
+import { createAssistant } from '../server/assistant';
 
 export const PREFERRED_PORT = 47741;
 export const HOST = '127.0.0.1';
+
+type Handler = (req: IncomingMessage, res: ServerResponse) => unknown;
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -54,7 +56,11 @@ export function resolveStatic(root: string, urlPath: string): string | null {
 export interface AppServer { port: number; fellBack: boolean; server: Server; close(): Promise<void> }
 
 export function createHandler(dist: string, env: Record<string, string> = {}): Handler {
-  const routes = apiRoutes(env);
+  // Mounted like vite.config.ts does: each handler owns everything under its prefix.
+  const routes: [string, Handler][] = [
+    ...Object.keys(SITES).map((site): [string, Handler] => [`/api/${site}`, createBridge(site, { env }) as Handler]),
+    ['/api/assistant', createAssistant() as Handler],
+  ];
   return async (req, res) => {
     const path = (req.url ?? '/').split('?')[0]!;
     const route = routes.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`));
@@ -74,7 +80,7 @@ export function createHandler(dist: string, env: Record<string, string> = {}): H
     const cache = file.startsWith(join(resolve(dist), 'assets') + sep) ? 'public, max-age=31536000, immutable' : 'no-cache';
     res.writeHead(200, { 'Content-Type': contentType(file), 'Content-Length': size, 'Cache-Control': cache });
     if (req.method === 'HEAD') return res.end();
-    createReadStream(file).on('error', () => res.destroy()).pipe(res);
+    createReadStream(file).pipe(res);
   };
 }
 

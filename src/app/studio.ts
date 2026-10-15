@@ -3,18 +3,17 @@
 // Live to a projector window. Autopilot steps through the list on the beat, or follows a plan (an
 // ordered queue with beats per step) that the AI director or the assistant wrote.
 //
-// All state lives here (plain class, created by sessions.ts); the component re-renders on its
-// `changed` events and mutates only through these methods, so the per-frame hooks always see the
-// latest values. The assistant's tools and the director are handed this session.
+// All state lives here (plain class); the component re-renders on `version` and mutates only
+// through these methods, so the per-frame hooks always see the latest values. The assistant's
+// tools reach it through the controller's `studio` hook.
 
 import { z } from 'zod';
 import { toUniform, type ParamSpec, type ParamValue, ParamValueSchema, type ParamValues } from '../engine/params';
-import { applyLook, programState, smoothstep, type FrameLook } from '../engine/look';
 import { Renderer, type ProgramState, type SceneUniforms } from '../engine/renderer';
 import type { ScreenDetailed } from '../engine/output-link';
 import { LOOK_KEYS, type LookKey } from '../state/app-state';
 import { listedScenes } from '../state/library-prefs';
-import { KEYS, debouncedWriter, readJSON } from '../state/persistence';
+import { KEYS, readJSON, writeJSON } from '../state/persistence';
 import { paramKey } from '../state/scene-list';
 import { LIST_MAX_SECONDS, PlanSchema, type Plan, type PlanStep } from '../state/show-plan';
 import type { AppController } from './controller';
@@ -26,20 +25,17 @@ const CueSchema = z.object({
   values: z.record(z.string(), ParamValueSchema).default({}),
   look: z.record(z.string(), z.number()).default({}),
 });
-// A stored number, clamped to the range its control allows (an imported or hand-edited show can't, say,
-// run the autopilot every frame); a missing or non-number value falls back to the default.
-const bounded = (min: number, max: number, def: number) => z.number().catch(def).transform((v) => Math.min(max, Math.max(min, v)));
 export const ShowSchema = z.object({
   cues: z.array(CueSchema).default([]),
   mode: z.enum(['cut', 'fade']).default('fade'),
-  seconds: bounded(0.2, 8, 1.5),
-  autoBeats: bounded(1, 1024, 32),
+  seconds: z.number().default(1.5),
+  autoBeats: z.number().default(32),
   autoUnit: z.enum(['beats', 'seconds']).default('beats'),
-  autoSeconds: bounded(5, 600, 30),
+  autoSeconds: z.number().default(30),
   plan: PlanSchema.nullable().default(null),
-  directorBeats: bounded(16, 1024, 128),
+  directorBeats: z.number().default(128),
   directorUnit: z.enum(['beats', 'seconds']).default('beats'),
-  directorSeconds: bounded(15, 3600, 120),
+  directorSeconds: z.number().default(120),
 });
 export type Cue = z.infer<typeof CueSchema>;
 export type ParamTab = 'preview' | 'live';
@@ -61,7 +57,7 @@ interface PinnedLive {
   look: Record<string, number>;
   values: ParamValues;
 }
-const NO_SPECS: readonly ParamSpec[] = [];
+const smoothstep = (x: number) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 
 export class StudioSession {
   cues: Cue[];
@@ -86,10 +82,6 @@ export class StudioSession {
   master = 1;
   masterTarget = 1;
   version = 0;
-  // Bumps whenever the show itself (its scenes or its plan) changes, whoever changed it: an undo only
-  // restores a snapshot when nothing changed the show after the step it undoes.
-  revision = 0;
-  private lastShow: { cues: Cue[]; plan: Plan | null } = { cues: [], plan: null };
   private lastLevel = 1;
   private beatCount = 0;
   private stepStart = 0;   // clock seconds when the current step began (the timer, and the wall-clock ceiling)
@@ -99,16 +91,10 @@ export class StudioSession {
   private readonly previewState: ProgramState;
   private readonly liveState: ProgramState;
   private readonly liveParams: Record<number, SceneUniforms> = {};
-  private readonly liveResult: { program: ProgramState; params: Record<number, SceneUniforms> };
-  private readonly look: FrameLook = { hue: 0, trails: 0.86, aberration: 0, synesthesia: 0 };   // reused every frame
-  // A show scene's uniforms, per values object (a cue's values are replaced, never edited, so the
-  // object names one set of values): the monitors reuse them instead of rebuilding them every frame.
-  private readonly uniformCache = new WeakMap<ParamValues, { index: number; specs: readonly ParamSpec[]; uniforms: SceneUniforms }>();
-  private readonly writer = debouncedWriter(KEYS.show, () => this.serialised(), 300);
   private pinned: PinnedLive | null = null;
   private open = false;
 
-  constructor(private readonly app: AppController, private readonly notify: () => void = () => {}) {
+  constructor(private readonly app: AppController, private readonly notify: () => void) {
     const saved = readJSON(KEYS.show, ShowSchema, { cues: [], mode: 'fade', seconds: 1.5, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120 });
     this.cues = saved.cues;
     this.mode = saved.mode;
@@ -119,10 +105,8 @@ export class StudioSession {
     this.directorUnit = saved.directorUnit;
     this.directorSeconds = saved.directorSeconds;
     this.previewId = this.cues[0]?.id ?? null;
-    this.lastShow = { cues: this.cues, plan: this.plan };
-    this.previewState = programState();
-    this.liveState = programState();
-    this.liveResult = { program: this.liveState, params: this.liveParams };
+    this.previewState = { scene: -1, prevScene: -1, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, hue: 0, spectrum: new Uint8Array(512), extra: {}, bright: 0.5, mood: 0.5, grade: { exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] }, feedback: 0.86, zoom: 1, rotation: 0, hueDrift: 0, warp: 0, aberration: 0, master: 1 };
+    this.liveState = { ...this.previewState };
   }
 
   // Beats counted towards the next autopilot take, and how many it waits for (the plan step's, or the dial's).
@@ -146,8 +130,8 @@ export class StudioSession {
 
   // ---------- Lifecycle ----------
 
-  // The main window's hooks: Preview monitor + master fader every frame, autopilot on the beat, and
-  // the Parameters dock editing the selected show scene.
+  // The main window's hooks: Preview monitor + master fader every frame, autopilot on the beat,
+  // the Parameters dock editing the selected show scene, and the global shortcuts.
   attach(): () => void {
     return this.app.setHooks({
       onFrame: (dt, program) => { this.update(dt); this.renderPreview(program); },
@@ -159,12 +143,13 @@ export class StudioSession {
       master: () => this.master,
       autopilot: () => this.autopilot.on,
       paramsOverride: () => this.paramsOverride(),
+      take: () => this.take(),
+      blackout: () => this.blackout(),
+      studioStep: (dir) => { if (this.open) this.stepPreview(dir); },
+      studioCue: (n) => { if (this.open) this.setPreview(this.cues[n] ?? null); },
+      studio: () => this,
     });
   }
-
-  // The studio's shortcuts: step Preview, pick a cue (only while the studio is open).
-  stepPreviewKey(dir: number): void { if (this.open) this.stepPreview(dir); }
-  cueKey(n: number): void { if (this.open) this.setPreview(this.cues[n] ?? null); }
 
   setOpen(open: boolean, previewCanvas: HTMLCanvasElement | null): void {
     if (open === this.open) return;
@@ -214,36 +199,23 @@ export class StudioSession {
     const mix = pin.fade > 0 ? smoothstep((app.state.clock.clock - pin.transitionStart) / pin.fade) : 1;
     if (mix >= 1) pin.prevScene = -1;
     p.scene = pin.scene; p.prevScene = pin.prevScene; p.mix = mix;
-    applyLook(p, this.frameLook(pin.look), app.state.clock.huePhase, app.state.scenes[pin.scene]?.trails ?? 1);
+    p.hue = (pin.look.hue ?? 0) + app.state.clock.huePhase;
+    p.feedback = Math.min(0.97, (pin.look.trails ?? 0.86) * (app.state.scenes[pin.scene]?.trails ?? 1));
+    p.aberration = (pin.look.aberration ?? 0) * (1 + base.beat * 1.5);
     p.master = this.master;
     const params = this.liveParams;
     for (const k in params) delete params[k];
     params[pin.scene] = this.uniformsFor(pin.scene, pin.values);
     if (pin.prevScene >= 0) params[pin.prevScene] = app.renderer.sceneParams[pin.prevScene] ?? {};
-    return this.liveResult;
-  }
-
-  // A show scene's look, with the app's sliders for what it doesn't store (as Take does). Reused object.
-  private frameLook(look: Record<string, number>): FrameLook {
-    const app = this.app.state.look, l = this.look;
-    l.hue = look.hue ?? app.hue;
-    l.trails = look.trails ?? app.trails;
-    l.aberration = look.aberration ?? app.aberration;
-    l.synesthesia = app.synesthesia;
-    return l;
+    return { program: p, params };
   }
 
   dispose(): void {
-    this.writer.flush();   // the writer lives as long as the session (StrictMode re-attaches after a dispose)
     this.previewRenderer?.dispose();
     this.previewRenderer = null;
   }
 
   private changed(save = true): void {
-    if (this.cues !== this.lastShow.cues || this.plan !== this.lastShow.plan) {
-      this.revision++;
-      this.lastShow = { cues: this.cues, plan: this.plan };
-    }
     if (save) this.save();
     this.version++;
     this.notify();
@@ -254,12 +226,8 @@ export class StudioSession {
   // A show edit made by hand (not by a tool): the director hears about it in its next digest.
   private touched(): void { this.userTouched = true; }
 
-  // Saving is coalesced (a slider drag is many edits); it is flushed when the page is hidden and
-  // before an export or import.
-  save(): void { this.writer.schedule(); }
-
-  private serialised() {
-    return { cues: this.cues, mode: this.mode, seconds: this.seconds, autoBeats: this.autopilot.beats, autoUnit: this.autopilot.unit, autoSeconds: this.autopilot.seconds, plan: this.plan, directorBeats: this.directorBeats, directorUnit: this.directorUnit, directorSeconds: this.directorSeconds };
+  save(): void {
+    writeJSON(KEYS.show, { cues: this.cues, mode: this.mode, seconds: this.seconds, autoBeats: this.autopilot.beats, autoUnit: this.autopilot.unit, autoSeconds: this.autopilot.seconds, plan: this.plan, directorBeats: this.directorBeats, directorUnit: this.directorUnit, directorSeconds: this.directorSeconds });
   }
 
   // ---------- Show scenes ----------
@@ -488,10 +456,10 @@ export class StudioSession {
   restoreLastPlan(): void { if (this.lastPlan) this.setPlan(this.lastPlan); }
 
   setAutopilot(on: boolean): void { this.autopilot.on = on; this.beatCount = 0; this.stepStart = this.app.state.clock.clock; this.changed(false); }
-  setAutoBeats(beats: number): void { this.autopilot.beats = Math.min(1024, Math.max(1, Math.round(beats))); this.changed(); }
+  setAutoBeats(beats: number): void { this.autopilot.beats = beats; this.changed(); }
   setAutoUnit(unit: AutoUnit): void { this.autopilot.unit = unit; this.beatCount = 0; this.stepStart = this.app.state.clock.clock; this.changed(); }
   setAutoSeconds(seconds: number): void { this.autopilot.seconds = Math.min(600, Math.max(5, seconds)); this.changed(); }
-  setDirectorBeats(beats: number): void { this.directorBeats = Math.min(1024, Math.max(16, Math.round(beats))); this.changed(); }
+  setDirectorBeats(beats: number): void { this.directorBeats = beats; this.changed(); }
   setDirectorUnit(unit: AutoUnit): void { this.directorUnit = unit; this.changed(); }
   setDirectorSeconds(seconds: number): void { this.directorSeconds = Math.min(3600, Math.max(15, seconds)); this.changed(); }
   setParamTab(tab: ParamTab): void { this.paramTab = tab; this.changed(false); }
@@ -499,7 +467,7 @@ export class StudioSession {
   // ---------- Transition & master ----------
 
   setMode(mode: 'cut' | 'fade'): void { this.mode = mode; this.changed(); }
-  setSeconds(seconds: number): void { this.seconds = Math.min(8, Math.max(0.2, seconds)); this.changed(); }
+  setSeconds(seconds: number): void { this.seconds = seconds; this.changed(); }
 
   setMaster(level: number): void {
     this.masterTarget = level;
@@ -531,12 +499,8 @@ export class StudioSession {
   // ---------- Monitors ----------
 
   private uniformsFor(i: number, values: ParamValues): SceneUniforms {
-    const specs = this.app.sceneParams[i] ?? NO_SPECS;
-    const hit = this.uniformCache.get(values);
-    if (hit && hit.index === i && hit.specs === specs) return hit.uniforms;
-    const uniforms: SceneUniforms = Object.fromEntries(specs.map((s) => [s.name, toUniform(s, values[s.name] ?? s.def)]));
-    this.uniformCache.set(values, { index: i, specs, uniforms });
-    return uniforms;
+    const specs = this.app.sceneParams[i] ?? [];
+    return Object.fromEntries(specs.map((s) => [s.name, toUniform(s, values[s.name] ?? s.def)]));
   }
 
   private renderPreview(base: ProgramState): void {
@@ -547,8 +511,11 @@ export class StudioSession {
     const p = Object.assign(this.previewState, base);
     if (index < 0 || !cue) { p.scene = -1; p.prevScene = -1; p.mix = 1; p.master = 0; r.render(p); return; }
     r.setParams(index, this.uniformsFor(index, cue.values));
+    const look = cue.look;
     p.scene = index; p.prevScene = -1; p.mix = 1; p.master = 1;
-    applyLook(p, this.frameLook(cue.look), this.app.state.clock.huePhase, this.app.state.scenes[index]!.trails ?? 1);
+    p.hue = (look.hue ?? 0) + this.app.state.clock.huePhase;
+    p.feedback = Math.min(0.97, (look.trails ?? 0.86) * (this.app.state.scenes[index]!.trails ?? 1));
+    p.aberration = look.aberration ?? 0;
     r.render(p);
   }
 

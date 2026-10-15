@@ -9,9 +9,8 @@ edits to built-in scenes, *My Shader*, the visual maker graph, live parameter va
 autopilot and director settings), favourites and the auto-switch rotation, volume and *pitch follows tempo*, the
 widget layout and *Use the video's sound*.
 
-It doesn't include recently played tracks, the Beat Racer high score, the loaded media, the assistant's conversations
-(export one as Markdown from the conversation list instead), or the Look sliders, which aren't saved between sessions
-anyway. Files over 5 MB aren't imported.
+It doesn't include recently played tracks, the Beat Racer high score, the loaded media, or the Look sliders, which
+aren't saved between sessions anyway.
 
 ## Import
 

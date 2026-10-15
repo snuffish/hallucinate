@@ -1,10 +1,7 @@
 // The assistant's tools, implemented against the app. Each returns its result (which goes back to
 // the model) and may register an undo. Errors are thrown: TanStack turns them into error tool results.
-// The input is parsed with the tool's own schema (tools.ts) before it gets here, and every tool name
-// must have an implementation: a missing or misspelt one doesn't compile.
 
 import type { AppController } from '../app/controller';
-import { SUPERSEDED } from '../app/editor';
 import type { Cue, StudioSession } from '../app/studio';
 import { blobToBase64, encodeJpeg } from '../engine/jpeg';
 import type { ParamSpec, ParamValue, ParamValues } from '../engine/params';
@@ -13,23 +10,11 @@ import type { Scene } from '../engine/scenes';
 import { LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
 import { paramKey } from '../state/scene-list';
 import { PlanSchema } from '../state/show-plan';
-import type { z } from 'zod';
 import type { UndoStack } from './undo';
-import { TOOL_DEFINITIONS, type ContentParts, type ToolName } from './tools';
+import type { ContentParts } from './tools';
 
 export interface AssistantContext { run: ToolRunner }
-export type ToolRunner = (name: string, input: unknown) => Promise<unknown>;
-
-type Definition = (typeof TOOL_DEFINITIONS)[number];
-type InputOf<K extends ToolName> = z.output<NonNullable<Extract<Definition, { name: K }>['inputSchema']>>;
-type Implementations = { [K in ToolName]: (input: InputOf<K>) => Promise<unknown> | unknown };
-const DEFINITIONS = new Map<string, Definition>(TOOL_DEFINITIONS.map((d) => [d.name, d]));
-
-// The show changed after an assistant change (by hand, by the director or another chat): undoing it
-// by restoring the old show would silently undo those changes too.
-export class UndoConflict extends Error {
-  constructor(label: string) { super(`The show changed after "${label}", so it can't be undone without undoing that too.`); this.name = 'UndoConflict'; }
-}
+export type ToolRunner = (name: string, input: Record<string, unknown>) => Promise<unknown>;
 
 const kindOf = (s: Scene) => (s.kind === 'game' ? 'game' : s.kind === 'custom' ? 'custom' : s.kind === 'nodes' ? 'visual maker' : s.user ? 'mine' : 'built-in');
 
@@ -92,15 +77,14 @@ function coerceLook(raw: unknown): Record<string, number> {
   return look;
 }
 
-// `studio` is the show the studio tools act on (null where there is none, e.g. in tests).
-export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push'>, getStudio: () => StudioSession | null = () => null): ToolRunner {
+export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push'>): ToolRunner {
   const scenes = () => app.state.scenes;
   const findScene = (name: unknown): number => (name == null ? app.sceneIndex : app.sceneByName(String(name)));
   const noScene = (name: unknown) => new Error(`There's no scene called "${String(name)}". Call get_app_state for the exact names.`);
 
   // ---------- The studio ----------
   const studio = (): StudioSession => {
-    const s = getStudio();
+    const s = app.studio();
     if (!s) throw new Error('The studio isn\'t available.');
     return s;
   };
@@ -124,14 +108,10 @@ export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push
     studioOpen: s.isOpen, livePinned: s.isPinned,
     userTouched: s.userTouched,
   });
-  // Every show change is one undo step: the show as it was before. Runs `change`; a change that throws
-  // leaves nothing to undo. The undo refuses once anything else changed the show since.
-  const undoable = <T>(s: StudioSession, label: string, change: () => T): T => {
+  // Every show change is one undo step: the show as it was before.
+  const undoable = (s: StudioSession, label: string) => {
     const before = s.snapshot();
-    const result = change();
-    const after = s.revision;
-    undo.push({ label, undo: () => { if (s.revision !== after) throw new UndoConflict(label); s.restore(before); } });
-    return result;
+    undo.push({ label, undo: () => s.restore(before) });
   };
 
   const paramSummary = (i: number) => {
@@ -150,7 +130,7 @@ export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push
     return out;
   };
 
-  const tools: Implementations = {
+  const tools: Record<string, (input: Record<string, unknown>) => Promise<unknown> | unknown> = {
     get_app_state() {
       const i = app.sceneIndex, s = app.currentScene;
       const c = app.state.clock;
@@ -187,7 +167,6 @@ export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push
       const before = t.body;
       app.setScene(i);
       const error = await app.editor.compileInto(t, String(code));
-      if (error === SUPERSEDED) throw new Error('Another edit to this scene replaced your code before it compiled. Read the scene\'s code again before writing.');
       if (error) throw new Error(`It didn't compile; the previous version is still running. Errors (line numbers count from the first line of your code):\n${error}`);
       undo.push({ label: `Edited ${t.name}`, undo: () => { void app.editor.compileInto(app.editor.target(i), before); app.setScene(i); } });
       return { compiled: true, scene: t.name, nowPlaying: true, parameters: paramSummary(i) };
@@ -270,8 +249,8 @@ export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push
       if (i < 0) throw noScene(scene);
       if (scenes()[i]!.kind) throw new Error(`"${String(scene)}" can't be a show scene (only visual scenes can).`);
       const coerced = coerceValues(app.sceneParams[i] ?? [], values);
-      const cue = undoable(s, `Added "${String(name ?? scene)}" to the show`, () =>
-        s.add({ name: String(name ?? scene).trim().slice(0, 60) || String(scene), scene: String(scene), values: coerced.values, look: coerceLook(look) }));
+      undoable(s, `Added "${String(name ?? scene)}" to the show`);
+      const cue = s.add({ name: String(name ?? scene).trim().slice(0, 60) || String(scene), scene: String(scene), values: coerced.values, look: coerceLook(look) });
       return { added: cueView(s, cue), ...(coerced.problems.length && { problems: coerced.problems }), showScenes: s.cues.length };
     },
 
@@ -296,21 +275,24 @@ export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push
       }
       if (look !== undefined) patch.look = { ...cue.look, ...coerceLook(look) };
       if (!Object.keys(patch).length) throw new Error(problems.join('; ') || 'Nothing to change.');
-      const next = undoable(s, `Changed "${cue.name}"`, () => s.updateCue(cue, patch));
+      undoable(s, `Changed "${cue.name}"`);
+      const next = s.updateCue(cue, patch);
       return { updated: cueView(s, next), ...(problems.length && { problems }), note: s.liveId === cue.id ? 'This show scene is Live; the change shows at its next take.' : undefined };
     },
 
     reorder_show({ order }) {
       const s = studio();
       if (!Array.isArray(order)) throw new Error('Give the show scene ids as an array.');
-      undoable(s, 'Reordered the show', () => s.reorder(order.map(String)));
+      undoable(s, 'Reordered the show');
+      s.reorder(order.map(String));
       return { order: s.cues.map((c) => ({ id: c.id, name: c.name })) };
     },
 
     remove_show_scene({ cue: ref }) {
       const s = studio();
       const cue = findCue(s, ref);
-      undoable(s, `Removed "${cue.name}" from the show`, () => s.removeCue(cue));
+      undoable(s, `Removed "${cue.name}" from the show`);
+      s.removeCue(cue);
       return { removed: cue.name, showScenes: s.cues.length };
     },
 
@@ -339,16 +321,18 @@ export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push
     set_autopilot_plan({ plan: raw }) {
       const s = studio();
       if (raw === null || raw === undefined) {
-        undoable(s, 'Dropped the plan', () => s.setPlan(null));
+        undoable(s, 'Dropped the plan');
+        s.setPlan(null);
         return { plan: null, autopilot: showView(s).autopilot };
       }
       const parsed = PlanSchema.safeParse(raw);
       if (!parsed.success) throw new Error(`The plan doesn't fit: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
       const unknown = parsed.data.steps.map((st) => st.cue).filter((ref) => !s.cueByRef(ref));
       if (unknown.length === parsed.data.steps.length) throw new Error(`None of the plan's show scenes exist: ${unknown.join(', ')}. Call get_show for the ids.`);
+      undoable(s, `Planned ${parsed.data.steps.length} steps`);
       // Store ids, so renames don't break the plan.
       const plan = { ...parsed.data, steps: parsed.data.steps.map((st) => ({ ...st, cue: s.cueByRef(st.cue)?.id ?? st.cue })) };
-      undoable(s, `Planned ${parsed.data.steps.length} steps`, () => s.setPlan(plan));
+      s.setPlan(plan);
       if (!s.autopilot.on) s.setAutopilot(true);
       const v = showView(s);
       return { plan: v.plan, planStep: v.planStep, autopilot: v.autopilot, ...(unknown.length && { problems: unknown.map((ref) => `"${ref}" isn't a show scene; that step is skipped`) }) };
@@ -365,13 +349,10 @@ export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push
   };
 
   return async (name, input) => {
-    const definition = DEFINITIONS.get(name);
-    if (!definition) throw new Error(`Unknown tool "${name}".`);
-    const parsed = (definition.inputSchema as z.ZodType).safeParse(input ?? {});
-    if (!parsed.success) throw new Error(`The input doesn't fit ${name}: ${parsed.error.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ')}`);
-    const tool = tools[name as ToolName] as (input: unknown) => Promise<unknown> | unknown;
+    const tool = tools[name];
+    if (!tool) throw new Error(`Unknown tool "${name}".`);
     try {
-      return await tool(parsed.data);
+      return await tool(input ?? {});
     } catch (err) {
       throw err instanceof Error ? err : new Error(`The app hit an error: ${String(err)}`);
     }

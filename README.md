@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://snuffish.github.io/hallucinate/"><b>▶ Try it in your browser</b></a> — the web demo has everything except SoundCloud, YouTube, the AI
-  assistant and the studio's AI Director, which need the local server (<code>npm run dev</code>).
+  <a href="https://snuffish.github.io/hallucinate/"><b>▶ Try it in your browser</b></a> — the web demo has everything except SoundCloud, YouTube and the AI
+  assistant, which need the local server (<code>npm run dev</code>).
 </p>
 
 <p align="center">
@@ -71,7 +71,7 @@ Press **?** in the app for help and every shortcut.
 | ✦ | **[AI assistant](docs/assistant.md)** · I | Claude writes and fixes scenes, sets parameters and runs the studio for you, across several conversations. |
 | 🪟 | **[Interface](docs/interface.md)** | Dockable, resizable widgets with a remembered layout, and help on every panel. |
 | 💾 | **[Back up](docs/backup.md)** | Export everything you made to one file and import it elsewhere. |
-| 🖥 | **[Desktop app](docs/desktop.md)** | The whole app in its own window, with installers for macOS, Windows and Linux on the [releases page](https://github.com/snuffish/hallucinate/releases). |
+| 🖥 | **[Desktop app](docs/desktop.md)** | The whole app in its own window, with installers for macOS, Windows and Linux. |
 
 More: [keyboard shortcuts](docs/keys.md) · [development & project structure](docs/development.md) ·
 [ARCHITECTURE.md](ARCHITECTURE.md) · [PERF.md](PERF.md) · [CHANGELOG.md](CHANGELOG.md)

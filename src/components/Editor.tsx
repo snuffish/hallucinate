@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
-import { SUPERSEDED, type EditorTarget } from '../app/editor';
+import type { EditorTarget } from '../app/editor';
 import { SCENES, TEMPLATE } from '../engine/scenes';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
@@ -51,7 +51,6 @@ export function Editor() {
   const compile = async (t: EditorTarget, source: string) => {
     if (t.kind === 'nodes') return;
     const error = await editor.compileInto(t, source);
-    if (error === SUPERSEDED) return;   // a newer compile reports instead
     if (error) setStatus({ text: error, kind: 'error' });
     else {
       const n = app.state.scenes[t.index]?.params.length ?? 0;

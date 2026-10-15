@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { COMMON, SCENES, TEMPLATE, type Scene } from '../engine/scenes';
 import { parseParams } from '../engine/params';
+import type { Renderer } from '../engine/renderer';
 import { KEYS, readJSON, writeJSON } from './persistence';
 
 export const UserScenesSchema = z.array(z.object({ name: z.string(), body: z.string() }));
@@ -37,33 +38,27 @@ export interface SceneListInit {
   parked: ParkedScenes;    // the same, kept stored
 }
 
-// Compiles a shader source and returns the error, or null (Renderer.check).
-export type CompileCheck = (frag: string, name: string) => string | null;
-
 // Built-ins, the two editor slots, then your saved scenes (compiled after the built-ins, so a broken
-// one can't stop the app) and your edits to built-in scenes. Fills `scenes` in place: it is the array
-// the renderer was created with, and it must stay that one array for the app's lifetime. The
-// built-ins are copies, so building the list twice (React's StrictMode) can't leak one run's edits
-// into the other's originals.
-export function buildSceneList(scenes: Scene[], check: CompileCheck): SceneListInit {
-  const builtins = SCENES.map((s) => ({ ...s, original: s.body }));
-  scenes.push(
-    ...builtins,
+// one can't stop the app) and your edits to built-in scenes.
+export function buildSceneList(renderer: Renderer): SceneListInit {
+  const scenes: Scene[] = [
+    ...SCENES,
     { id: 'custom', name: 'My Shader', kind: 'custom', cat: '', desc: '', body: TEMPLATE, frag: COMMON + TEMPLATE, params: [] },
     { id: 'nodes', name: 'Node Scene', kind: 'nodes', cat: '', desc: '', body: TEMPLATE, frag: COMMON + TEMPLATE, params: [] },
-  );
+  ];
   const errors: string[] = [];
   const parked: ParkedScenes = { userScenes: [], sceneEdits: {} };
   for (const { name, body } of loadUserScenes()) {
     const scene = userScene(name, body);
-    if (check(scene.frag, name)) { errors.push(name); parked.userScenes.push({ name, body }); }
+    if (renderer.check(scene.frag, name)) { errors.push(name); parked.userScenes.push({ name, body }); }
     else scenes.push(scene);
   }
+  for (const s of SCENES) s.original = s.body;
   for (const [name, body] of Object.entries(loadSceneEdits())) {
-    const s = builtins.find((x) => x.name === name);
+    const s = SCENES.find((x) => x.name === name);
     if (!s) continue;
     const { code, params } = parseParams(body);
-    if (check(COMMON + code, name)) { errors.push(`${name} (your edit)`); parked.sceneEdits[name] = body; continue; }
+    if (renderer.check(COMMON + code, name)) { errors.push(`${name} (your edit)`); parked.sceneEdits[name] = body; continue; }
     Object.assign(s, { body, frag: COMMON + code, params, edited: true });
   }
   return {
@@ -108,11 +103,6 @@ export function discardParked(parked: ParkedScenes, kind: 'scene' | 'edit', name
     delete parked.sceneEdits[name];
     writeSceneEdits(scenes, parked);
   }
-}
-
-// The only way a scene joins the list: appended, so every index already handed out stays valid.
-export function appendScene(scenes: readonly Scene[], scene: Scene): number {
-  return (scenes as Scene[]).push(scene) - 1;
 }
 
 export const sceneByName = (scenes: readonly Scene[], name: string): number => scenes.findIndex((s) => s.name === name && !s.removed);

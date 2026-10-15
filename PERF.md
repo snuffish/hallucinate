@@ -44,9 +44,6 @@ Raw results: `perf/results/baseline.json` (old app) and `perf/results/after-port
   batched and flushed on `visibilitychange` / `pagehide`.
 - **No per-frame allocation in the pipeline**: the frame state, uniform sets and the media uniforms are reused
   objects; the game's uniform arrays are reused too.
-- **Studio monitors reuse their state** (2026-10-15): the Preview monitor and the pinned Live slot refill reused
-  frame states through the same `applyLook` as the main output, and cache each show scene's uniforms, so they no
-  longer allocate every frame. Slider drags on a show scene are coalesced like the other parameter writes.
 - **Meters on the compositor**: `transform: scaleX()` instead of `width`.
 - **UI updates at UI rate**: the frame loop publishes meters, BPM and mood every second frame; everything
   else in the React tree only re-renders when its selected slice changes.

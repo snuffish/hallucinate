@@ -1,4 +1,4 @@
-// yt-dlp bridge for the dev / preview server and the desktop app: SoundCloud audio and YouTube video.
+// yt-dlp bridge for the dev / preview server: SoundCloud audio and YouTube video.
 //
 // Browsers can't analyse audio from SoundCloud's player or read pixels from YouTube's (both are
 // cross-origin iframes), so tracks and videos are fetched with yt-dlp into a temp cache and served
@@ -11,43 +11,30 @@
 
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { mkdir, readdir, rm, stat } from 'node:fs/promises';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import { mkdir, stat } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const YTDLP = process.env.YTDLP || 'yt-dlp';
-const TYPES: Record<string, string> = {
+const TYPES = {
   '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.opus': 'audio/ogg', '.ogg': 'audio/ogg',
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska',
 };
 const MISSING = 'yt-dlp is not installed. Install it with "sudo pacman -S yt-dlp" (or "pip install yt-dlp"), then restart the server.';
 const FORBIDDEN = 'YouTube refused the download (HTTP 403). Update yt-dlp (e.g. "sudo pacman -Syu yt-dlp yt-dlp-ejs") — YouTube changes often — and try again.';
-// Each site's cache is trimmed (oldest first) to this size after every download.
-const CACHE_LIMIT = Number(process.env.YTDLP_CACHE_MB || 2048) * 1024 * 1024;
-
-type Env = Record<string, string>;
-type HttpError = Error & { status?: number };
-const httpError = (message: string, status: number): HttpError => Object.assign(new Error(message), { status });
-
-export interface Progress { percent: number; stage: string; bytes: number | null; total: number | null; speed: number | null; eta: number | null }
-interface Listener { progress(p: Progress): void; done(src: string): void; failed(error: string): void }
-interface Job { last: Progress | null; add(l: Listener): void; remove(l: Listener): void }
 
 // YouTube only hands out working video URLs to clients that solve its JavaScript challenge; without a
 // JS runtime yt-dlp gets intermittent "HTTP Error 403: Forbidden". Lend it the Node that runs this server
 // (needs a yt-dlp with --js-runtimes, plus its yt-dlp-ejs solver scripts).
 // Inside the desktop app execPath is the Electron binary; the app passes ELECTRON_RUN_AS_NODE=1 in `env`
 // so that binary behaves as plain Node for yt-dlp.
-let jsRuntimeArgs: Promise<string[]> | undefined;
-function jsRuntime(env?: Env): Promise<string[]> {
+let jsRuntimeArgs;
+async function jsRuntime(env) {
   jsRuntimeArgs ??= ytdlp(['--help'], 15_000, { env })
     .then((help) => (help.includes('--js-runtimes') ? ['--js-runtimes', `node:${process.execPath}`] : []))
     .catch(() => []);
   return jsRuntimeArgs;
 }
-
-interface Site { hosts: string[]; jsRuntime?: boolean; search(q: string): string; download: string[] }
 
 export const SITES = {
   soundcloud: {
@@ -65,38 +52,32 @@ export const SITES = {
       '--merge-output-format', 'mp4', '--match-filter', '!is_live',
     ],
   },
-} satisfies Record<string, Site>;
-
-export type SiteName = keyof typeof SITES;
-
-// A cached file's name: what yt-dlp writes (`<id>.<ext>`), never `.` or `..`.
-export const safeFileName = (name: string): boolean => /^[\w-][\w.-]*$/.test(name) && !name.includes('..');
+};
 
 // `env` is added to yt-dlp's environment (the desktop app uses it, see jsRuntime()).
-export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
-  const site: Site = SITES[name];
+export function createBridge(name, { env } = {}) {
+  const site = SITES[name];
   const cache = join(tmpdir(), `hallucinate-${name}`);
   const prefix = `/api/${name}/`;
 
-  async function search(query: string) {
+  async function search(query) {
     query = query.trim();
     if (!query) return [];
     const target = /^https?:\/\//i.test(query) ? siteUrl(query) : site.search(query);
     const data = JSON.parse(await ytdlp([...(site.jsRuntime ? await jsRuntime(env) : []), '-J', '--flat-playlist', '--no-warnings', '--', target], 30_000, { env }));
-    const entries: Record<string, unknown>[] = (data.entries ?? [data]).filter(Boolean);
-    return entries.map((e) => ({
-      url: (e.webpage_url ?? e.url) as string | undefined,
-      title: (e.title as string | undefined) ?? 'Untitled',
-      artist: ((e.uploader ?? e.channel) as string | undefined) ?? '',
-      duration: (e.duration as number | undefined) ?? null,
-      artwork: pickArtwork(e.thumbnails as Thumb[] | undefined) ?? (e.thumbnail as string | undefined) ?? null,
+    return (data.entries ?? [data]).filter(Boolean).map((e) => ({
+      url: e.webpage_url ?? e.url,
+      title: e.title ?? 'Untitled',
+      artist: e.uploader ?? e.channel ?? '',
+      duration: e.duration ?? null,
+      artwork: pickArtwork(e.thumbnails) ?? e.thumbnail ?? null,
     })).filter((r) => r.url);
   }
 
   // Progress lines from yt-dlp ("@@P|status|bytes|total|estimate|speed|eta|fragment|fragments|format").
   const PROGRESS = '@@P|%(progress.status)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s|%(progress.fragment_index)s|%(progress.fragment_count)s|%(info.format_id)s';
 
-  async function fetchFile(url: string, onProgress: (p: Progress) => void, signal: AbortSignal): Promise<string> {
+  async function fetchFile(url, onProgress = () => {}, signal) {
     await mkdir(cache, { recursive: true });
     // yt-dlp skips the download when the file is already cached, and still prints its path.
     const args = [
@@ -108,9 +89,9 @@ export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
       '--print', 'after_move:@@D|%(filepath)s', '--no-simulate',
       '--', url,
     ];
-    const run = (): Promise<string | null> => {
+    const run = () => {
       const progress = progressTracker(onProgress);
-      let file: string | null = null;
+      let file = null;
       return ytdlp(args, 60 * 60_000, {
         signal,
         env,
@@ -120,33 +101,31 @@ export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
         },
       }).then(() => file);
     };
-    let file: string | null;
+    let file;
     try {
       file = await run();
     } catch (err) {
-      if (!/\b403\b/.test((err as Error).message)) throw err;
+      if (!/\b403\b/.test(err.message)) throw err;
       try {
         file = await run();   // a single refused request is common; the retry usually works
       } catch (again) {
-        throw /\b403\b/.test((again as Error).message) ? httpError(FORBIDDEN, 502) : again;
+        throw /\b403\b/.test(again.message) ? Object.assign(new Error(FORBIDDEN), { status: 502 }) : again;
       }
     }
-    if (!file) throw httpError('Nothing was downloaded (live streams aren\'t supported).', 502);
-    await trimCache(cache, basename(file), CACHE_LIMIT).catch(() => {});
+    if (!file) throw Object.assign(new Error('Nothing was downloaded (live streams aren\'t supported).'), { status: 502 });
     return `${prefix}file/${encodeURIComponent(basename(file))}`;
   }
 
   // One download per link: a second request for the same link follows the running one. When nobody
-  // is listening any more (you picked something else, or the client went away), the download stops;
-  // yt-dlp resumes it next time.
-  const jobs = new Map<string, Job>();
-  function job(link: string): Job {
+  // is listening any more (you picked something else), the download stops; yt-dlp resumes it next time.
+  const jobs = new Map();
+  function job(link) {
     const url = siteUrl(link);
-    const running = jobs.get(url);
-    if (running) return running;
-    const listeners = new Set<Listener>();
+    if (jobs.has(url)) return jobs.get(url);
+    const listeners = new Set();
     const controller = new AbortController();
-    const j: Job = {
+    const emit = (kind, value) => listeners.forEach((l) => l[kind](value));
+    const j = {
       last: null,
       add(l) { listeners.add(l); if (j.last) l.progress(j.last); },
       remove(l) {
@@ -155,24 +134,23 @@ export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
       },
     };
     jobs.set(url, j);
-    fetchFile(url, (p) => { j.last = p; listeners.forEach((l) => l.progress(p)); }, controller.signal)
-      .then((src) => listeners.forEach((l) => l.done(src)), (err: Error) => { if (!controller.signal.aborted) listeners.forEach((l) => l.failed(err.message)); })
+    fetchFile(url, (p) => { j.last = p; emit('progress', p); }, controller.signal)
+      .then((src) => emit('done', src), (err) => { if (!controller.signal.aborted) emit('failed', err.message); })
       .finally(() => { if (jobs.get(url) === j) jobs.delete(url); });
     return j;
   }
 
-  function streamFetch(req: IncomingMessage, res: ServerResponse, link: string): void {
+  function streamFetch(req, res, link) {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-    const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    let j: Job;
+    const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    let j;
     try {
       j = job(link);
     } catch (err) {
-      send('failed', { error: (err as Error).message });
-      res.end();
-      return;
+      send('failed', { error: err.message });
+      return res.end();
     }
-    const listener: Listener = {
+    const listener = {
       progress: (p) => send('progress', p),
       done: (src) => { send('done', { src }); res.end(); },
       failed: (error) => { send('failed', { error }); res.end(); },
@@ -181,31 +159,13 @@ export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
     req.on('close', () => j.remove(listener));
   }
 
-  // The plain JSON form follows the same job, so it is shared and stops when the client goes away.
-  function plainFetch(req: IncomingMessage, res: ServerResponse, link: string): void {
-    const j = job(link);
-    const listener: Listener = {
-      progress: () => {},
-      done: (src) => json(res, 200, { src }),
-      failed: (error) => json(res, 502, { error }),
-    };
-    j.add(listener);
-    req.on('close', () => j.remove(listener));
-  }
-
-  async function serveFile(req: IncomingMessage, res: ServerResponse, fileName: string): Promise<void> {
-    try {
-      fileName = decodeURIComponent(fileName);
-    } catch {
-      return json(res, 400, { error: 'Bad file name' });
-    }
-    if (!safeFileName(fileName)) return json(res, 400, { error: 'Bad file name' });
+  async function serveFile(req, res, fileName) {
+    fileName = decodeURIComponent(fileName);
+    if (!/^[\w.-]+$/.test(fileName)) return json(res, 400, { error: 'Bad file name' });
     const file = join(cache, fileName);
-    let size: number;
+    let size;
     try {
-      const s = await stat(file);
-      if (!s.isFile()) return json(res, 404, { error: 'Not in cache' });
-      size = s.size;
+      ({ size } = await stat(file));
     } catch {
       return json(res, 404, { error: 'Not in cache' });
     }
@@ -213,119 +173,95 @@ export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
     const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range ?? '');
     if (!range) {
       res.writeHead(200, { ...headers, 'Content-Length': size });
-      return pipeFile(file, res);
+      return createReadStream(file).pipe(res);
     }
     let start = range[1] ? Number(range[1]) : size - Number(range[2]);
     let end = range[1] && range[2] ? Number(range[2]) : size - 1;
     start = Math.max(0, start);
     end = Math.min(end, size - 1);
-    if (start > end) return void res.writeHead(416, { 'Content-Range': `bytes */${size}` }).end();
+    if (start > end) return res.writeHead(416, { 'Content-Range': `bytes */${size}` }).end();
     res.writeHead(206, { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1 });
-    pipeFile(file, res, { start, end });
+    createReadStream(file, { start, end }).pipe(res);
   }
 
-  function siteUrl(text: string): string {
-    let u: URL;
+  function siteUrl(text) {
+    let u;
     try {
       u = new URL(text);
     } catch {
-      throw httpError('Not a valid link', 400);
+      throw Object.assign(new Error('Not a valid link'), { status: 400 });
     }
     if (!/^https?:$/.test(u.protocol) || !site.hosts.includes(u.hostname)) {
-      throw httpError(`Only ${site.hosts[0]} links are supported here`, 400);
+      throw Object.assign(new Error(`Only ${site.hosts[0]} links are supported here`), { status: 400 });
     }
     return u.href;
   }
 
-  return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  return async function handle(req, res) {
     try {
-      const url = new URL((req as IncomingMessage & { originalUrl?: string }).originalUrl ?? req.url ?? '/', 'http://localhost');
+      const url = new URL(req.originalUrl ?? req.url, 'http://localhost');
       const route = url.pathname.slice(prefix.length);
       if (route === 'search') return json(res, 200, { results: await search(url.searchParams.get('q') ?? '') });
       if (route === 'fetch') {
         const link = url.searchParams.get('url') ?? '';
         if ((req.headers.accept ?? '').includes('text/event-stream')) return streamFetch(req, res, link);
-        return plainFetch(req, res, link);
+        return json(res, 200, { src: await fetchFile(siteUrl(link)) });
       }
-      if (route.startsWith('file/')) return await serveFile(req, res, route.slice(5));
+      if (route.startsWith('file/')) return serveFile(req, res, route.slice(5));
       json(res, 404, { error: 'Unknown endpoint' });
     } catch (err) {
-      json(res, (err as HttpError).status ?? 502, { error: (err as Error).message });
+      json(res, err.status ?? 502, { error: err.message });
     }
   };
 }
 
-// Streams a file; a read error (the file vanished) ends the response instead of crashing the server.
-function pipeFile(file: string, res: ServerResponse, range?: { start: number; end: number }): void {
-  createReadStream(file, range)
-    .on('error', () => res.destroy())
-    .pipe(res);
-}
-
-// Deletes the least recently used files until the cache fits in `limit` bytes. `keep` (just
-// downloaded) and yt-dlp's partial files are never removed.
-export async function trimCache(dir: string, keep: string, limit: number): Promise<void> {
-  const files = await Promise.all((await readdir(dir)).map(async (name) => {
-    const s = await stat(join(dir, name)).catch(() => null);
-    return s?.isFile() ? { name, size: s.size, used: Math.max(s.atimeMs, s.mtimeMs) } : null;
-  }));
-  const present = files.filter((f) => f !== null);
-  let total = present.reduce((sum, f) => sum + f.size, 0);
-  for (const f of present.sort((a, b) => a.used - b.used)) {
-    if (total <= limit) break;
-    if (f.name === keep || f.name.endsWith('.part') || f.name.endsWith('.ytdl')) continue;
-    await rm(join(dir, f.name), { force: true });
-    total -= f.size;
-  }
-}
-
 // Runs yt-dlp; `onLine` sees every output line as it arrives. Resolves with stdout.
-function ytdlp(args: string[], timeoutMs: number, { onLine, signal, env }: { onLine?: (line: string) => void; signal?: AbortSignal; env?: Env } = {}): Promise<string> {
+function ytdlp(args, timeoutMs, { onLine, signal, env } = {}) {
   return new Promise((resolve, reject) => {
     const proc = spawn(YTDLP, args, { stdio: ['ignore', 'pipe', 'pipe'], signal, env: env ? { ...process.env, ...env } : process.env });
     let stdout = '', stderr = '';
-    const lines = (stream: NodeJS.ReadableStream, append: (d: string) => void) => {
+    const lines = (stream, append) => {
       let rest = '';
-      stream.on('data', (d: Buffer) => {
+      stream.on('data', (d) => {
         append(String(d));
         if (!onLine) return;
         const parts = (rest + d).split(/\r?\n/);
-        rest = parts.pop() ?? '';
+        rest = parts.pop();
         parts.forEach((l) => l && onLine(l));
       });
     };
     lines(proc.stdout, (d) => (stdout += d));
     lines(proc.stderr, (d) => (stderr += d));
     const timer = setTimeout(() => proc.kill('SIGKILL'), timeoutMs);
-    proc.on('error', (err: NodeJS.ErrnoException) => {
+    proc.on('error', (err) => {
       clearTimeout(timer);
-      reject(err.code === 'ENOENT' ? httpError(MISSING, 503) : err);
+      reject(err.code === 'ENOENT' ? Object.assign(new Error(MISSING), { status: 503 }) : err);
     });
     proc.on('close', (code) => {
       clearTimeout(timer);
       if (code === 0) return resolve(stdout);
       const reason = stderr.trim().split('\n').filter((l) => l.includes('ERROR')).pop() ?? `yt-dlp exited with code ${code}`;
-      reject(httpError(reason.replace(/^ERROR:\s*/, ''), 502));
+      reject(Object.assign(new Error(reason.replace(/^ERROR:\s*/, '')), { status: 502 }));
     });
   });
 }
 
 // Turns yt-dlp's progress lines into one overall percentage. A video + sound download fetches two
 // streams (video first, ~92 % of the bytes), then merges them.
-function progressTracker(onProgress: (p: Progress) => void): (line: string) => void {
-  let streams = 1, stream = -1, current: string | null = null, best = 0;
-  const n = (v: string | undefined): number | null => (v === undefined || v === 'NA' || v === 'None' ? null : Number(v));
+function progressTracker(onProgress) {
+  let streams = 1, stream = -1, current = null, best = 0;
+  const n = (v) => (v === undefined || v === 'NA' || v === 'None' ? null : Number(v));
   return (line) => {
     if (line.startsWith('@@F|')) { streams = line.slice(4).split('+').length; return; }
     if (!line.startsWith('@@P|')) return;
     const [status, done, total, estimate, speed, eta, frag, frags, format] = line.slice(4).split('|');
-    if (format !== current) { current = format ?? null; stream++; }
+    if (format !== current) { current = format; stream++; }
     const size = n(total) ?? n(estimate);
     // An exact size beats counting fragments, which beats yt-dlp's (jumpy) size estimate.
-    const part = status === 'finished' ? 1 : n(total) ? n(done)! / n(total)! : n(frags) ? n(frag)! / n(frags)! : size ? n(done)! / size : 0;
-    const weights = streams === 2 ? [0.92, 0.08] : Array<number>(streams).fill(1 / streams);
+    const part = status === 'finished' ? 1 : n(total) ? n(done) / n(total) : n(frags) ? n(frag) / n(frags) : size ? n(done) / size : 0;
+    const weights = streams === 2 ? [0.92, 0.08] : Array(streams).fill(1 / streams);
     const i = Math.min(stream, streams - 1);
-    const percent = (weights.slice(0, i).reduce((a, b) => a + b, 0) + weights[i]! * Math.min(1, part)) * 100;
+    const percent = (weights.slice(0, i).reduce((a, b) => a + b, 0) + weights[i] * Math.min(1, part)) * 100;
     const last = status === 'finished' && i === streams - 1;
     best = Math.max(best, Math.min(99.5, percent));   // the bar never moves backwards
     onProgress({
@@ -336,18 +272,15 @@ function progressTracker(onProgress: (p: Progress) => void): (line: string) => v
   };
 }
 
-interface Thumb { id?: string; url?: string; width?: number }
-
 // SoundCloud names its sizes; YouTube lists widths. Aim for ~300 px.
-function pickArtwork(thumbs: Thumb[] = []): string | undefined {
+function pickArtwork(thumbs = []) {
   const named = thumbs.find((t) => t.id === 't300x300') ?? thumbs.find((t) => t.id === 'large');
   if (named) return named.url;
-  const sized = thumbs.filter((t) => t.width).sort((a, b) => Math.abs(a.width! - 320) - Math.abs(b.width! - 320));
+  const sized = thumbs.filter((t) => t.width).sort((a, b) => Math.abs(a.width - 320) - Math.abs(b.width - 320));
   return (sized[0] ?? thumbs.at(-1))?.url;
 }
 
-function json(res: ServerResponse, status: number, body: unknown): void {
-  if (res.headersSent) return;
+function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
 }

@@ -25,7 +25,7 @@ export const HELP_TOPICS = {
       'Export scenes & settings (☰ menu) saves your scenes, edits to built-ins, My Shader, the visual maker graph, parameter values, the Studio show, favourites, player settings and layout to one file. Import… (or drop the file on the page) replaces them and reloads; your current setup is downloaded first as a backup.',
       'The controls fade away while the music plays and you leave the mouse alone; move it to bring them back.',
       'Every button with a shortcut shows its key. Hold a modifier to see which badges light up.',
-      'Randomize (R) rolls the Look sliders (not Resolution), mood from tempo and the spin direction. Tick "Randomize also picks a random scene" to change the scene too. Shift+R goes back to the look before each roll.',
+      'Randomize (R) rolls the Look sliders (not Resolution). Tick "Randomize also picks a random scene" to change the scene too. Shift+R goes back to the look before each roll.',
     ],
     hotkeys: ['help', 'hidePanel', 'resetLayout', 'fullscreen', 'randomize', 'randomizeBack', 'record'],
   },

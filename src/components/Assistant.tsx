@@ -9,8 +9,7 @@ import { z } from 'zod';
 import { useApp, useLayout, useUI } from '../app/AppContext';
 import { downloadFile, fileStamp } from '../app/download';
 import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
-import { useSessions } from '../app/sessions';
-import { LONG_CHAT_TOKENS } from '../assistant/conversations';
+import { AssistantSession, LONG_CHAT_TOKENS } from '../assistant/conversations';
 import { toMarkdown } from '../assistant/transcript';
 import { formatTokens, totalTokens } from '../assistant/usage';
 import { HOTKEYS } from '../hotkeys/registry';
@@ -229,7 +228,8 @@ export function Assistant() {
   const open = useUI((ui) => ui.assistantOpen);
   const narrow = useNarrow();
   const size: WidgetSize = useLayout((l) => effective(l, narrow).chatSize);
-  const session = useSessions().assistant;
+  const [session] = useState(() => new AssistantSession(app));
+  useEffect(() => session.attach(), [session]);
   const sv = useStore(session.store, (s) => s);
   const chat = session.conversation(sv.activeId);
   const view = useStore(chat.store, (v) => v);
@@ -269,10 +269,9 @@ export function Assistant() {
   };
   const doUndo = () => {
     const owner = undo.lastChat;
-    const done = session.undoLast();
-    if (!done) return;
-    if (done.error) app.toast(done.error, 6000);
-    else if (owner && owner !== sv.activeId) app.toast(`Undid: ${done.label} (from “${session.meta(owner)?.title ?? 'another chat'}”)`);
+    const label = session.undoLast();
+    if (!label) return;
+    if (owner && owner !== sv.activeId) app.toast(`Undid: ${label} (from “${session.meta(owner)?.title ?? 'another chat'}”)`);
   };
   const pick = (id: string) => { session.select(id); setListOpen(false); };
   const exportChat = (id: string) => {

@@ -5,7 +5,7 @@
 import { parseParams } from '../engine/params';
 import { COMMON, TEMPLATE, type Scene } from '../engine/scenes';
 import { KEYS, readString, writeString } from '../state/persistence';
-import { appendScene, paramKey, saveSceneEdit, saveUserScenes, userScene } from '../state/scene-list';
+import { paramKey, saveSceneEdit, saveUserScenes, userScene } from '../state/scene-list';
 import type { AppController } from './controller';
 
 const HEADER_LINES = COMMON.split('\n').length - 1;
@@ -21,11 +21,6 @@ export function formatError(message: string): string {
     .map((l) => l.replace(/^ERROR: \d+:(\d+): /, (_, n: string) => `Line ${Number(n) - HEADER_LINES}: `))
     .join('\n') || message;
 }
-
-// What compileInto resolves with when a newer compile for the same scene started meanwhile: neither
-// this source's success nor its error is current any more, so callers leave their status alone.
-export const SUPERSEDED = Symbol('superseded');
-export type CompileResult = string | null | typeof SUPERSEDED;
 
 export class EditorCore {
   customCode: string;
@@ -57,8 +52,8 @@ export class EditorCore {
 
   // Compiles `source` into the target scene. Resolves with the error text (line numbers relative to
   // `source`), or null once the new program is live and saved. A newer compile for the same scene
-  // supersedes an older one that is still in flight (SUPERSEDED; its program is freed).
-  async compileInto(target: EditorTarget, source: string): Promise<CompileResult> {
+  // supersedes an older one that is still in flight.
+  async compileInto(target: EditorTarget, source: string): Promise<string | null> {
     const scene = this.app.state.scenes[target.index];
     if (!scene) return 'No such scene.';
     const { code, params } = parseParams(source);
@@ -66,11 +61,8 @@ export class EditorCore {
     const n = (this.seq.get(target.index) ?? 0) + 1;
     this.seq.set(target.index, n);
     const error = await this.app.renderer.compileAsync(frag, scene.name);
-    if (this.seq.get(target.index) !== n) {
-      if (!error) this.app.renderer.release(frag);
-      return SUPERSEDED;
-    }
     if (error) return formatError(error);
+    if (this.seq.get(target.index) !== n) return null;
     scene.frag = frag;
     scene.params = params;
     scene.body = source;
@@ -83,7 +75,7 @@ export class EditorCore {
   }
 
   // Load code into "My Shader" (Send to code, Edit a copy), whether or not it's the scene on screen.
-  setCustomCode(code: string): Promise<CompileResult> {
+  setCustomCode(code: string): Promise<string | null> {
     return this.compileInto(this.customTarget(), code);
   }
 
@@ -107,7 +99,7 @@ export class EditorCore {
       Object.assign(scenes[existing]!, scene);
     } else {
       if (app.renderer.check(scene.frag, name)) { app.toast('Fix the shader errors before saving.'); return; }
-      index = appendScene(scenes, scene);
+      index = scenes.push(scene) - 1;
     }
     if (from.index !== index) app.paramStore.copy(paramKey(scenes[from.index]!), paramKey(scenes[index]!));   // keep the values you tweaked
     app.setSceneParams(index, scene.params);

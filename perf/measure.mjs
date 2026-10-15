@@ -4,7 +4,6 @@
 // numbers (long tasks, layouts, style recalcs, localStorage writes, frame cadence) are.
 import { chromium } from '@playwright/test';
 import fs from 'node:fs/promises';
-import path from 'node:path';
 
 const url = process.argv[2] ?? 'http://localhost:5199/';
 const out = process.argv[3] ?? 'perf/results/result.json';
@@ -84,6 +83,5 @@ results['editor-keystroke-compile'] = await page.evaluate(() => ({ longTasks: wi
 console.log('editor', JSON.stringify(results['editor-keystroke-compile']));
 await page.keyboard.press('Escape');
 
-await fs.mkdir(path.dirname(out), { recursive: true });
 await fs.writeFile(out, JSON.stringify({ date: new Date().toISOString(), url, results }, null, 2));
 await browser.close();

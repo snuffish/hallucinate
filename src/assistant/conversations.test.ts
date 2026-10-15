@@ -139,7 +139,7 @@ describe('assistant conversations', () => {
     const replies = c.view.messages.filter((m) => m.role === 'assistant');
     expect(replies.map((m) => c.view.replyUsage[m.id]?.prompt)).toEqual([1000, 1200]);
 
-    expect(s.undoLast()).toEqual({ label: 'Adjusted the look' });
+    expect(s.undoLast()).toBe('Adjusted the look');
     expect(app.state.look.hue).toBe(0);
     expect(c.view.notes).toHaveLength(1);
     c.send('thanks');
@@ -217,26 +217,6 @@ describe('assistant conversations', () => {
     expect(seen[0]!.text).toMatch(/^\(This conversation was reopened on .*get_app_state.*\)\n\nhello again$/);
     expect(JSON.stringify(seen[0]!.messages)).toContain(NOT_RUN);
     s.dispose();
-  });
-
-  it('a session disposed before a stored transcript was read leaves that transcript alone (StrictMode mounts twice)', async () => {
-    const id = '00000000-0000-4000-8000-000000000002';
-    const messages: UIMessage[] = [{ id: 'u1', role: 'user', parts: [{ type: 'text', content: 'keep me' }] }];
-    const stored = memoryTranscripts();
-    stored.data.set(id, { messages, replyUsage: {} });
-    // Reading takes a while (IndexedDB); the first session is gone before it answers.
-    const slow: TranscriptBackend = { ...stored, get: async (key) => { await new Promise((r) => setTimeout(r, 50)); return stored.get(key); } };
-    storage.set(KEYS.assistantChats, JSON.stringify({ v: 1, chats: [{ id, title: 'keep me', createdAt: 1, updatedAt: 2 }], activeId: id }));
-
-    const first = session([], { transcripts: slow });
-    first.s.dispose();
-    await new Promise((r) => setTimeout(r, 1200));   // past the transcript writer's delay
-    expect(stored.data.get(id)?.messages).toEqual(messages);
-
-    const second = session([], { transcripts: slow });
-    await until(() => second.s.active.view.loaded);
-    expect(second.s.active.view.messages[0]!.id).toBe('u1');
-    second.s.dispose();
   });
 
   it('deletes a conversation everywhere: index, transcript and the CLI session', async () => {

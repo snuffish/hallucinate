@@ -47,15 +47,14 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
 
   // Previews render a couple at a time so opening the library doesn't stall the visuals. A preview
   // is redone when the scene's code changed, or the media changed for a scene that samples it.
-  // Each batch updates `thumbs`, which re-runs this effect for the next batch. The effect follows
-  // which previews are missing, not every render, so hovering a card doesn't restart a batch.
-  const stale = (s: Scene, i: number) => {
-    const t = thumbs.get(s);
-    return !t || t.frag !== s.frag || (app.renderer.usesMedia(i) && t.mediaVersion !== app.media.version);
-  };
-  const missing = open ? shown.filter(({ s, i }) => stale(s, i)).slice(0, 2) : [];
-  const missingKey = missing.map(({ s, i }) => `${i}:${s.frag.length}:${app.media.version}`).join(',');
+  // Each batch updates `thumbs`, which re-runs this effect for the next batch.
   useEffect(() => {
+    if (!open) return;
+    const stale = (s: Scene, i: number) => {
+      const t = thumbs.get(s);
+      return !t || t.frag !== s.frag || (app.renderer.usesMedia(i) && t.mediaVersion !== app.media.version);
+    };
+    const missing = shown.filter(({ s, i }) => stale(s, i)).slice(0, 2);
     if (!missing.length) return;
     let cancelled = false;
     void Promise.all(missing.map(async ({ s, i }) => {
@@ -76,7 +75,7 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
       });
     });
     return () => { cancelled = true; };
-  }, [missingKey, thumbs, app]);   // eslint-disable-line react-hooks/exhaustive-deps -- `missing` is what `missingKey` names
+  }, [open, shown, thumbs, app]);
 
   const pick = (i: number) => { app.setScene(i); app.setOverlay(null); };
 

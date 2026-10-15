@@ -24,6 +24,7 @@ function fakeApp() {
     setScene: vi.fn(), setLook: vi.fn(), pushParams: vi.fn(), paramValues: vi.fn(() => ({})), showParams: vi.fn(), toast: vi.fn(),
     setHooks: vi.fn(() => () => {}),
     sceneByName: (name: string) => scenes.findIndex((s) => s.name === name),
+    studio: () => null as StudioSession | null,
   };
   return app;
 }
@@ -66,6 +67,7 @@ describe('a director cycle', () => {
   it('sends the digest on a fresh director thread, runs the plan tool here, forgets the thread, and stays flat', async () => {
     const app = fakeApp();
     const studio = new StudioSession(app as unknown as AppController, () => {});
+    app.studio = () => studio;
     studio.attach();
     studio.add({ name: 'Alpha', scene: 'Alpha', values: {}, look: { hue: 0.1 } });
     studio.add({ name: 'Beta', scene: 'Beta', values: {}, look: { hue: 0.6 } });
@@ -106,6 +108,7 @@ describe('a director cycle', () => {
   it('waits while the chat is busy, the music is off or the show is too small', async () => {
     const app = fakeApp();
     const studio = new StudioSession(app as unknown as AppController, () => {});
+    app.studio = () => studio;
     studio.attach();
     const seen: Seen[] = [];
     const director = new Director(app as unknown as AppController, studio, { connection: scriptedConnection(seen), forgetThread: () => {} });
