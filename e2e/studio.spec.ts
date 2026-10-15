@@ -37,6 +37,7 @@ test('studio: Live stays pinned to the taken scene while the screen previews oth
 });
 
 test('studio: the autopilot follows a saved plan instead of list order', async ({ page }) => {
+  test.slow();   // at a slow runner's frame rate the demo's 124 BPM reads as 17-31 BPM, so beats come slowly
   // A show of three scenes whose plan plays them in a different order than the list, with short steps.
   const cue = (name: string) => ({ id: `id-${name}`, name, scene: name, values: {}, look: {} });
   const show = {
@@ -53,10 +54,10 @@ test('studio: the autopilot follows a saved plan instead of list order', async (
   await expect(page.locator('#st-director')).toBeVisible();   // the footer stays in view at 720p; the list scrolls instead
   await page.locator('#st-auto').check();
   // The plan starts at the next take (16 beats on the dial), then its own counts: Hyper Tunnel, then Star Nest.
-  await expect(page.locator('#st-live-name')).toHaveText('Hyper Tunnel', { timeout: 30_000 });
+  await expect(page.locator('#st-live-name')).toHaveText('Hyper Tunnel', { timeout: 90_000 });
   await expect(page.locator('#st-beats')).toContainText('/ 8 beats');
   await expect(page.locator('#st-plan li.playing')).toContainText('Hyper Tunnel');
-  await expect(page.locator('#st-live-name')).toHaveText('Star Nest', { timeout: 20_000 });
+  await expect(page.locator('#st-live-name')).toHaveText('Star Nest', { timeout: 45_000 });
   await page.locator('#st-plan-clear').click();              // drop the plan: back to the list
   await expect(page.locator('#st-plan')).toHaveCount(0);
   await expect(page.locator('#st-beats')).toContainText('/ 16 beats');
