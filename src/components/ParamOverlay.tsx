@@ -9,7 +9,7 @@ import { useApp, useUI } from '../app/AppContext';
 import { groupParams, type ParamSpec, type ParamValue, type ParamValues, type VecParamSpec, type FloatParamSpec } from '../engine/params';
 import { HOTKEYS } from '../hotkeys/registry';
 import type { WidgetLayout } from '../state/layout';
-import { toggleGroup, useCollapsedGroups } from '../state/param-groups';
+import { setCollapsed, toggleGroup, useCollapsedGroups } from '../state/param-groups';
 import { HelpButton } from './Help';
 import { Widget } from './widgets/Widget';
 
@@ -55,6 +55,20 @@ const ResetButton = () => {
   return <button id="params-reset" title="Reset every value to the default in the code" onClick={() => app.resetParams()}>Reset</button>;
 };
 
+// Folds every group, or unfolds them all once every one is folded. Only for scenes with groups.
+function FoldAllButton() {
+  const key = useUI((ui) => ui.params.key);
+  const specs = useUI((ui) => ui.params.specs);
+  const collapsed = useCollapsedGroups(key);
+  const names = groupParams(specs).map((g) => g.name).filter(Boolean);
+  if (!names.length) return null;
+  const allFolded = names.every((n) => collapsed.includes(n));
+  return (
+    <button className="params-fold-all" aria-label={allFolded ? 'Expand all groups' : 'Collapse all groups'} title={allFolded ? 'Expand all groups' : 'Collapse all groups'}
+      onClick={() => setCollapsed(key, allFolded ? [] : names)}>{allFolded ? '⊞' : '⊟'}</button>
+  );
+}
+
 // Only once a source plays (not over the start screen) and not while the studio shows its own copy.
 export function ParamsWidget({ entry }: { entry: WidgetLayout }) {
   const paramsVisible = useUI((ui) => ui.paramsVisible);
@@ -62,7 +76,7 @@ export function ParamsWidget({ entry }: { entry: WidgetLayout }) {
   const title = useUI((ui) => ui.params.title);
   return (
     <Widget id="params" domId="params" entry={entry} title={<span id="params-title">{title}</span>} help="params"
-      tools={<ResetButton />} collapse={{ id: 'params-collapse', hotkey: HOTKEYS.params }} hidden={!paramsVisible || studioOpen}>
+      tools={<><FoldAllButton /><ResetButton /></>} collapse={{ id: 'params-collapse', hotkey: HOTKEYS.params }} hidden={!paramsVisible || studioOpen}>
       <ParamsList />
     </Widget>
   );
@@ -76,6 +90,7 @@ export function StudioParams() {
     <aside className="params" hidden={!paramsVisible}>
       <header>
         <strong>{title}</strong>
+        <FoldAllButton />
         <ResetButton />
         <HelpButton topic="params" />
       </header>

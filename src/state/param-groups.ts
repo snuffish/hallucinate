@@ -17,7 +17,11 @@ export const useCollapsedGroups = (key: string): readonly string[] => useStore(s
 // edit renamed or removed, so the stored lists don't grow.
 export function toggleGroup(key: string, group: string, current: readonly string[]): void {
   const was = store.get()[key] ?? [];
-  const next = (was.includes(group) ? was.filter((g) => g !== group) : [...was, group]).filter((g) => current.includes(g));
-  store.set({ [key]: next });
+  setCollapsed(key, (was.includes(group) ? was.filter((g) => g !== group) : [...was, group]).filter((g) => current.includes(g)));
+}
+
+// Fold every group of scene `key` (pass its group names) or unfold them all (pass []).
+export function setCollapsed(key: string, groups: readonly string[]): void {
+  store.set({ [key]: [...groups] });
   writeJSON(KEYS.paramGroups, Object.fromEntries(Object.entries(store.get()).filter(([, list]) => list.length)));
 }

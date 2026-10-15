@@ -22,6 +22,7 @@ test('parameters: @group sections fold, stay folded across a reload, and ungroup
   await expect(page.locator('#params')).toBeVisible();
   await expect(page.locator('#params-list .param').first()).toBeVisible();
   await expect(page.locator('#params-list .param-group')).toHaveCount(0);   // the first scene has no groups
+  await expect(page.locator('#params .params-fold-all')).toHaveCount(0);   // …so no collapse/expand all
 
   await playScene(page, 'tesseract', 'Tesseract');
   const groups = page.locator('#params-list .param-group');
@@ -40,4 +41,15 @@ test('parameters: @group sections fold, stay folded across a reload, and ungroup
   await expect(dots.locator('.param-group-head')).toHaveAttribute('aria-expanded', 'false');
   await toggle(page, 'Travelling dots');
   await expect(dots.locator('.param')).toHaveCount(3);
+
+  // Collapse all, then (once everything is folded) expand all.
+  const foldAll = page.locator('#params .params-fold-all');
+  await foldAll.focus();
+  await page.keyboard.press('Enter');
+  await expect(groups.locator('.param-group-head[aria-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('#params-list .param')).toHaveCount(0);
+  await expect(foldAll).toHaveAttribute('aria-label', 'Expand all groups');
+  await page.keyboard.press('Enter');
+  await expect(groups.locator('.param-group-head[aria-expanded="false"]')).toHaveCount(0);
+  await expect(page.locator('#params-list .param')).toHaveCount(12);
 });
