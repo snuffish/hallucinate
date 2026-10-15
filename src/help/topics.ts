@@ -1,7 +1,7 @@
 import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
 import { HOTKEYS, type HotkeyDef, type HotkeyId, type HotkeyWhen } from '../hotkeys/registry';
 
-// What the `?` buttons explain, one entry per area. Kept short on purpose: the README is the long
+// What the `?` buttons explain, one entry per area. Kept short on purpose: docs/ is the long
 // reference. Shortcut lists come from the hotkey registry, so they can't drift from what the keys do.
 
 export interface HelpTopic {

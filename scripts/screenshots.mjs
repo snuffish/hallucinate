@@ -1,4 +1,4 @@
-// Takes the README screenshots. Run with the dev server up:
+// Takes the README and docs/ screenshots. Run with the dev server up:
 //   node scripts/screenshots.mjs http://localhost:5199/
 // Headless Chromium renders WebGL with SwiftShader, so give scenes a moment to build up trails.
 import { chromium } from '@playwright/test';
