@@ -1,11 +1,12 @@
 import type { Hotkey } from '@tanstack/react-hotkeys';
+import type { Overlay } from '../state/ui-state';
 
 // Every keyboard shortcut in the app, in one place: the hooks register them, the badges display them
-// and the help sheet lists them. `when` encodes the old overlay rules (src/main.js keydown handler).
+// and the help sheet lists them. `when` says under which UI state a binding is live (`isEnabled`).
 
 export type HotkeyWhen =
   | 'always'
-  | 'noOverlay'      // no overlay open and not the visual maker
+  | 'noOverlay'      // no overlay open (the code editor excepted: it follows the scene), not the game
   | 'noNodes'        // everything except while the visual maker is open
   | 'notGame'        // scene keys that the game reuses
   | 'game'
@@ -86,3 +87,36 @@ export type HotkeyId = keyof typeof HOTKEYS;
 // Scene number keys: 1–9 and 0 outside the studio, cue keys 1–9 inside it.
 export const SCENE_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'] as const;
 export const CUE_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
+export const SCENE_DIGITS_WHEN: HotkeyWhen = 'notStudio';
+export const CUE_DIGITS_WHEN: HotkeyWhen = 'studio';
+
+// The UI state the `when` conditions read.
+export interface HotkeyContext {
+  overlay: Overlay;
+  inGame: boolean;
+  assistantOpen: boolean;
+  helpOpen: boolean;
+  paramsVisible: boolean;
+}
+
+// Whether a binding is live. Bindings that share a key must never be live together: the registry
+// test runs this over every context, and `useAppHotkeys` registers conflicts as errors.
+export function isEnabled(when: HotkeyWhen, c: HotkeyContext): boolean {
+  const nodesOpen = c.overlay === 'nodes';
+  const studioOpen = c.overlay === 'studio';
+  switch (when) {
+    case 'always': return true;
+    case 'noOverlay': return (c.overlay === null || c.overlay === 'editor') && !c.inGame;
+    case 'noNodes': return !nodesOpen;
+    case 'notGame': return !c.inGame && !nodesOpen;
+    case 'game': return c.inGame && c.overlay !== 'library' && !nodesOpen && !studioOpen;
+    case 'studio': return studioOpen;
+    case 'notStudio': return !studioOpen && !nodesOpen;
+    case 'nodesOpen': return nodesOpen;
+    case 'paramsVisible': return c.paramsVisible && !nodesOpen;
+    case 'overlayOpen': return c.overlay !== null || c.assistantOpen || c.helpOpen;
+    case 'library': return c.overlay === 'library';
+    case 'noLibrary': return c.overlay !== 'library' && !nodesOpen;
+    case 'assistantOpen': return c.assistantOpen;
+  }
+}

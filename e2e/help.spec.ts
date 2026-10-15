@@ -51,6 +51,7 @@ test('help: switching overlays closes help; Esc closes only help', async ({ page
   await expect(page.locator('#editor')).toBeVisible();
   await expect(openPopovers(page)).toHaveCount(0);
 
+  await page.locator('#ed-code').blur();   // the editor focuses its code; a key typed there is code, not a shortcut
   await page.keyboard.press('l');
   await expect(page.locator('#library')).toBeVisible();
   await page.getByRole('button', { name: 'Help: Scene library' }).click();

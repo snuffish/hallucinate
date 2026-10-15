@@ -1,12 +1,16 @@
-// Creates the AppController once the canvas exists, and disposes it on unmount. Under StrictMode the
-// effect runs twice in development; the second controller reuses the same WebGL context, so this is
-// safe, just slower to start.
+// Creates the AppController once the canvas exists, plus the sessions beside it (studio, director,
+// assistant), and disposes them on unmount. Under StrictMode the effect runs twice in development; the
+// second controller reuses the same WebGL context and builds its own scene list, so this is safe,
+// just slower to start.
 
 import { useEffect, useState, type RefObject } from 'react';
 import { AppController } from '../app/controller';
+import { createSessions, type Sessions } from '../app/sessions';
 
-export function useEngines(canvas: RefObject<HTMLCanvasElement | null>): { app: AppController | null; error: string | null } {
-  const [app, setApp] = useState<AppController | null>(null);
+interface Engines { app: AppController; sessions: Sessions }
+
+export function useEngines(canvas: RefObject<HTMLCanvasElement | null>): { app: AppController | null; sessions: Sessions | null; error: string | null } {
+  const [engines, setEngines] = useState<Engines | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!canvas.current) return;
@@ -20,11 +24,13 @@ export function useEngines(canvas: RefObject<HTMLCanvasElement | null>): { app: 
       return;
     }
     controller.start();
-    setApp(controller);
+    const sessions = createSessions(controller);
+    setEngines({ app: controller, sessions });
     return () => {
+      sessions.dispose();
       controller.dispose();
-      setApp(null);
+      setEngines(null);
     };
   }, [canvas]);
-  return { app, error };
+  return { app: engines?.app ?? null, sessions: engines?.sessions ?? null, error };
 }

@@ -9,10 +9,11 @@
 
 import { ChatClient, createChatClientOptions, fetchServerSentEvents, type ConnectConnectionAdapter, type ConnectionAdapter, type UIMessage } from '@tanstack/ai-client';
 import type { AppController } from '../app/controller';
+import type { StudioSession } from '../app/studio';
 import { KEYS } from '../state/persistence';
 import { Store } from '../state/store';
 import { clientTools } from './client-tools';
-import { createToolRunner, type ToolRunner } from './executor';
+import { createToolRunner, UndoConflict, type ToolRunner } from './executor';
 import { HISTORY_CAP, indexedDBTranscripts, loadTranscript, prune, readIndex, transcriptWriter, writeIndex, type ChatMeta, type TranscriptBackend, type TranscriptWriter } from './history-store';
 import { createLock, serialized, type Lock } from './lock';
 import { resumeNote, undoNote, withNotes } from './notes';
@@ -62,6 +63,8 @@ export interface SessionOptions {
   locks?: LockManagerLike | null;
   forgetThread?: (threadId: string) => void;
   now?: () => number;
+  lock?: Lock;                              // shared with the director (sessions.ts); one of its own otherwise
+  studio?: () => StudioSession | null;      // the show the studio tools act on
 }
 
 const newId = () => crypto.randomUUID();
@@ -153,12 +156,13 @@ export class Conversation {
     this.client.reload().catch((err: Error) => this.store.set({ error: err.message })).finally(() => this.check());
   }
 
-  // `save`: keep the transcript (false when the conversation is being deleted).
+  // `save`: keep the transcript (false when the conversation is being deleted). A conversation whose
+  // stored transcript hasn't been read yet has nothing of its own to save, and must not overwrite it.
   dispose(save = true): void {
     if (this.settleTimer) clearTimeout(this.settleTimer);
     this.client?.stop();
     this.seal();
-    if (save) this.writer.schedule(this.transcript());
+    if (save && this.view.loaded) this.writer.schedule(this.transcript());
     this.writer.dispose();
     this.client?.dispose();
     this.client = null;
@@ -242,7 +246,7 @@ export class AssistantSession {
   readonly transcripts: TranscriptBackend;
   readonly connection: ConnectionAdapter;
   readonly now: () => number;
-  private readonly lockTools: Lock = createLock();
+  private readonly lockTools: Lock;
   private readonly chats = new Map<string, Conversation>();
   private readonly runners = new Map<string, ToolRunner>();
   private readonly locks: LockManagerLike | null;
@@ -253,6 +257,7 @@ export class AssistantSession {
 
   constructor(private readonly app: AppController, private readonly opts: SessionOptions = {}) {
     this.now = opts.now ?? Date.now;
+    this.lockTools = opts.lock ?? createLock();
     this.transcripts = opts.transcripts ?? indexedDBTranscripts();
     const base: ConnectConnectionAdapter = opts.connection ?? fetchServerSentEvents('/api/assistant');
     // Not resumable on purpose (no joinRun): a run is never rejoined, only sealed. Old screenshots stay home.
@@ -359,13 +364,19 @@ export class AssistantSession {
     for (const id of this.view.chats.map((c) => c.id)) await this.remove(id);   // removing the active one opens the next, finally a new one
   }
 
-  // Undo reverts the newest change any conversation made, and tells that conversation.
-  undoLast(): string | null {
+  // Undo reverts the newest change any conversation made, and tells that conversation. A show change
+  // that something else built on since can't be undone safely: it is dropped and `error` says why.
+  undoLast(): { label: string; error?: string } | null {
     const step = this.undo.pop();
     if (!step) return null;
-    step.undo();
+    try {
+      step.undo();
+    } catch (err) {
+      if (err instanceof UndoConflict) return { label: step.label, error: err.message };
+      throw err;
+    }
     if (step.chatId) this.chats.get(step.chatId)?.addNote(undoNote(step.label));   // (a deleted conversation hears nothing)
-    return step.label;
+    return { label: step.label };
   }
 
   // ---- for conversations ----
@@ -373,7 +384,7 @@ export class AssistantSession {
   runnerFor(chatId: string): ToolRunner {
     let r = this.runners.get(chatId);
     if (!r) {
-      r = serialized(createToolRunner(this.app, { push: (entry) => this.undo.push({ ...entry, chatId }) }), this.lockTools);
+      r = serialized(createToolRunner(this.app, { push: (entry) => this.undo.push({ ...entry, chatId }) }, this.opts.studio), this.lockTools);
       this.runners.set(chatId, r);
     }
     return r;

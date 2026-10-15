@@ -4,6 +4,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import type { AppController } from '../app/controller';
+import { SUPERSEDED, type CompileResult } from '../app/editor';
 import { CATEGORIES, EXAMPLES, GraphSchema, NODE_TYPES, compileGraph, defaultParams, emptyGraph, type Graph, type GraphNode, type PortType } from '../engine/nodes';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
@@ -45,7 +46,7 @@ class GraphSession {
   moved(g: Graph): void { this.latest = g; this.writer.schedule(); }
 
   async compile(g: Graph): Promise<void> {
-    let error: string | null;
+    let error: CompileResult;
     try {
       const code = compileGraph(g);
       this.app.editor.setNodeCode(code);
@@ -53,6 +54,7 @@ class GraphSession {
     } catch (err) {
       error = (err as Error).message;
     }
+    if (error === SUPERSEDED) return;   // a newer graph is compiling; it reports instead
     this.onStatus({ text: error ?? `✓ ${g.nodes.length} nodes · ${g.links.length} wires — live`, error: !!error });
   }
 

@@ -67,7 +67,7 @@ export const defaultClock = (): Clock => ({
 export type SourceButton = 'file' | 'mic' | 'soundcloud' | 'display' | 'demo' | 'media';
 
 export interface AppState {
-  scenes: Scene[];          // the shared list; stable indices, soft-deleted entries stay
+  scenes: readonly Scene[]; // the shared list; stable indices, soft-deleted entries stay (append with appendScene)
   gameIndex: number;
   customIndex: number;
   nodesIndex: number;

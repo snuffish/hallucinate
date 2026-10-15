@@ -261,6 +261,25 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+.crash {
+  z-index: var(--z-toast);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px));
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+.crash h2 { margin: 0 0 6px; font-size: 15px; }
+.crash p { margin: 0 0 10px; color: var(--muted); }
+.crash pre { margin: 0 0 12px; max-height: 30vh; overflow: auto; white-space: pre-wrap; color: #f88; font-size: 12px; }
+.crash-actions { display: flex; gap: 8px; }
+.crash-actions button { flex: 1; }
+
 
 /* Beat Racer HUD */
 .hud {

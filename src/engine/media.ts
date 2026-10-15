@@ -17,6 +17,11 @@ export type MediaElement = HTMLImageElement | HTMLVideoElement;
 // What a video follows: the <audio> player, or the main window's clock on a projector.
 export interface MediaClock { currentTime: number; paused: boolean; playbackRate: number }
 
+// A load that a newer load or a clear() overtook while it was still opening. Callers ignore it.
+export class StaleMediaLoad extends Error {
+  constructor() { super('Superseded by a newer media change.'); this.name = 'StaleMediaLoad'; }
+}
+
 export class MediaLayer {
   el: MediaElement | null = null;
   kind: MediaKind | null = null;
@@ -25,8 +30,12 @@ export class MediaLayer {
   url: string | null = null;
   version = 0;      // bumps on every change so renderers re-upload
   private lastJump = -1e9;
+  private generation = 0;   // bumps on every load() and clear(): only the newest change may land
 
+  // Opens `source` and makes it the media. Rejects with StaleMediaLoad when a newer load or a clear()
+  // came in while it was opening; the last change the user made always wins.
   async load(source: MediaSource): Promise<this> {
+    const generation = ++this.generation;
     const isFile = source instanceof Blob;
     const name = source.name ?? 'media';
     const url = isFile ? URL.createObjectURL(source) : source.url;
@@ -49,9 +58,15 @@ export class MediaLayer {
       }
     } catch (err) {
       if (isFile) URL.revokeObjectURL(url);
+      if (generation !== this.generation) throw new StaleMediaLoad();
       throw new Error(`Couldn't open "${name}": ${(err as Error).message}`);
     }
-    this.clear();
+    if (generation !== this.generation) {
+      if (el instanceof HTMLVideoElement) { el.pause(); el.removeAttribute('src'); el.load(); }
+      if (isFile) URL.revokeObjectURL(url);
+      throw new StaleMediaLoad();
+    }
+    this.release();
     this.el = el;
     this.kind = kind;
     this.source = source;
@@ -62,6 +77,11 @@ export class MediaLayer {
   }
 
   clear(): void {
+    this.generation++;
+    this.release();
+  }
+
+  private release(): void {
     if (!this.el) return;
     if (this.kind === 'video') (this.el as HTMLVideoElement).pause();
     if (this.source instanceof Blob && this.url) URL.revokeObjectURL(this.url);

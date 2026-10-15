@@ -3,7 +3,33 @@ import { chat, EventType, maxIterations, type AdapterYieldChunk, type DefaultMes
 import { BaseTextAdapter, type StructuredOutputOptions } from '@tanstack/ai/adapters';
 import { DIRECTOR_TOOLS, TOOL_DEFINITIONS } from '../src/assistant/tools';
 import { continuedOf, modeOf, runConfig } from './assistant';
-import { cliUsage, sessionRetry, withTranscript } from './claude-cli-adapter';
+import { cliArgs, cliUsage, sessionRetry, withTranscript } from './claude-cli-adapter';
+
+describe('Claude CLI lockdown (ARCHITECTURE.md, invariant 8)', () => {
+  const args = cliArgs({ mcpPath: '/tmp/x/mcp.json', tools: ['get_app_state', 'set_look'], system: 'SYS', resume: false, sessionId: 'sid', model: 'claude-code', effort: undefined });
+  const valueOf = (flag: string) => args[args.indexOf(flag) + 1];
+
+  it('gives the CLI no built-in tools, none of the user settings and only this app\'s MCP server', () => {
+    expect(valueOf('--tools')).toBe('');
+    expect(valueOf('--setting-sources')).toBe('');
+    expect(args).toContain('--strict-mcp-config');
+    expect(valueOf('--mcp-config')).toBe('/tmp/x/mcp.json');
+    expect(args).toContain('--disable-slash-commands');
+    expect(valueOf('--allowedTools')).toBe('mcp__hallucinate__get_app_state,mcp__hallucinate__set_look');
+  });
+
+  it('never uses --safe-mode (it switches MCP servers, i.e. the tools, off)', () => {
+    expect(args).not.toContain('--safe-mode');
+  });
+
+  it('starts or resumes the session by id', () => {
+    expect(valueOf('--session-id')).toBe('sid');
+    const resumed = cliArgs({ mcpPath: 'm', tools: [], system: '', resume: true, sessionId: 'sid', model: 'opus', effort: 'high' });
+    expect(resumed[resumed.indexOf('--resume') + 1]).toBe('sid');
+    expect(resumed[resumed.indexOf('--model') + 1]).toBe('opus');
+    expect(resumed[resumed.indexOf('--effort') + 1]).toBe('high');
+  });
+});
 
 // What does chat() hand a custom adapter when the tools are bare definitions (client-executed)?
 class SpyAdapter extends BaseTextAdapter<string, Record<string, never>, readonly ['text'], DefaultMessageMetadataByModality> {

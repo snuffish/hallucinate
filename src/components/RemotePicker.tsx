@@ -53,8 +53,9 @@ export function RemotePicker({ id, site, title, noun = 'track', recentKey, fetch
   const request = useRef(0);
   const playRequest = useRef(0);
   const download = useRef<{ cancel: () => void } | null>(null);
-  const latest = useRef({ results, current });
-  useEffect(() => { latest.current = { results, current }; });
+  // The newest state for callbacks registered once (the play queue's next / previous).
+  const latest = useRef({ results, current, recent });
+  useEffect(() => { latest.current = { results, current, recent }; });
 
   const showRecent = (list = recent) => {
     setView('recent');
@@ -119,7 +120,8 @@ export function RemotePicker({ id, site, title, noun = 'track', recentKey, fetch
       if (n !== playRequest.current) return;
       endDownload();
       setStatus({ text: `Playing "${track.title}"` });
-      const next = [track, ...recent.filter((t) => t.url !== track.url)].slice(0, RECENT_MAX);
+      const next = [track, ...latest.current.recent.filter((t) => t.url !== track.url)].slice(0, RECENT_MAX);
+      latest.current.recent = next;
       setRecent(next);
       writeJSON(recentKey, next);
       await onPlay(src, track.artist ? `${track.artist} — ${track.title}` : track.title, track);

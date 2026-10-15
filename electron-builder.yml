@@ -16,7 +16,11 @@ asar: true
 npmRebuild: false
 mac:
   category: public.app-category.music
-  target: [dmg, zip]
+  target:   # Apple silicon and Intel
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
   extendInfo:
     NSMicrophoneUsageDescription: Hallucinate listens to the microphone or line-in to make the visuals react to the sound.
     NSAudioCaptureUsageDescription: Hallucinate captures system audio to make the visuals react to what is playing.

@@ -27,7 +27,7 @@ export const KEYS = {
   paramsPos: 'hallucinate.paramsPos',
   best: 'hallucinate.best',
   helpHint: 'hallucinate.helpHint',
-  // Settings import (src/state/bundle.ts): other tabs reload when this changes; the report is shown
+  // Settings import (src/app/bundle.ts): other tabs reload when this changes; the report is shown
   // once after the reload.
   importedAt: 'hallucinate.importedAt',
   importReport: 'hallucinate.importReport',

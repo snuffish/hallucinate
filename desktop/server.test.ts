@@ -1,4 +1,5 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -79,6 +80,26 @@ describe('startServer', () => {
     // An empty query never spawns yt-dlp.
     expect(await (await fetch(`${base}/api/soundcloud/search?q=`)).json()).toEqual({ results: [] });
     expect((await fetch(`${base}/api/youtube/nope`)).status).toBe(404);
+  });
+
+  it('refuses /api calls from other sites and rebound host names', async () => {
+    const run = (headers: Record<string, string>) => fetch(`${base}/api/assistant`, { method: 'POST', headers, body: '{}' });
+    expect((await run({ 'Content-Type': 'text/plain' })).status).toBe(403);
+    expect((await run({ 'Content-Type': 'application/json', Origin: 'https://evil.test' })).status).toBe(403);
+    expect((await fetch(`${base}/api/assistant/info`, { headers: { 'Sec-Fetch-Site': 'cross-site' } })).status).toBe(403);
+    // A browser page at the app's own origin gets through.
+    expect((await fetch(`${base}/api/assistant/info`, { headers: { Origin: base, 'Sec-Fetch-Site': 'same-origin' } })).status).toBe(200);
+  });
+
+  it('refuses dot names in the download cache instead of crashing', async () => {
+    // Sent as-is (fetch would normalise the dots away), like `curl --path-as-is`.
+    const raw = (path: string) => new Promise<number>((done, fail) => {
+      request({ host: '127.0.0.1', port: app.port, path }, (res) => { res.resume(); done(res.statusCode ?? 0); }).on('error', fail).end();
+    });
+    for (const path of ['/api/youtube/file/..', '/api/youtube/file/%2e%2e', '/api/youtube/file/.', '/api/youtube/file/...']) {
+      expect([400, 404], path).toContain(await raw(path));
+    }
+    expect((await fetch(`${base}/api/assistant/info`)).status).toBe(200);   // still up
   });
 
   it('falls back to another port when the preferred one is taken', async () => {

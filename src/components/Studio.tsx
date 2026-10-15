@@ -4,8 +4,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
-import { AUTO_BEATS, AUTO_SECONDS, StudioSession, type AutoUnit, type Cue } from '../app/studio';
-import { Director, DIRECTOR_BEATS, DIRECTOR_SECONDS } from '../director/director';
+import { useSessions } from '../app/sessions';
+import { AUTO_BEATS, AUTO_SECONDS, type AutoUnit, type Cue } from '../app/studio';
+import { DIRECTOR_BEATS, DIRECTOR_SECONDS } from '../director/director';
 import { HOTKEYS, CUE_DIGITS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { useStore } from '../state/store';
@@ -18,17 +19,16 @@ export function Studio() {
   const outputs = useUI((ui) => ui.outputs);
   const sceneVersion = useUI((ui) => ui.sceneVersion);
   const sceneName = useUI((ui) => ui.sceneName);
+  const { studio, director } = useSessions();
   const [, setVersion] = useState(0);
-  const [studio] = useState(() => new StudioSession(app, () => setVersion((v) => v + 1)));
-  const [director] = useState(() => new Director(app, studio));
   const dir = useStore(director.store, (s) => s);
   const [screen, setScreen] = useState('');
   const previewCanvas = useRef<HTMLCanvasElement>(null);
   const liveBox = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLElement>(null);
 
-  useEffect(() => { const detach = studio.attach(); return () => { detach(); studio.dispose(); }; }, [studio]);
-  useEffect(() => director.attach(), [director]);
+  // The session mutates itself; re-render on every change it announces (takes and beats included).
+  useEffect(() => studio.subscribe(() => setVersion((v) => v + 1)), [studio]);
   useEffect(() => { studio.setOpen(open, previewCanvas.current); }, [open, studio]);
 
   // Pin the main canvas over the Live monitor box while the studio is open.

@@ -58,6 +58,21 @@ describe('GraphSchema', () => {
     expect(GraphSchema.safeParse({ nodes: [{ id: 1, type: 'nope', x: 0, y: 0 }], links: [] }).success).toBe(false);
   });
 
+  it('rejects names inherited from Object (an imported graph must not reach the view with them)', () => {
+    for (const type of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect(GraphSchema.safeParse({ nodes: [{ id: 1, type, x: 0, y: 0 }], links: [] }).success, type).toBe(false);
+    }
+  });
+
+  it('drops wires whose block or port does not exist', () => {
+    const g = GraphSchema.parse({
+      nodes: [{ id: 1, type: 'uv', x: 0, y: 0 }, { id: 2, type: 'output', x: 0, y: 0 }],
+      links: [{ from: 9, out: 'p', to: 2, in: 'color' }, { from: 1, out: 'nope', to: 2, in: 'color' }, { from: 1, out: 'p', to: 2, in: 'nope' }],
+    });
+    expect(g.nodes).toHaveLength(2);
+    expect(g.links).toEqual([]);
+  });
+
   it('every node type lists a category the palette knows, except Output', () => {
     for (const [name, def] of Object.entries(NODE_TYPES)) {
       if (name === 'output') continue;
