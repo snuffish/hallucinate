@@ -25,6 +25,23 @@ await press('2', 3500);                               // Hyper Tunnel
 await wake();
 await shot('main');                                   // widgets + scene + parameters
 
+// The Look widget with Drift on, cropped to the widget.
+await page.check('#drift'); await settle(1500); await wake();
+await page.locator('[data-widget="look"]').screenshot({ path: `${out}/look-drift.jpg`, type: 'jpeg', quality: 86 });
+await page.uncheck('#drift');
+await page.evaluate(() => {
+  document.activeElement?.blur();                     // hotkeys ignore keys while a checkbox has focus
+  for (let el = document.querySelector('#drift'); el; el = el.parentElement) el.scrollTop = 0;   // checking it scrolled the panel
+});
+
+// Parameter groups: Aurora Veil, with two of its groups unfolded.
+await press('l', 600); await press('/', 200);
+await page.keyboard.type('Aurora'); await settle(300); await press('Enter', 3500);
+await wake();
+for (const g of ['Curtains', 'Colour']) await page.click(`.param-group[data-group="${g}"] .param-group-head`);
+await settle(300); await wake();
+await shot('params-groups');
+
 // Gallery: a few scenes, controls hidden, trails built up.
 await page.addStyleTag({ content: '#widgets, #toast { display: none !important; }' });
 const gallery = [['2', 'hyper-tunnel'], ['3', 'mandala-bloom'], ['8', 'voronoi-glass'], ['0', 'neon-loop']];
@@ -42,15 +59,20 @@ await settle(500);
 await shot('library');
 await press('Escape');
 
-await wake(); await press('e', 600); await shot('editor'); await press('Escape');
-await wake(); await press('n', 1200); await shot('visual-maker'); await press('Escape');
+// Shoot with some UI hidden: the Parameters overlay covers the editor's toolbar, the panel covers the block list.
+const hidden = async (selector, fn) => {
+  const tag = await page.addStyleTag({ content: `${selector} { display: none !important; }` });
+  await fn(); await tag.evaluate((el) => el.remove());
+};
+await wake(); await press('e', 600); await hidden('#params', () => shot('editor')); await press('Escape');
+await wake(); await press('n', 1200); await hidden('#widgets, #assistant-bubble', () => shot('visual-maker')); await press('Escape');
 await press('2', 2500); await wake();                 // back to Hyper Tunnel (the visual maker switched to the Node Scene)
 await press('o', 600);
 await page.selectOption('#st-add', '@live'); await settle(300);
 await page.selectOption('#st-add', 'Star Nest'); await settle(300);
 await page.selectOption('#st-add', 'Neon Loop'); await settle(1500);
 await wake();
-await shot('studio');
+await hidden('#assistant-bubble', () => shot('studio'));
 await press('Escape');
 await wake(); await press('i', 800); await wake(); await shot('assistant'); await press('Escape');   // the bubble opens beside the panel
 await press('g', 4000); await shot('beat-racer'); await press('2');
