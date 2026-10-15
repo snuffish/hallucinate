@@ -53,6 +53,7 @@ await page.addStyleTag({ content: '#widgets, #toast { display: revert !important
 await press('2', 2500);
 await wake();
 await press('l', 100);
+await page.fill('#lib-search', ''); await page.evaluate(() => document.activeElement?.blur());   // the Aurora search above sticks
 // Previews render a couple per frame; wait until the cards have their pictures.
 await page.waitForFunction(() => { const imgs = [...document.querySelectorAll('#lib-grid img')]; return imgs.length > 0 && imgs.every((i) => i.src); }, null, { timeout: 60_000 }).catch(() => {});
 await settle(500);

@@ -65,6 +65,8 @@ modifier. The full list is at the bottom of the panel and in [Keys](#%EF%B8%8F-k
 
 ## 🎧 Audio sources
 
+<img src="docs/screenshots/main.jpg" alt="Hyper Tunnel playing with the panel's widgets on the left (Source, Media, Audio, Scene) and its live parameters on the right" width="100%">
+
 - **File** – click *Open audio file* or drag & drop any mp3/wav/flac/ogg/m4a onto the page.
 - **SoundCloud** – search SoundCloud, or paste a track / playlist / artist link, and click a result.
   The picker opens on your *recently played* tracks (last 25; *Recent* brings the list back, *Clear history*
@@ -87,6 +89,8 @@ tick *Pitch follows tempo* for a vinyl / nightcore effect. The demo beat gets pl
 Volume is applied after the analyser, so the visuals react the same at any listening volume, even when muted.
 
 ## 🌈 Synesthesia (sound ↔ light mapping)
+
+<img src="docs/screenshots/look-drift.jpg" alt="The Look widget: reactivity, speed, trails, colour, synesthesia and the other sliders, with Drift and its speed switched on" width="220" align="right">
 
 Based on crossmodal-correspondence research (people reliably pair loud ↔ bright, high/bright timbre ↔ light and
 warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm colours).
@@ -147,7 +151,7 @@ Steer with ← / →, dodge walls (+1 × multiplier), grab orbs (+10 × multipli
 
 ## 🧑‍💻 Code your own — press E
 
-<img src="docs/screenshots/editor.jpg" alt="The live GLSL editor next to the scene it edits, with the parameters overlay" width="100%">
+<img src="docs/screenshots/editor.jpg" alt="The live GLSL editor next to the scene it edits" width="100%">
 
 Opens the code of **the scene that's playing** in a live GLSL editor, and edits it in place. It recompiles as you type
 — in the background, so the visuals never freeze — shows errors with line numbers (the last working version keeps
@@ -164,7 +168,7 @@ running), and saves automatically in the browser. While it's open the editor fol
 
 ## 🎛 Live parameters — press P
 
-<img src="docs/screenshots/main.jpg" alt="Hyper Tunnel playing with the control panel on the left and its live parameters overlay on the right" width="100%">
+<img src="docs/screenshots/params-groups.jpg" alt="Aurora Veil with its parameters in folding groups: Curtains and Colour open, Scenery folded" width="100%">
 
 Expose values and constants as controls in an overlay on the scene, and tweak them while it runs (no recompiling).
 In the code editor, tag a top-level `uniform` or `const` with `// @param`:
