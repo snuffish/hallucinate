@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 // The widgets fade out and ignore the pointer 3 s after the mouse last moved, and headless software
 // WebGL can make a click's stability wait outlast that. So fold with the keyboard, like a user tabbing in.

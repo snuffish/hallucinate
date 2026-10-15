@@ -9,6 +9,9 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${port}/`,
     viewport: { width: 1280, height: 720 },
+    // CI uploads test-results/ on failure; these make it show what the page looked like.
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
     launchOptions: {
       // Software WebGL2 for headless runs; AudioContext without a user gesture.
       args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 const pop = (page: Page) => page.locator('#help-pop');
 const openPopovers = (page: Page) => page.locator(':popover-open');

@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from './fixtures';
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -150,6 +150,7 @@ async function dragBy(page: Page, grip: Locator, dx: number, dy: number) {
 }
 
 test('layout: widgets and docks resize, and keep their size after a reload', async ({ page }) => {
+  test.slow();   // many drags before the reload; a CI runner needs more than 60 s
   await page.goto('/');
   await start(page);
   // A floating widget, by its corner.

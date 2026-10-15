@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 // A fake projector: says hello like output.html does and reports the scene index of the next frame.
 async function projectorSees(page: import('@playwright/test').Page): Promise<number> {
@@ -33,7 +33,7 @@ test('studio: Live stays pinned to the taken scene while the screen previews oth
   await expect(page.locator('#live-pin')).toHaveCount(0);
   await expect(page.locator('#st-beats')).toContainText('— / 32 beats');
   await page.locator('#st-auto').check();
-  await expect(page.locator('#st-beats')).toContainText('/ 32 beats');
+  await expect(page.locator('#st-beats')).toContainText('/ 32 beats', { timeout: 30_000 });   // tempo detection is slow on a loaded runner
 });
 
 test('studio: the autopilot follows a saved plan instead of list order', async ({ page }) => {
