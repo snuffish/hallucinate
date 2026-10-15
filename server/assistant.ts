@@ -7,7 +7,7 @@
 // 30 turns) and `director` (a show-planning cycle: the show tools only, a few turns).
 //
 // Routes:  GET  /info            backend and model
-//          POST /                one chat run (AG-UI body from useChat)
+//          POST /                one chat run (AG-UI body from the panel's ChatClient)
 //          POST /new             forget a conversation (subscription backend; the panel deleted it)
 //          POST /tool-result     the browser's answer to a relayed tool call
 //          POST /mcp             the MCP endpoint the CLI connects to
@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { DIRECTOR_TOOLS, TOOL_DEFINITIONS } from '../src/assistant/tools';
 import { createAdapter, detectBackend, DIRECTOR_EFFORT, EFFORT, MODEL, NO_BACKEND, type Backend } from './adapters';
 import { ClaudeCliAdapter, type McpResult } from './claude-cli-adapter';
+import { localAddress } from './guard';
 import { SYSTEM } from './system-prompt';
 
 const MAX_BODY = 30 * 1024 * 1024;   // screenshots travel back as base64 images
@@ -88,7 +89,8 @@ export function createAssistant() {
     const config = runConfig(modeOf(params.forwardedProps), b);
     const adapter = createAdapter(b, config.effort);
     if (!adapter) return json(res, 503, { error: NO_BACKEND });
-    if (adapter instanceof ClaudeCliAdapter && req.headers.host) adapter.host = req.headers.host;
+    const self = localAddress(req);
+    if (adapter instanceof ClaudeCliAdapter) adapter.host = self;
 
     // Stop in the panel closes the connection: abort the run (and the CLI process) with it.
     const abortController = new AbortController();
@@ -103,7 +105,7 @@ export function createAssistant() {
       agentLoopStrategy: maxIterations(config.maxTurns),
       abortController,
       ...(config.promptCache && { promptCache: config.promptCache }),
-      ...(b === 'api' ? { reasoning: config.effort as 'high' } : { modelOptions: { host: req.headers.host, continued: continuedOf(params.forwardedProps) } }),
+      ...(b === 'api' ? { reasoning: config.effort as 'high' } : { modelOptions: { host: self, continued: continuedOf(params.forwardedProps) } }),
     });
     const response = toServerSentEventsResponse(stream, { abortController });
     res.writeHead(response.status, Object.fromEntries(response.headers));

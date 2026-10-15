@@ -9,6 +9,7 @@ import type { AppController } from '../app/controller';
 import type { StudioSession } from '../app/studio';
 import { clientTools } from '../assistant/client-tools';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
+import { createLock, serialized, type Lock } from '../assistant/lock';
 import { relayToolCalls } from '../assistant/relay';
 import { UndoStack } from '../assistant/undo';
 import { usageOf } from '../assistant/usage';
@@ -43,6 +44,7 @@ export function cycleDue(unit: 'beats' | 'seconds', beatsSince: number, beats: n
 export interface DirectorOptions {
   connection?: ConnectionAdapter;   // tests hand in a fake one
   forgetThread?: (threadId: string) => void;
+  lock?: Lock;                      // the assistant panel's tool lock (sessions.ts): their tools never interleave
 }
 
 export class Director {
@@ -57,7 +59,7 @@ export class Director {
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly app: AppController, private readonly studio: StudioSession, private readonly opts: DirectorOptions = {}) {
-    this.runner = createToolRunner(app, this.undo);
+    this.runner = serialized(createToolRunner(app, this.undo, () => studio), opts.lock ?? createLock());
   }
 
   get view(): DirectorView { return this.store.get(); }

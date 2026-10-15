@@ -8,6 +8,8 @@ import { AppProvider, useApp, useUI } from './AppContext';
 import type { AppController } from './controller';
 import { Assistant, AssistantBubble } from '../components/Assistant';
 import { Editor } from '../components/Editor';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { SessionsProvider, useSessions } from './sessions';
 import { HelpLayer } from '../components/Help';
 import { Hud } from '../components/Hud';
 import { Library } from '../components/Library';
@@ -23,16 +25,20 @@ import type { SourceButton } from '../state/app-state';
 
 export function App() {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const { app, error } = useEngines(canvas);
+  const { app, sessions, error } = useEngines(canvas);
   return (
     <>
       <canvas id="gl" ref={canvas} />
       {error && <pre style={{ padding: 24, color: '#f88', whiteSpace: 'pre-wrap' }}>{error}</pre>}
-      {app && (
+      {app && sessions && (
         <AppProvider value={app}>
-          <HotkeysProvider defaultOptions={{ hotkey: { preventDefault: true } }}>
-            <Shell app={app} />
-          </HotkeysProvider>
+          <SessionsProvider value={sessions}>
+            <ErrorBoundary>
+              <HotkeysProvider defaultOptions={{ hotkey: { preventDefault: true } }}>
+                <Shell app={app} />
+              </HotkeysProvider>
+            </ErrorBoundary>
+          </SessionsProvider>
         </AppProvider>
       )}
     </>
@@ -93,6 +99,7 @@ function Shell({ app }: { app: AppController }) {
 
 function Hotkeys() {
   const app = useApp();
+  const { studio } = useSessions();
   const tr = app.transport;
   useAppHotkeys({
     playPause: () => app.togglePlay(),
@@ -129,10 +136,10 @@ function Hotkeys() {
       if (app.overlay) app.setOverlay(null);
       else app.toggleAssistant(false);
     },
-    take: () => app.hooks.take?.(),
-    blackout: () => app.hooks.blackout?.(),
-    studioStep: (dir) => app.hooks.studioStep?.(dir),
-    studioCue: (n) => app.hooks.studioCue?.(n),
+    take: () => studio.take(),
+    blackout: () => studio.blackout(),
+    studioStep: (dir) => studio.stepPreviewKey(dir),
+    studioCue: (n) => studio.cueKey(n),
     librarySearch: () => app.hooks.librarySearch?.(),
     libraryMove: (dx, dy) => app.hooks.libraryMove?.(dx, dy),
     libraryPick: () => app.hooks.libraryPick?.(),

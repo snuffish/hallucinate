@@ -6,7 +6,8 @@
 
 ## Widgets & layout
 
-The controls are separate widgets: Hallucinate, Source, Media, Audio, Scene, Look, Actions and Parameters. Drag one by
+The controls are separate widgets: Hallucinate, Source, Media, Audio, Scene, Look, Actions, Screen and Parameters
+(Screen chooses what the main screen shows; see [Studio](studio.md)). Drag one by
 its title bar onto an edge of the screen to dock it there (a preview shows where it lands, and you can reorder a dock), or
 drop it anywhere else to float it. Floating widgets resize by their corner, docked ones by their bottom edge, and a
 dock's inner edge sets its width. Double-click a title bar to put that widget back where it started. The assistant

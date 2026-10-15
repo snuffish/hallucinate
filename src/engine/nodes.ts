@@ -211,14 +211,20 @@ const LIBS: Record<string, string> = {
 
 export const GraphNodeSchema = z.object({
   id: z.number(),
-  type: z.string().refine((t) => t in NODE_TYPES, { message: 'unknown node type' }),
+  type: z.string().refine((t) => Object.hasOwn(NODE_TYPES, t), { message: 'unknown node type' }),
   x: z.number(),
   y: z.number(),
   values: z.record(z.string(), z.number()).default({}),
   params: z.record(z.string(), z.union([z.string(), z.number()])).default({}),
 });
 export const GraphLinkSchema = z.object({ from: z.number(), out: z.string(), to: z.number(), in: z.string() });
-export const GraphSchema = z.object({ nodes: z.array(GraphNodeSchema), links: z.array(GraphLinkSchema) });
+// Wires whose ends don't exist (a block or port that isn't there) are dropped rather than refusing the graph.
+export const GraphSchema = z.object({ nodes: z.array(GraphNodeSchema), links: z.array(GraphLinkSchema) }).transform((g) => {
+  const types = new Map(g.nodes.map((n) => [n.id, NODE_TYPES[n.type]!]));
+  const links = g.links.filter((l) =>
+    types.get(l.from)?.outputs.some((o) => o.name === l.out) && types.get(l.to)?.inputs.some((i) => i.name === l.in));
+  return links.length === g.links.length ? g : { ...g, links };
+});
 export type GraphNode = z.infer<typeof GraphNodeSchema>;
 export type GraphLink = z.infer<typeof GraphLinkSchema>;
 export type Graph = z.infer<typeof GraphSchema>;

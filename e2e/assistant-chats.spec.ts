@@ -5,7 +5,7 @@ import { TOOL_DEFINITIONS } from '../src/assistant/tools';
 
 // The assistant panel against a scripted backend: TanStack's real chat() and SSE encoding run here in
 // the test with a fake model, so the browser gets exactly what the dev server would send. No Claude.
-//   "slow …"   answers after a pause      "think …"  reasons first, then answers
+//   "slow …"   answers after 6 s          "think …"  reasons first, then answers
 //   "look …"   calls set_look, then answers on the continuation
 
 const text = (m: ModelMessage | undefined) => (typeof m?.content === 'string' ? m.content : Array.isArray(m?.content) ? m!.content.map((p) => ('content' in p && typeof p.content === 'string' ? p.content : '')).join('') : '');
@@ -19,7 +19,7 @@ class ScriptedModel extends BaseTextAdapter<string, Record<string, never>, reado
     const last = o.messages.at(-1);
     const typed = text([...o.messages].reverse().find((m) => m.role === 'user')).split('\n').at(-1)!;
     yield { type: EventType.RUN_STARTED, runId, threadId, model, timestamp: now };
-    if (typed.startsWith('slow')) await new Promise((r) => setTimeout(r, 2500));
+    if (typed.startsWith('slow')) await new Promise((r) => setTimeout(r, 6000));   // long enough to still run after the second chat's round trip
     if (typed.startsWith('look') && last?.role !== 'tool') {
       const input = { hue: 0.42 };
       yield { type: EventType.TOOL_CALL_START, toolCallId: 'call-look', toolCallName: 'set_look', toolName: 'set_look', model, timestamp: now };
@@ -94,7 +94,7 @@ test('assistant: two conversations at once; the bubble counts unread replies and
   // Close the panel while the first is still working: the ring turns, then a badge and a peek.
   await page.keyboard.press('Escape');
   await expect(page.locator('#assistant-bubble')).toHaveClass(/busy/);
-  await expect(page.locator('#assistant-bubble .ai-bubble-badge')).toHaveText('1', { timeout: 8000 });
+  await expect(page.locator('#assistant-bubble .ai-bubble-badge')).toHaveText('1', { timeout: 12_000 });
   await expect(page.locator('#ai-peek')).toContainText('Reply to: slow first question');
   await expect(page.locator('#ai-peek')).toContainText('slow first question');
   await page.locator('#ai-peek .ai-peek-open').click();
@@ -108,7 +108,7 @@ test('assistant: two conversations at once; the bubble counts unread replies and
   await page.getByRole('button', { name: 'Play demo beat' }).click();
   await page.keyboard.press('i');
   await expect(page.locator('#ai-log .ai-text')).toContainText('Reply to: slow first question');
-  await page.keyboard.press('Control+k');
+  await page.keyboard.press('ControlOrMeta+k');
   await expect(page.locator('#ai-chat-search')).toBeFocused();
   await expect(page.locator('.ai-chat-row')).toHaveCount(2);
   await page.locator('#ai-chat-search').fill('second');

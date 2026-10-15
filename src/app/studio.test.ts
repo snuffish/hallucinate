@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppController } from './controller';
 import { StudioSession } from './studio';
-import { KEYS } from '../state/persistence';
+import { KEYS, flushAll } from '../state/persistence';
 import type { Plan } from '../state/show-plan';
 
 // A stand-in controller: the scenes, the clock, the look and the few methods a show touches.
@@ -131,6 +131,7 @@ describe('StudioSession plan executor', () => {
     expect(s.live?.name).toBe('Gamma');       // the plan's step, after the timer's 20 s, not its beats
     seconds(app, s, 20.5);
     expect(s.live?.name).toBe('Beta');
+    flushAll();                               // saves are coalesced
     expect(JSON.parse(storage.get(KEYS.show)!)).toMatchObject({ autoUnit: 'seconds', autoSeconds: 20 });
     s.setAutoUnit('beats');
     beats(s, 16);
@@ -163,7 +164,28 @@ describe('StudioSession plan executor', () => {
     expect(s.lastPlan?.note).toBe('one');
     s.restoreLastPlan();
     expect(s.plan?.note).toBe('one');
+    flushAll();
     expect(JSON.parse(storage.get(KEYS.show)!).plan.note).toBe('one');   // persisted
+  });
+
+  it('coalesces a burst of edits into one write', () => {
+    const app = fakeApp();
+    const s = session(app, { cues: [cue('Alpha')] });
+    const writes = vi.spyOn(localStorage, 'setItem');
+    for (let i = 0; i < 50; i++) s.updateCue(s.cues[0]!, { values: { amount: i } });
+    expect(writes).not.toHaveBeenCalled();
+    flushAll();
+    expect(writes).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(storage.get(KEYS.show)!).cues[0].values).toEqual({ amount: 49 });
+  });
+
+  it('clamps imported autopilot and fade values to what the controls allow', () => {
+    const app = fakeApp();
+    const s = session(app, { cues: [cue('Alpha')], autoSeconds: 0, seconds: 99, autoBeats: 'x' });
+    expect(s.autopilot.seconds).toBe(5);
+    expect(s.seconds).toBe(8);
+    expect(s.autopilot.beats).toBe(32);   // not a number: the default
+    expect(s.cues).toHaveLength(1);       // the rest of the show is kept
   });
 
   it('reorders only with every id exactly once', () => {

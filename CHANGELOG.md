@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — fixes from the architecture review (2026-10-15)
+
+### Fixed
+
+- Opening the library during Beat Racer (G, then L) no longer blanks the app; ← / → change scene with the code
+  editor open, as documented. A crash in the controls now shows a message while the visuals keep running.
+- Only the app itself can use its local server: other websites can no longer start assistant runs on your account or
+  downloads through it. The yt-dlp cache is trimmed to 2 GB (`YTDLP_CACHE_MB`).
+- An imported visual-maker graph with an unknown block or a dangling wire can no longer break the app on start.
+- Loading or clearing media quickly always ends on your last choice, in the main window and on projectors.
+- Fast typing in the code editor no longer leaks graphics memory, and an old error no longer covers a newer success.
+- The studio's Preview shows exactly what Take puts on screen (beat fringing and synesthesia included); its slider
+  drags are saved once instead of on every movement; imported shows can't set out-of-range autopilot timings.
+- The AI Director and the assistant's conversations take turns with their tools, and Undo refuses (with a message)
+  instead of silently reverting changes made after the step it undoes.
+- The desktop app reads `ANTHROPIC_API_KEY`, `CLAUDE_BIN`, `YTDLP` and the `ASSISTANT_*` settings from your shell
+  profile, as documented, and builds Intel as well as Apple-silicon Macs; tagged releases are published on GitHub.
+
 ## Unreleased — React + TypeScript port (2026-10-13)
 
 ### Added

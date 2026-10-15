@@ -4,7 +4,7 @@
 
 import { Renderer, type SceneSource, type SceneUniforms } from './engine/renderer';
 import { CHANNEL, type OutputMessage } from './engine/output-link';
-import { MediaLayer } from './engine/media';
+import { MediaLayer, StaleMediaLoad } from './engine/media';
 
 const $ = (id: string) => document.getElementById(id)!;
 const id = crypto.randomUUID();
@@ -30,7 +30,7 @@ channel.onmessage = ({ data: m }: MessageEvent<OutputMessage>) => {
   if (m.type === 'scene') scenes[m.index] = m.scene;
   if (m.type === 'frame') { pending = m; lastFrameAt = performance.now(); }
   if (m.type === 'identify') identify();
-  if (m.type === 'media') { if (m.source) media.load(m.source).catch((err) => console.error(err)); else media.clear(); }
+  if (m.type === 'media') { if (m.source) media.load(m.source).catch((err) => { if (!(err instanceof StaleMediaLoad)) console.error(err); }); else media.clear(); }
 };
 channel.postMessage({ type: 'hello', id } satisfies OutputMessage);
 

@@ -1,6 +1,6 @@
 // A TanStack AI text adapter that runs the user's Claude subscription through the local Claude Code
 // CLI, locked down: no built-in tools (`--tools ''`: no files, no shell), none of the user's settings
-// (`--setting-sources ''`), a throw-away working directory, and ONLY this app's tools, offered to the CLI as a tiny MCP server at
+// (`--setting-sources ''`), a private working directory of its own, and ONLY this app's tools, offered to the CLI as a tiny MCP server at
 // /api/assistant/mcp. Every tool call is handed to the browser (which owns the renderer and
 // editors) as a CUSTOM stream event and answered through POST /api/assistant/tool-result.
 //
@@ -9,9 +9,9 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { tmpdir } from 'node:os';
+import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { EventType, type AdapterYieldChunk, type AnyTool, type DefaultMessageMetadataByModality, type ModelMessage, type TextOptions } from '@tanstack/ai';
 import { BaseTextAdapter, type StructuredOutputOptions } from '@tanstack/ai/adapters';
@@ -20,13 +20,16 @@ import { z } from 'zod';
 export const CLAUDE_BIN = process.env.CLAUDE_BIN || 'claude';
 const SERVER = 'hallucinate';
 const PREFIX = `mcp__${SERVER}__`;
-const WORKDIR = join(tmpdir(), 'hallucinate-assistant');   // keeps these sessions apart from the user's projects
+// Keeps these sessions apart from the user's projects. It stays the same across restarts (the CLI files
+// its sessions by working directory, so `--resume` needs that) and only this user can read it: it
+// holds the MCP configs, whose tokens let a caller run the app's tools.
+const WORKDIR = join(tmpdir(), `hallucinate-assistant-${userInfo().username}`);
 const TOOL_TIMEOUT_MS = 120_000;
 const DEBUG = !!process.env.ASSISTANT_DEBUG;   // log the CLI arguments, MCP traffic and stderr
 const debug = (...args: unknown[]) => { if (DEBUG) console.error('[assistant]', ...args); };
 
 export interface ClaudeCliProviderOptions {
-  // Host header of the dev server, so the CLI can reach the MCP endpoint.
+  // Where the CLI reaches this server's MCP endpoint (the server's own address, never the Host header).
   host?: string;
   // The conversation already has replies (the browser keeps the history): resume its CLI session.
   continued?: boolean;
@@ -58,6 +61,32 @@ function sessionFor(threadId: string): Session {
 }
 
 const toolError = (text: string): McpResult => ({ content: [{ type: 'text', text }], isError: true });
+
+function privateWorkdir(): string {
+  mkdirSync(WORKDIR, { recursive: true, mode: 0o700 });
+  const st = lstatSync(WORKDIR);
+  if (!st.isDirectory() || (process.getuid && st.uid !== process.getuid())) throw new Error(`${WORKDIR} isn't a directory of yours. Remove it and try again.`);
+  if (process.platform !== 'win32') chmodSync(WORKDIR, 0o700);
+  return WORKDIR;
+}
+
+export interface CliArgsOptions { mcpPath: string; tools: readonly string[]; system: string; resume: boolean; sessionId: string; model: string; effort: string | undefined }
+
+// The CLI's arguments. The first lines are the lockdown (ARCHITECTURE.md, invariant 8); the test pins them.
+export function cliArgs(o: CliArgsOptions): string[] {
+  return [
+    '--setting-sources', '',                             // none of the user's CLAUDE.md, plugins, hooks or settings
+    '-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
+    '--tools', '',                                       // no built-in tools: no files, no shell
+    '--mcp-config', o.mcpPath, '--strict-mcp-config',
+    '--allowedTools', o.tools.map((t) => PREFIX + t).join(','),
+    '--system-prompt', `${o.system}\n\n(Your tools come from the "${SERVER}" MCP server, so their names carry the prefix ${PREFIX}.)`,
+    '--disable-slash-commands',                          // (no --safe-mode: it silently disables MCP servers, i.e. our tools)
+    ...(o.resume ? ['--resume', o.sessionId] : ['--session-id', o.sessionId]),
+    ...(o.model !== 'claude-code' ? ['--model', o.model] : []),
+    ...(o.effort ? ['--effort', o.effort] : []),
+  ];
+}
 
 // Simple push-based async iterable: the process parser and the MCP bridge both feed it.
 class Channel<T> {
@@ -100,8 +129,8 @@ export class ClaudeCliAdapter extends BaseTextAdapter<string, ClaudeCliProviderO
   readonly name = 'claude-cli';
   override readonly inputModalities = ['text'] as const;
 
-  // Host of the dev server (from the request), so the CLI can reach the MCP endpoint.
-  host = 'localhost:5173';
+  // This server's address, so the CLI can reach the MCP endpoint (set per request from its socket).
+  host = '127.0.0.1:5173';
 
   constructor(model: string | undefined, private readonly effort: string | undefined) {
     super({}, model ?? 'claude-code');
@@ -132,22 +161,11 @@ export class ClaudeCliAdapter extends BaseTextAdapter<string, ClaudeCliProviderO
     const system = (options.systemPrompts ?? []).map((p) => (typeof p === 'string' ? p : p.content)).join('\n\n');
     const text = latestUserText(options.messages);
     const mcp = { mcpServers: { [SERVER]: { type: 'http', url: `http://${host}/api/assistant/mcp?chat=${encodeURIComponent(threadId)}&token=${session.token}` } } };
-    mkdirSync(WORKDIR, { recursive: true });
+    const workdir = privateWorkdir();
     // The CLI wants the MCP config as a file (inline JSON is silently ignored by recent versions).
-    const mcpPath = join(WORKDIR, `mcp-${session.token}.json`);
-    writeFileSync(mcpPath, JSON.stringify(mcp));
-    const argsFor = (resume: boolean) => [
-      '--setting-sources', '',                             // none of the user's CLAUDE.md, plugins, hooks or settings
-      '-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-      '--tools', '',                                       // no built-in tools: no files, no shell
-      '--mcp-config', mcpPath, '--strict-mcp-config',
-      '--allowedTools', session.tools.map((t) => PREFIX + t.name).join(','),
-      '--system-prompt', `${system}\n\n(Your tools come from the "${SERVER}" MCP server, so their names carry the prefix ${PREFIX}.)`,
-      '--disable-slash-commands',                          // (no --safe-mode: it silently disables MCP servers, i.e. our tools)
-      ...(resume ? ['--resume', session.sessionId] : ['--session-id', session.sessionId]),
-      ...(this.model !== 'claude-code' ? ['--model', this.model] : []),
-      ...(this.effort ? ['--effort', this.effort] : []),
-    ];
+    const mcpPath = join(workdir, `mcp-${session.token}.json`);
+    writeFileSync(mcpPath, JSON.stringify(mcp), { mode: 0o600 });
+    const argsFor = (resume: boolean) => cliArgs({ mcpPath, tools: session.tools.map((t) => t.name), system, resume, sessionId: session.sessionId, model: this.model, effort: this.effort });
 
     const chunks = new Channel<AdapterYieldChunk>();
     session.push = (c) => chunks.push(c);
@@ -235,7 +253,7 @@ export class ClaudeCliAdapter extends BaseTextAdapter<string, ClaudeCliProviderO
     const launch = (resume: boolean, prompt: string, retried: boolean) => {
       const args = argsFor(resume);
       debug('spawn', CLAUDE_BIN, args.map((a) => (a.length > 200 ? `${a.slice(0, 200)}…` : a)));
-      const p = spawn(CLAUDE_BIN, args, { cwd: WORKDIR, stdio: ['pipe', 'pipe', 'pipe'] });
+      const p = spawn(CLAUDE_BIN, args, { cwd: workdir, stdio: ['pipe', 'pipe', 'pipe'] });
       proc = p;
       session.proc = p;
       session.uses = [];

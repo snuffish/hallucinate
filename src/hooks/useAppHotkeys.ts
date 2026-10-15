@@ -1,9 +1,9 @@
-// Registers every shortcut from the registry with TanStack Hotkeys. `when` rules come from the
-// old keydown handler: overlays and the game take some keys over, the visual maker takes them all.
+// Registers every shortcut from the registry with TanStack Hotkeys. Overlays and the game take some
+// keys over, the visual maker takes them all; `isEnabled` in the registry decides which is live.
 
 import { useHotkeys, type UseHotkeyDefinition } from '@tanstack/react-hotkeys';
 import { useApp, useUI } from '../app/AppContext';
-import { CUE_DIGITS, HOTKEYS, SCENE_DIGITS, type HotkeyDef, type HotkeyWhen } from '../hotkeys/registry';
+import { CUE_DIGITS, CUE_DIGITS_WHEN, HOTKEYS, isEnabled, SCENE_DIGITS, SCENE_DIGITS_WHEN, type HotkeyContext, type HotkeyDef, type HotkeyWhen } from '../hotkeys/registry';
 
 export interface HotkeyActions {
   playPause(): void; seek(seconds: number): void; changeVolume(delta: number): void; changeRate(delta: number): void; toggleMute(): void;
@@ -21,27 +21,8 @@ export function useAppHotkeys(actions: HotkeyActions): void {
   const helpOpen = useUI((ui) => ui.help !== null);
   const paramsVisible = useUI((ui) => ui.paramsVisible);
   const sceneIndex = useUI((ui) => ui.sceneIndex);
-  const inGame = sceneIndex === app.state.gameIndex;
-  const nodesOpen = overlay === 'nodes';
-  const studioOpen = overlay === 'studio';
-
-  const enabled = (when: HotkeyWhen): boolean => {
-    switch (when) {
-      case 'always': return true;
-      case 'noOverlay': return overlay === null && !inGame;
-      case 'noNodes': return !nodesOpen;
-      case 'notGame': return !inGame && !nodesOpen;
-      case 'game': return inGame && !nodesOpen && !studioOpen;
-      case 'studio': return studioOpen;
-      case 'notStudio': return !studioOpen && !nodesOpen;
-      case 'nodesOpen': return nodesOpen;
-      case 'paramsVisible': return paramsVisible && !nodesOpen;
-      case 'overlayOpen': return overlay !== null || assistantOpen || helpOpen;
-      case 'library': return overlay === 'library';
-      case 'noLibrary': return overlay !== 'library' && !nodesOpen;
-      case 'assistantOpen': return assistantOpen;
-    }
-  };
+  const context: HotkeyContext = { overlay, inGame: sceneIndex === app.state.gameIndex, assistantOpen, helpOpen, paramsVisible };
+  const enabled = (when: HotkeyWhen): boolean => isEnabled(when, context);
 
   // After a shortcut, hand the keyboard back from any focused control (the old handler blurred too).
   const fire = (def: HotkeyDef, fn: () => void): UseHotkeyDefinition => ({
@@ -99,10 +80,10 @@ export function useAppHotkeys(actions: HotkeyActions): void {
     fire(HOTKEYS.libraryTabPrev, () => actions.libraryTab(-1)),
     // 1–9, 0 pick scenes; inside the studio 1–9 pick cues.
     ...SCENE_DIGITS.map((d, n): UseHotkeyDefinition => ({
-      hotkey: d, callback: () => actions.pickScene(n), options: { enabled: !studioOpen && !nodesOpen, preventDefault: true, meta: { name: `Scene ${d}`, group: 'Scenes' } },
+      hotkey: d, callback: () => actions.pickScene(n), options: { enabled: enabled(SCENE_DIGITS_WHEN), preventDefault: true, meta: { name: `Scene ${d}`, group: 'Scenes' } },
     })),
     ...CUE_DIGITS.map((d, n): UseHotkeyDefinition => ({
-      hotkey: d, callback: () => actions.studioCue(n), options: { enabled: studioOpen, preventDefault: true, meta: { name: `Cue ${d}`, group: 'Studio' } },
+      hotkey: d, callback: () => actions.studioCue(n), options: { enabled: enabled(CUE_DIGITS_WHEN), preventDefault: true, meta: { name: `Cue ${d}`, group: 'Studio' } },
     })),
   ];
   // Several actions share a key (← is scene / steer / cue) and exactly one is enabled at a time, so

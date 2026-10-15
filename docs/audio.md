@@ -48,5 +48,6 @@ speed and render resolution (lower it if frames drop).
 
 - **Drift** – the Look sliders glide to new random values on their own, each at its own pace, so the look keeps
   changing smoothly; *Drift speed* sets how fast. A slider you move by hand drifts on from there.
-- **Randomize** (R) jumps the Look sliders (not Resolution) to new values instead. Tick *Randomize also picks a random
+- **Randomize** (R) jumps the Look sliders (not Resolution) to new values instead, and flips *Mood from tempo* and the
+  spin direction at random. Tick *Randomize also picks a random
   scene* to change the scene too. Shift+R steps back to the look (and scene) before each randomize, up to 20 steps.

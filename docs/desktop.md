@@ -14,17 +14,21 @@ npm run package:dir   # build the app unpacked into release/ (quick to try: rele
 npm run package       # build the installer for this OS into release/ (.dmg + .zip, .exe, or .AppImage)
 ```
 
-Installers for macOS, Windows and Linux are also built by [`.github/workflows/release.yml`](../.github/workflows/release.yml)
-on a `v*` tag (or by hand from the Actions tab) and attached to the run.
+Installers for macOS (Apple silicon and Intel), Windows and Linux are also built by
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) once the checks pass: on a `v*` tag they are attached
+to that tag's [GitHub Release](https://github.com/snuffish/hallucinate/releases); a run started by hand from the Actions
+tab keeps them as run artifacts.
 
 - **Unsigned.** The builds aren't code-signed. On macOS, open the app the first time with right-click → *Open*; Windows
   SmartScreen asks once too.
 - **`claude`, `yt-dlp` and `ffmpeg`** are found through your login shell's `PATH`, also when the app is started from the
-  Dock or a menu. `CLAUDE_BIN` and `YTDLP` still point at a specific binary, and `ANTHROPIC_API_KEY` in your shell
-  profile selects the API backend.
+  Dock or a menu. The app's own settings are read from your shell profile too: `CLAUDE_BIN` and `YTDLP` point at a
+  specific binary, `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN`) selects the API backend, and the `ASSISTANT_*`
+  settings apply. Nothing else is taken from the shell, and a value the app was started with wins.
 - **Your data** (scenes, shows, settings, assistant conversations) lives in the app's own profile, separate from the
   browser's and from `npm run desktop`'s. Move a setup between them with *☰ → Export scenes & settings* and *Import…*
-  (see [Back up & move your setup](backup.md)). The app serves itself on `http://127.0.0.1:47741`; if that port is
+  (see [Back up & move your setup](backup.md)); assistant conversations don't move that way, but each one can be
+  exported as Markdown from the conversation list. The app serves itself on `http://127.0.0.1:47741`; if that port is
   taken it says so and runs on another one, without your saved data, until the port is free again.
 - **System audio** (*Tab / system audio*): on Windows it captures everything playing. On macOS it opens the system's
   screen-sharing picker; whether sound comes along depends on the macOS version. On Linux, Electron can't capture

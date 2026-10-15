@@ -4,7 +4,8 @@
 
 import { AudioEngine } from '../engine/audio';
 import { BeatRacer } from '../engine/game';
-import { MediaLayer, isMediaFile, type MediaSource } from '../engine/media';
+import { applyLook, programState, smoothstep } from '../engine/look';
+import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
 import { OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { Renderer, type ProgramState, type SceneUniforms } from '../engine/renderer';
@@ -14,14 +15,13 @@ import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readString, remove, unfreeze, writeJSON, writeString } from '../state/persistence';
-import { buildSceneList, discardParked, paramKey, saveUserScenes, userScene, type ParkedScenes } from '../state/scene-list';
+import { appendScene, buildSceneList, discardParked, paramKey, saveUserScenes, userScene, type ParkedScenes } from '../state/scene-list';
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type ScreenMode, type UIState } from '../state/ui-state';
 import { applyWrites, buildBundle, parseBundle } from './bundle';
 import { downloadFile, fileStamp } from './download';
 import { EditorCore } from './editor';
-import type { StudioSession } from './studio';
 import { Transport } from './transport';
 
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
@@ -31,7 +31,6 @@ const SOURCE_LABELS: Record<string, string> = { mic: 'Microphone / line-in', dis
 const COOL = [0.7, 0.85, 1.35];
 const WARM = [1.3, 1.05, 0.7];
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
-const smoothstep = (x: number) => { x = clamp01(x); return x * x * (3 - 2 * x); };
 const viewport = (): L.Size => ({ width: window.innerWidth, height: window.innerHeight });
 
 // Hooks other panels plug in. All optional; the controller works without them.
@@ -51,13 +50,6 @@ export interface ControllerHooks {
   // Studio: while the Live slot is pinned (studio closed after a take), projectors get this instead
   // of what the main window shows.
   liveProgram?: (base: ProgramState) => { program: ProgramState; params: Record<number, SceneUniforms> } | null;
-  // Studio actions reached from the global shortcuts.
-  take?: () => void;
-  blackout?: () => void;
-  studioStep?: (dir: number) => void;
-  studioCue?: (n: number) => void;
-  // The studio session itself, for the assistant's show tools and the director.
-  studio?: () => StudioSession;
   // Scene library keyboard navigation.
   librarySearch?: () => void;
   libraryMove?: (dx: number, dy: number) => void;
@@ -102,6 +94,7 @@ export class AppController {
   mediaSound = readString(KEYS.mediaSound) === '1';
 
   private raf = 0;
+  private frameError: string | null = null;   // the last per-frame error reported (each is logged once)
   private last = 0;
   private meterTick = 0;
   private recorder: MediaRecorder | null = null;
@@ -132,9 +125,9 @@ export class AppController {
   };
 
   constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new Renderer(canvas, []);   // the scene list is attached right below (same array)
-    const list = buildSceneList(this.renderer);
-    (this.renderer as unknown as { scenes: Scene[] }).scenes = list.scenes;
+    const scenes: Scene[] = [];   // the one shared list: the renderer holds it, buildSceneList fills it
+    this.renderer = new Renderer(canvas, scenes);
+    const list = buildSceneList(scenes, (frag, name) => this.renderer.check(frag, name));
     this.parked = list.parked;
     this.state = {
       scenes: list.scenes, gameIndex: list.gameIndex, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
@@ -161,12 +154,7 @@ export class AppController {
     list.scenes.forEach((s, i) => this.setSceneParams(i, s.params ?? []));
     this.editor = new EditorCore(this);
     this.audio.onBeat = () => this.beat();
-    this.program = {
-      scene: this.state.clock.scene, prevScene: -1, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, hue: 0,
-      spectrum: this.audio.spectrum, extra: {}, bright: 0.5, mood: 0.5,
-      grade: { exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] },
-      feedback: 0.86, zoom: 1, rotation: 0, hueDrift: 0, warp: 0, aberration: 0, master: 1,
-    };
+    this.program = { ...programState(this.audio.spectrum), scene: this.state.clock.scene };
     this.publishScene();
   }
 
@@ -216,9 +204,6 @@ export class AppController {
     Object.assign(this.hooks, hooks);
     return () => { for (const k of Object.keys(hooks) as (keyof ControllerHooks)[]) if (this.hooks[k] === hooks[k]) delete this.hooks[k]; };
   }
-
-  // The studio session (null until the Studio panel has mounted).
-  studio(): StudioSession | null { return this.hooks.studio?.() ?? null; }
 
   // ---------- UI helpers ----------
 
@@ -334,7 +319,7 @@ export class AppController {
 
   // ---------- Scenes ----------
 
-  get scenes(): Scene[] { return this.state.scenes; }
+  get scenes(): readonly Scene[] { return this.state.scenes; }
   get sceneIndex(): number { return this.state.clock.scene; }
   get currentScene(): Scene { return this.state.scenes[this.state.clock.scene]!; }
 
@@ -418,7 +403,7 @@ export class AppController {
     const scene = userScene(name, body);
     const error = this.renderer.check(scene.frag, name);
     if (error) return { error };
-    const index = this.state.scenes.push(scene) - 1;
+    const index = appendScene(this.state.scenes, scene);
     this.setSceneParams(index, scene.params);
     saveUserScenes(this.state.scenes, this.parked);
     this.bumpScenes();
@@ -658,6 +643,7 @@ export class AppController {
     try {
       await this.media.load(source);
     } catch (err) {
+      if (err instanceof StaleMediaLoad) return;   // the user picked something else (or cleared) meanwhile
       return this.toast((err as Error).message, 6000);
     }
     this.output.sendMedia(source);
@@ -801,8 +787,20 @@ export class AppController {
 
   // ---------- Main loop ----------
 
+  // The loop re-arms first, so one frame that throws (a hook, a scene) can't stop the show for good.
   private readonly frame = (now: number): void => {
     if (this.disposed) return;
+    this.raf = requestAnimationFrame(this.frame);
+    try {
+      this.step(now);
+    } catch (err) {
+      if (this.frameError === (err as Error).message) return;   // report each new problem once, not every frame
+      this.frameError = (err as Error).message;
+      console.error(err);
+    }
+  };
+
+  private step(now: number): void {
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     const c = this.state.clock;
@@ -839,17 +837,14 @@ export class AppController {
     const p = this.program;
     p.scene = c.scene; p.prevScene = c.prevScene; p.mix = mix;
     p.time = c.time; p.bass = bass; p.mid = mid; p.high = high; p.level = level; p.beat = beat;
-    p.hue = look.hue + c.huePhase;
     p.extra = inGame ? this.game.uniforms() : p.extra;
     p.bright = f.bright; p.mood = c.mood;
     this.colourGrade(f.bright);
-    // dark sound lingers (longer trails), bright sound is crisp (shorter trails, more fringing)
-    p.feedback = Math.min(0.97, look.trails * (this.currentScene.trails ?? 1) * (1 + look.synesthesia * (0.5 - f.bright) * 0.12));
+    applyLook(p, look, c.huePhase, this.currentScene.trails ?? 1);
     p.zoom = 1.006 + bass * 0.025;
     p.rotation = look.spin * (0.003 * Math.sin(c.time * 0.1) + mid * 0.01);
     p.hueDrift = 0.01 + high * 0.03;
     p.warp = bass;
-    p.aberration = look.aberration * (1 + beat * 1.5) * (1 + look.synesthesia * (f.bright - 0.5) * 1.2);
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
     // Live is pinned (studio closed after a take): projectors get it; the screen shows it too when
@@ -881,6 +876,5 @@ export class AppController {
         ...(inGame && { hud: this.game.hud() }),
       });
     }
-    this.raf = requestAnimationFrame(this.frame);
-  };
+  }
 }
