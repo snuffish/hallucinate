@@ -145,7 +145,7 @@ export function Editor() {
             <code>uniform float uGlow; // @param min=0 max=3 default=1</code><br />
             <code>const vec3 TINT = vec3(1., .3, .8); // @param color</code><br />
             types float · bool · vec2 · vec3 · vec4; options min max step default label int color group</dd>
-          <dt><code>// @group Name</code></dt><dd>on its own line: the <code>@param</code>s after it get a heading in the Parameters overlay that folds, until the next <code>@group</code> (a bare <code>// @group</code> ends grouping)</dd>
+          <dt><code>// @group Name</code></dt><dd>on its own line: the <code>@param</code>s after it get a heading in the Parameters overlay (folded until you open it), until the next <code>@group</code> (a bare <code>// @group</code> ends grouping)</dd>
         </dl>
       </details>
       <textarea id="ed-code" ref={textarea} spellCheck={false} autoCapitalize="off" autoComplete="off" value={code} readOnly={readOnly}

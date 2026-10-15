@@ -165,6 +165,8 @@ export function LookBody() {
       <label className="toggle"><input type="checkbox" id="mood" checked={look.mood} onChange={(e) => app.setLookFlag('mood', e.target.checked)} /> Mood from tempo <small>fast → vivid & warm · slow → muted & cool</small></label>
       <label>Aberration {slider('aberration')}</label>
       <label>Resolution {slider('resolution')}</label>
+      <label className="toggle"><input type="checkbox" id="drift" checked={look.drift} onChange={(e) => app.setLookFlag('drift', e.target.checked)} /> Drift <small>sliders glide to random values, each at its own pace</small></label>
+      {look.drift && <label>Drift speed {slider('driftSpeed')}</label>}
     </>
   );
 }
@@ -172,14 +174,16 @@ export function LookBody() {
 export function ActionsBody(a: PanelActions) {
   const app = useApp();
   const recording = useUI((ui) => ui.recording);
+  const randomScene = useUI((ui) => ui.look.randomScene);
   return (
     <>
-      <button id="randomize" onClick={() => app.randomize()}>Randomize<Kbd hotkey={HOTKEYS.randomize} /></button>
+      <button id="randomize" title={randomScene ? 'Random look and a random scene' : 'Random values for the Look sliders'} onClick={() => app.randomize()}>Randomize<Kbd hotkey={HOTKEYS.randomize} /></button>
       <button id="fullscreen" onClick={() => app.toggleFullscreen()}>Fullscreen<Kbd hotkey={HOTKEYS.fullscreen} /></button>
       <button id="record" className={recording ? 'recording' : undefined} onClick={() => app.toggleRecording()}>{recording ? 'Stop rec' : 'Record'}<Kbd hotkey={HOTKEYS.record} /></button>
       <button id="code" onClick={a.onOpenEditor}>Code<Kbd hotkey={HOTKEYS.editor} /></button>
       <button id="visual" onClick={a.onOpenVisualMaker}>Visual maker<Kbd hotkey={HOTKEYS.visualMaker} /></button>
       <button id="studio-open" onClick={a.onOpenStudio}>Studio &amp; projector<Kbd hotkey={HOTKEYS.studio} /></button>
+      <label className="toggle random-scene"><input type="checkbox" id="random-scene" checked={randomScene} onChange={(e) => app.setLookFlag('randomScene', e.target.checked)} /> Randomize also picks a random scene</label>
     </>
   );
 }

@@ -60,3 +60,20 @@ test('every panel opens with its key, shows key badges, and closes with Escape',
     await expect(page.locator(`${id} .kbd`)).toHaveCount(1);
   }
 });
+
+test('the scene on screen comes back after a reload', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Play demo beat' }).click();
+  await page.keyboard.press('l');
+  await page.keyboard.press('/');
+  await page.keyboard.type('nest');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#scene-name')).toContainText('Star Nest');
+  await page.locator('#auto').uncheck();   // so auto-switch doesn't move on before the reload
+
+  await page.reload();
+  await expect(page.locator('#scene-name')).toContainText('Star Nest');   // before any source starts
+  await page.getByRole('button', { name: 'Play demo beat' }).click();
+  await expect(page.locator('#scene-name')).toContainText('Star Nest');
+});

@@ -98,6 +98,8 @@ warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm col
   bright sound → lighter, warmer, crisper, more colour fringing; energetic mood → more saturated and warmer.
 - Both values are also available to your own shaders (`uBright`, `uMood`) and as *tone* / *mood* outputs on the
   visual maker's Audio block.
+- **Drift** (Look widget) – the Look sliders glide to new random values on their own, each at its own pace, so the
+  look keeps changing smoothly; *Drift speed* sets how fast. *Randomize* (R) jumps instead, and Shift+R steps back.
 
 ## 🎬 Scenes
 
@@ -177,7 +179,7 @@ uniform vec2 uCentre;                // @param min=-.5 max=.5
 
 Types: `float` (slider + number), `bool` (checkbox), `vec2`/`vec3`/`vec4` (a slider per component, or a colour picker
 with `color`). Options: `min max step default label int color group`. A `// @group Name` line puts the controls after it
-under a heading you can fold (until the next `@group`; a bare `// @group` ends grouping), which keeps a long list tidy. In the visual maker, use the **Slider** and
+under a heading that starts folded and opens with a click (until the next `@group`; a bare `// @group` ends grouping), which keeps a long list tidy. In the visual maker, use the **Slider** and
 **Colour picker** blocks — they become the same annotated uniforms, so *Send to code* and *Save to library* keep them.
 Values are remembered per scene; if you change a `default` in the code, the new default takes over. Double-click a slider
 to reset it, *Reset* resets them all, P collapses the overlay. Drag the overlay by its title bar to put it anywhere (it
@@ -364,7 +366,8 @@ library under the same name once it works. They stay saved, and in your exports,
 | E | shader editor |
 | N | visual maker (node graph; Delete removes a block) |
 | A | toggle auto-switch |
-| R | randomize look |
+| R | randomize the look (also the scene with *Randomize also picks a random scene* ticked) |
+| Shift+R | back to the look before the last randomize (again to step further back) |
 | C | start / stop recording (downloads a .webm with audio) |
 | F | fullscreen |
 | H | hide panel (also auto-hides after 3 s of no mouse movement) |

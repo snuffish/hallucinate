@@ -118,6 +118,7 @@ function Hotkeys() {
     toggleRecording: () => app.toggleRecording(),
     toggleAuto: () => app.toggleAuto(),
     randomize: () => app.randomize(),
+    randomizeBack: () => app.randomizeBack(),
     // Esc: close help first (it sits on top), then leave a text field, then close the open overlay, then the assistant bubble.
     closeOverlay: () => {
       if (app.ui.get().help) { app.setHelp(null); return; }

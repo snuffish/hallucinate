@@ -9,7 +9,7 @@ export interface HotkeyActions {
   playPause(): void; seek(seconds: number): void; changeVolume(delta: number): void; changeRate(delta: number): void; toggleMute(): void;
   stepScene(dir: number): void; pickScene(digit: number): void; steer(dir: number): void; restartGame(): void;
   toggleLibrary(): void; toggleAssistant(): void; toggleHelp(): void; toggleEditor(): void; toggleVisualMaker(): void; toggleStudio(): void;
-  toggleParams(): void; togglePanel(): void; resetLayout(): void; toggleFullscreen(): void; toggleRecording(): void; toggleAuto(): void; randomize(): void;
+  toggleParams(): void; togglePanel(): void; resetLayout(): void; toggleFullscreen(): void; toggleRecording(): void; toggleAuto(): void; randomize(): void; randomizeBack(): void;
   closeOverlay(): void; take(): void; blackout(): void; studioStep(dir: number): void; studioCue(n: number): void; game(): void;
   librarySearch(): void; libraryMove(dx: number, dy: number): void; libraryPick(): void; libraryTab(dir: number): void; deleteNode(): void;
 }
@@ -85,6 +85,7 @@ export function useAppHotkeys(actions: HotkeyActions): void {
     fire(HOTKEYS.record, actions.toggleRecording),
     fire(HOTKEYS.auto, actions.toggleAuto),
     fire(HOTKEYS.randomize, actions.randomize),
+    fire(HOTKEYS.randomizeBack, actions.randomizeBack),
     fire(HOTKEYS.closeOverlay, actions.closeOverlay),
     fire(HOTKEYS.deleteNode, actions.deleteNode),
     fire(HOTKEYS.deleteNodeBackspace, actions.deleteNode),

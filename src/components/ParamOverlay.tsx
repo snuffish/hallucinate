@@ -1,6 +1,6 @@
 // The Parameters: one control per `@param` of the scene on screen. Sliders for numbers (with an
 // editable value), checkboxes for bools, colour pickers for colours. Params under a `// @group`
-// sit in a section that folds; which ones are folded is remembered per scene. Outside the studio it is a
+// sit in a section that starts folded; which ones you open is remembered per scene. Outside the studio it is a
 // widget (drag it, dock it, collapse it with P); inside the studio the same list sits in the
 // studio's parameters dock.
 
@@ -9,7 +9,7 @@ import { useApp, useUI } from '../app/AppContext';
 import { groupParams, type ParamSpec, type ParamValue, type ParamValues, type VecParamSpec, type FloatParamSpec } from '../engine/params';
 import { HOTKEYS } from '../hotkeys/registry';
 import type { WidgetLayout } from '../state/layout';
-import { setCollapsed, toggleGroup, useCollapsedGroups } from '../state/param-groups';
+import { setOpen, toggleGroup, useOpenGroups } from '../state/param-groups';
 import { HelpButton } from './Help';
 import { Widget } from './widgets/Widget';
 
@@ -26,7 +26,7 @@ const fromHex = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 
 function ParamsList() {
   const app = useApp();
   const params = useUI((ui) => ui.params);
-  const collapsed = useCollapsedGroups(params.key);
+  const opened = useOpenGroups(params.key);
   const groups = groupParams(params.specs);
   const names = groups.map((g) => g.name).filter(Boolean);
   const rows = (specs: ParamSpec[], values: ParamValues) =>
@@ -35,7 +35,7 @@ function ParamsList() {
     <div id="params-list" className="params-list">
       {groups.map(({ name, specs }) => {
         if (!name) return rows(specs, params.values);
-        const open = !collapsed.includes(name);
+        const open = opened.includes(name);
         return (
           <section key={`group:${name}`} className="param-group" data-group={name}>
             <button type="button" className="param-group-head" aria-expanded={open} title={open ? 'Fold this group' : 'Show this group'}
@@ -55,17 +55,17 @@ const ResetButton = () => {
   return <button id="params-reset" title="Reset every value to the default in the code" onClick={() => app.resetParams()}>Reset</button>;
 };
 
-// Folds every group, or unfolds them all once every one is folded. Only for scenes with groups.
+// Opens every group while they're all folded, otherwise folds them all. Only for scenes with groups.
 function FoldAllButton() {
   const key = useUI((ui) => ui.params.key);
   const specs = useUI((ui) => ui.params.specs);
-  const collapsed = useCollapsedGroups(key);
+  const open = useOpenGroups(key);
   const names = groupParams(specs).map((g) => g.name).filter(Boolean);
   if (!names.length) return null;
-  const allFolded = names.every((n) => collapsed.includes(n));
+  const allFolded = !names.some((n) => open.includes(n));
   return (
     <button className="params-fold-all" aria-label={allFolded ? 'Expand all groups' : 'Collapse all groups'} title={allFolded ? 'Expand all groups' : 'Collapse all groups'}
-      onClick={() => setCollapsed(key, allFolded ? [] : names)}>{allFolded ? '⊞' : '⊟'}</button>
+      onClick={() => setOpen(key, allFolded ? names : [])}>{allFolded ? '⊞' : '⊟'}</button>
   );
 }
 

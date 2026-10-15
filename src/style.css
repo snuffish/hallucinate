@@ -127,6 +127,9 @@ body.idle { cursor: none; }
 .widget-close, .widget-collapse { opacity: 0.55; }
 .widget > header:hover .widget-close, .widget > header:hover .widget-collapse { opacity: 1; }
 .widget-body { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+/* The scrollbar sits in the widget's right padding with a gap before the content; when nothing scrolls the
+   negative margin and the padding cancel out, so the content is as wide as before. */
+.widget-body { margin-right: -8px; padding-right: 8px; }
 .widget.sized > .widget-body { flex: 1 1 auto; }
 .widget.resizing { transition: none; user-select: none; }
 
@@ -237,6 +240,7 @@ body.idle { cursor: none; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 .actions button { flex: 1; }
+.actions .random-scene { flex-basis: 100%; font-size: 12px; }
 
 .toast {
   z-index: var(--z-toast);

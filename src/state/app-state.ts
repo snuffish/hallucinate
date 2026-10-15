@@ -18,9 +18,12 @@ export interface Look {
   synesthesia: number;
   mood: boolean;
   auto: boolean;
+  randomScene: boolean;   // Randomize also jumps to a random scene
+  drift: boolean;         // the sliders wander on their own (src/state/look-drift.ts)
+  driftSpeed: number;
   spin: number;
 }
-export type LookKey = 'hue' | 'cycle' | 'trails' | 'speed' | 'reactivity' | 'aberration' | 'synesthesia' | 'resolution';
+export type LookKey = 'hue' | 'cycle' | 'trails' | 'speed' | 'reactivity' | 'aberration' | 'synesthesia' | 'resolution' | 'driftSpeed';
 export const LOOK_KEYS: readonly LookKey[] = ['hue', 'cycle', 'trails', 'speed', 'reactivity', 'aberration'];   // stored in show scenes
 export const LOOK_RANGES: Record<LookKey, { min: number; max: number; step: number }> = {
   reactivity: { min: 0, max: 2, step: 0.01 },
@@ -31,11 +34,12 @@ export const LOOK_RANGES: Record<LookKey, { min: number; max: number; step: numb
   synesthesia: { min: 0, max: 1, step: 0.01 },
   aberration: { min: 0, max: 0.04, step: 0.001 },
   resolution: { min: 0.3, max: 1, step: 0.05 },
+  driftSpeed: { min: 0.2, max: 4, step: 0.05 },
 };
 
 export const defaultLook = (): Look => ({
   reactivity: 1, speed: 1, trails: 0.86, hue: 0, cycle: 0.6, aberration: 0.012, resolution: 0.75,
-  synesthesia: 0.7, mood: true, auto: true, spin: 1,
+  synesthesia: 0.7, mood: true, auto: true, randomScene: false, drift: false, driftSpeed: 1, spin: 1,
 });
 
 export interface Clock {

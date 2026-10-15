@@ -17,10 +17,11 @@ export const KEYS = {
   ytRecent: 'hallucinate.ytRecent',
   mediaSound: 'hallucinate.mediaSound',
   layout: 'hallucinate.layout',
+  lastScene: 'hallucinate.lastScene',   // the scene on screen (its paramKey), restored on the next start; not exported
   // The assistant's conversations: this index; the transcripts live in IndexedDB (src/assistant/history-store.ts).
   assistantChats: 'hallucinate.assistantChats',
   assistantThinking: 'hallucinate.assistantThinking',   // the panel's "Show reasoning" toggle
-  paramGroups: 'hallucinate.paramGroups',   // folded parameter groups per scene (not exported)
+  paramGroups: 'hallucinate.paramGroupsOpen',   // opened parameter groups per scene; they start folded (not exported)
   // Migrated into `layout` (src/state/layout.ts) on first load, then removed.
   paramsCollapsed: 'hallucinate.paramsCollapsed',
   paramsPos: 'hallucinate.paramsPos',

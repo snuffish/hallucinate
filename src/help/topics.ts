@@ -25,8 +25,9 @@ export const HELP_TOPICS = {
       'Export scenes & settings (☰ menu) saves your scenes, edits to built-ins, My Shader, the visual maker graph, parameter values, the Studio show, favourites, player settings and layout to one file. Import… (or drop the file on the page) replaces them and reloads; your current setup is downloaded first as a backup.',
       'The controls fade away while the music plays and you leave the mouse alone; move it to bring them back.',
       'Every button with a shortcut shows its key. Hold a modifier to see which badges light up.',
+      'Randomize (R) rolls the Look sliders (not Resolution). Tick "Randomize also picks a random scene" to change the scene too. Shift+R goes back to the look before each roll.',
     ],
-    hotkeys: ['help', 'hidePanel', 'resetLayout', 'fullscreen', 'randomize', 'record'],
+    hotkeys: ['help', 'hidePanel', 'resetLayout', 'fullscreen', 'randomize', 'randomizeBack', 'record'],
   },
   sources: {
     id: 'sources',
@@ -46,9 +47,10 @@ export const HELP_TOPICS = {
     body: [
       'These sliders apply to every scene: how strongly it reacts, how fast it moves, how long its trails are, and its colour.',
       'Synesthesia grades the picture by the sound: dark sound goes dim and cool, bright sound light and warm. Mood from tempo makes fast music more vivid.',
+      'Drift lets the sliders glide to new random values on their own, each at its own pace, for a look that keeps slowly changing; Drift speed sets how fast. Move a slider yourself and it drifts on from there.',
       'Lower the resolution if the frame rate drops.',
     ],
-    hotkeys: ['randomize', 'auto'],
+    hotkeys: ['randomize', 'randomizeBack', 'auto'],
   },
   library: {
     id: 'library',
@@ -115,7 +117,7 @@ export const HELP_TOPICS = {
     id: 'params',
     title: 'Live parameters',
     body: [
-      'The controls this scene exposes. Changes apply instantly and are remembered per scene. Click a group heading to fold it.',
+      'The controls this scene exposes. Changes apply instantly and are remembered per scene. Groups start folded: click a heading to open it, or use ⊞ / ⊟ to open or fold them all.',
       'Double-click a slider to reset it; Reset resets them all. Drag the title bar to move or dock the widget, double-click it to send it back.',
     ],
     hotkeys: ['params'],
