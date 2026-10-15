@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 // Reads the WebGL canvas inside a rAF callback that runs after the app's own frame, so the drawing
 // buffer still holds the frame. Returns the brightest channel value seen in a coarse sample.

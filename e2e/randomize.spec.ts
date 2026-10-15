@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 const lookValues = (page: import('@playwright/test').Page) =>
   page.locator('#w-look input[type="range"]').evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));

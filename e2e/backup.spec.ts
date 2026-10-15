@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 const GOOD = 'void main() { fragColor = vec4(1.); }';
 const BROKEN = 'void main() { nope }';

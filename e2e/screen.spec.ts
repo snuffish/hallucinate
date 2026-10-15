@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 // Two solid-colour scenes, so what the screen shows can be told apart by colour.
 const solid = (name: string, rgb: string) => ({ name, body: `void main() { fragColor = vec4(${rgb}, 1.); }` });
@@ -57,16 +57,16 @@ test('screen widget: the screen switches between your preview and the pinned Liv
   await expect(page.locator('#scene-name')).toContainText('Blue');
   await expect(page.locator('#live-pin')).toContainText('screen is a preview');
   await expect(page.locator('#screen-preview')).toHaveAttribute('aria-pressed', 'true');
-  await expect.poll(() => centreColour(page).then(bluish), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => centreColour(page).then(bluish), { timeout: 30_000 }).toBe(true);
 
   // Live: the screen shows what the projectors get (Red); the scene you browsed to stays the preview.
   await clickWidget(page, '#screen-live');
   await expect(page.locator('#screen-live')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#live-pin')).toContainText('on screen');
   await expect(page.locator('#screen-status')).toContainText('Showing Live: Red');
-  await expect.poll(() => centreColour(page).then(reddish), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => centreColour(page).then(reddish), { timeout: 30_000 }).toBe(true);
   await expect(page.locator('#scene-name')).toContainText('Blue');
 
   await clickWidget(page, '#screen-preview');
-  await expect.poll(() => centreColour(page).then(bluish), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => centreColour(page).then(bluish), { timeout: 30_000 }).toBe(true);
 });

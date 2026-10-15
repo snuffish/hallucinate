@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from './fixtures';
 import { chat, chatParamsFromRequestBody, convertMessagesToModelMessages, EventType, maxIterations, toServerSentEventsResponse, type AdapterYieldChunk, type DefaultMessageMetadataByModality, type ModelMessage, type TextOptions } from '@tanstack/ai';
 import { BaseTextAdapter, type StructuredOutputOptions } from '@tanstack/ai/adapters';
 import { TOOL_DEFINITIONS } from '../src/assistant/tools';

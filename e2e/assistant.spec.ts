@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 // Talks to the real backend (your Claude subscription or API key), so it only runs when asked:
 //   ASSISTANT_E2E=1 npx playwright test e2e/assistant.spec.ts
