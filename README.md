@@ -176,7 +176,8 @@ uniform vec2 uCentre;                // @param min=-.5 max=.5
 ```
 
 Types: `float` (slider + number), `bool` (checkbox), `vec2`/`vec3`/`vec4` (a slider per component, or a colour picker
-with `color`). Options: `min max step default label int color`. In the visual maker, use the **Slider** and
+with `color`). Options: `min max step default label int color group`. A `// @group Name` line puts the controls after it
+under a heading you can fold (until the next `@group`; a bare `// @group` ends grouping), which keeps a long list tidy. In the visual maker, use the **Slider** and
 **Colour picker** blocks — they become the same annotated uniforms, so *Send to code* and *Save to library* keep them.
 Values are remembered per scene; if you change a `default` in the code, the new default takes over. Double-click a slider
 to reset it, *Reset* resets them all, P collapses the overlay. Drag the overlay by its title bar to put it anywhere (it

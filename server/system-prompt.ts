@@ -21,7 +21,11 @@ A top-level uniform or const followed by \`// @param\` gets a control in the Par
   const vec3 TINT = vec3(1., .3, .8);  // @param color
   uniform bool uMirror;                // @param default=true
   uniform vec2 uCentre;                // @param min=-.5 max=.5
-Types: float, bool, vec2, vec3, vec4. Options: min max step default label int color. Constants become uniforms, so give every new scene a handful of meaningful parameters (counts, speeds, sizes, colours, on/off layers) whose defaults are the look you intend.
+Types: float, bool, vec2, vec3, vec4. Options: min max step default label int color group. Constants become uniforms, so give every new scene a handful of meaningful parameters (counts, speeds, sizes, colours, on/off layers) whose defaults are the look you intend.
+A top-level \`// @group Name\` line puts the parameters after it under a heading that folds, until the next \`@group\` (a bare \`// @group\` ends grouping; \`group="Name"\` on one @param line overrides it). When a scene has more than about six parameters, group them by what they control (e.g. "Shape", "Motion", "Colour", one group per layer) and keep the labels short, since the heading gives the context:
+  // @group Mushrooms
+  uniform float uMushAmount;           // @param min=0 max=1 default=.5 label="Amount"
+  uniform bool uSpots;                 // @param default=true label="Spotted caps"
 
 # GLSL ES 3.00 rules that commonly break compiles
 - No implicit int-to-float conversion: write 1. or 1.0, never 1, in float expressions; float(i) for loop counters.

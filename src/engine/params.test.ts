@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ParamStore, parseParams, toUniform, valueSchema, type FloatParamSpec, type VecParamSpec } from './params';
+import { ParamStore, groupParams, parseParams, toUniform, valueSchema, type FloatParamSpec, type VecParamSpec } from './params';
 
 const README_EXAMPLES = `
 uniform float uGlow;                 // @param min=0 max=3 default=1 label="Glow"
@@ -35,6 +35,48 @@ describe('parseParams', () => {
   it('prettifies names', () => {
     const { params } = parseParams('uniform float uGlowSize; // @param\nconst float RING_COUNT = 1.; // @param\n');
     expect(params.map((p) => p.label)).toEqual(['Glow size', 'Ring count']);
+  });
+});
+
+describe('param groups', () => {
+  const CODE = `
+uniform float uLoose;                 // @param
+// @group Network
+uniform float uDensity;               // @param label="Density"
+uniform float uSize;                  // @param label="Size" group=Mushrooms
+uniform float uWarp;                  // @param label="Warp"
+//   @group   Mushrooms
+uniform bool uSpots;                  // @param
+// @group
+uniform float uAfter;                 // @param
+// @group Network
+uniform float uThread;                // @param
+void main() { fragColor = vec4(1.); }
+`;
+
+  it('takes the group from the last @group line, overridden by group= on the line', () => {
+    const { code, params } = parseParams(CODE);
+    expect(Object.fromEntries(params.map((p) => [p.name, p.group]))).toEqual({
+      uLoose: '', uDensity: 'Network', uSize: 'Mushrooms', uWarp: 'Network', uSpots: 'Mushrooms', uAfter: '', uThread: 'Network',
+    });
+    expect(code.split('\n').length).toBe(CODE.split('\n').length);   // @group lines stay, line numbers stay valid
+    expect(code).toContain('// @group Network');
+  });
+
+  it('lists the ungrouped params first, then groups in first-appearance order, merging repeated names', () => {
+    const groups = groupParams(parseParams(CODE).params);
+    expect(groups.map((g) => [g.name, g.specs.map((s) => s.name)])).toEqual([
+      ['', ['uLoose', 'uAfter']],
+      ['Network', ['uDensity', 'uWarp', 'uThread']],
+      ['Mushrooms', ['uSize', 'uSpots']],
+    ]);
+  });
+
+  it('keeps a scene without groups as one unnamed group, and an empty scene as none', () => {
+    const groups = groupParams(parseParams(README_EXAMPLES).params);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.name).toBe('');
+    expect(groupParams([])).toEqual([]);
   });
 });
 

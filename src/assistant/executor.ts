@@ -32,13 +32,32 @@ function coerceParam(spec: ParamSpec, raw: unknown): ParamValue | undefined {
   return undefined;
 }
 
+// The spec a key from the model means: its exact name, "Group/Label", or a label that only one param
+// has. Groups make short labels repeat ("Size" under Mushrooms and under Trees); guessing the first
+// would quietly move the wrong slider, so an ambiguous label is an error that names the candidates.
+export function resolveParam(specs: ParamSpec[], key: string): ParamSpec | string {
+  const exact = specs.find((s) => s.name === key);
+  if (exact) return exact;
+  const k = key.trim().toLowerCase();
+  const slash = k.lastIndexOf('/');
+  if (slash > 0) {
+    const group = k.slice(0, slash).trim(), label = k.slice(slash + 1).trim();
+    const inGroup = specs.filter((s) => s.group.toLowerCase() === group && s.label.toLowerCase() === label);
+    if (inGroup.length === 1) return inGroup[0]!;
+  }
+  const byLabel = specs.filter((s) => s.label.toLowerCase() === k);
+  if (byLabel.length === 1) return byLabel[0]!;
+  if (byLabel.length > 1) return `"${key}" is ambiguous: use ${byLabel.map((s) => (s.group ? `"${s.group}/${s.label}"` : `"${s.name}"`)).join(' or ')}`;
+  return `"${key}" isn't a parameter of this scene`;
+}
+
 // A map of parameter name (or label) → raw value against a scene's specs.
 function coerceValues(specs: ParamSpec[], raw: unknown): { values: ParamValues; problems: string[] } {
   const values: ParamValues = {};
   const problems: string[] = [];
   for (const [k, v] of Object.entries((raw ?? {}) as Record<string, unknown>)) {
-    const spec = specs.find((s) => s.name === k) ?? specs.find((s) => s.label.toLowerCase() === k.toLowerCase());
-    if (!spec) { problems.push(`"${k}" isn't a parameter of this scene`); continue; }
+    const spec = resolveParam(specs, k);
+    if (typeof spec === 'string') { problems.push(spec); continue; }
     const value = coerceParam(spec, v);
     if (value === undefined) { problems.push(`"${k}" needs ${spec.type === 'bool' ? 'true/false' : spec.color ? 'a "#rrggbb" colour' : spec.type === 'float' ? 'a number' : `an array of ${spec.def.length} numbers`}`); continue; }
     values[spec.name] = value;
@@ -98,7 +117,7 @@ export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push
   const paramSummary = (i: number) => {
     const specs = app.sceneParams[i] ?? [];
     const values = app.paramValues(i);
-    return specs.map((s) => ({ name: s.name, label: s.label, type: s.color ? `${s.type} colour` : s.type, ...(s.type !== 'bool' && { min: s.min, max: s.max }), value: values[s.name] }));
+    return specs.map((s) => ({ name: s.name, label: s.label, ...(s.group && { group: s.group }), type: s.color ? `${s.type} colour` : s.type, ...(s.type !== 'bool' && { min: s.min, max: s.max }), value: values[s.name] }));
   };
 
   const lookAt = async (i: number, times: number[]): Promise<string[]> => {
@@ -170,8 +189,8 @@ export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push
       const applied: Record<string, ParamValue> = {};
       const problems: string[] = [];
       for (const [k, raw] of Object.entries((values ?? {}) as Record<string, unknown>)) {
-        const spec = specs.find((s) => s.name === k) ?? specs.find((s) => s.label.toLowerCase() === k.toLowerCase());
-        if (!spec) { problems.push(`"${k}" isn't a parameter of this scene`); continue; }
+        const spec = resolveParam(specs, k);
+        if (typeof spec === 'string') { problems.push(spec); continue; }
         const value = coerceParam(spec, raw);
         if (value === undefined) { problems.push(`"${k}" needs ${spec.type === 'bool' ? 'true/false' : spec.color ? 'a "#rrggbb" colour' : spec.type === 'float' ? 'a number' : `an array of ${spec.def.length} numbers`}`); continue; }
         app.paramStore.set(key, spec, value);

@@ -8,8 +8,11 @@
 //   uniform vec2 uCentre;             // @param min=-.5 max=.5
 //
 // Types: float, bool, vec2, vec3, vec4. Options: min, max, step, default, label, int (whole numbers),
-// color (vec3 / vec4 as a colour picker). Constants are rewritten to uniforms on the same line,
+// color (vec3 / vec4 as a colour picker), group. Constants are rewritten to uniforms on the same line,
 // so compiler error line numbers stay correct.
+//
+// Groups: a `// @group Name` line puts the params after it under a collapsible heading, until the next
+// `@group` (a bare `// @group` ends grouping). `group="Name"` on one `@param` line overrides it.
 
 import { z } from 'zod';
 import { KEYS, debouncedWriter, readJSON, type DebouncedWriter } from '../state/persistence';
@@ -21,7 +24,7 @@ export const ParamValueSchema = z.union([z.number(), z.boolean(), z.array(z.numb
 export type ParamValue = z.infer<typeof ParamValueSchema>;
 export type ParamValues = Record<string, ParamValue>;
 
-const SpecBase = z.object({ name: z.string(), type: ParamTypeSchema, color: z.boolean(), label: z.string() });
+const SpecBase = z.object({ name: z.string(), type: ParamTypeSchema, color: z.boolean(), label: z.string(), group: z.string() });   // group '' = ungrouped
 const NumericSpec = z.object({ min: z.number(), max: z.number(), step: z.number(), int: z.boolean() });
 export const ParamSpecSchema = z.discriminatedUnion('type', [
   SpecBase.extend({ type: z.literal('bool'), def: z.boolean() }),
@@ -36,17 +39,21 @@ export type FloatParamSpec = Extract<ParamSpec, { type: 'float' }>;
 export type VecParamSpec = Extract<ParamSpec, { type: 'vec2' | 'vec3' | 'vec4' }>;
 
 const DECL = /^(\s*)(uniform|const)\s+(float|bool|vec2|vec3|vec4)\s+(\w+)\s*(?:=\s*([^;]+?))?\s*;\s*\/\/\s*@param\b(.*)$/;
+const GROUP = /^\s*\/\/\s*@group\b(.*)$/;
 const OPTION = /(\w+)(?:=("[^"]*"|\S+))?/g;
 const SIZES: Record<ParamType, number> = { float: 1, bool: 1, vec2: 2, vec3: 3, vec4: 4 };
 
 export function parseParams(code: string): { code: string; params: ParamSpec[] } {
   const params: ParamSpec[] = [];
+  let group = '';
   const lines = code.split('\n').map((line) => {
+    const g = GROUP.exec(line);
+    if (g) { group = g[1]!.trim(); return line; }
     const m = DECL.exec(line);
     if (!m) return line;
     const indent = m[1]!, kind = m[2]!, type = m[3] as ParamType, name = m[4]!, init = m[5], opts = m[6]!;
     if ((kind === 'uniform') === Boolean(init) || params.some((p) => p.name === name)) return line;   // let the compiler complain
-    params.push(makeSpec(type, name, parseOptions(opts), init));
+    params.push(makeSpec(type, name, parseOptions(opts), init, group));
     return `${indent}uniform ${type} ${name};`;
   });
   return { code: lines.join('\n'), params };
@@ -60,11 +67,12 @@ function parseOptions(text: string): Options {
   return o;
 }
 
-function makeSpec(type: ParamType, name: string, o: Options, init: string | undefined): ParamSpec {
+function makeSpec(type: ParamType, name: string, o: Options, init: string | undefined, current: string): ParamSpec {
   const color = (type === 'vec3' || type === 'vec4') && (o.color === true || String(o.default ?? '').startsWith('#'));
   const label = typeof o.label === 'string' ? o.label : prettify(name);
+  const group = typeof o.group === 'string' ? o.group.trim() : current;
   const raw = o.default ?? init;
-  if (type === 'bool') return { name, type, color, label, def: /^(true|1)$/.test(String(raw ?? '').trim()) };
+  if (type === 'bool') return { name, type, color, label, group, def: /^(true|1)$/.test(String(raw ?? '').trim()) };
 
   const size = SIZES[type];
   const def = parseVector(raw, size) ?? Array<number>(size).fill(color ? 1 : 0);
@@ -72,8 +80,8 @@ function makeSpec(type: ParamType, name: string, o: Options, init: string | unde
   const max = num(o.max) ?? Math.max(1, ...def.map((v) => (v > 1 ? v * 2 : v)));
   const step = num(o.step) ?? (o.int ? 1 : niceStep((max - min) / 200));
   const int = Boolean(o.int);
-  if (type === 'float') return { name, type, color, label, def: def[0]!, min, max, step, int };
-  return { name, type, color, label, def, min, max, step, int } as VecParamSpec;
+  if (type === 'float') return { name, type, color, label, group, def: def[0]!, min, max, step, int };
+  return { name, type, color, label, group, def, min, max, step, int } as VecParamSpec;
 }
 
 // "1.5" · "vec3(1., .3, .8)" · "vec3(.5)" · "1,0.3,0.8" · "#ff4fd8"
@@ -107,6 +115,18 @@ function niceStep(x: number): number {
 function prettify(name: string): string {
   const words = name.replace(/^u(?=[A-Z])/, '').replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+// The specs as the Parameters list shows them: the ungrouped ones first (no heading), then each group in
+// the order it first appears. Groups that share a name are merged.
+export interface ParamGroup { name: string; specs: ParamSpec[] }
+export function groupParams(specs: ParamSpec[]): ParamGroup[] {
+  const groups = new Map<string, ParamSpec[]>([['', []]]);
+  for (const s of specs) {
+    const list = groups.get(s.group);
+    if (list) list.push(s); else groups.set(s.group, [s]);
+  }
+  return [...groups].filter(([, list]) => list.length).map(([name, list]) => ({ name, specs: list }));
 }
 
 // Value as the renderer wants it: number for float/bool, array for vectors.

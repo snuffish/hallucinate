@@ -20,6 +20,7 @@ export const KEYS = {
   // The assistant's conversations: this index; the transcripts live in IndexedDB (src/assistant/history-store.ts).
   assistantChats: 'hallucinate.assistantChats',
   assistantThinking: 'hallucinate.assistantThinking',   // the panel's "Show reasoning" toggle
+  paramGroups: 'hallucinate.paramGroups',   // folded parameter groups per scene (not exported)
   // Migrated into `layout` (src/state/layout.ts) on first load, then removed.
   paramsCollapsed: 'hallucinate.paramsCollapsed',
   paramsPos: 'hallucinate.paramsPos',

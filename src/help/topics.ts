@@ -65,7 +65,7 @@ export const HELP_TOPICS = {
     body: [
       'The GLSL code of the scene on screen. It recompiles as you type; an error keeps the last working version running.',
       'Edits to built-in scenes are kept as your version ("Revert to original" undoes them). "Save to library" stores the code as a new scene.',
-      'Tag a uniform or const with // @param to get a live control. The cheat sheet lists the audio inputs and helpers.',
+      'Tag a uniform or const with // @param to get a live control, and put a // @group Name line before related ones to give them a heading that folds. The cheat sheet lists the audio inputs and helpers.',
     ],
     hotkeys: ['editor', 'scenePrev', 'sceneNext', 'closeOverlay'],
   },
@@ -115,7 +115,7 @@ export const HELP_TOPICS = {
     id: 'params',
     title: 'Live parameters',
     body: [
-      'The controls this scene exposes. Changes apply instantly and are remembered per scene.',
+      'The controls this scene exposes. Changes apply instantly and are remembered per scene. Click a group heading to fold it.',
       'Double-click a slider to reset it; Reset resets them all. Drag the title bar to move or dock the widget, double-click it to send it back.',
     ],
     hotkeys: ['params'],

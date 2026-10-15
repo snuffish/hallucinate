@@ -41,7 +41,7 @@ export interface ControllerHooks {
   // Studio mode: Program no longer shows a show scene after a manual switch.
   onManualSceneChange?: () => void;
   // Studio dock: which parameters the overlay edits.
-  paramsOverride?: () => { title: string; specs: ParamSpec[]; values: ParamValues; onChange: (spec: ParamSpec, v: ParamValue) => void; onReset: () => void } | null;
+  paramsOverride?: () => { title: string; key: string; specs: ParamSpec[]; values: ParamValues; onChange: (spec: ParamSpec, v: ParamValue) => void; onReset: () => void } | null;
   master?: () => number;
   autopilot?: () => boolean;
   // Studio: while the Live slot is pinned (studio closed after a take), projectors get this instead
@@ -468,13 +468,13 @@ export class AppController {
   showParams(): void {
     const override = this.hooks.paramsOverride?.();
     if (override) {
-      this.ui.set({ params: { title: override.title, specs: override.specs, values: override.values, inStudio: true }, paramsVisible: override.specs.length > 0 });
+      this.ui.set({ params: { title: override.title, key: override.key, specs: override.specs, values: override.values, inStudio: true }, paramsVisible: override.specs.length > 0 });
       return;
     }
     const i = this.state.clock.scene;
     const specs = this.sceneParams[i] ?? [];
     const inStudio = this.overlay === 'studio';
-    this.ui.set({ params: { title: inStudio ? `${this.currentScene.name} — live` : this.currentScene.name, specs, values: this.paramValues(i), inStudio }, paramsVisible: specs.length > 0 });
+    this.ui.set({ params: { title: inStudio ? `${this.currentScene.name} — live` : this.currentScene.name, key: paramKey(this.currentScene), specs, values: this.paramValues(i), inStudio }, paramsVisible: specs.length > 0 });
   }
 
   setParam(spec: ParamSpec, value: ParamValue): void {
