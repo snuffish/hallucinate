@@ -23,13 +23,16 @@ export type SideZone = 'left' | 'right';
 export type BubblePlace = { kind: 'auto' } | FloatPlace;
 // `dockWidth`: the left and right docks are one column each, as wide as this.
 // `bubbleShown`: the assistant bubble can be switched off from the Widgets menu like a widget.
-export interface Layout { v: 1; widgets: Record<WidgetId, WidgetLayout>; bubble: BubblePlace; bubbleShown: boolean; dockWidth: Record<SideZone, number> }
+// `chatSize`: the assistant's chat window, resized by its grip like a widget (null: the stylesheet's size).
+export interface Layout { v: 1; widgets: Record<WidgetId, WidgetLayout>; bubble: BubblePlace; bubbleShown: boolean; dockWidth: Record<SideZone, number>; chatSize: WidgetSize }
 
 export const MIN_W = 200;
 export const MIN_H = 80;
 export const DOCK_MIN = 220;
 export const DOCK_MAX = 560;
 export const DOCK_WIDTH = 290;
+export const CHAT_MIN_W = 300;
+export const CHAT_MIN_H = 260;
 const AUTO: WidgetSize = { w: null, h: null };
 const clampTo = (v: number, lo: number, hi: number) => Math.round(Math.min(Math.max(v, lo), Math.max(lo, hi)));
 export const clampW = (w: number, viewport?: Size) => clampTo(w, MIN_W, (viewport?.width ?? Infinity) - 32);
@@ -58,6 +61,7 @@ export const DEFAULT_LAYOUT: Layout = {
   bubble: { kind: 'auto' },
   bubbleShown: true,
   dockWidth: { left: DOCK_WIDTH, right: DOCK_WIDTH },
+  chatSize: AUTO,
 };
 
 const withWidget = (layout: Layout, id: WidgetId, patch: Partial<WidgetLayout>): Layout =>
@@ -162,6 +166,14 @@ export function setBubbleShown(layout: Layout, shown: boolean): Layout {
   return { ...layout, bubbleShown: shown };
 }
 
+// The chat window's dragged size; null puts that dimension back to the stylesheet's.
+export function resizeChat(layout: Layout, size: Partial<WidgetSize>): Layout {
+  const cur = layout.chatSize;
+  const w = size.w === undefined ? cur.w : size.w === null ? null : clampTo(size.w, CHAT_MIN_W, Infinity);
+  const h = size.h === undefined ? cur.h : size.h === null ? null : clampTo(size.h, CHAT_MIN_H, Infinity);
+  return { ...layout, chatSize: { w, h } };
+}
+
 export function moveBubble(layout: Layout, rect: Rect, viewport: Size): Layout {
   return { ...layout, bubble: anchorFor(rect, viewport) };
 }
@@ -172,12 +184,14 @@ export function effective(layout: Layout, narrow: boolean): Layout {
   if (!narrow) return layout;
   const widgets = { ...layout.widgets };
   WIDGET_IDS.forEach((id, order) => { widgets[id] = { ...widgets[id], place: dockAt('left', order), size: AUTO }; });
-  return { ...layout, widgets, bubble: { kind: 'auto' }, dockWidth: DEFAULT_LAYOUT.dockWidth };
+  return { ...layout, widgets, bubble: { kind: 'auto' }, dockWidth: DEFAULT_LAYOUT.dockWidth, chatSize: AUTO };
 }
 
 // Where the chat window opens next to a moved bubble: toward the side with more room, above or
-// below and left- or right-aligned, kept `margin` px inside the screen.
-export function chatPlacement(bubble: Rect, chat: Size, viewport: Size, gap = 14, margin = 8): { left: number; top: number; maxHeight: number } {
+// below and left- or right-aligned, kept `margin` px inside the screen. `growX` / `growY` say which
+// way it grows when resized (away from the bubble), so its grip sits on that corner.
+export interface ChatPlacement { left: number; top: number; maxHeight: number; growX: 'left' | 'right'; growY: 'up' | 'down' }
+export function chatPlacement(bubble: Rect, chat: Size, viewport: Size, gap = 14, margin = 8): ChatPlacement {
   const roomRight = viewport.width - bubble.left;
   const roomLeft = bubble.left + bubble.width;
   const rawLeft = roomRight >= roomLeft ? bubble.left : bubble.left + bubble.width - chat.width;
@@ -188,7 +202,7 @@ export function chatPlacement(bubble: Rect, chat: Size, viewport: Size, gap = 14
   const maxHeight = Math.max(120, Math.min(chat.height, above ? roomAbove : roomBelow));
   const rawTop = above ? bubble.top - gap - maxHeight : bubble.top + bubble.height + gap;
   const top = Math.max(margin, Math.min(rawTop, viewport.height - maxHeight - margin));
-  return { left: Math.round(left), top: Math.round(top), maxHeight: Math.round(maxHeight) };
+  return { left: Math.round(left), top: Math.round(top), maxHeight: Math.round(maxHeight), growX: roomRight >= roomLeft ? 'right' : 'left', growY: above ? 'up' : 'down' };
 }
 
 // ---------- Persistence ----------
@@ -199,7 +213,7 @@ const SizeSchema = z.object({ w: z.number().nullable(), h: z.number().nullable()
 const WidgetLayoutSchema = z.object({ open: z.boolean(), collapsed: z.boolean(), place: z.discriminatedUnion('kind', [DockSchema, FloatSchema]), size: SizeSchema.optional() });
 const DockWidthSchema = z.object({ left: z.number(), right: z.number() });
 const BubbleSchema = z.discriminatedUnion('kind', [z.object({ kind: z.literal('auto') }), FloatSchema]);
-export const StoredLayoutSchema = z.object({ v: z.literal(1), widgets: z.record(z.string(), z.unknown()), bubble: z.unknown().optional(), bubbleShown: z.unknown().optional(), dockWidth: z.unknown().optional() });
+export const StoredLayoutSchema = z.object({ v: z.literal(1), widgets: z.record(z.string(), z.unknown()), bubble: z.unknown().optional(), bubbleShown: z.unknown().optional(), dockWidth: z.unknown().optional(), chatSize: z.unknown().optional() });
 
 // Every entry is checked on its own: an unknown widget is dropped and a missing or broken one falls
 // back to its default, so adding a widget in a later version never resets the rest of the layout.
@@ -219,6 +233,8 @@ export function parseLayout(raw: unknown): Layout {
   if (typeof stored.data.bubbleShown === 'boolean') layout.bubbleShown = stored.data.bubbleShown;
   const widths = DockWidthSchema.safeParse(stored.data.dockWidth);
   if (widths.success) layout.dockWidth = { left: clampDock(widths.data.left), right: clampDock(widths.data.right) };
+  const chat = SizeSchema.safeParse(stored.data.chatSize);
+  if (chat.success) layout.chatSize = resizeChat(layout, chat.data).chatSize;
   return renumber(layout);
 }
 

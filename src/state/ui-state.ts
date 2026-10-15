@@ -39,6 +39,9 @@ export interface ParamsView {
   inStudio: boolean;        // shown in the studio's parameters dock (and editing the Preview slot there)
 }
 
+// A reply that landed while the chat was closed: the card beside the bubble.
+export interface AssistantPeek { chatId: string; title: string; text: string; error: boolean; key: number }
+
 // What the main screen shows while the studio is closed and a show scene is Live.
 export type ScreenMode = 'preview' | 'live';
 
@@ -57,6 +60,10 @@ export interface UIState {
   overlay: Overlay;
   assistantOpen: boolean;   // the chat bubble; independent of the overlays
   assistantBusy: boolean;   // a chat run is in flight (the director waits for it)
+  assistantRunning: number; // conversations working right now
+  assistantUnread: number;  // conversations with a reply the user hasn't seen
+  assistantPeek: AssistantPeek | null;
+  assistantFocus: string | null;   // a conversation to show when the panel opens (the peek was clicked)
   help: HelpId | null;      // the open help popover; closed whenever an overlay, the panel or the assistant changes
   liveName: string | null;  // the pinned Live slot (studio closed after a take); projectors follow it, not the screen
   screenMode: ScreenMode;   // while Live is pinned: the screen shows your preview (browse freely) or Live (what projectors get)
@@ -90,6 +97,10 @@ export const initialUIState = (look: Look): UIState => ({
   overlay: null,
   assistantOpen: false,
   assistantBusy: false,
+  assistantRunning: 0,
+  assistantUnread: 0,
+  assistantPeek: null,
+  assistantFocus: null,
   help: null,
   liveName: null,
   screenMode: 'preview',

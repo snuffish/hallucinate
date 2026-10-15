@@ -14,6 +14,7 @@ export type HotkeyWhen =
   | 'nodesOpen'
   | 'paramsVisible'
   | 'overlayOpen'
+  | 'assistantOpen'  // the assistant's panel is open (its own shortcuts, registered by the panel)
   | 'library'        // the scene library is open
   | 'noLibrary';     // not the library, not the visual maker
 
@@ -56,6 +57,10 @@ export const HOTKEYS = {
   restartGame: { id: 'restartGame', keys: 'Enter', label: 'Race again', group: 'Game', when: 'game' },
 
   assistant: { id: 'assistant', keys: 'I', label: 'AI assistant', group: 'Panels', when: 'noNodes' },
+  assistantNew: { id: 'assistantNew', keys: 'Alt+N', label: 'New conversation', group: 'Panels', when: 'assistantOpen', inInputs: true },
+  assistantPrev: { id: 'assistantPrev', keys: 'Alt+ArrowUp', label: 'Previous conversation', group: 'Panels', when: 'assistantOpen', inInputs: true },
+  assistantNext: { id: 'assistantNext', keys: 'Alt+ArrowDown', label: 'Next conversation', group: 'Panels', when: 'assistantOpen', inInputs: true },
+  assistantSearch: { id: 'assistantSearch', keys: 'Mod+K', label: 'Find a conversation', group: 'Panels', when: 'assistantOpen', inInputs: true },
   editor: { id: 'editor', keys: 'E', label: 'Shader editor', group: 'Panels', when: 'always' },
   visualMaker: { id: 'visualMaker', keys: 'N', label: 'Visual maker', group: 'Panels', when: 'always' },
   params: { id: 'params', keys: 'P', label: 'Collapse parameters', group: 'Panels', when: 'paramsVisible' },

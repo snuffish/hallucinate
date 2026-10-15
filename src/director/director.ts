@@ -11,6 +11,7 @@ import { clientTools } from '../assistant/client-tools';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
 import { relayToolCalls } from '../assistant/relay';
 import { UndoStack } from '../assistant/undo';
+import { usageOf } from '../assistant/usage';
 import { Store } from '../state/store';
 import { buildDigest, type DigestInput } from './digest';
 import { DirectorHistory } from './history';
@@ -173,15 +174,10 @@ export class Director {
   }
 
   private countUsage(chunk: { type: string; usage?: unknown }): void {
-    if (chunk.type !== 'RUN_FINISHED' || !chunk.usage) return;
-    const items = Array.isArray(chunk.usage) ? chunk.usage : [chunk.usage];
-    let prompt = 0, completion = 0;
-    for (const u of items as { promptTokens?: number; completionTokens?: number }[]) {
-      prompt += Number(u.promptTokens) || 0;
-      completion += Number(u.completionTokens) || 0;
-    }
+    const u = usageOf(chunk);
+    if (!u) return;
     const t = this.view.tokens;
-    this.store.set({ tokens: { prompt: t.prompt + prompt, completion: t.completion + completion } });
+    this.store.set({ tokens: { prompt: t.prompt + u.prompt, completion: t.completion + u.completion } });
   }
 
   // The digest's input, read from the app and the studio.

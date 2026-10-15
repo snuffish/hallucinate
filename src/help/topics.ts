@@ -104,10 +104,12 @@ export const HELP_TOPICS = {
     title: 'AI assistant',
     body: [
       'Ask Claude to create or change scenes, set parameters and the look, or build and plan a studio show. Changes show up live.',
-      'Undo reverts the assistant\'s last change; New chat starts over.',
+      'Keep several conversations: New starts another while the others keep working, and the title at the top opens them all, with search, rename, pin, export and delete. They are kept in this browser (the 50 newest; pinned ones stay).',
+      'Close the panel while Claude works: the bubble turns while it does, then shows how many replies are waiting and a peek at the newest. Type while it works and your message is sent next.',
+      'Undo reverts the newest change any conversation made, and Claude hears about it with your next message. 💭 shows Claude\'s reasoning. Token use shows under each reply and for the whole chat; drag the panel\'s corner to resize it.',
       ...NEEDS_SERVER,
     ],
-    hotkeys: ['assistant', 'closeOverlay'],
+    hotkeys: ['assistant', 'assistantNew', 'assistantPrev', 'assistantNext', 'assistantSearch', 'closeOverlay'],
   },
   params: {
     id: 'params',

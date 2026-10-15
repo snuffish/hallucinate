@@ -83,10 +83,23 @@ API key: `useChat` → `POST /api/assistant` (AG-UI body) → `chat({ adapter: a
 → the model calls a tool → the server pauses → the browser runs the `.client()` implementation → the run
 resumes with the result.
 
+Conversations: `AssistantSession` (`src/assistant/conversations.ts`, outside React like the studio) owns one
+`ChatClient` per conversation, so several run at once and keep running while another is on screen. They share one
+tool lock (`lock.ts`: their tools act on one app, one at a time) and one undo stack (an undo closure restores a
+snapshot, so only the newest change can be undone safely; the entry says whose it was). The session publishes
+`assistantBusy` / `assistantRunning` / `assistantUnread` / `assistantPeek` for the bubble and the director. History:
+an index under `KEYS.assistantChats`, transcripts in IndexedDB (`history-store.ts`), written at most once a second and
+at once when a reply ends. A transcript is *sealed* when read and on Stop (`sealInterrupted`): a tool call without a
+result gets one saying the app closed first. Notes for Claude (undo, reopened later) ride at the start of the next
+user message (`notes.ts`). Before a send, screenshots older than the newest three are replaced by a short note
+(`prepareForSend`). The connection has no `joinRun` on purpose: a run is never rejoined.
+
 Subscription: the same route picks `ClaudeCliAdapter` → it spawns the CLI with an MCP config pointing back at
 `/api/assistant/mcp` → a tool call arrives as an MCP `tools/call` → the adapter emits a `hallucinate.tool_call`
 custom event on the chat stream → the browser runs the same implementation and answers via
-`POST /api/assistant/tool-result` → the adapter emits the tool result chunk and returns the MCP result.
+`POST /api/assistant/tool-result` → the adapter emits the tool result chunk and returns the MCP result. The CLI session id is the conversation's
+`threadId`, and `forwardedProps.continued` makes the adapter `--resume` it after a server restart; a session the
+CLI no longer has is retried as a new one that starts from a transcript. Usage comes from the CLI's `result` event.
 
 ## Adding things
 

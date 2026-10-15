@@ -8,7 +8,7 @@
 //
 // Routes:  GET  /info            backend and model
 //          POST /                one chat run (AG-UI body from useChat)
-//          POST /new             forget a conversation (subscription backend)
+//          POST /new             forget a conversation (subscription backend; the panel deleted it)
 //          POST /tool-result     the browser's answer to a relayed tool call
 //          POST /mcp             the MCP endpoint the CLI connects to
 
@@ -35,6 +35,8 @@ export function runConfig(mode: RunMode, backend: Backend) {
   };
 }
 export const modeOf = (forwardedProps: Record<string, unknown> | undefined): RunMode => (forwardedProps?.mode === 'director' ? 'director' : 'chat');
+// The panel says so when a conversation already has replies: the CLI backend resumes its session.
+export const continuedOf = (forwardedProps: Record<string, unknown> | undefined): boolean => forwardedProps?.continued === true;
 
 const ToolResultSchema = z.object({
   threadId: z.string(),
@@ -101,7 +103,7 @@ export function createAssistant() {
       agentLoopStrategy: maxIterations(config.maxTurns),
       abortController,
       ...(config.promptCache && { promptCache: config.promptCache }),
-      ...(b === 'api' ? { reasoning: config.effort as 'high' } : { modelOptions: { host: req.headers.host } }),
+      ...(b === 'api' ? { reasoning: config.effort as 'high' } : { modelOptions: { host: req.headers.host, continued: continuedOf(params.forwardedProps) } }),
     });
     const response = toServerSentEventsResponse(stream, { abortController });
     res.writeHead(response.status, Object.fromEntries(response.headers));

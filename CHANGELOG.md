@@ -2,7 +2,20 @@
 
 ## Unreleased — React + TypeScript port (2026-10-13)
 
+### Added
+
+- The assistant keeps several conversations, running side by side, with a history kept in the browser (IndexedDB;
+  search, rename, pin, delete, export as Markdown; the 50 newest, pinned ones stay). The bubble turns while one works
+  with the panel closed, then counts replies waiting and peeks at the newest. Token usage per reply and per
+  conversation, a hint when a conversation gets long, the assistant's reasoning on demand (💭), messages typed while
+  it works are queued, Retry and Copy, and the panel resizes from its corner like a widget. (2026-10-15)
+- The subscription backend reports token usage (the director's token count now works there too) and keeps a
+  conversation's Claude Code session across dev-server restarts, falling back to a transcript when the session is gone.
+
 ### Changed
+
+- Undo reverts the newest assistant change from any conversation, and tells Claude with the next message instead of
+  starting an extra reply.
 
 - The studio autopilot counts beats on a tempo clock (BPM from the detected kicks, re-anchored on each kick) instead of
   raw bass hits, so the show keeps moving through breakdowns; the indicator shows the tempo in use.

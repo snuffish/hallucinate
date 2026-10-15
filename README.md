@@ -273,10 +273,26 @@ and the look sliders, switches scenes, and looks at a rendered frame to check it
 [studio](#-studio--projector--press-o): it adds, changes, reorders and removes show scenes, sets the transition and the
 autopilot, writes a plan for the autopilot and takes show scenes live ("build a show from the Space scenes and plan an
 hour", "swap the next two scenes", "longer fades"). Every change shows up live, and
-**Undo** in the panel reverts the assistant's last change (edits, new scenes, parameters, look, show); built-in scenes can also
-be reverted to their original in the code editor. **Stop** interrupts it; **New chat** starts over.
-After each reply the assistant suggests three things you could ask next, as buttons under the reply, like the
-examples on an empty chat.
+**Undo** in the panel reverts the assistant's newest change (edits, new scenes, parameters, look, show), and Claude is
+told with your next message; built-in scenes can also be reverted to their original in the code editor. **Stop**
+interrupts it. After each reply the assistant suggests three things you could ask next, as buttons under the reply,
+like the examples on an empty chat.
+
+- **Several conversations at once.** **New** starts another while the others keep working; the title at the top opens
+  the list (working ones first, then pinned, then by day) with search (`Ctrl/⌘ K`), rename, pin, export as Markdown
+  and delete; `Alt ↑ / ↓` steps through them. They are kept in this browser (IndexedDB; the 50 newest, pinned ones
+  stay), so they survive a reload. On the subscription backend at most three run at once; a fourth waits its turn.
+- **Notifications.** Close the panel while Claude works: the bubble's ring turns, then a badge counts the
+  conversations with a reply waiting and a card next to the bubble peeks at it (click it to open that conversation).
+  With the tab in the background, the window title shows the count.
+- **Token usage** under each reply (in, out, how much came from the prompt cache) and for the whole conversation;
+  long conversations get a hint to start a new one. On a subscription the tooltip also shows the CLI's API-equivalent
+  cost (not billed).
+- **Reasoning.** 💭 shows Claude's reasoning (rendered, with a word count and Copy) or folds it away; the setting is
+  remembered.
+- **Type while it works**: your message waits (dimmed, × to drop it) and goes out when the reply is done. **Retry**
+  after an error; **Copy** on replies and code blocks. Drag the panel's corner to resize it (double-click for the
+  natural size).
 
 Two ways to reach Claude, picked automatically — the credentials never reach the browser:
 
@@ -338,7 +354,7 @@ library under the same name once it works. They stay saved, and in your exports,
 | M | mute |
 | ← / → , 1–9, 0 | change scene (← / → steer in the game) |
 | L | scene library (inside: `/` search, Tab categories, arrows move, Enter play) |
-| I | AI assistant |
+| I | AI assistant (inside: Alt+N new conversation, Alt+↑ / ↓ switch, Ctrl/⌘+K find one) |
 | O | studio & projector (inside: 1–9 / ← → preview, T take, Esc close) |
 | T | take Preview live |
 | B | blackout / restore |
@@ -364,7 +380,7 @@ in the React port. In short:
 - `src/engine/` – the engines (WebGL pipeline, audio analysis, scenes, `@param` parsing, visual-maker compiler, media, game, projector link), plain TypeScript classes.
 - `src/app/` – the controller that owns them and the frame loop, the editor / studio / player logic, the React shell.
 - `src/components/` – the panels; `src/hotkeys/` – the shortcut registry and the key badge; `src/state/` – app state, UI store, persistence.
-- `src/assistant/` – the assistant's tools (zod definitions, browser implementations, undo).
+- `src/assistant/` – the assistant's tools (zod definitions, browser implementations, undo), its conversations and their history.
 - `server/` – the yt-dlp bridges, the TanStack AI chat route, the two Claude backends and the system prompt.
 - `src/output.ts` / `output.html` – projector windows.
 
