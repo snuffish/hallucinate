@@ -20,5 +20,9 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' }, testIgnore: 'desktop.spec.ts' },
+    // The Electron app launches itself (e2e/desktop.spec.ts); it needs `npm run build:desktop` first.
+    { name: 'desktop', testMatch: 'desktop.spec.ts' },
+  ],
 });

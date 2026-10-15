@@ -30,18 +30,24 @@
   "author": "Snuffish",
   "type": "module",
   "private": true,
+  "main": "dist-desktop/main.js",
   "engines": {
-    "node": ">=20.19"
+    "node": ">=22.12"
   },
   "scripts": {
     "dev": "vite",
     "start": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "desktop": "node desktop/dev.mjs",
+    "build:desktop": "vite build && vite build -c vite.desktop.config.ts",
+    "package": "npm run build:desktop && electron-builder",
+    "package:dir": "npm run build:desktop && electron-builder --dir",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project chromium",
+    "test:e2e:desktop": "npm run build:desktop && playwright test --project desktop",
     "perf": "node perf/measure.mjs"
   },
   "devDependencies": {
@@ -53,6 +59,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "typescript": "^5.9.3",

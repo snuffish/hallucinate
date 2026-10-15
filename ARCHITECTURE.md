@@ -42,6 +42,17 @@ browser                                              dev server (Vite middleware
   `StudioSession` (cues, Preview/Live, master), the visual maker's `GraphSession`. They mutate themselves and
   bump a version the component re-renders on.
 
+## The desktop app
+
+`desktop/` packages the same app with Electron. The main process (`desktop/main.ts`) starts `desktop/server.ts`, a
+small Node server on `127.0.0.1` that serves the built `dist/` and mounts the same `/api` handlers as `vite.config.ts`,
+then loads it in a window. The renderer doesn't know it's in Electron: relative URLs, the projector pop-up and the
+BroadcastChannel work as in a browser. The main process answers what a browser would ask the user (microphone,
+screen capture, display access, which pop-ups may open) and imports the login shell's `PATH` so `claude` and `yt-dlp`
+are found from the Dock. The port is fixed (47741) because the storage origin includes it. `vite.desktop.config.ts`
+bundles the main process and the server code into `dist-desktop/main.js`; `electron-builder.yml` packages `dist/` and
+`dist-desktop/` without `node_modules`.
+
 ## Invariants
 
 1. **Scenes are addressed by index** in one shared `Scene[]`: the renderer, the projector protocol, the number
@@ -69,6 +80,9 @@ browser                                              dev server (Vite middleware
    throw-away working directory. Do not add `--safe-mode`: it silently disables MCP servers, which is how
    the app's tools reach the model. `server/probes/claude-code-lockdown.mjs` documents why TanStack's own
    Claude Code adapter is not used.
+9. **The server handlers are host-agnostic.** `server/` exports plain `(req, res)` handlers that the Vite dev /
+   preview server and the desktop app's own server both mount; anything server-side goes there, not into a
+   Vite-only hook.
 
 ## Data flow per frame
 

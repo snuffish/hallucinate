@@ -32,7 +32,10 @@ npm install
 npm run dev      # → http://localhost:5173 (localhost only; HOST=0.0.0.0 exposes it, PORT changes the port)
 npm run build    # → dist/
 npm run preview  # serve the built app (the SoundCloud / YouTube bridges and the assistant work here too)
+npm run desktop  # the same app as a desktop window (Electron); see Desktop app
 ```
+
+Needs Node 22.12 or newer.
 
 Every button with a shortcut shows its key as a small badge, and the badge lights up while you hold a
 modifier. The full list is at the bottom of the panel and in [Keys](#%EF%B8%8F-keys).
@@ -44,7 +47,7 @@ modifier. The full list is at the bottom of the panel and in [Keys](#%EF%B8%8F-k
 - [Scenes](#-scenes) · [Scene library](#-scene-library--press-l) · [Beat Racer](#-beat-racer-game--press-g)
 - [Code your own](#-code-your-own--press-e) · [Live parameters](#-live-parameters--press-p) · [Visual maker](#-visual-maker--press-n)
 - [Media](#%EF%B8%8F-media--drop-an-image-or-video) · [Studio & projector](#-studio--projector--press-o) · [AI assistant](#-ai-assistant--press-i)
-- [Back up & move your setup](#-back-up--move-your-setup) · [Keys](#%EF%B8%8F-keys) · [How it works](#%EF%B8%8F-how-it-works) · [Development](#%EF%B8%8F-development) · [Web demo](#-web-demo) · [License](#-license)
+- [Back up & move your setup](#-back-up--move-your-setup) · [Keys](#%EF%B8%8F-keys) · [How it works](#%EF%B8%8F-how-it-works) · [Development](#%EF%B8%8F-development) · [Desktop app](#-desktop-app) · [Web demo](#-web-demo) · [License](#-license)
 
 ## ✨ At a glance
 
@@ -401,9 +404,40 @@ npm run lint        # ESLint (TypeScript + React hooks rules)
 npm run typecheck   # tsc for the app and the server
 npm test            # Vitest unit tests (parameters, node compiler, scene list, hotkeys, persistence, assistant plumbing)
 npm run test:e2e    # Playwright: boot, scenes, every panel, library keyboard navigation
+npm run test:e2e:desktop   # builds the desktop app and drives it (needs a GPU, so not in CI)
 ASSISTANT_E2E=1 npx playwright test e2e/assistant.spec.ts   # one real assistant round-trip (uses your Claude backend)
 node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json   # performance probe, with the dev server running
 ```
+
+## 🖥 Desktop app
+
+Hallucinate also runs as a desktop app, built with [Electron](https://www.electronjs.org/). Everything works in it,
+including SoundCloud, YouTube, the AI assistant and the Director: the app starts the same local server the dev server
+provides and opens the app in its own window, so no terminal or browser is needed.
+
+```sh
+npm run desktop       # develop: the desktop window on the Vite dev server, with hot reload
+npm run package:dir   # build the app unpacked into release/ (quick to try: release/mac-arm64/Hallucinate.app)
+npm run package       # build the installer for this OS into release/ (.dmg + .zip, .exe, or .AppImage)
+```
+
+Installers for macOS, Windows and Linux are also built by [`.github/workflows/release.yml`](.github/workflows/release.yml)
+on a `v*` tag (or by hand from the Actions tab) and attached to the run.
+
+- **Unsigned.** The builds aren't code-signed. On macOS, open the app the first time with right-click → *Open*; Windows
+  SmartScreen asks once too.
+- **`claude`, `yt-dlp` and `ffmpeg`** are found through your login shell's `PATH`, also when the app is started from the
+  Dock or a menu. `CLAUDE_BIN` and `YTDLP` still point at a specific binary, and `ANTHROPIC_API_KEY` in your shell
+  profile selects the API backend.
+- **Your data** (scenes, shows, settings, assistant conversations) lives in the app's own profile, separate from the
+  browser's and from `npm run desktop`'s. Move a setup between them with *☰ → Export scenes & settings* and *Import…*.
+  The app serves itself on `http://127.0.0.1:47741`; if that port is taken it says so and runs on another one, without
+  your saved data, until the port is free again.
+- **System audio** (*Tab / system audio*): on Windows it captures everything playing. On macOS it opens the system's
+  screen-sharing picker; whether sound comes along depends on the macOS version. On Linux, Electron can't capture system audio; use the
+  microphone / line-in or a loopback device instead.
+- **Projectors** work as in Chrome: *Detect displays* lists the screens without asking, and projector windows are
+  ordinary app windows.
 
 ## 🌐 Web demo
 

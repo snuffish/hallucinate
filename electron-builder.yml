@@ -1,0 +1,30 @@
+# Desktop installers: `npm run package` (this OS) or `npm run package:dir` (unpacked, quick to try).
+# The renderer (dist/) and the bundled main process (dist-desktop/) are all the app needs; no node_modules.
+appId: io.github.snuffish.hallucinate
+productName: Hallucinate
+copyright: Copyright © Snuffish
+directories:
+  output: release
+  buildResources: build   # put icon.png (1024×1024) here for an app icon; without it Electron's default is used
+files:
+  - dist/**
+  - dist-desktop/**
+  - '!dist-desktop/**/*.map'
+  - package.json
+  - '!node_modules/**'
+asar: true
+npmRebuild: false
+mac:
+  category: public.app-category.music
+  target: [dmg, zip]
+  extendInfo:
+    NSMicrophoneUsageDescription: Hallucinate listens to the microphone or line-in to make the visuals react to the sound.
+    NSAudioCaptureUsageDescription: Hallucinate captures system audio to make the visuals react to what is playing.
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  target: AppImage
+  category: AudioVideo
