@@ -10,8 +10,9 @@ autopilot and director settings), favourites and the auto-switch rotation, volum
 widget layout and *Use the video's sound*.
 
 It doesn't include recently played tracks, the Beat Racer high score, the loaded media, the assistant's conversations
-(export one as Markdown from the conversation list instead), or the Look sliders, which aren't saved between sessions
-anyway. Files over 5 MB aren't imported.
+(export one as Markdown from the conversation list instead), the Look sliders, which aren't saved between sessions
+anyway, or the device [settings](settings.md) (render quality, microphone processing, when the controls hide), which
+belong to the computer rather than the setup. Files over 5 MB aren't imported.
 
 ## Import
 

@@ -1,6 +1,7 @@
 // Main-window side of the projector output. Projector windows (output.html) render the show
 // themselves at their own resolution; this sends them the scene shaders once (and whenever one
-// changes) and the render state every frame, over a BroadcastChannel.
+// changes), the render state every frame and the device preferences that reach every renderer
+// (on connect and when one changes, never per frame), over a BroadcastChannel.
 //
 // The message shapes are a contract with src/output.ts; scenes are addressed by INDEX in the
 // shared scene list, so that list must never be filtered or re-ordered (soft-delete only).
@@ -12,6 +13,8 @@ export const CHANNEL = 'hallucinate-output';
 const STALE_MS = 3000;
 
 export interface SceneSource { name: string; frag: string }
+// The device preferences (src/state/prefs.ts) a projector window applies to its own renderer.
+export interface OutputPrefs { maxPixelRatio: number }
 export interface OutputStatus { id: string; w: number; h: number; fullscreen: boolean; fps: number }
 interface SeenStatus extends OutputStatus { seen: number }
 
@@ -20,6 +23,7 @@ export type OutputMessage =
   | { type: 'scene'; index: number; scene: SceneSource }
   | { type: 'frame'; state: ProgramState; params: Record<number, SceneUniforms>; resolution: number }
   | { type: 'media'; source: File | RemoteMediaSource | null }
+  | { type: 'prefs'; prefs: OutputPrefs }
   | { type: 'identify' }
   | { type: 'hello'; id: string }
   | { type: 'status'; id: string; w: number; h: number; fullscreen: boolean; fps: number }
@@ -31,11 +35,11 @@ export class OutputLink {
   private readonly timer: ReturnType<typeof setInterval>;
   private mediaSource: File | RemoteMediaSource | null = null;
 
-  constructor(private readonly scenes: readonly SceneSource[], private readonly onStatus: (outputs: OutputStatus[]) => void) {
+  constructor(private readonly scenes: readonly SceneSource[], private readonly onStatus: (outputs: OutputStatus[]) => void, private prefs: OutputPrefs) {
     this.channel = new BroadcastChannel(CHANNEL);
     this.channel.onmessage = ({ data }: MessageEvent<OutputMessage>) => {
       const m = data;
-      if (m.type === 'hello') { this.sendScenes(); this.sendMedia(this.mediaSource); }
+      if (m.type === 'hello') { this.sendScenes(); this.sendMedia(this.mediaSource); this.post({ type: 'prefs', prefs: this.prefs }); }
       if (m.type === 'status') this.outputs.set(m.id, { ...m, seen: performance.now() });
       if (m.type === 'bye') this.outputs.delete(m.id);
       this.onStatus(this.status());
@@ -62,6 +66,11 @@ export class OutputLink {
   sendMedia(source: File | RemoteMediaSource | null): void {
     this.mediaSource = source;
     this.post({ type: 'media', source });
+  }
+
+  sendPrefs(prefs: OutputPrefs): void {
+    this.prefs = prefs;
+    this.post({ type: 'prefs', prefs });
   }
 
   sendScene(index: number): void {

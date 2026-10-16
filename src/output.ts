@@ -30,6 +30,7 @@ channel.onmessage = ({ data: m }: MessageEvent<OutputMessage>) => {
   if (m.type === 'scene') scenes[m.index] = m.scene;
   if (m.type === 'frame') { pending = m; lastFrameAt = performance.now(); }
   if (m.type === 'identify') identify();
+  if (m.type === 'prefs') renderer.setMaxPixelRatio(m.prefs.maxPixelRatio);
   if (m.type === 'media') { if (m.source) media.load(m.source).catch((err) => { if (!(err instanceof StaleMediaLoad)) console.error(err); }); else media.clear(); }
 };
 channel.postMessage({ type: 'hello', id } satisfies OutputMessage);

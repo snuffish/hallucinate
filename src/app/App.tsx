@@ -14,6 +14,7 @@ import { HelpLayer } from '../components/Help';
 import { Hud } from '../components/Hud';
 import { Library } from '../components/Library';
 import { PerfOverlay } from '../components/PerfOverlay';
+import { Settings } from '../components/Settings';
 import { SoundCloudPicker, YouTubePicker } from '../components/Pickers';
 import { StartScreen } from '../components/StartScreen';
 import { Studio } from '../components/Studio';
@@ -88,6 +89,7 @@ function Shell({ app }: { app: AppController }) {
       <Assistant />
       <SoundCloudPicker />
       <YouTubePicker />
+      <Settings />
       <Hud />
       <PerfOverlay />
       <Toast />
@@ -120,6 +122,7 @@ function Hotkeys() {
     toggleEditor: () => app.toggleOverlay('editor'),
     toggleVisualMaker: () => app.toggleOverlay('nodes'),
     toggleStudio: () => app.toggleOverlay('studio'),
+    toggleSettings: () => app.toggleOverlay('settings'),
     toggleParams: () => app.toggleWidgetCollapsed('params'),
     togglePanel: () => app.toggleWidgets(),
     resetLayout: () => app.resetLayout(),

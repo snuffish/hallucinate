@@ -155,6 +155,11 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 - **A persisted value:** add the key to `KEYS`, a zod schema, and read it with `readJSON(key, schema, fallback)`.
   Decide whether it is setup (add it to `SECTIONS` in `src/app/bundle.ts`, so Export / Import carry it) or history
   (leave it out, and say so in the comment above `SECTIONS`).
+- **A device preference** (how this computer renders, listens or shows the controls): add a field with a `.catch`
+  default to `PrefsSchema` in `src/state/prefs.ts`, say in `APPLIES` when it takes effect, apply it in the
+  controller's `applyPrefs`, and give it a control in `src/components/Settings.tsx`. A preference is a default that seeds
+  live state, never a second control for it. One that reaches every renderer (`all-renderers`) also goes into
+  `outputPrefs`, so projector windows get it; the prefs test fails otherwise. Preferences are not exported.
 
 ## Checks
 

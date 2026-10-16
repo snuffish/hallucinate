@@ -22,6 +22,7 @@ export const KEYS = {
   assistantChats: 'hallucinate.assistantChats',
   assistantThinking: 'hallucinate.assistantThinking',   // the panel's "Show reasoning" toggle
   paramGroups: 'hallucinate.paramGroupsOpen',   // opened parameter groups per scene; they start folded (not exported)
+  prefs: 'hallucinate.prefs',   // device preferences from the Settings overlay (src/state/prefs.ts); not exported
   // Migrated into `layout` (src/state/layout.ts) on first load, then removed.
   paramsCollapsed: 'hallucinate.paramsCollapsed',
   paramsPos: 'hallucinate.paramsPos',

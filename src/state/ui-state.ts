@@ -9,7 +9,7 @@ import type { HelpTopicId } from '../help/topics';
 import type { Look, SourceButton } from './app-state';
 import type { WidgetId } from './layout';
 
-export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | null;
+export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | 'settings' | null;
 
 // A panel's help popover, or the sheet with every shortcut.
 export type HelpId = HelpTopicId | 'sheet';

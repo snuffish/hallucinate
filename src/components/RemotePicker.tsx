@@ -142,6 +142,11 @@ export function RemotePicker({ id, site, title, noun = 'track', recentKey, fetch
       get hasQueue() { return latest.current.results.length > 1; },
       get busy() { return !!download.current; },
       cancel: () => cancel(),
+      clearRecent: () => {   // Settings → Data (it asks first)
+        latest.current.recent = [];
+        setRecent([]);
+        removeKey(recentKey);
+      },
     };
     return app.registerPicker(id, api);
   }, [app, id]);   // eslint-disable-line react-hooks/exhaustive-deps

@@ -15,9 +15,12 @@ bubble can be dragged anywhere too, and the chat opens beside it.
 
 **☰** shows or hides each widget and the assistant bubble, and *Reset layout* (Shift+H) restores the default
 arrangement. The layout is remembered. H hides all the controls, and they also hide on their own after 3 s without
-mouse movement. The scene that's playing is remembered too and comes back on the next start.
+mouse movement (Settings → Interface changes the delay, or turns it off). The scene that's playing is remembered too and comes back on the next start.
 
 The ☰ menu is also where you [export and import your setup](backup.md).
+
+**⚙** (or **,**) opens [Settings](settings.md): how this computer renders and listens, how soon the controls hide, and
+whether buttons show their key badges.
 
 ## Help
 

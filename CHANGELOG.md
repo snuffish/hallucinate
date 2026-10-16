@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — settings (2026-10-16)
+
+### Added
+
+- Settings (⚙ in the Hallucinate widget, ☰ → Settings…, or the , key): where Resolution starts, a pixel-density cap
+  for the main screen, the studio monitor and projectors, audio smoothing, the browser's microphone processing, how soon
+  the controls hide (or never), key badges on or off, and the assistant's reasoning toggle. Also export / import, clearing
+  the recently played lists and resetting the settings. They belong to this computer and stay out of Export; a change
+  in one tab reaches the others at once. See docs/settings.md.
+
 ## Unreleased — performance monitor (2026-10-16)
 
 ### Added

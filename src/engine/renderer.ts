@@ -161,6 +161,8 @@ export class Renderer {
   private specTex!: WebGLTexture;
   private targets: Targets | null = null;
   private pendingSize: [number, number] | null = null;
+  private cssSize: [number, number] | null = null;   // the canvas's size as the observer last reported it
+  private maxPixelRatio = 2;   // Settings → Display (src/state/prefs.ts)
   private readonly observer: ResizeObserver | null;
   private thumb: { scene: Target; out: Target } | null = null;
   private fakeSpectrum: Uint8Array | null = null;
@@ -190,8 +192,8 @@ export class Renderer {
     this.observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
       if (!rect) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      this.pendingSize = [Math.max(1, Math.floor(rect.width * dpr)), Math.max(1, Math.floor(rect.height * dpr))];
+      this.cssSize = [rect.width, rect.height];
+      this.pendingSize = this.pixels(rect.width, rect.height);
     });
     this.observer?.observe(canvas);
   }
@@ -576,11 +578,7 @@ export class Renderer {
   private resize(force = false): void {
     if (!force && !this.pendingSize && this.targets) return;
     let [w, h] = this.pendingSize ?? [0, 0];
-    if (!this.pendingSize) {   // before the observer has reported: one layout read
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      w = Math.max(1, Math.floor(this.canvas.clientWidth * dpr));
-      h = Math.max(1, Math.floor(this.canvas.clientHeight * dpr));
-    }
+    if (!this.pendingSize) [w, h] = this.pixels(this.canvas.clientWidth, this.canvas.clientHeight);   // before the observer has reported: one layout read
     this.pendingSize = null;
     if (!force && w === this.size[0] && h === this.size[1] && this.targets) return;
     const gl = this.gl;
@@ -602,6 +600,19 @@ export class Renderer {
   setScale(scale: number): void {
     this.scale = scale;
     this.resize(true);
+  }
+
+  // Caps the device pixel ratio the canvas renders at (a HiDPI screen at 2 draws four times the
+  // pixels of 1). Applied at the next frame, from the size the observer last reported.
+  setMaxPixelRatio(ratio: number): void {
+    if (ratio === this.maxPixelRatio) return;
+    this.maxPixelRatio = ratio;
+    if (this.cssSize) this.pendingSize = this.pixels(...this.cssSize);
+  }
+
+  private pixels(cssWidth: number, cssHeight: number): [number, number] {
+    const dpr = Math.min(window.devicePixelRatio || 1, this.maxPixelRatio);
+    return [Math.max(1, Math.floor(cssWidth * dpr)), Math.max(1, Math.floor(cssHeight * dpr))];
   }
 
   // ---------- Drawing ----------
