@@ -57,7 +57,7 @@ export const HELP_TOPICS = {
     id: 'library',
     title: 'Scene library',
     body: [
-      'Every scene with a live preview. Click a preview to play it, or filter by category and search.',
+      'Every scene with a live preview. Click a preview to play it, or filter by category and search. The built-ins are a laser show in Beams, Geometry, Fields and Media; your own are under Mine.',
       '★ makes a scene come up twice as often in auto-switch; the checkbox takes it out of the rotation. "Edit code" opens it in the code editor.',
     ],
     hotkeys: ['librarySearch', 'libraryTabNext', 'libraryRight', 'libraryDown', 'libraryPick', 'closeOverlay'],
@@ -149,7 +149,7 @@ export const HELP_TOPICS = {
     id: 'youtube',
     title: 'YouTube',
     body: [
-      'Search, or paste a video, playlist or Shorts link. The video becomes the picture the Media scenes distort.',
+      'Search, or paste a video, playlist or Shorts link. The video becomes the picture Scan Trace draws and your own shaders sample with media(p).',
       'Tick "Use the video\'s sound as the music" to make it the audio source too. The first load of a long video takes a moment.',
       ...NEEDS_SERVER,
     ],
@@ -160,12 +160,11 @@ export const HELP_TOPICS = {
 export type HelpTopicId = keyof typeof HELP_TOPICS;
 
 // The sheet's group order.
-export const SHEET_GROUPS: HotkeyDef['group'][] = ['Playback', 'Scenes', 'Look', 'Panels', 'Studio', 'Game'];
+export const SHEET_GROUPS: HotkeyDef['group'][] = ['Playback', 'Scenes', 'Look', 'Panels', 'Studio'];
 
 // Where a shortcut works, for keys that only apply in one place.
 const WHEN_NOTES: Partial<Record<HotkeyWhen, string>> = {
   library: 'in the library',
-  game: 'in Beat Racer',
   studio: 'in the studio',
   nodesOpen: 'in the visual maker',
   paramsVisible: 'while parameters show',

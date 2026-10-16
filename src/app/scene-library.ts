@@ -9,7 +9,7 @@
 // through a Compiler, the renderer or a test's fake.
 
 import { parseParams, type ParamSpec, type ParamStore, type ParamValues } from '../engine/params';
-import { COMMON, type Scene } from '../engine/scenes';
+import { COMMON, type Scene } from '../scenes';
 import { appendScene, discardParked, paramKey, saveSceneEdit, saveUserScenes, sceneByName, userScene, type ParkedScenes } from '../state/scene-list';
 
 // What a scene's code compiles with (Renderer has these). Errors are the GLSL compiler's text.

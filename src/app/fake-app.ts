@@ -5,7 +5,7 @@
 import type { Hearing } from '../engine/listener';
 import type { MediaLayer } from '../engine/media';
 import { ParamStore, type ParamSpec } from '../engine/params';
-import type { Scene } from '../engine/scenes';
+import type { Scene } from '../scenes';
 import { defaultClock, defaultLook, LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
 import { DEFAULT_PREFS } from '../state/prefs';
 import { Store } from '../state/store';
@@ -34,7 +34,7 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
   const scene = (s: Partial<Scene> & { name: string }, i: number): Scene => ({ id: `s${i}`, cat: '', desc: '', body: '', frag: '', params: opts.params?.[i] ?? [], ...s });
   const scenes: Scene[] = (opts.scenes ?? [{ name: 'Alpha', cat: 'Fractal' }, { name: 'Beta', cat: 'Space' }]).map(scene);
   const look = defaultLook();
-  const state = { scenes, gameIndex: -1, customIndex: -1, nodesIndex: -1, keyedScenes: [], look, clock: defaultClock(), activeSource: null };
+  const state = { scenes, customIndex: -1, nodesIndex: -1, keyedScenes: [], look, clock: defaultClock(), activeSource: null };
   const hooks: Partial<ControllerHooks> = {};
   const toasts: string[] = [];
   const ui = new Store(initialUIState(look));
@@ -50,7 +50,7 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
   };
   const setLook = (k: LookKey, v: number) => { const r = LOOK_RANGES[k]; look[k] = Math.min(r.max, Math.max(r.min, v)); };
 
-  const hearing: Hearing = { bass: 0.4, mid: 0.4, high: 0.4, level: 0.5, beat: 0, kick: false, tick: false, bpm: 120, bright: 0.6, centroid: 2500, energy: 0.5, mood: 0.5 };
+  const hearing: Hearing = { bass: 0.4, mid: 0.4, high: 0.4, level: 0.5, beat: 0, kick: false, tick: false, tickPhase: 0, ticks: 0, bpm: 120, bright: 0.6, centroid: 2500, energy: 0.5, mood: 0.5 };
 
   const app: FakeApp = {
     state, library, hooks, toasts,

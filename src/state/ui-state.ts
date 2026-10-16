@@ -1,7 +1,6 @@
 // What the React tree sees. Published by the render loop at ≤30 Hz and by actions immediately.
 // Everything here is a plain value, so selectors can compare with Object.is.
 
-import type { GameHud } from '../engine/game';
 import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
 import type { PerfReport } from '../engine/profiler';
@@ -53,7 +52,7 @@ export interface UIState {
   nowText: string;
   activeSource: SourceButton | null;
   sceneIndex: number;
-  sceneName: string;        // "3 · Hyper Tunnel"
+  sceneName: string;        // "3 · Ring Run"
   sceneVersion: number;     // bumps when the scene list changes (add/remove/edit), for lists
   look: Look;
   meters: Meters;
@@ -75,7 +74,6 @@ export interface UIState {
   dragging: DragId | null;
   paramsVisible: boolean;
   params: ParamsView;
-  hud: GameHud | null;
   perf: PerfReport | null;  // Shift+P: the performance overlay, ~2 Hz while on; null = off (not persisted)
   recording: boolean;
   transport: TransportView;
@@ -114,7 +112,6 @@ export const initialUIState = (look: Look): UIState => ({
   dragging: null,
   paramsVisible: false,
   params: { title: 'Parameters', key: '', specs: [], values: {}, inStudio: false },
-  hud: null,
   perf: null,
   recording: false,
   transport: { mode: null, hasQueue: false, playing: false, currentTime: 0, duration: 0, loop: false },

@@ -42,6 +42,7 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
 
   p.time = motion.time;
   p.bass = bass; p.mid = mid; p.high = high; p.level = level; p.beat = beat;
+  p.tickPhase = h.tickPhase; p.ticks = h.ticks;
   p.bright = h.bright;
   p.mood = look.mood ? h.mood : 0.5;
   grade(p, look);
@@ -86,8 +87,8 @@ export function crossfade(t: Transition, now: number): number {
 // A new, neutral frame state. Each pipeline keeps one and refills it every frame.
 export function programState(spectrum: Uint8Array = new Uint8Array(512)): ProgramState {
   return {
-    scene: -1, prevScene: -1, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, hue: 0,
-    spectrum, extra: {}, bright: 0.5, mood: 0.5,
+    scene: -1, prevScene: -1, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, tickPhase: 0, ticks: 0, hue: 0,
+    spectrum, bright: 0.5, mood: 0.5,
     grade: { exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] },
     feedback: 0.86, zoom: 1, rotation: 0, hueDrift: 0, warp: 0, aberration: 0, master: 1,
   };

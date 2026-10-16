@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ParamStore, parseParams } from '../engine/params';
-import { COMMON, type Scene } from '../engine/scenes';
+import { COMMON, type Scene } from '../scenes';
 import { KEYS, flushAll } from '../state/persistence';
 import { userScene, type ParkedScenes } from '../state/scene-list';
 import { SceneLibrary, SUPERSEDED, type Compiler, type SceneChange } from './scene-library';

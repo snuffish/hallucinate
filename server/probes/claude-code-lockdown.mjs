@@ -13,7 +13,7 @@ const cwd = mkdtempSync(join(tmpdir(), 'hallucinate-probe-'));
 const appTool = toolDefinition({
   name: 'get_app_state', description: 'Get what is on screen now.',
   inputSchema: z.object({}), outputSchema: z.object({ scene: z.string() }),
-}).server(async () => ({ scene: 'Kaleido Fractal' }));
+}).server(async () => ({ scene: 'Beam Fan' }));
 
 const BUILTIN = ['Bash', 'Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Glob', 'Grep', 'LS', 'WebSearch', 'WebFetch', 'Task', 'Agent', 'TodoWrite', 'KillShell', 'BashOutput', 'Skill', 'SlashCommand', 'AskUserQuestion', 'ListMcpResourcesTool', 'ReadMcpResourceTool', 'ExitPlanMode', 'EnterPlanMode', 'Monitor', 'ToolSearch'];
 const mode = process.argv[2] ?? 'locked';

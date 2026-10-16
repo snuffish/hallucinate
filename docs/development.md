@@ -41,7 +41,8 @@ See [ARCHITECTURE.md](../ARCHITECTURE.md) for the structure, the invariants and 
 shortcuts; [PERF.md](../PERF.md) for the performance work and measurements; [CHANGELOG.md](../CHANGELOG.md) for what
 changed in the React port. In short:
 
-- `src/engine/` – the engines (WebGL pipeline, audio analysis, scenes, `@param` parsing, visual-maker compiler, media, game, projector link), plain TypeScript classes.
+- `src/scenes/` – the built-in scenes (one module each, listed in key order in `index.ts`), the shared shader header and the new-scene template.
+- `src/engine/` – the engines (WebGL pipeline, audio analysis, `@param` parsing, visual-maker compiler, media, projector link), plain TypeScript classes.
 - `src/app/` – the controller that owns them and the frame loop, the editor / studio / player logic, the React shell.
 - `src/components/` – the panels, with the dockable widgets in `src/components/widgets/`; `src/hotkeys/` – the shortcut
   registry and the key badge; `src/help/` – the help topics; `src/state/` – app state, UI store, widget layout, persistence.
@@ -50,4 +51,4 @@ changed in the React port. In short:
 - `src/output.ts` / `output.html` – projector windows.
 - `desktop/` – the Electron main process and the local server it starts.
 
-Adding a scene = add a `scene(name, category, description, glsl)` line to `SCENES` in `src/engine/scenes.ts`.
+Adding a scene = a module in `src/scenes/` that builds it with `scene(name, category, description, glsl)`, listed in `SCENES` in `src/scenes/index.ts` (in key order). It uses only the scene inputs and the shared header's helpers (draw its lines with `beam(d, w)`, size them with `onePixel()`, time them with `tickFlash()` and `easedTicks()`); a helper two scenes need goes into `src/scenes/header.ts`. `e2e/builtin-scenes.spec.ts` checks every listed built-in against the laser-show checklist ([ADR 0001](adr/0001-replace-all-built-in-scenes.md)): it compiles, its category has a tab, it has 3–8 parameters, at least three quarters of its edges are pure black in silence, and neither a kick nor the step from one tick to the next makes a quarter of the frame or more over twice as bright.

@@ -24,7 +24,7 @@ What the music sounds like right now: its bands, kicks, ticks, tempo, tone, ener
 _Avoid_: features, audio state
 
 **Kick**:
-A clear bass hit heard in the music. Kicks jump the hue, drop Beat Racer's walls and count towards auto-switch.
+A clear bass hit heard in the music. Kicks jump the hue and count towards auto-switch.
 _Avoid_: beat, onset
 
 **Tick**:
@@ -50,6 +50,11 @@ How energetic the music feels, from calm to energetic: mostly its tempo, partly 
 _Avoid_: vibe
 
 ## The picture
+
+**Scene**:
+A picture that moves with the music, with its own parameters and a category. Built-in scenes ship with the app;
+your own are saved from the editor. Any scene may also show your video, camera or images.
+_Avoid_: visual, effect, shader, preset
 
 **Look**:
 The sliders that shape how a scene reacts and colours: reactivity, speed, trails, hue, colour cycling, fringing,

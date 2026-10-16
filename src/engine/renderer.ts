@@ -2,14 +2,14 @@
 //   1. scene shader(s)  -> scene targets (two while crossfading)
 //   2. feedback pass    -> mixes scene with a zoomed/rotated/hue-shifted copy of the
 //                          previous frame (ping-pong), giving Milkdrop-style trails
-//   3. display pass     -> tonemap, chromatic aberration, vignette, grain -> canvas
+//   3. display pass     -> tonemap, chromatic aberration, vignette, grain (not on black) -> canvas
 //
 // Programs compile in the background (KHR_parallel_shader_compile) so typing in the editor never
 // stalls the show; the previous program keeps running until the new one is ready. Media uploads go
 // through immutable storage + texSubImage2D, once per decoded video frame. Snapshots read back
 // asynchronously through a pixel buffer and a fence, so thumbnails don't stall the GPU.
 
-import { COMMON } from './scenes';
+import { COMMON } from '../scenes';
 import type { MediaLayer } from './media';
 import type { UniformValue } from './params';
 import { stillSpectrum, writeInputs, type SnapshotUniforms } from './scene-inputs';
@@ -77,7 +77,9 @@ void main() {
   float l = dot(col, vec3(.299, .587, .114));
   col = mix(vec3(l), col, 1.15 * uSat);
   col *= 1. - dot(c, c) * .6;
-  col += (hash(gl_FragCoord.xy + fract(uTime) * 100.) - .5) * .015;
+  // Grain fades out below a low brightness, so black stays exactly black on a projector.
+  float lit = smoothstep(0., .05, max(col.r, max(col.g, col.b)));
+  col += (hash(gl_FragCoord.xy + fract(uTime) * 100.) - .5) * .015 * lit;
   fragColor = vec4(clamp(col, 0., 1.) * uMaster, 1.);
 }
 `;
@@ -98,9 +100,10 @@ export interface ProgramState {
   high: number;
   level: number;
   beat: number;
+  tickPhase: number;
+  ticks: number;
   hue: number;
   spectrum: Uint8Array;
-  extra: Record<string, UniformValue>;
   bright: number;
   mood: number;
   grade: Grade;
@@ -443,7 +446,7 @@ export class Renderer {
 
   // ---------- Snapshots ----------
 
-  private renderThumb(index: number, uniforms: SnapshotUniforms, w: number, h: number): Target {
+  private renderThumb(index: number, uniforms: SnapshotUniforms, w: number, h: number, spectrum?: Uint8Array): Target {
     const gl = this.gl;
     if (this.thumb && (this.thumb.out.w !== w || this.thumb.out.h !== h)) {   // previews and assistant frames differ in size
       for (const t of [this.thumb.scene, this.thumb.out]) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
@@ -454,7 +457,7 @@ export class Renderer {
     const t = this.thumb;
     gl.bindVertexArray(this.vao);
     gl.bindTexture(gl.TEXTURE_2D, this.specTex);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 1, gl.RG, gl.UNSIGNED_BYTE, this.fakeSpectrum);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 1, gl.RG, gl.UNSIGNED_BYTE, spectrum ?? this.fakeSpectrum);
     const prog = this.program(index, true);
     if (prog) {
       this.use(prog, uniforms as unknown as SceneUniforms, this.mediaUniforms(index, -1), { uRes: [w, h], uSpec: this.specTex }, this.sceneParams[index]);
@@ -481,12 +484,13 @@ export class Renderer {
   }
 
   // Same picture, but the GPU is never stalled: the pixels come back through a pixel buffer once
-  // a fence says the frame is done. Calls are queued so they share one set of targets.
-  snapshotAsync(index: number, uniforms: SnapshotUniforms, w = 320, h = 180): Promise<ImageData> {
+  // a fence says the frame is done. Calls are queued so they share one set of targets. `spectrum`
+  // (256 × RG bytes) replaces the stand-in one, e.g. with silence.
+  snapshotAsync(index: number, uniforms: SnapshotUniforms, w = 320, h = 180, spectrum?: Uint8Array): Promise<ImageData> {
     const run = async (): Promise<ImageData> => {
       const gl = this.gl;
       if (this.disposed || this.lost) throw new Error('Renderer unavailable');
-      const out = this.renderThumb(index, uniforms, w, h);
+      const out = this.renderThumb(index, uniforms, w, h, spectrum);
       const bytes = w * h * 4;
       this.pbo ??= gl.createBuffer();
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
@@ -661,9 +665,9 @@ export class Renderer {
     writeInputs(u, s);
     u.uSpec = this.specTex;
     const media = this.mediaUniforms(s.scene, s.prevScene);
-    this.drawScene(s.scene, t.sceneA, u, media, s.extra);
+    this.drawScene(s.scene, t.sceneA, u, media);
     const crossfading = s.prevScene >= 0 && s.mix < 1;
-    if (crossfading) this.drawScene(s.prevScene, t.sceneB, u, media, s.extra);
+    if (crossfading) this.drawScene(s.prevScene, t.sceneB, u, media);
 
     const f = this.feedbackUniforms;
     f.uSceneA = t.sceneA.tex; f.uSceneB = crossfading ? t.sceneB.tex : t.sceneA.tex; f.uPrev = t.read.tex;
