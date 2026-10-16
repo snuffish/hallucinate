@@ -11,7 +11,6 @@ import { Editor } from '../components/Editor';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { SessionsProvider, useSessions } from './sessions';
 import { HelpLayer } from '../components/Help';
-import { Hud } from '../components/Hud';
 import { Library } from '../components/Library';
 import { PerfOverlay } from '../components/PerfOverlay';
 import { Settings } from '../components/Settings';
@@ -90,7 +89,6 @@ function Shell({ app }: { app: AppController }) {
       <SoundCloudPicker />
       <YouTubePicker />
       <Settings />
-      <Hud />
       <PerfOverlay />
       <Toast />
       <HelpLayer />
@@ -120,10 +118,6 @@ function Hotkeys() {
     auto: () => app.toggleAuto(),
     randomize: () => app.randomize(),
     randomizeBack: () => app.randomizeBack(),
-    game: () => app.setScene(app.state.gameIndex),
-    steerLeft: () => app.game.steer(-1),
-    steerRight: () => app.game.steer(1),
-    restartGame: () => app.game.reset(),
     assistant: () => app.toggleAssistant(),
     editor: () => app.toggleOverlay('editor'),
     visualMaker: () => app.toggleOverlay('nodes'),

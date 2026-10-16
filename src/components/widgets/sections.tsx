@@ -112,7 +112,6 @@ export function SceneBody({ onOpenLibrary }: { onOpenLibrary: () => void }) {
       {liveName && <div id="live-pin" className="live-pin" title="The projector shows the Live show scene. The Screen widget switches this screen between your preview and Live; the studio (O) puts Live back on screen too.">● LIVE · {liveName} <span>· {screenMode === 'live' ? 'on screen' : 'screen is a preview'}</span></div>}
       <div className="scene-buttons">
         <button id="open-library" onClick={onOpenLibrary}>Scene library<Kbd hotkey={HOTKEYS.library} /></button>
-        <button id="play-game" onClick={() => app.setScene(app.state.gameIndex)}>Beat Racer<Kbd hotkey={HOTKEYS.game} /></button>
       </div>
       <label className="toggle"><input type="checkbox" id="auto" checked={auto} onChange={(e) => app.setLookFlag('auto', e.target.checked)} /> Auto-switch on the beat <Kbd hotkey={HOTKEYS.auto} /></label>
     </>

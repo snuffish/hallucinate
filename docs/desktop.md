@@ -43,7 +43,7 @@ tab keeps them as run artifacts.
 
 **[https://snuffish.github.io/hallucinate/](https://snuffish.github.io/hallucinate/)** runs the app straight from
 GitHub Pages. Everything that runs in the browser works: audio files, mic, tab audio, the demo beat, all scenes, the
-editor, the visual maker, the studio with projector windows, and Beat Racer. SoundCloud, YouTube, the AI assistant and
+editor, the visual maker, and the studio with projector windows. SoundCloud, YouTube, the AI assistant and
 the studio director need the local server, so the demo hides them or points you to `npm run dev`.
 
 It is deployed by [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) on every push to `main`. To build the

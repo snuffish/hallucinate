@@ -1,4 +1,4 @@
-# 🎬 Scenes, the library & Beat Racer
+# 🎬 Scenes & the library
 
 [← Back to the README](../README.md)
 
@@ -38,11 +38,3 @@ Every scene as a card with a rendered preview. Filter by category or search, the
 Keyboard, with the library open: `/` jumps to the search box (`Esc` leaves it, a second `Esc` closes the library),
 `Tab` / `Shift+Tab` cycle the categories, `←` `↑` `↓` `→` move through the hits (also while typing), `Enter` plays the
 highlighted scene, `1`–`9` and `0` play the first ten scenes as everywhere else.
-
-## 🏁 Beat Racer (game) — press G
-
-<img src="screenshots/beat-racer.jpg" alt="Beat Racer: a synthwave road, walls dropping on the beat, the live spectrum as mountains" width="100%">
-
-A synthwave racer driven by your music: walls drop on every detected beat, the mountains are the live spectrum.
-Steer with ← / →, dodge walls (+1 × multiplier), grab orbs (+10 × multiplier). The multiplier grows every 8 in a row;
-3 lives; Enter restarts. Best score is remembered.

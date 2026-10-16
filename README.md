@@ -7,7 +7,7 @@
 <p align="center">
   <b>Psychedelic, audio-reactive visuals for your music, rendered in real time with WebGL2 shaders.</b><br>
   40 scenes that follow the beat · a live GLSL editor · a node-based visual maker · an OBS-style studio with projector output ·<br>
-  a beat-driven game · an AI assistant that writes and fixes scenes for you, inside the app.
+  an AI assistant that writes and fixes scenes for you, inside the app.
 </p>
 
 <p align="center">
@@ -64,7 +64,7 @@ Press **?** in the app for help and every shortcut.
 | | Feature | |
 | --- | --- | --- |
 | 🎧 | **[Audio](docs/audio.md)** | Play a file, SoundCloud, the mic, a browser tab or the built-in demo beat. A full player with tempo, and *synesthesia* that colours the visuals by how the music sounds. |
-| 🎬 | **[Scenes](docs/scenes.md)** · L | 40 scenes in seven categories that crossfade on the beat, a searchable library with favourites, and **Beat Racer** (G), a game driven by your music. |
+| 🎬 | **[Scenes](docs/scenes.md)** · L | 40 scenes in seven categories that crossfade on the beat, and a searchable library with favourites. |
 | 🧑‍💻 | **[Code editor](docs/editor.md)** · E | Edit any scene's GLSL live, with errors shown as you type. Tag a value with `// @param` and it becomes a slider (P). |
 | 🧩 | **[Visual maker](docs/visual-maker.md)** · N | Build scenes by wiring blocks together, then send the result to code. |
 | 🖼️ | **[Media](docs/media.md)** | Drop an image or video, or pick one from YouTube, and warp it with the Media scenes. |
