@@ -120,7 +120,7 @@ function prettify(name: string): string {
 // The specs as the Parameters list shows them: the ungrouped ones first (no heading), then each group in
 // the order it first appears. Groups that share a name are merged.
 export interface ParamGroup { name: string; specs: ParamSpec[] }
-export function groupParams(specs: ParamSpec[]): ParamGroup[] {
+export function groupParams(specs: readonly ParamSpec[]): ParamGroup[] {
   const groups = new Map<string, ParamSpec[]>([['', []]]);
   for (const s of specs) {
     const list = groups.get(s.group);
@@ -136,7 +136,7 @@ export function toUniform(spec: ParamSpec, value: ParamValue): UniformValue {
   return value as number | number[];
 }
 
-export function defaultValues(specs: ParamSpec[]): ParamValues {
+export function defaultValues(specs: readonly ParamSpec[]): ParamValues {
   return Object.fromEntries(specs.map((s) => [s.name, s.def]));
 }
 
@@ -162,7 +162,7 @@ export class ParamStore {
     this.writer = debouncedWriter(KEYS.params, () => this.data);
   }
 
-  values(key: string, specs: ParamSpec[]): ParamValues {
+  values(key: string, specs: readonly ParamSpec[]): ParamValues {
     const saved = this.data[key] ?? {};
     return Object.fromEntries(specs.map((s) => {
       const entry = saved[s.name];
@@ -177,7 +177,7 @@ export class ParamStore {
   }
 
   // Replace a scene's values (taking a show scene live). Missing values fall back to the defaults.
-  setAll(key: string, specs: ParamSpec[], values: ParamValues = {}): void {
+  setAll(key: string, specs: readonly ParamSpec[], values: ParamValues = {}): void {
     this.data[key] = Object.fromEntries(specs.map((s) => [s.name, { v: values[s.name] ?? s.def, def: s.def }]));
     this.writer.schedule();
   }

@@ -215,7 +215,7 @@ describe('assistant conversations', () => {
     const transcripts = memoryTranscripts();
     const { params } = parseParams('uniform float uGlow; // @param min=0 max=3');
     const app = fakeApp({ scenes: [{ name: 'Alpha', body: 'void main() { fragColor = vec4(1.); }' }], params: [params] });
-    app.setParamValues(0, params, { uGlow: 1.23456 });
+    app.library.setValues(0, { uGlow: 1.23456 });
     const scene = app.state.scenes[0]!;
     const first = session([], { transcripts, app });
     const c = first.s.active;

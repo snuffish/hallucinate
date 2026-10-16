@@ -25,7 +25,7 @@ export interface Routed { screen: Frame; projector: FullFrame | null }
 
 export interface LiveSlotDeps {
   readonly state: Pick<AppState, 'scenes' | 'look' | 'clock'>;
-  readonly specs: readonly (readonly ParamSpec[] | undefined)[];    // each scene's @params (the controller's sceneParams)
+  specs(i: number): readonly ParamSpec[];                           // each scene's @params (SceneLibrary.specs)
   readonly stored: readonly (SceneUniforms | undefined)[];          // each scene's values on the main canvas, as uniforms
   readonly ui: Store<UIState>;
   toast(text: string, ms?: number): void;
@@ -33,7 +33,6 @@ export interface LiveSlotDeps {
 
 // A frame state and its params table: one per output, refilled every frame.
 const output = (): FullFrame => ({ program: programState(), params: {} });
-const NO_SPECS: readonly ParamSpec[] = [];
 
 export class LiveSlot {
   // What is pinned, and the show scene it crossfades from (`prevScene` is released when the fade ends).
@@ -152,7 +151,7 @@ export class LiveSlot {
   }
 
   private uniforms(i: number, values: ParamValues): SceneUniforms {
-    const specs = this.deps.specs[i] ?? NO_SPECS;
+    const specs = this.deps.specs(i);
     const hit = this.uniformCache.get(values);
     if (hit && hit.index === i && hit.specs === specs) return hit.uniforms;
     const uniforms: SceneUniforms = Object.fromEntries(specs.map((s) => [s.name, toUniform(s, values[s.name] ?? s.def)]));

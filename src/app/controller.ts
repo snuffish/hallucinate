@@ -17,7 +17,7 @@ import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from 
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
-import { appendScene, buildSceneList, discardParked, paramKey, saveUserScenes, userScene, type ParkedScenes } from '../state/scene-list';
+import { buildSceneList, paramKey } from '../state/scene-list';
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
@@ -25,6 +25,7 @@ import { applyWrites, buildBundle, parseBundle } from './bundle';
 import { downloadFile, fileStamp } from './download';
 import { EditorCore } from './editor';
 import { LiveSlot } from './live-slot';
+import { SceneLibrary, type SceneChange } from './scene-library';
 import { Transport } from './transport';
 
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
@@ -48,7 +49,7 @@ export interface ControllerHooks {
   // Studio mode: Program no longer shows a show scene after a manual switch.
   onManualSceneChange?: () => void;
   // Studio dock: which parameters the overlay edits.
-  paramsOverride?: () => { title: string; key: string; specs: ParamSpec[]; values: ParamValues; onChange: (spec: ParamSpec, v: ParamValue) => void; onReset: () => void } | null;
+  paramsOverride?: () => { title: string; key: string; specs: readonly ParamSpec[]; values: ParamValues; onChange: (spec: ParamSpec, v: ParamValue) => void; onReset: () => void } | null;
   master?: () => number;
   autopilot?: () => boolean;
   // First Escape inside an overlay may just leave a text field; returns true when it was consumed.
@@ -71,7 +72,6 @@ export class AppController {
   readonly audio = new AudioEngine();
   readonly media = new MediaLayer();
   readonly game = new BeatRacer();
-  readonly paramStore = new ParamStore();
   readonly renderer: Renderer;
   readonly output: OutputLink;
   // The pinned Live slot (studio closed after a take): what projectors and the screen show, see live-slot.ts.
@@ -82,9 +82,8 @@ export class AppController {
   readonly layout = new Store<L.Layout>(this.initialLayout());
   readonly player: HTMLAudioElement;
   readonly transport: Transport;
-  readonly sceneParams: ParamSpec[][] = [];
-  // Saved scenes / edits that didn't compile on this device; kept stored, listed in the library.
-  readonly parked: ParkedScenes;
+  // Each scene's code, @params and stored values; adding, compiling and removing scenes (scene-library.ts).
+  readonly library: SceneLibrary;
   readonly tempo = new TempoClock();
   readonly editor: EditorCore;
   readonly pickers: Partial<Record<'sc' | 'yt', PickerApi>> = {};
@@ -113,6 +112,7 @@ export class AppController {
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly program: ProgramState;
+  private readonly paramStore = new ParamStore();
   private readonly profilerApi: ProfilerApi = {
     report: () => (this.profiler.on ? this.perfReport() : null),
     fillTest: () => this.runFillTest(),
@@ -146,7 +146,6 @@ export class AppController {
     const scenes: Scene[] = [];   // the one shared list: the renderer holds it, buildSceneList fills it
     this.renderer = new Renderer(canvas, scenes);
     const list = buildSceneList(scenes, (frag, name) => this.renderer.check(frag, name));
-    this.parked = list.parked;
     this.state = {
       scenes: list.scenes, gameIndex: list.gameIndex, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
       look: { ...defaultLook(), resolution: this.prefs.get().startResolution }, clock: defaultClock(), activeSource: null,
@@ -156,7 +155,8 @@ export class AppController {
     this.renderer.setMedia(this.media);
     this.renderer.setScale(this.state.look.resolution);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
-    this.live = new LiveSlot({ state: this.state, specs: this.sceneParams, stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
+    this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what));
+    this.live = new LiveSlot({ state: this.state, specs: (i) => this.library.specs(i), stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
     this.applyPrefs();
 
     this.player = document.createElement('audio');
@@ -171,7 +171,8 @@ export class AppController {
     });
 
     this.state.clock.scene = this.lastScene();   // before the params below, which publish the scene on screen's
-    list.scenes.forEach((s, i) => this.setSceneParams(i, s.params ?? []));
+    list.scenes.forEach((_, i) => this.pushParams(i));
+    this.showParams();
     this.editor = new EditorCore(this);
     this.audio.onBeat = () => this.beat();
     this.program = { ...programState(this.audio.spectrum), scene: this.state.clock.scene };
@@ -465,39 +466,23 @@ export class AppController {
     this.bumpScenes();
   }
 
-  // Appends a saved scene (editor "Save to library", assistant create_scene). Returns the index or an error.
-  addUserScene(name: string, body: string): { index: number } | { error: string } {
-    if (this.sceneByName(name) >= 0) return { error: `A scene called "${name}" already exists.` };
-    if (this.parked.userScenes.some((p) => p.name === name)) return { error: `A scene called "${name}" already exists (it doesn't compile on this device).` };
-    const scene = userScene(name, body);
-    const error = this.renderer.check(scene.frag, name);
-    if (error) return { error };
-    const index = appendScene(this.state.scenes, scene);
-    this.setSceneParams(index, scene.params);
-    saveUserScenes(this.state.scenes, this.parked);
-    this.bumpScenes();
-    return { index };
-  }
-
-  removeUserScene(index: number): void {
-    const s = this.state.scenes[index];
-    if (!s?.user) return;
-    s.removed = true;
-    saveUserScenes(this.state.scenes, this.parked);
-    if (this.state.clock.scene === index) this.setScene(0);
-    this.bumpScenes();
-  }
-
-  // A parked scene or edit (didn't compile here) is deleted for good.
-  discardParked(kind: 'scene' | 'edit', name: string): void {
-    discardParked(this.parked, kind, name, this.state.scenes);
-    this.bumpScenes();
+  // What a change in the library means on screen: new code reaches the renderer, the projector
+  // and the library list, new values the renderer; the Parameters panel follows the scene on screen.
+  private sceneChanged(i: number, what: SceneChange): void {
+    if (what === 'list') {
+      if (i === this.state.clock.scene && this.state.scenes[i]?.removed) this.setScene(0);
+      this.bumpScenes();
+      return;
+    }
+    this.pushParams(i);
+    if (what === 'code') { this.output.sendScene(i); this.bumpScenes(); }   // code edits reach the projector live
+    if (i === this.state.clock.scene) this.showParams();
   }
 
   // Loads a parked scene into "My Shader" so it can be fixed; "Save to library" under the same name
   // then replaces the parked copy. Nothing is stored until it compiles.
   openParkedInEditor(name: string): void {
-    const p = this.parked.userScenes.find((x) => x.name === name);
+    const p = this.library.parked.userScenes.find((x) => x.name === name);
     if (!p) return;
     this.editor.customCode = p.body;
     this.editor.libraryName = name;
@@ -511,7 +496,7 @@ export class AppController {
   captureScene(i = this.state.clock.scene): SceneSnapshot {
     const look: Record<string, number> = {};
     for (const k of LOOK_KEYS) look[k] = this.state.look[k];
-    return { scene: i, values: this.paramValues(i), look };
+    return { scene: i, values: this.library.values(i), look };
   }
 
   // Puts a scene on screen in one step, as the studio takes it: the look sliders it has, its values,
@@ -520,41 +505,17 @@ export class AppController {
     const scene = this.state.scenes[snap.scene];
     if (!scene || scene.removed) return;
     for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) this.setLook(k, snap.look[k]!);
-    this.paramStore.setAll(paramKey(scene), this.sceneParams[snap.scene] ?? [], snap.values);
-    this.pushParams(snap.scene);
+    this.library.replaceValues(snap.scene, snap.values);
     this.showScene(snap.scene, fade);
-    this.showParams();   // already on screen: showScene changed nothing, but the values did
   }
 
   // ---------- Live parameters ----------
 
-  // Some of a scene's parameters, set at once (the assistant's tools and their undo).
-  setParamValues(i: number, specs: readonly ParamSpec[], values: ParamValues): void {
-    const scene = this.state.scenes[i];
-    if (!scene) return;
-    for (const s of specs) if (values[s.name] !== undefined) this.paramStore.set(paramKey(scene), s, values[s.name]!);
-    this.pushParams(i);
-    if (i === this.state.clock.scene) this.showParams();
-  }
-
-  setSceneParams(i: number, specs: ParamSpec[]): void {
-    this.sceneParams[i] = specs;
-    this.pushParams(i);
-    this.output.sendScene(i);   // code edits reach the projector live
-    if (i === this.state.clock.scene) this.showParams();
-  }
-
+  // A scene's values as the renderer's uniforms.
   private pushParams(i: number): void {
-    const scene = this.state.scenes[i];
-    if (!scene) return;
-    const specs = this.sceneParams[i] ?? [];
-    const values = this.paramStore.values(paramKey(scene), specs);
-    this.renderer.setParams(i, Object.fromEntries(specs.map((s) => [s.name, toUniform(s, values[s.name]!)])));
-  }
-
-  paramValues(i: number): ParamValues {
-    const scene = this.state.scenes[i];
-    return scene ? this.paramStore.values(paramKey(scene), this.sceneParams[i] ?? []) : {};
+    if (!this.state.scenes[i]) return;
+    const values = this.library.values(i);
+    this.renderer.setParams(i, Object.fromEntries(this.library.specs(i).map((s) => [s.name, toUniform(s, values[s.name]!)])));
   }
 
   // Publishes what the Parameters panel edits: the studio's choice while it has one (it calls this
@@ -566,27 +527,21 @@ export class AppController {
       return;
     }
     const i = this.state.clock.scene;
-    const specs = this.sceneParams[i] ?? [];
+    const specs = this.library.specs(i);
     const inStudio = this.overlay === 'studio';
-    this.ui.set({ params: { title: inStudio ? `${this.currentScene.name} — live` : this.currentScene.name, key: paramKey(this.currentScene), specs, values: this.paramValues(i), inStudio }, paramsVisible: specs.length > 0 });
+    this.ui.set({ params: { title: inStudio ? `${this.currentScene.name} — live` : this.currentScene.name, key: paramKey(this.currentScene), specs, values: this.library.values(i), inStudio }, paramsVisible: specs.length > 0 });
   }
 
   setParam(spec: ParamSpec, value: ParamValue): void {
     const override = this.hooks.paramsOverride?.();
     if (override) return override.onChange(spec, value);
-    const i = this.state.clock.scene;
-    this.paramStore.set(paramKey(this.currentScene), spec, value);
-    this.pushParams(i);
-    this.showParams();
+    this.library.setValues(this.state.clock.scene, { [spec.name]: value });
   }
 
   resetParams(): void {
     const override = this.hooks.paramsOverride?.();
     if (override) return override.onReset();
-    const i = this.state.clock.scene;
-    this.paramStore.reset(paramKey(this.currentScene));
-    this.pushParams(i);
-    this.showParams();
+    this.library.resetValues(this.state.clock.scene);
   }
 
   // ---------- Look ----------

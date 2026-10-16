@@ -4,7 +4,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
-import { SUPERSEDED, type EditorTarget } from '../app/editor';
+import type { EditorTarget } from '../app/editor';
+import { SUPERSEDED } from '../app/scene-library';
 import { SCENES, TEMPLATE } from '../engine/scenes';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';

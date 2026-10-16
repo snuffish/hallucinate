@@ -4,7 +4,7 @@
 // must have an implementation: a missing or misspelt one doesn't compile.
 
 import type { AppPort } from '../app/app-port';
-import { SUPERSEDED } from '../app/editor';
+import { SUPERSEDED } from '../app/scene-library';
 import type { Cue, ShowSnapshot, StudioSession } from '../app/studio';
 import { blobToBase64, encodeJpeg } from '../engine/jpeg';
 import type { ParamSpec, ParamValue, ParamValues } from '../engine/params';
@@ -52,7 +52,7 @@ function coerceParam(spec: ParamSpec, raw: unknown): ParamValue | undefined {
 // The spec a key from the model means: its exact name, "Group/Label", or a label that only one param
 // has. Groups make short labels repeat ("Size" under Mushrooms and under Trees); guessing the first
 // would quietly move the wrong slider, so an ambiguous label is an error that names the candidates.
-export function resolveParam(specs: ParamSpec[], key: string): ParamSpec | string {
+export function resolveParam(specs: readonly ParamSpec[], key: string): ParamSpec | string {
   const exact = specs.find((s) => s.name === key);
   if (exact) return exact;
   const k = key.trim().toLowerCase();
@@ -69,7 +69,7 @@ export function resolveParam(specs: ParamSpec[], key: string): ParamSpec | strin
 }
 
 // A map of parameter name (or label) → raw value against a scene's specs.
-function coerceValues(specs: ParamSpec[], raw: unknown): { values: ParamValues; problems: string[] } {
+function coerceValues(specs: readonly ParamSpec[], raw: unknown): { values: ParamValues; problems: string[] } {
   const values: ParamValues = {};
   const problems: string[] = [];
   for (const [k, v] of Object.entries((raw ?? {}) as Record<string, unknown>)) {
@@ -207,8 +207,8 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
     write: (b) => { void app.editor.compileInto(app.editor.target(i), b); app.setScene(i); },
   });
   const params = (i: number, specs: readonly ParamSpec[]): Touched<ParamValues> => ({
-    read: () => { const v = app.paramValues(i); return Object.fromEntries(specs.map((s) => [s.name, structuredClone(v[s.name]!)])); },
-    write: (b) => app.setParamValues(i, specs, b),
+    read: () => { const v = app.library.values(i); return Object.fromEntries(specs.map((s) => [s.name, structuredClone(v[s.name]!)])); },
+    write: (b) => app.library.setValues(i, b),
   });
   const look = (keys: readonly LookKey[]): Touched<Partial<Record<LookKey, number>>> => ({
     read: () => Object.fromEntries(keys.map((k) => [k, app.state.look[k]])),
@@ -216,12 +216,12 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
   });
 
   const paramSummary = (i: number) => {
-    const specs = app.sceneParams[i] ?? [];
-    const values = app.paramValues(i);
+    const specs = app.library.specs(i);
+    const values = app.library.values(i);
     return specs.map((s) => ({ name: s.name, label: s.label, ...(s.group && { group: s.group }), type: s.color ? `${s.type} colour` : s.type, ...(s.type !== 'bool' && { min: s.min, max: s.max }), value: values[s.name] }));
   };
   // After a code change the model wrote the @param lines itself: their values are all it needs back.
-  const valuesOf = (i: number) => Object.fromEntries(Object.entries(app.paramValues(i)).map(([k, v]) => [k, round(v)]));
+  const valuesOf = (i: number) => Object.fromEntries(Object.entries(app.library.values(i)).map(([k, v]) => [k, round(v)]));
 
   // Compiles new code into a scene the model may edit, with one undo step. Shared by write and edit.
   const editable = (scene: unknown) => {
@@ -293,13 +293,13 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
 
     create_scene({ name, code }) {
       const n = String(name).trim().slice(0, 60);
-      const out = app.addUserScene(n, String(code));
+      const out = app.library.add(n, String(code));
       if ('error' in out) throw new Error(out.error.includes('exists') ? `${out.error} Pick another name, or edit it with write_scene_code.` : `It didn't compile, so nothing was created:\n${out.error}`);
       app.setScene(out.index);
       // Undo removes it again, unless the user has edited it since. (Deleted already: nothing to do.)
       const created: Touched<string | null> = {
         read: () => { const x = scenes()[out.index]; return x && !x.removed ? x.body : null; },
-        write: () => app.removeUserScene(out.index),
+        write: () => app.library.remove(out.index),
       };
       record(`Created "${n}"`, created, null);
       return { created: true, scene: n, nowPlaying: true, parameters: valuesOf(out.index) };
@@ -307,7 +307,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
 
     set_parameters({ values }) {
       const i = app.sceneIndex;
-      const specs = app.sceneParams[i] ?? [];
+      const specs = app.library.specs(i);
       const { values: applied, problems } = coerceValues(specs, values);
       const set = specs.filter((s) => s.name in applied);
       if (!set.length) throw new Error(problems.join('; ') || 'Nothing to set.');
@@ -352,7 +352,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
       const i = app.sceneByName(String(scene));
       if (i < 0) throw noScene(scene);
       if (scenes()[i]!.kind) throw new Error(`"${String(scene)}" can't be a show scene (only visual scenes can).`);
-      const coerced = coerceValues(app.sceneParams[i] ?? [], values);
+      const coerced = coerceValues(app.library.specs(i), values);
       const cue = undoable(`Added "${String(name ?? scene)}" to the show`, show(s), () =>
         s.add({ name: String(name ?? scene).trim().slice(0, 60) || String(scene), scene: String(scene), values: coerced.values, look: coerceLook(look) }));
       return { added: cueView(s, cue), ...(coerced.problems.length && { problems: coerced.problems }), showScenes: s.cues.length };
@@ -373,7 +373,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
       }
       let problems: string[] = [];
       if (values !== undefined) {
-        const coerced = coerceValues(sceneIndex >= 0 ? app.sceneParams[sceneIndex] ?? [] : [], values);
+        const coerced = coerceValues(app.library.specs(sceneIndex), values);
         problems = coerced.problems;
         patch.values = { ...(patch.values ?? cue.values), ...coerced.values };
       }

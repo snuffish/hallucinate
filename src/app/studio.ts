@@ -485,7 +485,7 @@ export class StudioSession {
     if (!this.open || this.paramTab !== 'preview') return null;
     const cue = this.preview;
     const i = this.sceneIndex(cue);
-    const specs: ParamSpec[] = i >= 0 ? this.app.sceneParams[i] ?? [] : [];
+    const specs = this.app.library.specs(i);
     const values: ParamValues = Object.fromEntries(specs.map((s) => [s.name, cue?.values[s.name] ?? s.def]));
     return {
       title: cue ? `${cue.name} — preview` : 'Preview',

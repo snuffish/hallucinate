@@ -228,6 +228,6 @@ describe('StudioSession pinned Live', () => {
     expect(s.isPinned).toBe(false);
     expect(app.ui.get().liveName).toBeNull();
     expect(app.state.clock.scene).toBe(1);
-    expect(app.paramValues(1)).toEqual({ uGlow: 1 });
+    expect(app.library.values(1)).toEqual({ uGlow: 1 });
   });
 });

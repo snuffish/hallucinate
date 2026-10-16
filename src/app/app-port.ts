@@ -14,9 +14,9 @@ import type { AppController } from './controller';
 import type { EditorCore } from './editor';
 
 export type AppPort = Pick<AppController,
-  | 'state' | 'ui' | 'live' | 'sceneParams' | 'sceneIndex' | 'currentScene' | 'overlay'
+  | 'state' | 'ui' | 'live' | 'library' | 'sceneIndex' | 'currentScene' | 'overlay'
   | 'toast' | 'setHooks' | 'showParams' | 'setScene' | 'sceneByName' | 'setLook'
-  | 'paramValues' | 'setParamValues' | 'captureScene' | 'applyScene' | 'addUserScene' | 'removeUserScene'
+  | 'captureScene' | 'applyScene'
 > & {
   readonly audio: Pick<AudioEngine, 'kind' | 'features'>;
   readonly tempo: Pick<TempoClock, 'bpm'>;

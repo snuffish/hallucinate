@@ -36,7 +36,7 @@ export interface DownloadView { id: 'sc' | 'yt'; title: string; percent: number;
 export interface ParamsView {
   title: string;
   key: string;              // the scene's `paramKey`: which scene's folded groups apply
-  specs: ParamSpec[];
+  specs: readonly ParamSpec[];
   values: ParamValues;
   inStudio: boolean;        // shown in the studio's parameters dock (and editing the Preview slot there)
 }

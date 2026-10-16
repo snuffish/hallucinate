@@ -4,7 +4,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import type { AppController } from '../app/controller';
-import { SUPERSEDED, type CompileResult } from '../app/editor';
+import { SUPERSEDED, type CompileResult } from '../app/scene-library';
 import { CATEGORIES, EXAMPLES, GraphSchema, NODE_TYPES, compileGraph, defaultParams, emptyGraph, type Graph, type GraphNode, type PortType } from '../engine/nodes';
 import { HOTKEYS } from '../hotkeys/registry';
 import { useHotkeyActions } from '../hooks/useAppHotkeys';

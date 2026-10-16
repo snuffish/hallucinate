@@ -18,7 +18,7 @@ function slot() {
   const stored: SceneUniforms[] = [{ uGlow: 0.1 }, { uGlow: 0.2 }, { uGlow: 0.3 }];
   const ui = new Store(initialUIState(look));
   const toasts: string[] = [];
-  const live = new LiveSlot({ state, specs: [GLOW, GLOW, GLOW], stored, ui, toast: (t) => { toasts.push(t); } });
+  const live = new LiveSlot({ state, specs: () => GLOW, stored, ui, toast: (t) => { toasts.push(t); } });
   // The main program this frame: scene 0, crossfading from nothing.
   const base = { ...programState(), scene: 0, master: 0.8 };
   const at = (t: number) => { state.clock.clock = t; };

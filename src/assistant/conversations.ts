@@ -393,7 +393,7 @@ export class AssistantSession {
   screen(): ScreenNow | null {
     try {
       const i = this.app.sceneIndex;
-      return { scene: this.app.currentScene.name, hash: codeHash(this.app.editor.target(i).body), values: this.app.paramValues(i) };
+      return { scene: this.app.currentScene.name, hash: codeHash(this.app.editor.target(i).body), values: this.app.library.values(i) };
     } catch {
       return null;
     }

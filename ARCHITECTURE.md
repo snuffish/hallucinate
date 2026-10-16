@@ -53,8 +53,13 @@ browser                                              dev server (Vite middleware
   the app through `AppPort` (`src/app/app-port.ts`), the part of the controller they use; the tests use one
   in-memory fake of it (`src/app/fake-app.ts`), so neither can drift from what the sessions need. A scene goes
   on screen as a whole through `applyScene` / `captureScene` (scene, parameter values, look), the way the studio
-  takes it; parameter changes go through the controller, which keeps the Parameters panel current. `EditorCore`
-  (compiling and saving code) belongs to the controller, the visual maker's `GraphSession` to its panel. The
+  takes it. A scene's code, its `@params` and their stored values belong to the scene library
+  (`src/app/scene-library.ts`, the controller's `library`): compiling into a scene, adding one of yours (one rule for
+  "Save to library" and the assistant's `create_scene`), removing it and setting values all go through it, and it
+  tells the controller what changed, which keeps the renderer, the projector and the Parameters panel current. It
+  compiles through a `Compiler` (the renderer), so the tests' fake app runs the real library on a fake one.
+  `EditorCore` keeps the editors' own text ("My Shader", the visual maker's code) and asks before a save; the visual
+  maker's `GraphSession` belongs to its panel. The
   controller's `ControllerHooks` are only what a session plugs into the frame loop, plus `escape` (a panel's
   first Escape may just leave its text field); panels register their own shortcuts.
 - **Errors in the interface** are caught by one `ErrorBoundary` around the panels; the canvas and the frame loop

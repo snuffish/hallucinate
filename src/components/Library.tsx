@@ -122,7 +122,7 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
   const remove = (i: number) => {
     const s = app.state.scenes[i]!;
     if (!confirm(`Delete "${s.name}" from the library?`)) return;
-    app.removeUserScene(i);
+    app.library.remove(i);
   };
 
   return (
@@ -184,7 +184,7 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
 function Parked() {
   const app = useApp();
   useUI((ui) => ui.sceneVersion);   // re-render when the parked set changes
-  const { userScenes, sceneEdits } = app.parked;
+  const { userScenes, sceneEdits } = app.library.parked;
   const edits = Object.keys(sceneEdits);
   if (!userScenes.length && !edits.length) return null;
   return (
@@ -196,13 +196,13 @@ function Parked() {
           <li key={`scene:${name}`} data-parked-scene={name}>
             <span>{name}</span>
             <button title="Load it into My Shader to fix it, then Save to library under the same name" onClick={() => app.openParkedInEditor(name)}>Fix in editor</button>
-            <button onClick={() => { if (confirm(`Delete "${name}" for good?`)) app.discardParked('scene', name); }}>Delete</button>
+            <button onClick={() => { if (confirm(`Delete "${name}" for good?`)) app.library.discardParked('scene', name); }}>Delete</button>
           </li>
         ))}
         {edits.map((name) => (
           <li key={`edit:${name}`} data-parked-edit={name}>
             <span>Your edit of {name}</span>
-            <button onClick={() => { if (confirm(`Discard your edit of "${name}"?`)) app.discardParked('edit', name); }}>Discard edit</button>
+            <button onClick={() => { if (confirm(`Discard your edit of "${name}"?`)) app.library.discardParked('edit', name); }}>Discard edit</button>
           </li>
         ))}
       </ul>
