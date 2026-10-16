@@ -90,8 +90,10 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
    active under and its owner (the app, or the library, visual maker or assistant panel), and `isEnabled(when,
    context)` decides which are live. Each owner registers its bindings with one action map typed by binding id
    (`useAppHotkeys` in `App.tsx`, `useHotkeyActions<'library'>` in a panel), so a binding without an action doesn't
-   compile; only the live ones are registered (a double binding is an error) and `<Kbd>` renders the badge. The registry test runs `isEnabled` over every UI
-   state and fails if two bindings are ever live on the same key.
+   compile; only the live ones are registered and `<Kbd>` renders the badge. The registry test runs `isEnabled` over
+   every UI state and fails if two bindings are ever live on the same key. That test is the guard, not TanStack's conflict
+   check: a panel taking a key over registers it (a child's effect) before the app drops its own, so the registrations
+   overlap for a moment and conflicts are allowed.
 6. **The assistant's tools run in the browser**, each declared once in `src/assistant/tools.ts` (zod schema,
    description, the panel's labels, whether the director gets it). The runner parses each call's input with that
    schema before the implementation sees it, and the implementations are a map typed by tool name, so a tool

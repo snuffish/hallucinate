@@ -28,10 +28,13 @@ const binding = (def: HotkeyDef, fn: () => void, context: HotkeyContext): UseHot
   options: { enabled: isEnabled(def.when, context), preventDefault: true, ...(def.inInputs && { ignoreInputs: false }), meta: { name: def.label, group: def.group } },
 });
 
-// Several actions share a key (← is scene / steer / cue) and exactly one is enabled at a time, so
-// only the enabled ones are registered and any real double binding is an error.
+// Several actions share a key (← is scene / steer / cue / library hit) and exactly one is enabled at a
+// time, so only the enabled ones are registered. Conflicts are allowed: when a panel takes a key over
+// (opening the library takes ←), its registration runs before the app's (a child's effects run first),
+// so both are registered until the app's effect drops its own, within the same commit. The registry
+// test is what proves no two bindings are ever live together.
 function useBindings(defs: UseHotkeyDefinition[]): void {
-  useHotkeys(defs.filter((d) => d.options?.enabled !== false), { conflictBehavior: 'error' });
+  useHotkeys(defs.filter((d) => d.options?.enabled !== false), { conflictBehavior: 'allow' });
 }
 
 // An owner's bindings with their actions: `useHotkeyActions<'library'>({ librarySearch: …, … })`.
