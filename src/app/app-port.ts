@@ -12,13 +12,15 @@ import type { Store } from '../state/store';
 import type { TempoClock } from '../state/tempo-clock';
 import type { AppController } from './controller';
 import type { EditorCore } from './editor';
+import type { MusicSource } from './music-source';
 
 export type AppPort = Pick<AppController,
   | 'state' | 'ui' | 'live' | 'library' | 'sceneIndex' | 'currentScene' | 'overlay'
   | 'toast' | 'setHooks' | 'showParams' | 'setScene' | 'sceneByName' | 'setLook'
   | 'captureScene' | 'applyScene'
 > & {
-  readonly audio: Pick<AudioEngine, 'kind' | 'features'>;
+  readonly audio: Pick<AudioEngine, 'features'>;
+  readonly music: Pick<MusicSource, 'playing'>;
   readonly tempo: Pick<TempoClock, 'bpm'>;
   readonly media: MediaLayer;                                     // the studio's Preview renderer shows it too
   readonly renderer: Pick<Renderer, 'snapshotAsync'>;

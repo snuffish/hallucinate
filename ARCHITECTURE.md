@@ -37,7 +37,8 @@ browser                                              dev server (Vite middleware
 - **The music** (`src/app/music-source.ts`, the controller's `music`): which source is playing, the "now playing"
   line and play / pause. A live input, a file or track through the `<audio>` player, or a video's sound starts there,
   and it hears when the audio engine lets go of a live input by itself (`AudioEngine.onEnded`: a shared tab stopped
-  sharing, the microphone went away). It is the only writer of `activeSource`.
+  sharing, the microphone went away). It is the only writer of `activeSource`, and the one place that says whether
+  the music is `playing` (a paused or finished file is still the source, but not playing).
 - **The Live slot** (`src/app/live-slot.ts`, the controller's `live`): closing the studio with a show scene Live pins
   it there. Projectors keep it, and crossfade from it on the next take with each show scene's own values, while the
   screen is free to browse (or shows Live too, from the Screen widget). `route()` decides each frame what the main

@@ -125,7 +125,7 @@ export class Director {
 
   // Can a cycle run now? Music must play, the show needs two scenes, and the chat must be idle.
   private ready(): boolean {
-    return !this.view.cycling && !!this.app.audio.kind && this.studio.cues.length >= 2 && !this.app.ui.get().assistantBusy;
+    return !this.view.cycling && this.app.music.playing && this.studio.cues.length >= 2 && !this.app.ui.get().assistantBusy;
   }
 
   // One cycle: a fresh thread, the digest, the model's tool calls, then the thread is forgotten.
@@ -170,7 +170,7 @@ export class Director {
     const app = this.app, s = this.studio;
     const scenes = app.state.scenes;
     return {
-      ...soundNow(app.state, app.audio),
+      ...soundNow(app.state, app.music.playing, app.audio.features.bright),
       elapsedSeconds: this.startedAt ? (Date.now() - this.startedAt) / 1000 : 0,
       media: !!app.media.el,
       trend: this.history.trend(),

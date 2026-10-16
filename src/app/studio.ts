@@ -456,7 +456,7 @@ export class StudioSession {
       if (elapsed >= this.autopilot.seconds) { this.advance(); return; }
       const tick = Math.floor(elapsed * 2);   // the timer bar, a few times a second, not every frame
       if (tick !== this.lastTimerTick) { this.lastTimerTick = tick; if (this.open) this.changed(false); }
-    } else if (this.app.audio.kind && elapsed > (this.currentStep?.maxSeconds ?? LIST_MAX_SECONDS)) this.advance();
+    } else if (this.app.music.playing && elapsed > (this.currentStep?.maxSeconds ?? LIST_MAX_SECONDS)) this.advance();
   }
 
   // ---------- Monitors ----------

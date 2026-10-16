@@ -258,7 +258,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
       return {
         playing: { name: s.name, kind: kindOf(s), category: s.cat || null, editedByUser: !!s.edited, parameters: paramSummary(i) },
         look: Object.fromEntries([...LOOK_KEYS, 'synesthesia'].map((k) => [k, app.state.look[k as LookKey]])),
-        audio: soundNow(app.state, app.audio),
+        audio: soundNow(app.state, app.music.playing, app.audio.features.bright),
         media: app.media.el ? { name: app.media.name, kind: app.media.kind } : null,
         codeEditorOpen: app.overlay === 'editor',
         scenes: sceneList(scenes()),
@@ -408,7 +408,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
         else if (typeof seconds === 'number' && typeof beats !== 'number' && s.autopilot.unit !== 'seconds') s.setAutoUnit('seconds');   // asking for seconds means the timer
         if (typeof on === 'boolean') s.setAutopilot(on);
       });
-      const warn = s.autopilot.on && s.cues.length < 2 ? 'The autopilot needs at least two show scenes.' : s.autopilot.on && s.autopilot.unit === 'beats' && !app.audio.kind ? 'Nothing is playing yet; the autopilot starts with the music.' : undefined;
+      const warn = s.autopilot.on && s.cues.length < 2 ? 'The autopilot needs at least two show scenes.' : s.autopilot.on && s.autopilot.unit === 'beats' && !app.music.playing ? 'Nothing is playing yet; the autopilot starts with the music.' : undefined;
       return { autopilot: showView(s).autopilot, ...(warn && { note: warn }) };
     },
 

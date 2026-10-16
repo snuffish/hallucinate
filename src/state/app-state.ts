@@ -1,7 +1,6 @@
 // The app's mutable state, shared by the engines (read every frame, no React) and the React tree
 // (through store.ts, which publishes immutable snapshots at UI rate). Nothing here allocates per frame.
 
-import type { AudioKind } from '../engine/audio';
 import type { Scene } from '../engine/scenes';
 
 export const BEATS_PER_SCENE = 32;
@@ -93,12 +92,11 @@ export const moodWord = (mood: number): MoodWord => thirds(mood, ['calm', 'groov
 export const toneWord = (bright: number): ToneWord => thirds(bright, ['dark', 'balanced', 'bright']);
 
 // The sound now, as the assistant and the director are told it: no mood or tone while nothing plays.
-export function soundNow(state: Pick<AppState, 'clock' | 'activeSource'>, audio: { kind: AudioKind | null; features: { bright: number } }) {
-  const playing = !!audio.kind;
+export function soundNow(state: Pick<AppState, 'clock' | 'activeSource'>, playing: boolean, bright: number) {
   return {
-    source: state.activeSource ?? audio.kind ?? 'none',
+    source: state.activeSource ?? 'none',
     bpm: state.clock.bpm,
     mood: playing ? moodWord(state.clock.mood) : null,
-    tone: playing ? toneWord(audio.features.bright) : null,
+    tone: playing ? toneWord(bright) : null,
   };
 }

@@ -140,7 +140,7 @@ export class AppController {
     if (seconds === null) return;   // Settings → Interface: the controls never fade
     this.idleTimer = setTimeout(() => {
       const ui = this.ui.get();
-      if (this.audio.kind && !ui.overlay && !ui.assistantOpen && !ui.assistantPeek && !ui.help && !ui.dragging && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
+      if (this.music.playing && !ui.overlay && !ui.assistantOpen && !ui.assistantPeek && !ui.help && !ui.dragging && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
     }, seconds * 1000);
   };
 
@@ -622,7 +622,7 @@ export class AppController {
     const c = this.state.clock;
     const tempo = c.bpm ? clamp01((c.bpm - 80) / 80) : 0.5;   // 80 BPM calm … 160 BPM energetic
     const energy = clamp01((this.audio.avg.level - 0.15) / 0.4);
-    const target = this.audio.kind ? tempo * 0.65 + energy * 0.35 : 0.5;
+    const target = this.music.playing ? tempo * 0.65 + energy * 0.35 : 0.5;
     c.mood += (target - c.mood) * (1 - Math.exp(-dt / 4));
   }
 
@@ -906,8 +906,8 @@ export class AppController {
     }
     if (this.state.activeSource === 'media') this.media.follow(this.player);
 
-    if (this.autoSwitching() && this.audio.kind && c.clock - c.sceneStart > MAX_SECONDS_PER_SCENE) this.nextRandomScene();
-    if (this.audio.kind && this.tempo.advance(c.clock)) this.hooks.onTempoBeat?.();   // scheduled tick (no kick needed)
+    if (this.autoSwitching() && this.music.playing && c.clock - c.sceneStart > MAX_SECONDS_PER_SCENE) this.nextRandomScene();
+    if (this.music.playing && this.tempo.advance(c.clock)) this.hooks.onTempoBeat?.();   // scheduled tick (no kick needed)
     const inGame = c.scene === this.state.gameIndex;
     if (inGame) this.game.update(dt, level);
     const mix = crossfade(c, c.clock);
@@ -937,7 +937,7 @@ export class AppController {
 
     if (++this.meterTick % 2 === 0) {
       const tone = toneWord(f.bright);
-      const moodLabel: MoodLabel = !look.mood || !this.audio.kind ? '' : `mood: ${moodWord(c.mood)}`;
+      const moodLabel: MoodLabel = !look.mood || !this.music.playing ? '' : `mood: ${moodWord(c.mood)}`;
       this.ui.set({
         meters: { bass: f.bass, mid: f.mid, high: f.high, bright: f.bright, centroid: f.centroid, beat: f.beat },
         bpm: c.bpm,

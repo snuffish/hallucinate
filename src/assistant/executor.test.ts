@@ -45,7 +45,7 @@ describe('tool runner', () => {
   });
 
   function setup() {
-    const app = fakeApp({ audio: null });
+    const app = fakeApp({ playing: false });
     const studio = new StudioSession(app);
     const undo = new UndoStack();
     return { studio, undo, run: createToolRunner(app, undo, () => studio) };
@@ -153,7 +153,7 @@ describe('scene code and parameter tools', () => {
         { name: 'Beta', cat: 'Fractal', edited: true }, { name: 'Maker', cat: 'Mine', kind: 'nodes' }, { name: 'Gone', cat: 'Space', removed: true },
       ],
       params: [specs],
-      audio: null,
+      playing: false,
       compiler,
     });
     app.library.setValues(0, { uGlow: 1.23456, uMirror: true });

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — the music and the visuals (2026-10-16)
+
+### Fixed
+
+- A paused, stopped or finished file (or SoundCloud track, or video's sound) no longer counts as music playing: the
+  autopilot's beats, auto-switch, the director's cycles and the assistant's "mood / tone" wait for it to play again,
+  instead of carrying on as if it still did. The assistant and the director say the source is "none" after a stop.
+
 ## Unreleased — studio Live (2026-10-16)
 
 ### Fixed

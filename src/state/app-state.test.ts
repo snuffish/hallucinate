@@ -9,7 +9,7 @@ describe('the sound in words', () => {
 
   it('says no mood or tone while nothing plays', () => {
     const clock = { ...defaultClock(), bpm: 124, mood: 0.8 };
-    expect(soundNow({ clock, activeSource: 'demo' }, { kind: 'demo', features: { bright: 0.2 } })).toEqual({ source: 'demo', bpm: 124, mood: 'energetic', tone: 'dark' });
-    expect(soundNow({ clock, activeSource: null }, { kind: null, features: { bright: 0.2 } })).toEqual({ source: 'none', bpm: 124, mood: null, tone: null });
+    expect(soundNow({ clock, activeSource: 'demo' }, true, 0.2)).toEqual({ source: 'demo', bpm: 124, mood: 'energetic', tone: 'dark' });
+    expect(soundNow({ clock, activeSource: 'soundcloud' }, false, 0.2)).toEqual({ source: 'soundcloud', bpm: 124, mood: null, tone: null });
   });
 });

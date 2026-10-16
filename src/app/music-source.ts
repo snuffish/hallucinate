@@ -45,6 +45,17 @@ export class MusicSource {
 
   get active(): SourceButton | null { return this.d.state.activeSource; }
 
+  // Whether the music is sounding now: a live input while it is connected (a quiet room is still a
+  // live input), the demo beat unless paused, and the player's sources while the player plays (paused,
+  // stopped or at the end, they aren't). What the tempo, the mood, auto-switch, the autopilot's
+  // ceiling and the director wait for.
+  get playing(): boolean {
+    const active = this.active, kind = this.d.audio.kind;
+    if (!active) return false;
+    if (active === 'mic' || active === 'display' || active === 'demo') return kind === active;
+    return kind === 'file' && !this.d.player.paused;
+  }
+
   // A live source. Throws what the browser refused (a permission, a cancelled capture).
   async start(kind: LiveSource, mic?: MediaTrackConstraints): Promise<void> {
     const audio = this.d.audio;
@@ -52,7 +63,7 @@ export class MusicSource {
     if (kind === 'mic') await audio.useMicrophone(mic);
     else if (kind === 'display') await audio.useDisplayAudio();
     else await audio.useDemo();
-    this.playing(LABELS[kind], kind);
+    this.began(LABELS[kind], kind);
     this.d.transport.setMode(kind === 'demo' ? 'demo' : null);
   }
 
@@ -63,7 +74,7 @@ export class MusicSource {
     player.src = src;
     await this.d.audio.useElement(player);
     await player.play();
-    this.playing(label, as);
+    this.began(label, as);
     this.d.transport.setMode('element', { hasQueue });
   }
 
@@ -89,7 +100,7 @@ export class MusicSource {
     this.set(null, text);
   }
 
-  private playing(label: string, source: SourceButton): void {
+  private began(label: string, source: SourceButton): void {
     this.demoPaused = false;
     this.set(source, `▶ ${label}`);
     this.d.started(source);
