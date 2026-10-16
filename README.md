@@ -20,6 +20,7 @@
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white">
   <img alt="Vite 8" src="https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white">
+  <a href="docs/desktop.md"><img alt="Electron 44" src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white"></a>
   <img alt="WebGL2" src="https://img.shields.io/badge/WebGL2-GLSL%20ES%203.00-990000?logo=webgl&logoColor=white">
   <img alt="TanStack AI" src="https://img.shields.io/badge/TanStack-AI%20%C2%B7%20Hotkeys%20%C2%B7%20Markdown-ff4154">
   <img alt="Tests" src="https://img.shields.io/badge/tests-vitest%20%2B%20playwright-6e9f18">
