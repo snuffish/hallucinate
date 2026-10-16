@@ -4,8 +4,9 @@
 
 import { z } from 'zod';
 import { COMMON, SCENES, TEMPLATE, type Scene } from '../scenes';
-import { parseParams } from '../engine/params';
-import { KEYS, readJSON, writeJSON } from './persistence';
+import { ParamDataSchema, parseParams } from '../engine/params';
+import { loadLibraryPrefs, saveLibraryPrefs } from './library-prefs';
+import { KEYS, readJSON, readString, remove, writeJSON, writeString } from './persistence';
 
 export const UserScenesSchema = z.array(z.object({ name: z.string(), body: z.string() }));
 export const SceneEditsSchema = z.record(z.string(), z.string());
@@ -27,6 +28,41 @@ export function userScene(name: string, body: string): Scene {
   return { id: `user:${name}`, name, body, frag: COMMON + code, params, cat: 'Mine', desc: 'Your shader', user: true };
 }
 
+// What is stored under a renamed scene's old name follows it: its parameter values, favourite and
+// auto-switch exclusion, and the last-scene mark. Saved-show cues are not moved: a cue that named your
+// scene now plays the built-in of that name (spec #23).
+function moveSettings(renamed: readonly Rename[]): void {
+  const params = readJSON(KEYS.params, ParamDataSchema, {});
+  let paramsMoved = false;
+  for (const { from, to } of renamed) {
+    const values = params[`user:${from}`];
+    if (!values) continue;
+    params[`user:${to}`] = values;
+    delete params[`user:${from}`];
+    paramsMoved = true;
+  }
+  if (paramsMoved) writeJSON(KEYS.params, params);
+
+  const prefs = loadLibraryPrefs();
+  const rename = (name: string) => renamed.find((r) => r.from === name)?.to ?? name;
+  saveLibraryPrefs({ ...prefs, favs: prefs.favs.map(rename), off: prefs.off.map(rename) });
+
+  const last = readString(KEYS.lastScene);
+  const moved = renamed.find((r) => `user:${r.from}` === last);
+  if (moved) writeString(KEYS.lastScene, `user:${moved.to}`);
+}
+
+// The startup toast about renames, stored when the list is built and taken once. Stored rather than
+// returned, so a list built twice (StrictMode: only the first build renames) still shows it.
+const storeRenameReport = (renamed: readonly Rename[]): void =>
+  writeString(KEYS.renameReport, `Renamed your scene(s) that share a built-in's name: ${renamed.map((r) => `${r.from} → ${r.to}`).join(', ')}`);
+
+export function takeRenameReport(): string | null {
+  const report = readString(KEYS.renameReport);
+  if (report !== null) remove(KEYS.renameReport);
+  return report;
+}
+
 export interface SceneListInit {
   scenes: Scene[];
   customIndex: number;
@@ -34,6 +70,27 @@ export interface SceneListInit {
   keyedScenes: number[];   // keys 1–0
   errors: string[];        // saved scenes / edits that no longer compile
   parked: ParkedScenes;    // the same, kept stored
+  renamed: Rename[];       // your scenes renamed because a built-in has their name
+}
+
+export interface Rename { from: string; to: string }
+
+// A saved scene named like a built-in (one that shipped after you saved yours) becomes "Name (mine)",
+// or "Name (mine 2)" and so on when that is taken too, so both stay reachable by name. Save and import
+// already refuse such names; this covers scenes saved before the built-in arrived.
+function renameClashes(stored: StoredScene[], shipped: readonly Scene[]): { stored: StoredScene[]; renamed: Rename[] } {
+  const builtin = new Set(shipped.map((s) => s.name));
+  const taken = new Set([...builtin, ...stored.map((s) => s.name)]);
+  const renamed: Rename[] = [];
+  const out = stored.map(({ name, body }) => {
+    if (!builtin.has(name)) return { name, body };
+    let to = `${name} (mine)`;
+    for (let n = 2; taken.has(to); n++) to = `${name} (mine ${n})`;
+    taken.add(to);
+    renamed.push({ from: name, to });
+    return { name: to, body };
+  });
+  return { stored: out, renamed };
 }
 
 // Compiles a shader source and returns the error, or null (Renderer.check).
@@ -53,7 +110,9 @@ export function buildSceneList(scenes: Scene[], check: CompileCheck, shipped: re
   );
   const errors: string[] = [];
   const parked: ParkedScenes = { userScenes: [], sceneEdits: {} };
-  for (const { name, body } of loadUserScenes()) {
+  const { stored, renamed } = renameClashes(loadUserScenes(), shipped);
+  if (renamed.length) { writeJSON(KEYS.userScenes, stored); moveSettings(renamed); storeRenameReport(renamed); }
+  for (const { name, body } of stored) {
     const scene = userScene(name, body);
     if (check(scene.frag, name)) { errors.push(name); parked.userScenes.push({ name, body }); }
     else scenes.push(scene);
@@ -72,6 +131,7 @@ export function buildSceneList(scenes: Scene[], check: CompileCheck, shipped: re
     keyedScenes: scenes.map((s, i) => (s.kind ? -1 : i)).filter((i) => i >= 0).slice(0, 10),
     errors,
     parked,
+    renamed,
   };
 }
 
