@@ -12,12 +12,12 @@ import { toUniform, type ParamSpec, type ParamValue, ParamValueSchema, type Para
 import { applyLook, programState, smoothstep, type FrameLook } from '../engine/look';
 import { Renderer, type ProgramState, type SceneUniforms } from '../engine/renderer';
 import type { ScreenDetailed } from '../engine/output-link';
-import { LOOK_KEYS, type LookKey } from '../state/app-state';
+import { LOOK_KEYS } from '../state/app-state';
 import { listedScenes } from '../state/library-prefs';
 import { KEYS, debouncedWriter, readJSON } from '../state/persistence';
 import { paramKey } from '../state/scene-list';
 import { LIST_MAX_SECONDS, PlanSchema, type Plan, type PlanStep } from '../state/show-plan';
-import type { AppController } from './controller';
+import type { AppPort } from './app-port';
 
 const CueSchema = z.object({
   id: z.string(),
@@ -108,7 +108,7 @@ export class StudioSession {
   private pinned: PinnedLive | null = null;
   private open = false;
 
-  constructor(private readonly app: AppController, private readonly notify: () => void = () => {}) {
+  constructor(private readonly app: AppPort, private readonly notify: () => void = () => {}) {
     const saved = readJSON(KEYS.show, ShowSchema, { cues: [], mode: 'fade', seconds: 1.5, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120 });
     this.cues = saved.cues;
     this.mode = saved.mode;
@@ -187,9 +187,8 @@ export class StudioSession {
   private pin(): void {
     const app = this.app;
     const c = app.state.clock;
-    const look: Record<string, number> = {};
-    for (const k of LOOK_KEYS) look[k] = app.state.look[k];
-    this.pinned = { scene: c.scene, prevScene: -1, transitionStart: c.clock, fade: 0, look, values: app.paramValues(c.scene) };
+    const { look, values } = app.captureScene(c.scene);
+    this.pinned = { scene: c.scene, prevScene: -1, transitionStart: c.clock, fade: 0, look: { ...look }, values };
     app.ui.set({ liveName: this.live?.name ?? app.state.scenes[c.scene]?.name ?? null });
   }
 
@@ -199,12 +198,7 @@ export class StudioSession {
     if (!pin) return;
     this.pinned = null;
     app.ui.set({ liveName: null });
-    const scene = app.state.scenes[pin.scene];
-    if (!scene || scene.removed) return;
-    for (const k of LOOK_KEYS) if (pin.look[k] !== undefined) app.setLook(k as LookKey, pin.look[k]!);
-    app.paramStore.setAll(paramKey(scene), app.sceneParams[pin.scene] ?? [], pin.values);
-    app.pushParams(pin.scene);
-    app.setScene(pin.scene, 0, true);
+    app.applyScene({ scene: pin.scene, values: pin.values, look: pin.look }, 0);
   }
 
   // What projectors render while Live is pinned: the Live cue with the live audio, crossfading on a take.
@@ -277,11 +271,9 @@ export class StudioSession {
   // A show scene = a scene, its parameter values and the look sliders, as they are on Live now.
   capture(): Omit<Cue, 'id'> {
     const app = this.app;
-    const i = app.sceneIndex;
-    const { name } = app.state.scenes[i]!;
-    const look: Record<string, number> = {};
-    for (const k of LOOK_KEYS) look[k] = app.state.look[k];
-    return { name, scene: name, values: app.paramValues(i), look };
+    const { scene, values, look } = app.captureScene();
+    const { name } = app.state.scenes[scene]!;
+    return { name, scene: name, values, look: { ...look } };
   }
 
   addFromSelect(value: string): void {
@@ -406,14 +398,10 @@ export class StudioSession {
     const fade = mode === 'cut' ? 0 : step?.seconds ?? this.seconds;
     if (source === 'user') this.touched();
     if (this.open) {
-      for (const k of LOOK_KEYS) if (cue.look[k] !== undefined) app.setLook(k as LookKey, cue.look[k]!);
-      const scene = app.state.scenes[i]!;
-      app.paramStore.setAll(paramKey(scene), app.sceneParams[i] ?? [], cue.values);
-      app.pushParams(i);
-      app.setScene(i, fade, true);
+      app.applyScene({ scene: i, values: cue.values, look: cue.look }, fade);
     } else {
-      const look: Record<string, number> = {};
-      for (const k of LOOK_KEYS) look[k] = cue.look[k] ?? app.state.look[k];
+      const now = app.captureScene(i).look;
+      const look = Object.fromEntries(LOOK_KEYS.map((k) => [k, cue.look[k] ?? now[k]!]));
       this.pinned = { scene: i, prevScene: this.pinned?.scene ?? -1, transitionStart: app.state.clock.clock, fade, look, values: cue.values };
       app.ui.set({ liveName: cue.name });
       if (!this.open) app.toast(`Live: ${cue.name}`, 1500);

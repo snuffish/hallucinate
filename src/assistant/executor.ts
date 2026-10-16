@@ -3,7 +3,7 @@
 // The input is parsed with the tool's own schema (tools.ts) before it gets here, and every tool name
 // must have an implementation: a missing or misspelt one doesn't compile.
 
-import type { AppController } from '../app/controller';
+import type { AppPort } from '../app/app-port';
 import { SUPERSEDED } from '../app/editor';
 import type { Cue, ShowSnapshot, StudioSession } from '../app/studio';
 import { blobToBase64, encodeJpeg } from '../engine/jpeg';
@@ -11,7 +11,6 @@ import type { ParamSpec, ParamValue, ParamValues } from '../engine/params';
 import type { SnapshotUniforms } from '../engine/renderer';
 import type { Scene } from '../engine/scenes';
 import { LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
-import { paramKey } from '../state/scene-list';
 import { PlanSchema } from '../state/show-plan';
 import type { z } from 'zod';
 import type { UndoStack } from './undo';
@@ -136,7 +135,7 @@ function sceneList(list: readonly Scene[]): Record<string, string> {
 }
 
 // `studio` is the show the studio tools act on (null where there is none, e.g. in tests).
-export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push'>, getStudio: () => StudioSession | null = () => null): ToolRunner {
+export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, getStudio: () => StudioSession | null = () => null): ToolRunner {
   const scenes = () => app.state.scenes;
   const findScene = (name: unknown): number => (name == null ? app.sceneIndex : app.sceneByName(String(name)));
   const noScene = (name: unknown) => new Error(`There's no scene called "${String(name)}". Call get_app_state for the exact names.`);
@@ -207,13 +206,10 @@ export function createToolRunner(app: AppController, undo: Pick<UndoStack, 'push
     read: () => app.editor.target(i).body,
     write: (b) => { void app.editor.compileInto(app.editor.target(i), b); app.setScene(i); },
   });
-  const params = (i: number, specs: readonly ParamSpec[]): Touched<ParamValues> => {
-    const key = paramKey(scenes()[i]!);
-    return {
-      read: () => { const v = app.paramValues(i); return Object.fromEntries(specs.map((s) => [s.name, structuredClone(v[s.name]!)])); },
-      write: (b) => { for (const s of specs) app.paramStore.set(key, s, b[s.name]!); app.pushParams(i); app.showParams(); },
-    };
-  };
+  const params = (i: number, specs: readonly ParamSpec[]): Touched<ParamValues> => ({
+    read: () => { const v = app.paramValues(i); return Object.fromEntries(specs.map((s) => [s.name, structuredClone(v[s.name]!)])); },
+    write: (b) => app.setParamValues(i, specs, b),
+  });
   const look = (keys: readonly LookKey[]): Touched<Partial<Record<LookKey, number>>> => ({
     read: () => Object.fromEntries(keys.map((k) => [k, app.state.look[k]])),
     write: (b) => { for (const k of keys) app.setLook(k, b[k]!); },

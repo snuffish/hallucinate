@@ -11,7 +11,7 @@ import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValue
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState, type SceneUniforms } from '../engine/renderer';
 import type { Scene } from '../engine/scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
 import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
@@ -37,6 +37,9 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const viewport = (): L.Size => ({ width: window.innerWidth, height: window.innerHeight });
 
 // Hooks other panels plug in. All optional; the controller works without them.
+// A scene with its parameter values and look sliders (only the keys a show scene keeps: LOOK_KEYS).
+export interface SceneSnapshot { scene: number; values: ParamValues; look: Readonly<Record<string, number>> }
+
 export interface ControllerHooks {
   // The code editor follows the scene on screen while it's open.
   onSceneChanged?: (index: number) => void;
@@ -420,10 +423,14 @@ export class AppController {
     this.setScene(i);
   }
 
-  // `fade` is the crossfade time (0 = cut). Changing scene outside the studio means Program no
-  // longer shows a show scene.
-  setScene(i: number, fade = CROSSFADE_SECONDS, fromStudio = false): void {
-    if (!fromStudio) this.hooks.onManualSceneChange?.();
+  // `fade` is the crossfade time (0 = cut). Changing scene this way (not as a show scene, see
+  // applyScene) means Program no longer shows a show scene.
+  setScene(i: number, fade = CROSSFADE_SECONDS): void {
+    this.hooks.onManualSceneChange?.();
+    this.showScene(i, fade);
+  }
+
+  private showScene(i: number, fade: number): void {
     const c = this.state.clock;
     const scene = this.state.scenes[i];
     if (i === c.scene || !scene || scene.removed) return;
@@ -518,7 +525,37 @@ export class AppController {
     if (this.ui.get().liveName) this.toast(mode === 'live' ? `Screen shows Live: ${this.ui.get().liveName}` : 'Screen shows your preview', 1500);
   }
 
+  // ---------- A scene as a whole: which one, its parameter values, the look ----------
+
+  // A scene as a show scene keeps it: its parameter values and the look sliders, as they are now.
+  captureScene(i = this.state.clock.scene): SceneSnapshot {
+    const look: Record<string, number> = {};
+    for (const k of LOOK_KEYS) look[k] = this.state.look[k];
+    return { scene: i, values: this.paramValues(i), look };
+  }
+
+  // Puts a scene on screen in one step, as the studio takes it: the look sliders it has, its values,
+  // then the scene, crossfading for `fade` seconds. Not a manual scene change.
+  applyScene(snap: SceneSnapshot, fade: number): void {
+    const scene = this.state.scenes[snap.scene];
+    if (!scene || scene.removed) return;
+    for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) this.setLook(k, snap.look[k]!);
+    this.paramStore.setAll(paramKey(scene), this.sceneParams[snap.scene] ?? [], snap.values);
+    this.pushParams(snap.scene);
+    this.showScene(snap.scene, fade);
+    this.showParams();   // already on screen: showScene changed nothing, but the values did
+  }
+
   // ---------- Live parameters ----------
+
+  // Some of a scene's parameters, set at once (the assistant's tools and their undo).
+  setParamValues(i: number, specs: readonly ParamSpec[], values: ParamValues): void {
+    const scene = this.state.scenes[i];
+    if (!scene) return;
+    for (const s of specs) if (values[s.name] !== undefined) this.paramStore.set(paramKey(scene), s, values[s.name]!);
+    this.pushParams(i);
+    if (i === this.state.clock.scene) this.showParams();
+  }
 
   setSceneParams(i: number, specs: ParamSpec[]): void {
     this.sceneParams[i] = specs;
@@ -527,7 +564,7 @@ export class AppController {
     if (i === this.state.clock.scene) this.showParams();
   }
 
-  pushParams(i: number): void {
+  private pushParams(i: number): void {
     const scene = this.state.scenes[i];
     if (!scene) return;
     const specs = this.sceneParams[i] ?? [];
@@ -540,6 +577,8 @@ export class AppController {
     return scene ? this.paramStore.values(paramKey(scene), this.sceneParams[i] ?? []) : {};
   }
 
+  // Publishes what the Parameters panel edits: the studio's choice while it has one (it calls this
+  // when that changes), else the scene on screen. Every change made through the controller calls it.
   showParams(): void {
     const override = this.hooks.paramsOverride?.();
     if (override) {

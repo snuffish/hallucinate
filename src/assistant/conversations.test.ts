@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventType } from '@tanstack/ai';
 import type { ConnectConnectionAdapter, UIMessage } from '@tanstack/ai-client';
-import type { AppController } from '../app/controller';
+import { fakeApp, type FakeApp } from '../app/fake-app';
+import { parseParams } from '../engine/params';
 import { KEYS } from '../state/persistence';
-import { Store } from '../state/store';
 import { AssistantSession, MAX_RUNNING_CLI, type Conversation } from './conversations';
 import type { Transcript, TranscriptBackend } from './history-store';
 import { codeHash } from './notes';
@@ -18,15 +18,6 @@ beforeEach(() => {
   storage.clear();
   vi.stubGlobal('localStorage', { getItem: (k: string) => storage.get(k) ?? null, setItem: (k: string, v: string) => { storage.set(k, v); }, removeItem: (k: string) => { storage.delete(k); } });
 });
-
-function fakeApp() {
-  const look = { hue: 0, cycle: 0.6, trails: 0.86, speed: 1, reactivity: 1, aberration: 0.012, synesthesia: 0 };
-  return {
-    state: { look },
-    setLook: vi.fn((k: keyof typeof look, v: number) => { look[k] = v; }),
-    ui: new Store({ assistantOpen: false, assistantBusy: false, assistantRunning: 0, assistantUnread: 0, assistantPeek: null as null | { chatId: string; text: string }, assistantFocus: null as string | null }),
-  };
-}
 
 function memoryTranscripts(): TranscriptBackend & { data: Map<string, Transcript> } {
   const data = new Map<string, Transcript>();
@@ -82,10 +73,10 @@ const until = async (cond: () => boolean, ms = 4000) => {
   }
 };
 
-function session(seen: Seen[], extra: { transcripts?: TranscriptBackend; gate?: { wait: Promise<void> }; app?: ReturnType<typeof fakeApp> } = {}) {
+function session(seen: Seen[], extra: { transcripts?: TranscriptBackend; gate?: { wait: Promise<void> }; app?: FakeApp } = {}) {
   const app = extra.app ?? fakeApp();
   const forgotten: string[] = [];
-  const s = new AssistantSession(app as unknown as AppController, { connection: scripted(seen, extra.gate), transcripts: extra.transcripts ?? memoryTranscripts(), locks: null, forgetThread: (id) => forgotten.push(id) });
+  const s = new AssistantSession(app, { connection: scripted(seen, extra.gate), transcripts: extra.transcripts ?? memoryTranscripts(), locks: null, forgetThread: (id) => forgotten.push(id) });
   s.attach();
   return { app, s, forgotten };
 }
@@ -213,7 +204,7 @@ describe('assistant conversations', () => {
 
     c.send('hello again');
     await until(() => seen.length >= 1 && !c.running);
-    expect(app.setLook).not.toHaveBeenCalled();           // the stale call did not run
+    expect(app.state.look.hue).toBe(0);                   // the stale call (hue 0.9) did not run
     expect(seen).toHaveLength(1);
     expect(seen[0]!.text).toMatch(/^\(This conversation was reopened on .*get_app_state.*\)\n\nhello again$/);
     expect(JSON.stringify(seen[0]!.messages)).toContain(NOT_RUN);
@@ -222,8 +213,10 @@ describe('assistant conversations', () => {
 
   it('remembers what was on screen when a reply finished, and a reopened conversation hears whether that scene changed', async () => {
     const transcripts = memoryTranscripts();
-    const scene = { name: 'Alpha', body: 'void main() { fragColor = vec4(1.); }' };
-    const app = Object.assign(fakeApp(), { sceneIndex: 0, currentScene: scene, editor: { target: () => ({ body: scene.body }) }, paramValues: () => ({ uGlow: 1.23456 }) });
+    const { params } = parseParams('uniform float uGlow; // @param min=0 max=3');
+    const app = fakeApp({ scenes: [{ name: 'Alpha', body: 'void main() { fragColor = vec4(1.); }' }], params: [params] });
+    app.setParamValues(0, params, { uGlow: 1.23456 });
+    const scene = app.state.scenes[0]!;
     const first = session([], { transcripts, app });
     const c = first.s.active;
     await c.load(false);

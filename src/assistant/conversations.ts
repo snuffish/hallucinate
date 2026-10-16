@@ -8,7 +8,7 @@
 // undo closure restores a snapshot, so only the newest change can be undone safely).
 
 import { fetchServerSentEvents, type ConnectConnectionAdapter, type ConnectionAdapter, type UIMessage } from '@tanstack/ai-client';
-import type { AppController } from '../app/controller';
+import type { AppPort } from '../app/app-port';
 import type { StudioSession } from '../app/studio';
 import { KEYS } from '../state/persistence';
 import { Store } from '../state/store';
@@ -211,7 +211,7 @@ export class AssistantSession {
   private baseTitle = typeof document !== 'undefined' ? document.title : '';
   private readonly disposers: (() => void)[] = [];
 
-  constructor(private readonly app: AppController, private readonly opts: SessionOptions = {}) {
+  constructor(private readonly app: AppPort, private readonly opts: SessionOptions = {}) {
     this.now = opts.now ?? Date.now;
     this.lockTools = opts.lock ?? createLock();
     this.transcripts = opts.transcripts ?? indexedDBTranscripts();

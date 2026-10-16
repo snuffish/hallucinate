@@ -1,34 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AppController } from './controller';
+import { fakeApp, type FakeApp } from './fake-app';
 import { StudioSession } from './studio';
 import { KEYS, flushAll } from '../state/persistence';
 import type { Plan } from '../state/show-plan';
 
-// A stand-in controller: the scenes, the clock, the look and the few methods a show touches.
-// The preview renderer is never created because setOpen() is not called.
-function fakeApp() {
-  const scenes = [
-    { name: 'Alpha', cat: 'Fractal', trails: 1 }, { name: 'Beta', cat: 'Tunnel & 3D', trails: 1 }, { name: 'Gamma', cat: 'Organic', trails: 1 },
-  ];
-  const app = {
-    state: { scenes, clock: { clock: 0, scene: 0, huePhase: 0 }, look: { hue: 0, cycle: 0.6, trails: 0.86, speed: 1, reactivity: 1, aberration: 0.012 } },
-    audio: { kind: 'demo' as string | null },
-    sceneParams: [[], [], []],
-    sceneIndex: 0,
-    tempo: { bpm: 120 },
-    ui: { set: vi.fn() },
-    paramStore: { setAll: vi.fn() },
-    setScene: vi.fn(function (this: unknown, i: number) { app.state.clock.scene = i; app.sceneIndex = i; }),
-    setLook: vi.fn(),
-    pushParams: vi.fn(),
-    paramValues: vi.fn(() => ({})),
-    showParams: vi.fn(),
-    toast: vi.fn(),
-    setHooks: vi.fn(() => () => {}),
-  };
-  return app;
-}
-type Fake = ReturnType<typeof fakeApp>;
+// The app in memory (fake-app.ts): the preview renderer is never created because setOpen() is not called.
+const app3 = () => fakeApp({ scenes: [{ name: 'Alpha', cat: 'Fractal', trails: 1 }, { name: 'Beta', cat: 'Tunnel & 3D', trails: 1 }, { name: 'Gamma', cat: 'Organic', trails: 1 }] });
+type Fake = FakeApp;
 
 const storage = new Map<string, string>();
 beforeEach(() => {
@@ -38,7 +16,7 @@ beforeEach(() => {
 
 function session(app: Fake, show?: object): StudioSession {
   if (show) storage.set(KEYS.show, JSON.stringify(show));
-  const s = new StudioSession(app as unknown as AppController, () => {});
+  const s = new StudioSession(app, () => {});
   s.attach();
   return s;
 }
@@ -49,7 +27,7 @@ const seconds = (app: Fake, s: StudioSession, n: number) => { app.state.clock.cl
 
 describe('StudioSession plan executor', () => {
   it('follows the plan instead of list order, with each step\'s own beat count', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha'), cue('Beta'), cue('Gamma')], autoBeats: 16 });
     s.setAutopilot(true);
     s.setPlan({ steps: [{ cue: 'id-Gamma', beats: 8, maxSeconds: 90 }, { cue: 'id-Alpha', beats: 16, maxSeconds: 90 }], note: 'test', loop: true });
@@ -65,7 +43,7 @@ describe('StudioSession plan executor', () => {
   });
 
   it('continues a step that is already Live when the plan starts with it', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha'), cue('Beta')], autoBeats: 32 });
     s.setAutopilot(true);
     s.take(s.cues[1]!, 'tool');
@@ -77,11 +55,11 @@ describe('StudioSession plan executor', () => {
     beats(s, 8);                              // no loop: back to list order, the plan is gone
     expect(s.plan).toBeNull();
     expect(s.live?.name).toBe('Beta');
-    expect(app.toast).toHaveBeenCalledWith(expect.stringContaining('Plan finished'), expect.any(Number));
+    expect(app.toasts).toContainEqual(expect.stringContaining('Plan finished'));
   });
 
   it('skips steps whose show scene is gone and drops a plan nothing in it can play', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha'), cue('Beta'), cue('Gamma')], autoBeats: 8 });
     s.setAutopilot(true);
     s.setPlan({ steps: [{ cue: 'nope', beats: 8, maxSeconds: 90 }, { cue: 'id-Beta', beats: 8, maxSeconds: 90 }], note: '', loop: true });
@@ -91,11 +69,11 @@ describe('StudioSession plan executor', () => {
     beats(s, 8);
     expect(s.plan).toBeNull();
     expect(s.live?.name).toBe('Alpha');       // list order from the top
-    expect(app.toast).toHaveBeenCalledWith(expect.stringContaining('no playable'), expect.any(Number));
+    expect(app.toasts).toContainEqual(expect.stringContaining('no playable'));
   });
 
   it('moves on by wall clock when the beats never come', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha'), cue('Beta')], autoBeats: 32 });
     s.setAutopilot(true);
     s.setPlan({ steps: [{ cue: 'id-Beta', beats: 64, maxSeconds: 15 }, { cue: 'id-Alpha', beats: 64, maxSeconds: 15 }], note: '', loop: true });
@@ -113,7 +91,7 @@ describe('StudioSession plan executor', () => {
   });
 
   it('on the timer, every show scene and every plan step gets the dial\'s seconds, music or not', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha'), cue('Beta'), cue('Gamma')], autoBeats: 16 });
     s.setAutoUnit('seconds');
     s.setAutoSeconds(20);
@@ -139,7 +117,7 @@ describe('StudioSession plan executor', () => {
   });
 
   it('a hand-made take lands on its plan step and marks the show as touched', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha'), cue('Beta'), cue('Gamma')], autoBeats: 32 });
     s.setAutopilot(true);
     s.setPlan({ steps: [{ cue: 'id-Alpha', beats: 8, maxSeconds: 90 }, { cue: 'id-Beta', beats: 8, maxSeconds: 90 }, { cue: 'id-Gamma', beats: 8, maxSeconds: 90 }], note: '', loop: true });
@@ -154,7 +132,7 @@ describe('StudioSession plan executor', () => {
   });
 
   it('replaces the plan atomically, remembers the previous one and restores it', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha'), cue('Beta')], autoBeats: 32 });
     const one: Plan = { steps: [{ cue: 'id-Alpha', beats: 8, maxSeconds: 90 }], note: 'one', loop: true };
     const two: Plan = { steps: [{ cue: 'id-Beta', beats: 8, maxSeconds: 90 }], note: 'two', loop: true };
@@ -169,7 +147,7 @@ describe('StudioSession plan executor', () => {
   });
 
   it('coalesces a burst of edits into one write', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha')] });
     const writes = vi.spyOn(localStorage, 'setItem');
     for (let i = 0; i < 50; i++) s.updateCue(s.cues[0]!, { values: { amount: i } });
@@ -180,7 +158,7 @@ describe('StudioSession plan executor', () => {
   });
 
   it('clamps imported autopilot and fade values to what the controls allow', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha')], autoSeconds: 0, seconds: 99, autoBeats: 'x' });
     expect(s.autopilot.seconds).toBe(5);
     expect(s.seconds).toBe(8);
@@ -189,7 +167,7 @@ describe('StudioSession plan executor', () => {
   });
 
   it('reorders only with every id exactly once', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha'), cue('Beta'), cue('Gamma')] });
     s.reorder(['id-Gamma', 'id-Alpha', 'id-Beta']);
     expect(s.cues.map((c) => c.name)).toEqual(['Gamma', 'Alpha', 'Beta']);
@@ -199,7 +177,7 @@ describe('StudioSession plan executor', () => {
   });
 
   it('snapshot and restore bring the show and the plan back', () => {
-    const app = fakeApp();
+    const app = app3();
     const s = session(app, { cues: [cue('Alpha'), cue('Beta')] });
     const before = s.snapshot();
     s.add({ name: 'Gamma', scene: 'Gamma', values: {}, look: {} });
@@ -210,7 +188,7 @@ describe('StudioSession plan executor', () => {
   });
 
   it('reads an old show without a plan, and a saved plan with defaults', () => {
-    const app = fakeApp();
+    const app = app3();
     const old = session(app, { cues: [cue('Alpha')], mode: 'cut', seconds: 2, autoBeats: 64 });
     expect(old.plan).toBeNull();
     expect(old.directorBeats).toBe(128);

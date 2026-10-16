@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AppController } from '../app/controller';
+import { fakeApp } from '../app/fake-app';
 import { StudioSession } from '../app/studio';
 import { parseParams } from '../engine/params';
-import { SUPERSEDED } from '../app/editor';
+import { SUPERSEDED, type CompileResult } from '../app/editor';
 import { applyEdits, createToolRunner, resolveParam, UndoConflict } from './executor';
 import { UndoStack } from './undo';
 
@@ -45,14 +45,7 @@ describe('tool runner', () => {
   });
 
   function setup() {
-    const scenes = [{ name: 'Alpha', cat: 'Fractal' }, { name: 'Beta', cat: 'Space' }];
-    const app = {
-      state: { scenes, clock: { clock: 0, scene: 0, huePhase: 0 }, look: { hue: 0, cycle: 0.6, trails: 0.86, speed: 1, reactivity: 1, aberration: 0.012 } },
-      audio: { kind: null }, sceneParams: [[], []], sceneIndex: 0, tempo: { bpm: 120 },
-      ui: { set: vi.fn() }, paramStore: { setAll: vi.fn() }, setScene: vi.fn(), setLook: vi.fn(), pushParams: vi.fn(), paramValues: vi.fn(() => ({})), showParams: vi.fn(), toast: vi.fn(),
-      setHooks: vi.fn(() => () => {}),
-      sceneByName: (name: string) => scenes.findIndex((s) => s.name === name),
-    } as unknown as AppController;
+    const app = fakeApp({ audio: null });
     const studio = new StudioSession(app);
     const undo = new UndoStack();
     return { studio, undo, run: createToolRunner(app, undo, () => studio) };
@@ -151,65 +144,62 @@ describe('scene code and parameter tools', () => {
 
   const { params: specs } = parseParams('uniform float uGlow; // @param min=0 max=3 label="Glow"\nuniform bool uMirror; // @param label="Mirror"');
 
-  function setup(compileError: string | null | typeof SUPERSEDED = null) {
-    const scene = { name: 'Alpha', cat: 'Fractal', body: 'float k = 1.;\nvoid main() { fragColor = vec4(k); }', user: true };
-    const scenes = [scene, { name: 'Beta', cat: 'Fractal', edited: true }, { name: 'Maker', cat: 'Mine', kind: 'nodes' }, { name: 'Gone', cat: 'Space', removed: true }];
-    const values = { uGlow: 1.23456, uMirror: true };
-    const app = {
-      state: { scenes, clock: { scene: 0, bpm: 120, mood: 0.5, huePhase: 0 }, look: { hue: 0 }, activeSource: null },
-      audio: { kind: null, features: { bright: 0.5 } }, media: { el: null }, overlay: null,
-      sceneParams: [specs, [], [], []], sceneIndex: 0, currentScene: scene,
-      sceneByName: (name: string) => scenes.findIndex((s) => s.name === name),
-      setScene: vi.fn(), pushParams: vi.fn(), showParams: vi.fn(), paramValues: vi.fn(() => values),
-      addUserScene: (name: string, body: string) => ({ index: scenes.push({ name, cat: 'Mine', body, user: true }) - 1 }),
-      removeUserScene: vi.fn((i: number) => { (scenes[i] as { removed?: boolean }).removed = true; }),
-      paramStore: { set: vi.fn((_key: string, spec: { name: string }, v: unknown) => { (values as Record<string, unknown>)[spec.name] = v; }) },
-      editor: {
-        target: (i: number) => ({ index: i, name: scenes[i]!.name, kind: (scenes[i] as { kind?: string }).kind === 'nodes' ? 'nodes' : 'user', body: (scenes[i] as { body?: string }).body ?? '' }),
-        compileInto: vi.fn(async (_t: unknown, src: string) => { if (compileError) return compileError; scene.body = src; return null; }),
-      },
-    } as unknown as AppController & { editor: { compileInto: ReturnType<typeof vi.fn> }; removeUserScene: ReturnType<typeof vi.fn> };
+  function setup(compileError: CompileResult = null) {
+    const app = fakeApp({
+      scenes: [
+        { name: 'Alpha', cat: 'Fractal', body: 'float k = 1.;\nvoid main() { fragColor = vec4(k); }', user: true },
+        { name: 'Beta', cat: 'Fractal', edited: true }, { name: 'Maker', cat: 'Mine', kind: 'nodes' }, { name: 'Gone', cat: 'Space', removed: true },
+      ],
+      params: [specs],
+      audio: null,
+      compile: () => compileError,
+    });
+    app.setParamValues(0, specs, { uGlow: 1.23456, uMirror: true });
     const undo = new UndoStack();
-    return { app, scene, scenes, values, undo, run: createToolRunner(app, undo) };
+    return {
+      app, scene: app.state.scenes[0]!, scenes: app.state.scenes, undo, run: createToolRunner(app, undo),
+      compileInto: vi.spyOn(app.editor, 'compileInto'), removeUserScene: vi.spyOn(app, 'removeUserScene'),
+    };
   }
 
   it('edit_scene_code compiles the edited code, returns the values only, and undoes to the old code', async () => {
-    const { app, scene, undo, run } = setup();
+    const { compileInto, scene, undo, run } = setup();
     const before = scene.body;
     const out = await run('edit_scene_code', { edits: [{ find: 'float k = 1.;', replace: 'float k = .5;' }] });
     expect(scene.body).toBe(before.replace('1.;', '.5;'));
     expect(out).toEqual({ compiled: true, scene: 'Alpha', nowPlaying: true, parameters: { uGlow: 1.235, uMirror: true } });
     expect(undo.last).toBe('Edited Alpha');
     undo.pop()!.undo();
-    expect(app.editor.compileInto).toHaveBeenLastCalledWith(expect.anything(), before);
+    expect(compileInto).toHaveBeenLastCalledWith(expect.anything(), before);
   });
 
   it('does not undo a code change once the scene\'s code was changed after it', async () => {
-    const { app, scene, undo, run } = setup();
+    const { compileInto, scene, undo, run } = setup();
     await run('edit_scene_code', { edits: [{ find: 'float k = 1.;', replace: 'float k = .5;' }] });
     scene.body = 'void main() { fragColor = vec4(1.); }';   // the user's own edit
-    app.editor.compileInto.mockClear();
+    compileInto.mockClear();
     expect(() => undo.pop()!.undo()).toThrow(UndoConflict);
-    expect(app.editor.compileInto).not.toHaveBeenCalled();
+    expect(compileInto).not.toHaveBeenCalled();
   });
 
   it('undoes a new scene by removing it, but not once the user edited its code', async () => {
-    const { app, scenes, undo, run } = setup();
+    const { removeUserScene, scenes, undo, run } = setup();
     await run('create_scene', { name: 'Neon Tide', code: 'void main() { fragColor = vec4(1.); }' });
     undo.pop()!.undo();
-    expect(app.removeUserScene).toHaveBeenCalledWith(4);
+    expect(removeUserScene).toHaveBeenCalledWith(4);
+    expect(scenes[4]!.removed).toBe(true);
 
     await run('create_scene', { name: 'Neon Tide 2', code: 'void main() { fragColor = vec4(1.); }' });
-    (scenes[5] as { body: string }).body = 'void main() { fragColor = vec4(.5); }';
-    app.removeUserScene.mockClear();
+    scenes[5]!.body = 'void main() { fragColor = vec4(.5); }';
+    removeUserScene.mockClear();
     expect(() => undo.pop()!.undo()).toThrow(UndoConflict);
-    expect(app.removeUserScene).not.toHaveBeenCalled();
+    expect(removeUserScene).not.toHaveBeenCalled();
   });
 
   it('edit_scene_code changes nothing when an edit misses or the result does not compile', async () => {
     const miss = setup();
     await expect(miss.run('edit_scene_code', { edits: [{ find: 'float q', replace: '' }] })).rejects.toThrow(/didn't match[\s\S]*Nothing was changed/);
-    expect(miss.app.editor.compileInto).not.toHaveBeenCalled();
+    expect(miss.compileInto).not.toHaveBeenCalled();
     expect(miss.undo.last).toBeUndefined();
 
     const broken = setup('ERROR: 0:2: syntax error');
@@ -235,16 +225,16 @@ describe('scene code and parameter tools', () => {
   });
 
   it('set_parameters undoes only the parameters it set, and not after they were changed again', async () => {
-    const { values, undo, run } = setup();
+    const { app, undo, run } = setup();
     await run('set_parameters', { values: { Glow: 2 } });
-    values.uMirror = false;   // another parameter, by hand: no conflict
+    app.setParamValues(0, specs, { uMirror: false });   // another parameter, by hand: no conflict
     undo.pop()!.undo();
-    expect(values).toEqual({ uGlow: 1.23456, uMirror: false });
+    expect(app.paramValues(0)).toEqual({ uGlow: 1.23456, uMirror: false });
 
     await run('set_parameters', { values: { Glow: 2 } });
-    values.uGlow = 2.5;   // the same one, by hand
+    app.setParamValues(0, specs, { uGlow: 2.5 });   // the same one, by hand
     expect(() => undo.pop()!.undo()).toThrow(UndoConflict);
-    expect(values.uGlow).toBe(2.5);
+    expect(app.paramValues(0).uGlow).toBe(2.5);
   });
 
   it('get_app_state keeps the playing scene\'s parameters in full and lists the library compactly', async () => {

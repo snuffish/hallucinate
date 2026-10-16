@@ -5,7 +5,7 @@
 // like the assistant panel's, and the director never takes Live by itself.
 
 import { fetchServerSentEvents, type ConnectionAdapter } from '@tanstack/ai-client';
-import type { AppController } from '../app/controller';
+import type { AppPort } from '../app/app-port';
 import type { StudioSession } from '../app/studio';
 import { Chat, forgetThread } from '../assistant/chat';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
@@ -55,7 +55,7 @@ export class Director {
   private chat: Chat | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly app: AppController, private readonly studio: StudioSession, private readonly opts: DirectorOptions = {}) {
+  constructor(private readonly app: AppPort, private readonly studio: StudioSession, private readonly opts: DirectorOptions = {}) {
     // The director's changes aren't undone from the panel: nothing keeps their undo steps.
     this.runner = serialized(createToolRunner(app, { push: () => {} }, () => studio), opts.lock ?? createLock());
   }
