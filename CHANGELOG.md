@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — assistant undo (2026-10-16)
+
+### Fixed
+
+- Undoing the assistant's transition, autopilot, parameter, look or code change refuses (with a message) once you or
+  the director changed the same thing after it, instead of silently overwriting your change. Before, only show edits
+  were checked.
+- Undoing a plan also switches the autopilot back off when the plan switched it on.
+- Undoing a parameter change resets only the parameters the assistant set, not every parameter of the scene.
+- Undoing a new scene leaves it alone once you edited its code.
+
 ## Unreleased — settings (2026-10-16)
 
 ### Added

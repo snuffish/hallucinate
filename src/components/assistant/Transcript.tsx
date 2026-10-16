@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type ReactN
 import type { ChatView, Conversation } from '../../assistant/conversations';
 import { splitFollowUps } from '../../assistant/follow-ups';
 import { describeNote, splitNotes } from '../../assistant/notes';
-import { ContentPartsSchema, DONE_VERBS, VERBS, type ToolName } from '../../assistant/tools';
+import { ContentPartsSchema, toolLabel } from '../../assistant/tools';
 import { textOf } from '../../assistant/transcript';
 import { addUsage, formatCost, formatTokens, newInput, NO_USAGE, type Usage } from '../../assistant/usage';
 
@@ -73,7 +73,7 @@ function ToolChip({ part, message }: { part: Extract<Part, { type: 'tool-call' }
   const result = message.parts.find((q): q is Extract<Part, { type: 'tool-result' }> => q.type === 'tool-result' && q.toolCallId === part.id);
   const error = result?.state === 'error';
   const done = part.output !== undefined || !!result;
-  const label = ((done && !error ? DONE_VERBS : VERBS)[part.name as ToolName] ?? (() => part.name))(input);
+  const label = toolLabel(part.name, input, done && !error);
   const images = imagesOf(part.output ?? result?.content);
   const why = error && typeof result?.content === 'string' ? result.content : undefined;
   return (

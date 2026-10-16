@@ -86,11 +86,13 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
    active under, and `isEnabled(when, context)` decides which are live; `useAppHotkeys` registers only those (a
    double binding is an error) and `<Kbd>` renders the badge. The registry test runs `isEnabled` over every UI
    state and fails if two bindings are ever live on the same key.
-6. **The assistant's tools run in the browser**, defined once with zod in `src/assistant/tools.ts`. The runner
-   parses each call's input with that schema before the implementation sees it, and the implementations are a
-   map typed by tool name, so a tool without one doesn't compile. Errors are thrown and become error tool
-   results; changes register an undo. Every tool call, from any conversation or the director, waits on one lock.
-   A show change's undo restores a snapshot only if nothing changed the show after it (`UndoConflict`).
+6. **The assistant's tools run in the browser**, each declared once in `src/assistant/tools.ts` (zod schema,
+   description, the panel's labels, whether the director gets it). The runner parses each call's input with that
+   schema before the implementation sees it, and the implementations are a map typed by tool name, so a tool
+   without one doesn't compile. Errors are thrown and become error tool results. Every tool call, from any
+   conversation or the director, waits on one lock. Every change is one undo step under one rule
+   (`undoable` / `record` in `executor.ts`): the undo puts back what the change touched only while that is still
+   what the change left, and refuses (`UndoConflict`) once anything else changed it since.
 7. **Overlays lay out around the widgets through one contract.** They read `--dock-*` and `body[data-widgets]`
    only, never a widget's selector, and stack with the `--z-*` scale; the studio's pinned Live canvas (`--z-live`)
    stays above every floating widget.
@@ -148,9 +150,11 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
   Tag uniforms or constants with `// @param` for live controls.
 - **A visual-maker block:** add an entry to `NODE_TYPES` in `src/engine/nodes.ts` (and a helper to `LIBS` if it
   needs GLSL). The examples test compiles every example graph.
-- **An assistant tool:** define it in `src/assistant/tools.ts` (add it to `TOOL_DEFINITIONS`), then implement it in
-  `src/assistant/executor.ts` and give it a verb in `VERBS` / `DONE_VERBS`; the compiler points at both until you
-  do. The browser wrapper (`client-tools.ts`) is generated from the definitions.
+- **An assistant tool:** add a `tool({ … })` entry to `TOOLS` in `src/assistant/tools.ts` (schema, description, its
+  `running` / `done` labels, `director: true` if the director may use it), then implement it in
+  `src/assistant/executor.ts`, where the compiler points until you do. A change goes through `undoable` with what it
+  touches (`show(s)`, `params(i, specs)`, …), never a hand-pushed undo. The browser wrapper (`client-tools.ts`) is
+  generated from the definitions.
 - **A shortcut:** add it to `HOTKEYS` with a `when` condition, wire the action in `useAppHotkeys` / `App.tsx`,
   and put `<Kbd hotkey={HOTKEYS.x} />` on the control it triggers.
 - **A persisted value:** add the key to `KEYS`, a zod schema, and read it with `readJSON(key, schema, fallback)`.

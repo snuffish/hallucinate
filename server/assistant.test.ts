@@ -71,7 +71,7 @@ describe('run modes', () => {
     const director = runConfig('director', 'api');
     expect(chatRun.tools.map((t) => t.name)).toEqual([...TOOL_DEFINITIONS].map((t) => t.name));
     expect(chatRun.maxTurns).toBe(30);
-    expect(director.tools.map((t) => t.name)).toEqual(['get_show', 'set_autopilot_plan', 'update_show_scene']);
+    expect(director.tools.map((t) => t.name)).toEqual(['get_show', 'update_show_scene', 'set_autopilot_plan']);
     expect(director.maxTurns).toBe(6);
     expect(director.tools.map((t) => t.name)).not.toContain('write_scene_code');
     expect(director.tools.map((t) => t.name)).not.toContain('take_show_scene');

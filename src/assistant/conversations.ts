@@ -364,8 +364,8 @@ export class AssistantSession {
     for (const id of this.view.chats.map((c) => c.id)) await this.remove(id);   // removing the active one opens the next, finally a new one
   }
 
-  // Undo reverts the newest change any conversation made, and tells that conversation. A show change
-  // that something else built on since can't be undone safely: it is dropped and `error` says why.
+  // Undo reverts the newest change any conversation made, and tells that conversation. A change that
+  // something else built on since can't be undone safely: it is dropped and `error` says why.
   undoLast(): { label: string; error?: string } | null {
     const step = this.undo.pop();
     if (!step) return null;
