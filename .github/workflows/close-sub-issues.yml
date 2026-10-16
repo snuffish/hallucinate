@@ -1,0 +1,45 @@
+name: Close sub-issues
+
+# When a parent issue closes, close its open sub-issues with the same reason
+# (completed / not planned). Issues closed by GITHUB_TOKEN don't trigger new
+# workflow runs, so nested sub-issues are walked here rather than by cascade.
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  issues: write
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const parent = context.payload.issue;
+            const reason = parent.state_reason === 'not_planned' ? 'not_planned' : 'completed';
+
+            async function closeChildren(number) {
+              const children = await github.paginate(
+                'GET /repos/{owner}/{repo}/issues/{issue_number}/sub_issues',
+                { owner, repo, issue_number: number, per_page: 100 },
+              );
+              for (const child of children) {
+                await closeChildren(child.number);
+                if (child.state !== 'open') continue;
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: child.number,
+                  body: `Closed because parent #${parent.number} was closed.`,
+                });
+                await github.rest.issues.update({
+                  owner, repo, issue_number: child.number,
+                  state: 'closed', state_reason: reason,
+                });
+                core.info(`Closed #${child.number} (${reason})`);
+              }
+            }
+
+            await closeChildren(parent.number);
