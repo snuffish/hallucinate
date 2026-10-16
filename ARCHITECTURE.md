@@ -49,8 +49,8 @@ browser                                              dev server (Vite middleware
   on screen as a whole through `applyScene` / `captureScene` (scene, parameter values, look), the way the studio
   takes it; parameter changes go through the controller, which keeps the Parameters panel current. `EditorCore`
   (compiling and saving code) belongs to the controller, the visual maker's `GraphSession` to its panel. The
-  controller's `ControllerHooks` are only what a session plugs into the frame loop and the shortcuts that
-  follow the open panel (library navigation, deleting a block).
+  controller's `ControllerHooks` are only what a session plugs into the frame loop, plus `escape` (a panel's
+  first Escape may just leave its text field); panels register their own shortcuts.
 - **Errors in the interface** are caught by one `ErrorBoundary` around the panels; the canvas and the frame loop
   sit outside it, so the show keeps running. The loop itself re-arms before each frame, so a frame that throws
   is logged once and the next one runs.
@@ -87,8 +87,10 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
    and treated as untrusted. Bursts of writes (slider drags, graph edits, the studio's show) are coalesced with
    `debouncedWriter`.
 5. **One shortcut registry.** `src/hotkeys/registry.ts` declares every binding with the condition it is
-   active under, and `isEnabled(when, context)` decides which are live; `useAppHotkeys` registers only those (a
-   double binding is an error) and `<Kbd>` renders the badge. The registry test runs `isEnabled` over every UI
+   active under and its owner (the app, or the library, visual maker or assistant panel), and `isEnabled(when,
+   context)` decides which are live. Each owner registers its bindings with one action map typed by binding id
+   (`useAppHotkeys` in `App.tsx`, `useHotkeyActions<'library'>` in a panel), so a binding without an action doesn't
+   compile; only the live ones are registered (a double binding is an error) and `<Kbd>` renders the badge. The registry test runs `isEnabled` over every UI
    state and fails if two bindings are ever live on the same key.
 6. **The assistant's tools run in the browser**, each declared once in `src/assistant/tools.ts` (zod schema,
    description, the panel's labels, whether the director gets it). The runner parses each call's input with that
@@ -160,8 +162,9 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
   `src/assistant/executor.ts`, where the compiler points until you do. A change goes through `undoable` with what it
   touches (`show(s)`, `params(i, specs)`, …), never a hand-pushed undo. The browser wrapper (`client-tools.ts`) is
   generated from the definitions.
-- **A shortcut:** add it to `HOTKEYS` with a `when` condition, wire the action in `useAppHotkeys` / `App.tsx`,
-  and put `<Kbd hotkey={HOTKEYS.x} />` on the control it triggers.
+- **A shortcut:** add it to `HOTKEYS` with a `when` condition (and an `owner` if a panel handles it), give it its
+  action in that owner's map (`App.tsx`, or the panel's `useHotkeyActions`; the compiler points there), and put
+  `<Kbd hotkey={HOTKEYS.x} />` on the control it triggers.
 - **A persisted value:** add the key to `KEYS`, a zod schema, and read it with `readJSON(key, schema, fallback)`.
   Decide whether it is setup (add it to `SECTIONS` in `src/app/bundle.ts`, so Export / Import carry it) or history
   (leave it out, and say so in the comment above `SECTIONS`).

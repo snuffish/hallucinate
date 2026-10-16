@@ -41,11 +41,8 @@ const viewport = (): L.Size => ({ width: window.innerWidth, height: window.inner
 export interface SceneSnapshot { scene: number; values: ParamValues; look: Readonly<Record<string, number>> }
 
 export interface ControllerHooks {
-  // The code editor follows the scene on screen while it's open.
-  onSceneChanged?: (index: number) => void;
   // The studio draws its Preview monitor and glides its master fader every frame.
   onFrame?: (dt: number, program: ProgramState) => void;
-  onBeat?: () => void;          // a detected bass hit
   onTempoBeat?: () => void;     // a tick of the tempo clock (keeps going through breakdowns)
   // Studio mode: Program no longer shows a show scene after a manual switch.
   onManualSceneChange?: () => void;
@@ -56,15 +53,8 @@ export interface ControllerHooks {
   // Studio: while the Live slot is pinned (studio closed after a take), projectors get this instead
   // of what the main window shows.
   liveProgram?: (base: ProgramState) => { program: ProgramState; params: Record<number, SceneUniforms> } | null;
-  // Scene library keyboard navigation.
-  librarySearch?: () => void;
-  libraryMove?: (dx: number, dy: number) => void;
-  libraryPick?: () => void;
-  libraryTab?: (dir: number) => void;
   // First Escape inside an overlay may just leave a text field; returns true when it was consumed.
   escape?: () => boolean;
-  // Visual maker: Delete removes the selected block.
-  deleteNode?: () => void;
   // A device preference changed (the studio's Preview renderer follows the pixel density).
   onPrefs?: (prefs: Prefs) => void;
 }
@@ -448,7 +438,6 @@ export class AppController {
     c.beatsInScene = 0;
     this.publishScene();
     this.showParams();
-    this.hooks.onSceneChanged?.(i);
   }
 
   // The scene that was on screen when the page closed (by name, not index: the list can change in
@@ -839,7 +828,6 @@ export class AppController {
     if (bpm) { c.bpm = bpm; this.tempo.setBpm(bpm); }
     if (c.scene === this.state.gameIndex) this.game.onBeat();
     if (this.autoSwitching() && c.beatsInScene >= BEATS_PER_SCENE) this.nextRandomScene();
-    this.hooks.onBeat?.();
     if (this.tempo.onDetectedBeat(c.clock)) this.hooks.onTempoBeat?.();
   }
 

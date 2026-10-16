@@ -3,7 +3,6 @@
 // the panel is closed; the bubble shows when they work and when a reply is waiting, with a peek at it.
 // The panel resizes from its corner like a widget, and can show the assistant's reasoning.
 
-import { useHotkeys, type UseHotkeyDefinition } from '@tanstack/react-hotkeys';
 import { createRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { useApp, useLayout, useUI } from '../app/AppContext';
@@ -14,6 +13,7 @@ import { LONG_CHAT_TOKENS } from '../assistant/conversations';
 import { toMarkdown } from '../assistant/transcript';
 import { formatTokens, totalTokens } from '../assistant/usage';
 import { HOTKEYS } from '../hotkeys/registry';
+import { useHotkeyActions } from '../hooks/useAppHotkeys';
 import { Kbd } from '../hotkeys/Kbd';
 import { chatPlacement, effective, type WidgetSize } from '../state/layout';
 import { setShowThinking, useShowThinking } from '../state/prefs';
@@ -287,16 +287,12 @@ export function Assistant() {
   const toggleThinking = () => setShowThinking(!showThinking);
 
   // Panel shortcuts, while it is open (they work from the text box too).
-  const hk = (def: { keys: string; label: string }, fn: () => void): UseHotkeyDefinition => ({
-    hotkey: def.keys as UseHotkeyDefinition['hotkey'], callback: fn,
-    options: { enabled: open, preventDefault: true, ignoreInputs: false, meta: { name: def.label, group: 'Panels' } },
+  useHotkeyActions<'assistant'>({
+    assistantNew: () => { session.newChat(); setListOpen(false); },
+    assistantPrev: () => session.step(-1),
+    assistantNext: () => session.step(1),
+    assistantSearch: () => { setListOpen(true); setSearchTick((n) => n + 1); },
   });
-  useHotkeys([
-    hk(HOTKEYS.assistantNew, () => { session.newChat(); setListOpen(false); }),
-    hk(HOTKEYS.assistantPrev, () => session.step(-1)),
-    hk(HOTKEYS.assistantNext, () => session.step(1)),
-    hk(HOTKEYS.assistantSearch, () => { setListOpen(true); setSearchTick((n) => n + 1); }),
-  ].filter((d) => d.options?.enabled));
 
   const running = view.status === 'running';
   const idle = info?.backend === 'claude-code' ? 'Using your Claude subscription (via Claude Code)' : info?.backend === 'api' ? `Anthropic API${info.model ? ` · ${info.model}` : ''}` : '';

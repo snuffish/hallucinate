@@ -1,94 +1,54 @@
-// Registers every shortcut from the registry with TanStack Hotkeys. Overlays and the game take some
-// keys over, the visual maker takes them all; `isEnabled` in the registry decides which is live.
+// Registers the shortcuts from the registry with TanStack Hotkeys. Every binding has one owner: the
+// app (App.tsx) or a panel (the library, the visual maker, the assistant), which registers it with its
+// action through useHotkeyActions. The actions are a map typed by binding, so a binding without one
+// doesn't compile. Overlays and the game take some keys over, the visual maker takes them all;
+// `isEnabled` in the registry decides which is live, for every registration.
 
 import { useHotkeys, type UseHotkeyDefinition } from '@tanstack/react-hotkeys';
 import { useApp, useUI } from '../app/AppContext';
-import { CUE_DIGITS, CUE_DIGITS_WHEN, HOTKEYS, isEnabled, SCENE_DIGITS, SCENE_DIGITS_WHEN, type HotkeyContext, type HotkeyDef, type HotkeyWhen } from '../hotkeys/registry';
+import { CUE_DIGITS, CUE_DIGITS_WHEN, HOTKEYS, isEnabled, SCENE_DIGITS, SCENE_DIGITS_WHEN, type HotkeyActions, type HotkeyContext, type HotkeyDef, type HotkeyIdOf, type HotkeyOwner } from '../hotkeys/registry';
 
-export interface HotkeyActions {
-  playPause(): void; seek(seconds: number): void; changeVolume(delta: number): void; changeRate(delta: number): void; toggleMute(): void;
-  stepScene(dir: number): void; pickScene(digit: number): void; steer(dir: number): void; restartGame(): void;
-  toggleLibrary(): void; toggleAssistant(): void; toggleHelp(): void; toggleEditor(): void; toggleVisualMaker(): void; toggleStudio(): void; toggleSettings(): void;
-  toggleParams(): void; togglePanel(): void; resetLayout(): void; togglePerf(): void; toggleFullscreen(): void; toggleRecording(): void; toggleAuto(): void; randomize(): void; randomizeBack(): void;
-  closeOverlay(): void; take(): void; blackout(): void; studioStep(dir: number): void; studioCue(n: number): void; game(): void;
-  librarySearch(): void; libraryMove(dx: number, dy: number): void; libraryPick(): void; libraryTab(dir: number): void; deleteNode(): void;
-}
-
-export function useAppHotkeys(actions: HotkeyActions): void {
+function useHotkeyContext(): HotkeyContext {
   const app = useApp();
   const overlay = useUI((ui) => ui.overlay);
   const assistantOpen = useUI((ui) => ui.assistantOpen);
   const helpOpen = useUI((ui) => ui.help !== null);
   const paramsVisible = useUI((ui) => ui.paramsVisible);
   const sceneIndex = useUI((ui) => ui.sceneIndex);
-  const context: HotkeyContext = { overlay, inGame: sceneIndex === app.state.gameIndex, assistantOpen, helpOpen, paramsVisible };
-  const enabled = (when: HotkeyWhen): boolean => isEnabled(when, context);
+  return { overlay, inGame: sceneIndex === app.state.gameIndex, assistantOpen, helpOpen, paramsVisible };
+}
 
-  // After a shortcut, hand the keyboard back from any focused control (the old handler blurred too).
-  const fire = (def: HotkeyDef, fn: () => void): UseHotkeyDefinition => ({
-    hotkey: def.keys,
-    callback: (event) => {
-      fn();
-      if (event.target instanceof HTMLInputElement && !def.inInputs) event.target.blur();
-    },
-    options: { enabled: enabled(def.when), preventDefault: true, ...(def.inInputs && { ignoreInputs: false }), meta: { name: def.label, group: def.group } },
-  });
+// After a shortcut, hand the keyboard back from any focused control (the old handler blurred too).
+const binding = (def: HotkeyDef, fn: () => void, context: HotkeyContext): UseHotkeyDefinition => ({
+  hotkey: def.keys,
+  callback: (event) => {
+    fn();
+    if (event.target instanceof HTMLInputElement && !def.inInputs) event.target.blur();
+  },
+  options: { enabled: isEnabled(def.when, context), preventDefault: true, ...(def.inInputs && { ignoreInputs: false }), meta: { name: def.label, group: def.group } },
+});
 
-  const defs: UseHotkeyDefinition[] = [
-    fire(HOTKEYS.playPause, actions.playPause),
-    fire(HOTKEYS.seekBack, () => actions.seek(-10)),
-    fire(HOTKEYS.seekFwd, () => actions.seek(10)),
-    fire(HOTKEYS.volumeUp, () => actions.changeVolume(0.05)),
-    fire(HOTKEYS.volumeDown, () => actions.changeVolume(-0.05)),
-    fire(HOTKEYS.tempoDown, () => actions.changeRate(-0.05)),
-    fire(HOTKEYS.tempoUp, () => actions.changeRate(0.05)),
-    fire(HOTKEYS.mute, actions.toggleMute),
-    fire(HOTKEYS.scenePrev, () => actions.stepScene(-1)),
-    fire(HOTKEYS.sceneNext, () => actions.stepScene(1)),
-    fire(HOTKEYS.steerLeft, () => actions.steer(-1)),
-    fire(HOTKEYS.steerRight, () => actions.steer(1)),
-    fire(HOTKEYS.restartGame, actions.restartGame),
-    fire(HOTKEYS.studioPrev, () => actions.studioStep(-1)),
-    fire(HOTKEYS.studioNext, () => actions.studioStep(1)),
-    fire(HOTKEYS.library, actions.toggleLibrary),
-    fire(HOTKEYS.assistant, actions.toggleAssistant),
-    fire(HOTKEYS.help, actions.toggleHelp),
-    fire(HOTKEYS.settings, actions.toggleSettings),
-    fire(HOTKEYS.editor, actions.toggleEditor),
-    fire(HOTKEYS.visualMaker, actions.toggleVisualMaker),
-    fire(HOTKEYS.studio, actions.toggleStudio),
-    fire(HOTKEYS.take, actions.take),
-    fire(HOTKEYS.blackout, actions.blackout),
-    fire(HOTKEYS.params, actions.toggleParams),
-    fire(HOTKEYS.game, actions.game),
-    fire(HOTKEYS.hidePanel, actions.togglePanel),
-    fire(HOTKEYS.resetLayout, actions.resetLayout),
-    fire(HOTKEYS.perf, actions.togglePerf),
-    fire(HOTKEYS.fullscreen, actions.toggleFullscreen),
-    fire(HOTKEYS.record, actions.toggleRecording),
-    fire(HOTKEYS.auto, actions.toggleAuto),
-    fire(HOTKEYS.randomize, actions.randomize),
-    fire(HOTKEYS.randomizeBack, actions.randomizeBack),
-    fire(HOTKEYS.closeOverlay, actions.closeOverlay),
-    fire(HOTKEYS.deleteNode, actions.deleteNode),
-    fire(HOTKEYS.deleteNodeBackspace, actions.deleteNode),
-    fire(HOTKEYS.librarySearch, actions.librarySearch),
-    fire(HOTKEYS.libraryLeft, () => actions.libraryMove(-1, 0)),
-    fire(HOTKEYS.libraryRight, () => actions.libraryMove(1, 0)),
-    fire(HOTKEYS.libraryUp, () => actions.libraryMove(0, -1)),
-    fire(HOTKEYS.libraryDown, () => actions.libraryMove(0, 1)),
-    fire(HOTKEYS.libraryPick, actions.libraryPick),
-    fire(HOTKEYS.libraryTabNext, () => actions.libraryTab(1)),
-    fire(HOTKEYS.libraryTabPrev, () => actions.libraryTab(-1)),
-    // 1–9, 0 pick scenes; inside the studio 1–9 pick cues.
-    ...SCENE_DIGITS.map((d, n): UseHotkeyDefinition => ({
-      hotkey: d, callback: () => actions.pickScene(n), options: { enabled: enabled(SCENE_DIGITS_WHEN), preventDefault: true, meta: { name: `Scene ${d}`, group: 'Scenes' } },
-    })),
-    ...CUE_DIGITS.map((d, n): UseHotkeyDefinition => ({
-      hotkey: d, callback: () => actions.studioCue(n), options: { enabled: enabled(CUE_DIGITS_WHEN), preventDefault: true, meta: { name: `Cue ${d}`, group: 'Studio' } },
-    })),
-  ];
-  // Several actions share a key (← is scene / steer / cue) and exactly one is enabled at a time, so
-  // only the enabled ones are registered and any real double binding is an error.
+// Several actions share a key (← is scene / steer / cue) and exactly one is enabled at a time, so
+// only the enabled ones are registered and any real double binding is an error.
+function useBindings(defs: UseHotkeyDefinition[]): void {
   useHotkeys(defs.filter((d) => d.options?.enabled !== false), { conflictBehavior: 'error' });
+}
+
+// An owner's bindings with their actions: `useHotkeyActions<'library'>({ librarySearch: …, … })`.
+export function useHotkeyActions<O extends HotkeyOwner>(actions: HotkeyActions<O>): void {
+  const context = useHotkeyContext();
+  useBindings((Object.keys(actions) as HotkeyIdOf<O>[]).map((id) => binding(HOTKEYS[id], actions[id], context)));
+}
+
+// The app's bindings, plus the number keys: 1–9, 0 pick scenes; inside the studio 1–9 pick cues.
+export function useAppHotkeys(actions: HotkeyActions<'app'>, digits: { pickScene(n: number): void; studioCue(n: number): void }): void {
+  const context = useHotkeyContext();
+  const digit = (key: string, when: HotkeyDef['when'], name: string, group: HotkeyDef['group'], fn: () => void): UseHotkeyDefinition => ({
+    hotkey: key as UseHotkeyDefinition['hotkey'], callback: fn, options: { enabled: isEnabled(when, context), preventDefault: true, meta: { name, group } },
+  });
+  useBindings([
+    ...(Object.keys(actions) as HotkeyIdOf<'app'>[]).map((id) => binding(HOTKEYS[id], actions[id], context)),
+    ...SCENE_DIGITS.map((d, n) => digit(d, SCENE_DIGITS_WHEN, `Scene ${d}`, 'Scenes', () => digits.pickScene(n))),
+    ...CUE_DIGITS.map((d, n) => digit(d, CUE_DIGITS_WHEN, `Cue ${d}`, 'Studio', () => digits.studioCue(n))),
+  ]);
 }
