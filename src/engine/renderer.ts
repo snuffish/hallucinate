@@ -98,6 +98,8 @@ export interface ProgramState {
   high: number;
   level: number;
   beat: number;
+  tickPhase: number;
+  ticks: number;
   hue: number;
   spectrum: Uint8Array;
   bright: number;

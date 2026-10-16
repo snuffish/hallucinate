@@ -76,6 +76,52 @@ describe('Listener', () => {
     expect(l.hearing.bpm).toBeLessThanOrEqual(141);
   });
 
+  it('hears how far through the current tick the music is: rising from 0 to 1, back to 0 on each tick', () => {
+    const l = new Listener();
+    listen(l, music({ bpm: 120 }), 10);
+    let last = l.hearing.tickPhase, rises = 0, resets = 0;
+    for (let t = 10; t < 14; t += 1 / 60) {
+      const h = l.hear(music({ bpm: 120 })(t), true, 1 / 60, t);
+      expect(h.tickPhase).toBeGreaterThanOrEqual(0);
+      expect(h.tickPhase).toBeLessThanOrEqual(1);
+      if (h.tick) { expect(h.tickPhase).toBeLessThan(0.1); resets++; }
+      else if (h.tickPhase > last) rises++;
+      last = h.tickPhase;
+    }
+    expect(resets).toBeGreaterThanOrEqual(7);   // 8 beats in 4 s at 120 BPM
+    expect(rises).toBeGreaterThan(200);         // every other frame climbs
+  });
+
+  it('counts the ticks, one step per tick', () => {
+    const l = new Listener();
+    const before = l.hearing.ticks;
+    const { ticks } = listen(l, music({ bpm: 124 }), 20);
+    expect(ticks).toBeGreaterThan(35);
+    expect(l.hearing.ticks - before).toBe(ticks);
+  });
+
+  it('holds the tick phase and count still while the music is not playing', () => {
+    const l = new Listener();
+    listen(l, music({ bpm: 120 }), 10.2);
+    const { tickPhase, ticks } = l.hearing;
+    expect(tickPhase).toBeGreaterThan(0);
+    for (let t = 10.2; t < 15; t += 1 / 60) {
+      const h = l.hear(null, false, 1 / 60, t);
+      expect([h.tickPhase, h.ticks]).toEqual([tickPhase, ticks]);
+    }
+  });
+
+  it('keeps the tick phase and count going through a breakdown', () => {
+    const l = new Listener();
+    listen(l, music({ bpm: 120 }), 15);
+    const ticks = l.hearing.ticks;
+    const quiet = () => bins(() => 30);
+    const phases = new Set<number>();
+    for (let t = 15; t < 23; t += 1 / 60) phases.add(Math.round(l.hear(quiet(), true, 1 / 60, t).tickPhase * 10));
+    expect(l.hearing.ticks - ticks).toBeGreaterThanOrEqual(15);   // 16 beats in 8 s at 120 BPM
+    expect(phases.size).toBeGreaterThanOrEqual(10);               // the phase sweeps 0..1 the whole way
+  });
+
   it('hears a dark tone and a bright one, and only over seconds', () => {
     const l = new Listener();
     listen(l, music({ bpm: 100, bed: dark }), 0.5);
