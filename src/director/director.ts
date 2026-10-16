@@ -11,6 +11,7 @@ import { Chat, forgetThread } from '../assistant/chat';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
 import { createLock, serialized, type Lock } from '../assistant/lock';
 import type { Usage } from '../assistant/usage';
+import { soundNow } from '../state/app-state';
 import { Store } from '../state/store';
 import { buildDigest, type DigestInput } from './digest';
 import { DirectorHistory } from './history';
@@ -167,14 +168,9 @@ export class Director {
   // The digest's input, read from the app and the studio.
   collect(): DigestInput {
     const app = this.app, s = this.studio;
-    const c = app.state.clock;
-    const bright = app.audio.features.bright;
     const scenes = app.state.scenes;
     return {
-      bpm: c.bpm,
-      mood: !app.audio.kind ? null : c.mood < 0.35 ? 'calm' : c.mood > 0.65 ? 'energetic' : 'groovy',
-      tone: !app.audio.kind ? null : bright < 0.35 ? 'dark' : bright > 0.65 ? 'bright' : 'balanced',
-      source: app.state.activeSource ?? app.audio.kind ?? 'none',
+      ...soundNow(app.state, app.audio),
       elapsedSeconds: this.startedAt ? (Date.now() - this.startedAt) / 1000 : 0,
       media: !!app.media.el,
       trend: this.history.trend(),

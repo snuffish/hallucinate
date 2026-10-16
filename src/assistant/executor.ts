@@ -10,7 +10,7 @@ import { blobToBase64, encodeJpeg } from '../engine/jpeg';
 import type { ParamSpec, ParamValue, ParamValues } from '../engine/params';
 import type { SnapshotUniforms } from '../engine/renderer';
 import type { Scene } from '../engine/scenes';
-import { LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
+import { LOOK_KEYS, LOOK_RANGES, soundNow, type LookKey } from '../state/app-state';
 import { PlanSchema } from '../state/show-plan';
 import type { z } from 'zod';
 import type { UndoStack } from './undo';
@@ -255,17 +255,10 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
   const tools: Implementations = {
     get_app_state() {
       const i = app.sceneIndex, s = app.currentScene;
-      const c = app.state.clock;
-      const bright = app.audio.features.bright;
       return {
         playing: { name: s.name, kind: kindOf(s), category: s.cat || null, editedByUser: !!s.edited, parameters: paramSummary(i) },
         look: Object.fromEntries([...LOOK_KEYS, 'synesthesia'].map((k) => [k, app.state.look[k as LookKey]])),
-        audio: {
-          source: app.state.activeSource ?? app.audio.kind ?? 'none',
-          bpm: c.bpm,
-          mood: !app.audio.kind ? null : c.mood < 0.35 ? 'calm' : c.mood > 0.65 ? 'energetic' : 'groovy',
-          tone: app.audio.kind ? (bright < 0.35 ? 'dark' : bright > 0.65 ? 'bright' : 'balanced') : null,
-        },
+        audio: soundNow(app.state, app.audio),
         media: app.media.el ? { name: app.media.name, kind: app.media.kind } : null,
         codeEditorOpen: app.overlay === 'editor',
         scenes: sceneList(scenes()),

@@ -11,7 +11,7 @@ import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValue
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState } from '../engine/renderer';
 import type { Scene } from '../engine/scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, moodWord, toneWord, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
 import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
@@ -936,8 +936,8 @@ export class AppController {
     this.profiler.lap(Stage.studio);
 
     if (++this.meterTick % 2 === 0) {
-      const tone = f.bright < 0.35 ? 'dark' : f.bright > 0.65 ? 'bright' : 'balanced';
-      const moodLabel: MoodLabel = !look.mood || !this.audio.kind ? '' : c.mood < 0.35 ? 'mood: calm' : c.mood > 0.65 ? 'mood: energetic' : 'mood: groovy';
+      const tone = toneWord(f.bright);
+      const moodLabel: MoodLabel = !look.mood || !this.audio.kind ? '' : `mood: ${moodWord(c.mood)}`;
       this.ui.set({
         meters: { bass: f.bass, mid: f.mid, high: f.high, bright: f.bright, centroid: f.centroid, beat: f.beat },
         bpm: c.bpm,
