@@ -7,9 +7,10 @@ export interface Usage {
   cacheRead: number;     // part of `prompt` served from the prompt cache
   cacheWrite: number;    // part of `prompt` written to the cache
   cost: number;          // USD as the provider reported it (the CLI's API-equivalent figure); 0 when unknown
+  context: number;       // the biggest single call's input: how much the conversation resends per step
 }
 
-export const NO_USAGE: Usage = { prompt: 0, completion: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
+export const NO_USAGE: Usage = { prompt: 0, completion: 0, cacheRead: 0, cacheWrite: 0, cost: 0, context: 0 };
 
 interface TokenUsageLike {
   promptTokens?: unknown;
@@ -28,12 +29,19 @@ function fromTokenUsage(u: TokenUsageLike): Usage {
     cacheRead: num(u.promptTokensDetails?.cachedTokens),
     cacheWrite: num(u.promptTokensDetails?.cacheWriteTokens),
     cost: num(u.cost),
+    context: num(u.providerUsageDetails?.contextTokens) || num(u.promptTokens),
   };
 }
 
+// Sums, except the context: a conversation only grows, so the larger one is the later one, whichever
+// order runs are added in.
 export function addUsage(a: Usage, b: Usage): Usage {
-  return { prompt: a.prompt + b.prompt, completion: a.completion + b.completion, cacheRead: a.cacheRead + b.cacheRead, cacheWrite: a.cacheWrite + b.cacheWrite, cost: a.cost + b.cost };
+  return { prompt: a.prompt + b.prompt, completion: a.completion + b.completion, cacheRead: a.cacheRead + b.cacheRead, cacheWrite: a.cacheWrite + b.cacheWrite, cost: a.cost + b.cost, context: Math.max(a.context, b.context) };
 }
+
+// Input the cache didn't serve: written to it, or not cached at all. Both cost at least full price,
+// while a cache read costs about a tenth; "in" alone mostly counts those cheap reads.
+export const newInput = (u: Usage) => Math.max(0, u.prompt - u.cacheRead);
 
 // The usage a stream chunk reports: only RUN_FINISHED carries it (an object, or AG-UI's array form).
 export function usageOf(chunk: { type: string; usage?: unknown }): Usage | null {
@@ -59,3 +67,5 @@ export function formatTokens(n: number): string {
 }
 
 export const totalTokens = (u: Usage) => u.prompt + u.completion;
+
+export const formatCost = (usd: number) => `$${usd.toFixed(usd < 0.1 ? 3 : 2)}`;

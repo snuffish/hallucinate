@@ -19,7 +19,7 @@ import { NO_USAGE, type Usage } from './usage';
 export const HISTORY_CAP = 50;
 const WRITE_MS = 1000;
 
-const UsageSchema = z.object({ prompt: z.number(), completion: z.number(), cacheRead: z.number(), cacheWrite: z.number(), cost: z.number() });
+const UsageSchema = z.object({ prompt: z.number(), completion: z.number(), cacheRead: z.number(), cacheWrite: z.number(), cost: z.number(), context: z.number().default(0) });
 
 const ChatMetaSchema = z.object({
   id: z.string().min(1),
@@ -31,6 +31,7 @@ const ChatMetaSchema = z.object({
   usage: UsageSchema.default(NO_USAGE),
   lastPrompt: z.number().default(0),     // prompt tokens of the newest run: what one more message resends
   count: z.number().default(0),          // messages
+  seen: z.object({ scene: z.string(), hash: z.string() }).optional(),   // on screen when the last reply finished (the reopen note compares)
 });
 export type ChatMeta = z.infer<typeof ChatMetaSchema>;
 
