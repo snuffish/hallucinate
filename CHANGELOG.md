@@ -2,6 +2,12 @@
 
 ## Unreleased — the music and the visuals (2026-10-16)
 
+### Removed
+
+- Beat Racer, the game: its scene, the *Game* tab in the library, the toolbar button, the score overlay and the
+  assistant's knowledge of it. The G key is now free (it does nothing). See
+  [ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md).
+
 ### Fixed
 
 - A paused, stopped or finished file (or SoundCloud track, or video's sound) no longer counts as music playing: the

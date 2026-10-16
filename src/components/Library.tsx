@@ -35,7 +35,7 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
 
   const all = useMemo(() => listedScenes(app.state.scenes), [app, version]);   // eslint-disable-line react-hooks/exhaustive-deps
   const hasMine = all.some(({ s }) => s.user);
-  const tabs = ['All', '★ Favourites', '⚙ Tweakable', ...CATEGORIES, 'Game', ...(hasMine ? ['Mine'] : [])];
+  const tabs = ['All', '★ Favourites', '⚙ Tweakable', ...CATEGORIES, ...(hasMine ? ['Mine'] : [])];
   const activeFilter = tabs.includes(filter) ? filter : 'All';
   const q = query.trim().toLowerCase();
   const shown = all.filter(({ s }) => {

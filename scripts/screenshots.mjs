@@ -76,7 +76,6 @@ await wake();
 await hidden('#assistant-bubble', () => shot('studio'));
 await press('Escape');
 await wake(); await press('i', 800); await wake(); await shot('assistant'); await press('Escape');   // the bubble opens beside the panel
-await press('g', 4000); await shot('beat-racer'); await press('2');
 
 await browser.close();
 console.log('done:', (await fs.readdir(out)).join(' '));

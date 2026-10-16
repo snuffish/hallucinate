@@ -34,7 +34,7 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
   const scene = (s: Partial<Scene> & { name: string }, i: number): Scene => ({ id: `s${i}`, cat: '', desc: '', body: '', frag: '', params: opts.params?.[i] ?? [], ...s });
   const scenes: Scene[] = (opts.scenes ?? [{ name: 'Alpha', cat: 'Fractal' }, { name: 'Beta', cat: 'Space' }]).map(scene);
   const look = defaultLook();
-  const state = { scenes, gameIndex: -1, customIndex: -1, nodesIndex: -1, keyedScenes: [], look, clock: defaultClock(), activeSource: null };
+  const state = { scenes, customIndex: -1, nodesIndex: -1, keyedScenes: [], look, clock: defaultClock(), activeSource: null };
   const hooks: Partial<ControllerHooks> = {};
   const toasts: string[] = [];
   const ui = new Store(initialUIState(look));

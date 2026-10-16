@@ -56,9 +56,10 @@ test('every panel opens with its key, shows key badges, and closes with Escape',
   await page.keyboard.press('Escape');
   await expect(page.locator('#gl')).not.toHaveAttribute('style', /width: \d/);
   // Badges on the panel's bound buttons.
-  for (const id of ['#open-library', '#play-game', '#code', '#visual', '#studio-open', '#assistant-bubble', '#randomize', '#fullscreen', '#record']) {
+  for (const id of ['#open-library', '#code', '#visual', '#studio-open', '#assistant-bubble', '#randomize', '#fullscreen', '#record']) {
     await expect(page.locator(`${id} .kbd`)).toHaveCount(1);
   }
+  await expect(page.locator('#play-game')).toHaveCount(0);   // no game button, and G is left unbound
 });
 
 test('the scene on screen comes back after a reload', async ({ page }) => {

@@ -102,7 +102,6 @@ export interface ProgramState {
   ticks: number;
   hue: number;
   spectrum: Uint8Array;
-  extra: Record<string, UniformValue>;
   bright: number;
   mood: number;
   grade: Grade;
@@ -663,9 +662,9 @@ export class Renderer {
     writeInputs(u, s);
     u.uSpec = this.specTex;
     const media = this.mediaUniforms(s.scene, s.prevScene);
-    this.drawScene(s.scene, t.sceneA, u, media, s.extra);
+    this.drawScene(s.scene, t.sceneA, u, media);
     const crossfading = s.prevScene >= 0 && s.mix < 1;
-    if (crossfading) this.drawScene(s.prevScene, t.sceneB, u, media, s.extra);
+    if (crossfading) this.drawScene(s.prevScene, t.sceneB, u, media);
 
     const f = this.feedbackUniforms;
     f.uSceneA = t.sceneA.tex; f.uSceneB = crossfading ? t.sceneB.tex : t.sceneA.tex; f.uPrev = t.read.tex;

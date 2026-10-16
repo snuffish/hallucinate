@@ -13,7 +13,7 @@ export const Stage = { audio: 0, logic: 1, render: 2, output: 3, studio: 4, ui: 
 
 export const STAGE_LABELS: Record<StageName, string> = {
   audio: 'Audio analysis',
-  logic: 'Clock, look & game',
+  logic: 'Clock & look',
   render: 'Draw calls',
   output: 'Projector link',
   studio: 'Studio & Preview',

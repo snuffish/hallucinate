@@ -36,7 +36,7 @@ under it counts the beats gone and left until the next take.
 
 These beats come from a tempo clock: it takes its speed from the BPM detected on the kick drum, re-anchors on every
 real kick, and keeps counting through breakdowns and silence, so the show moves on even when the bass stops.
-(Everything else that reacts "on the beat", the `uBeat` uniform, auto-switch and Beat Racer, follows the detected kicks
+(Everything else that reacts "on the beat", the `uBeat` uniform and auto-switch, follows the detected kicks
 themselves.)
 
 For music without a usable beat (ambient, a talk, a film), switch the unit box from *beats* to *seconds*: the autopilot

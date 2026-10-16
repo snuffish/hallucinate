@@ -6,10 +6,8 @@ import type { Overlay } from '../state/ui-state';
 
 export type HotkeyWhen =
   | 'always'
-  | 'noOverlay'      // no overlay open (the code editor excepted: it follows the scene), not the game
+  | 'noOverlay'      // no overlay open (the code editor excepted: it follows the scene)
   | 'noNodes'        // everything except while the visual maker is open
-  | 'notGame'        // scene keys that the game reuses
-  | 'game'
   | 'studio'
   | 'notStudio'
   | 'nodesOpen'
@@ -23,7 +21,7 @@ export interface HotkeyDef {
   id: string;
   keys: Hotkey;               // TanStack Hotkeys syntax, e.g. 'Shift+ArrowLeft'
   label: string;
-  group: 'Playback' | 'Scenes' | 'Panels' | 'Studio' | 'Game' | 'Look';
+  group: 'Playback' | 'Scenes' | 'Panels' | 'Studio' | 'Look';
   when: HotkeyWhen;
   // Fires even while a text field has focus (Escape and the like).
   inInputs?: boolean;
@@ -36,8 +34,8 @@ export type HotkeyOwner = 'app' | PanelOwner;
 
 export const HOTKEYS = {
   playPause: { id: 'playPause', keys: 'Space', label: 'Play / pause', group: 'Playback', when: 'noNodes' },
-  seekBack: { id: 'seekBack', keys: 'Shift+ArrowLeft', label: 'Seek −10 s', group: 'Playback', when: 'notGame' },
-  seekFwd: { id: 'seekFwd', keys: 'Shift+ArrowRight', label: 'Seek +10 s', group: 'Playback', when: 'notGame' },
+  seekBack: { id: 'seekBack', keys: 'Shift+ArrowLeft', label: 'Seek −10 s', group: 'Playback', when: 'noNodes' },
+  seekFwd: { id: 'seekFwd', keys: 'Shift+ArrowRight', label: 'Seek +10 s', group: 'Playback', when: 'noNodes' },
   volumeUp: { id: 'volumeUp', keys: 'ArrowUp', label: 'Volume up', group: 'Playback', when: 'noLibrary' },
   volumeDown: { id: 'volumeDown', keys: 'ArrowDown', label: 'Volume down', group: 'Playback', when: 'noLibrary' },
   tempoDown: { id: 'tempoDown', keys: '[', label: 'Tempo −5 %', group: 'Playback', when: 'noNodes' },
@@ -58,10 +56,6 @@ export const HOTKEYS = {
   auto: { id: 'auto', keys: 'A', label: 'Auto-switch', group: 'Scenes', when: 'noNodes' },
   randomize: { id: 'randomize', keys: 'R', label: 'Randomize', group: 'Look', when: 'noNodes' },
   randomizeBack: { id: 'randomizeBack', keys: 'Shift+R', label: 'Back to the previous random look', group: 'Look', when: 'noNodes' },
-  game: { id: 'game', keys: 'G', label: 'Beat Racer', group: 'Game', when: 'noNodes' },
-  steerLeft: { id: 'steerLeft', keys: 'ArrowLeft', label: 'Steer left', group: 'Game', when: 'game' },
-  steerRight: { id: 'steerRight', keys: 'ArrowRight', label: 'Steer right', group: 'Game', when: 'game' },
-  restartGame: { id: 'restartGame', keys: 'Enter', label: 'Race again', group: 'Game', when: 'game' },
 
   assistant: { id: 'assistant', keys: 'I', label: 'AI assistant', group: 'Panels', when: 'noNodes' },
   assistantNew: { id: 'assistantNew', keys: 'Alt+N', label: 'New conversation', group: 'Panels', when: 'assistantOpen', inInputs: true, owner: 'assistant' },
@@ -106,7 +100,6 @@ export const CUE_DIGITS_WHEN: HotkeyWhen = 'studio';
 // The UI state the `when` conditions read.
 export interface HotkeyContext {
   overlay: Overlay;
-  inGame: boolean;
   assistantOpen: boolean;
   helpOpen: boolean;
   paramsVisible: boolean;
@@ -119,10 +112,8 @@ export function isEnabled(when: HotkeyWhen, c: HotkeyContext): boolean {
   const studioOpen = c.overlay === 'studio';
   switch (when) {
     case 'always': return true;
-    case 'noOverlay': return (c.overlay === null || c.overlay === 'editor') && !c.inGame;
+    case 'noOverlay': return c.overlay === null || c.overlay === 'editor';
     case 'noNodes': return !nodesOpen;
-    case 'notGame': return !c.inGame && !nodesOpen;
-    case 'game': return c.inGame && c.overlay !== 'library' && !nodesOpen && !studioOpen;
     case 'studio': return studioOpen;
     case 'notStudio': return !studioOpen && !nodesOpen;
     case 'nodesOpen': return nodesOpen;
