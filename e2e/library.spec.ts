@@ -21,8 +21,8 @@ test('library: L opens it, / focuses search, arrows move through hits, Enter pla
   await expect(page.locator('#lib-filters button.active')).toHaveText('★ Favourites');
   await page.keyboard.press('Shift+Tab');
   await expect(page.locator('#lib-filters button.active')).toHaveText('All');
-  // No built-in scenes yet: only the special tabs and Mine.
-  await expect(page.locator('#lib-filters button')).toHaveText(['All', '★ Favourites', '⚙ Tweakable', 'Mine']);
+  // Only the categories that have scenes get a tab.
+  await expect(page.locator('#lib-filters button')).toHaveText(['All', '★ Favourites', '⚙ Tweakable', 'Beams', 'Mine']);
   await page.keyboard.press('/');
   await page.keyboard.type('nest');
   await expect(page.locator('#lib-grid .lib-card')).toHaveCount(1);
@@ -70,7 +70,7 @@ test('every panel opens with its key, shows key badges, and closes with Escape',
 test('the scene on screen comes back after a reload', async ({ page }) => {
   await seedScenes(page, SCENES);
   await page.goto('/');
-  await expect(page.locator('#scene-name')).toContainText('My Shader');   // nothing to restore yet
+  await expect(page.locator('#scene-name')).toContainText('Beam Fan');   // nothing to restore yet: the first built-in
   await page.getByRole('button', { name: 'Play demo beat' }).click();
   await page.keyboard.press('l');
   await page.keyboard.press('/');

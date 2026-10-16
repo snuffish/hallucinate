@@ -49,6 +49,13 @@ export const AUDIO_HELP = AUDIO_OUTPUTS
   .map((run) => `${run.map((o) => `${o.name}: ${o.help}`).join('; ')} (${run[0]!.range})`)
   .join('. ');
 
+// The spectrum of silence: nothing in any band, a flat waveform.
+export function silentSpectrum(): Uint8Array {
+  const spectrum = new Uint8Array(512);
+  for (let i = 0; i < 256; i++) spectrum[i * 2 + 1] = 128;
+  return spectrum;
+}
+
 // A stand-in spectrum for still frames: falling off towards the treble, and a wavy waveform.
 export function stillSpectrum(): Uint8Array {
   const spectrum = new Uint8Array(512);

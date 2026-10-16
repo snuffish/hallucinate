@@ -40,11 +40,11 @@ Needs Node 22.12 or newer. SoundCloud and YouTube also need [yt-dlp](https://git
 and the AI assistant needs a Claude subscription or an Anthropic API key ([setup](docs/assistant.md#setup)).
 Press **?** in the app for help and every shortcut.
 
-## ✨ Scenes: a new set is on the way
+## ✨ Scenes: a laser show
 
-There are **no built-in scenes yet**. The old ones were removed to make way for a new set built for one style, a laser
-show ([ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md)). Until the first one ships, the app starts on
-**My Shader**: write your own scenes in the code editor or the visual maker, or ask the assistant for one.
+The built-in scenes are a new set built for one style, a laser show: thin luminous lines on pure black
+([ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md)). The first is **Beam Fan**, and more are on the way. Write
+your own scenes in the code editor or the visual maker, or ask the assistant for one.
 
 ## 🎛 Features
 
@@ -53,7 +53,7 @@ show ([ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md)). Until the first
 | | Feature | |
 | --- | --- | --- |
 | 🎧 | **[Audio](docs/audio.md)** | Play a file, SoundCloud, the mic, a browser tab or the built-in demo beat. A full player with tempo, and *synesthesia* that colours the visuals by how the music sounds. |
-| 🎬 | **[Scenes](docs/scenes.md)** · L | No built-in scenes yet (a new set is coming in Beams, Geometry, Fields and Media). Your scenes crossfade on the beat, in a searchable library with favourites. |
+| 🎬 | **[Scenes](docs/scenes.md)** · L | A laser-show set, growing (Beams, Geometry, Fields and Media). Your scenes crossfade on the beat, in a searchable library with favourites. |
 | 🧑‍💻 | **[Code editor](docs/editor.md)** · E | Edit any scene's GLSL live, with errors shown as you type. Tag a value with `// @param` and it becomes a slider (P). |
 | 🧩 | **[Visual maker](docs/visual-maker.md)** · N | Build scenes by wiring blocks together, then send the result to code. |
 | 🖼️ | **[Media](docs/media.md)** | Drop an image or video, or pick one from YouTube, and sample it in any scene with `media(p)`. |

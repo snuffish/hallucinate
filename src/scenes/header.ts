@@ -39,6 +39,9 @@ float fbm(vec2 p) {
   return v;
 }
 vec2 centered() { return (gl_FragCoord.xy - .5 * uRes) / uRes.y; }
+// A thin luminous line at distance d from it: a hard core w wide plus a short halo that never lights
+// the whole frame. Give w in pixels, as WIDTH / uRes.y, so lines keep their width at any size.
+float beam(float d, float w) { d = abs(d); return 1. - smoothstep(w * .35, w, d) + .45 * exp(-d / (w * 3.)); }
 float luma(vec3 c) { return dot(c, vec3(.299, .587, .114)); }
 // Undo the display's tonemapping, so a picture keeps its true colours on screen.
 vec3 untone(vec3 c) { return -log(1. - clamp(c, 0., .985)) / 1.3; }

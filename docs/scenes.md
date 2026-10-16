@@ -4,10 +4,17 @@
 
 ## Scenes
 
-**There are no built-in scenes yet.** The old ones were removed to make way for a new set built for one style: a laser
-show (see [ADR 0001](adr/0001-replace-all-built-in-scenes.md)). Until the first new scene ships, the app starts on
-**My Shader**, and you can play the [Node Scene](visual-maker.md) and your own saved scenes (*Mine*). Built-in scenes will
-come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has scenes.
+The built-in scenes are a **laser show**: thin luminous lines, beams and points on pure black (see
+[ADR 0001](adr/0001-replace-all-built-in-scenes.md)). Every one reacts to the kicks, the ticks of the tempo and the
+bands, takes its colour from the hue slider and colour cycling, and keeps the background pure black. A kick never
+brightens more than a quarter of the frame. The set is still growing; the number keys play them in this order:
+
+| Key | Scene | Category | What it does |
+| --- | --- | --- | --- |
+| 1 | **Beam Fan** | Beams | A fan of thin beams rising from the bottom edge. It sweeps, opens with the bass, strobes on kicks and chases one beam along on each tick. |
+
+They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has
+scenes. You can also play the [Node Scene](visual-maker.md), **My Shader** and your own saved scenes (*Mine*).
 
 A show you saved that uses a removed scene keeps that show scene, marked *missing scene* in the [Studio](studio.md):
 taking it only shows a message, and the autopilot and the director skip it.
