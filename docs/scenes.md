@@ -12,6 +12,7 @@ brightens more than a quarter of the frame. The set is still growing; the number
 | Key | Scene | Category | What it does |
 | --- | --- | --- | --- |
 | 1 | **Beam Fan** | Beams | A fan of thin beams rising from the bottom edge. It sweeps, opens with the bass, strobes on kicks and chases one beam along on each tick. |
+| 3 | **Ring Run** | Geometry | Thin polygon rings flying towards you. A new ring is born on each tick, the rings glow with the spectrum and flare on kicks; the polygon and ring speed are parameters. |
 
 They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has
 scenes. You can also play the [Node Scene](visual-maker.md), **My Shader** and your own saved scenes (*Mine*).
