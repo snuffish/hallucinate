@@ -9,7 +9,7 @@ import type { HelpTopicId } from '../help/topics';
 import type { Look, SourceButton } from './app-state';
 import type { WidgetId } from './layout';
 
-export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | null;
+export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | 'settings' | null;
 
 // A panel's help popover, or the sheet with every shortcut.
 export type HelpId = HelpTopicId | 'sheet';
@@ -66,6 +66,7 @@ export interface UIState {
   assistantUnread: number;  // conversations with a reply the user hasn't seen
   assistantPeek: AssistantPeek | null;
   assistantFocus: string | null;   // a conversation to show when the panel opens (the peek was clicked)
+  assistantConfig: number;  // bumps when Settings → Assistant saved: the panel asks the server again
   help: HelpId | null;      // the open help popover; closed whenever an overlay, the panel or the assistant changes
   liveName: string | null;  // the pinned Live slot (studio closed after a take); projectors follow it, not the screen
   screenMode: ScreenMode;   // while Live is pinned: the screen shows your preview (browse freely) or Live (what projectors get)
@@ -104,6 +105,7 @@ export const initialUIState = (look: Look): UIState => ({
   assistantUnread: 0,
   assistantPeek: null,
   assistantFocus: null,
+  assistantConfig: 0,
   help: null,
   liveName: null,
   screenMode: 'preview',

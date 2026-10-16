@@ -24,7 +24,8 @@ type Storage = 'json' | 'text' | 'flag';
 interface Section { key: string; storage: Storage; schema: ZodType; normalise?: (value: unknown) => unknown }
 
 // What an export contains. Left out on purpose: recently played tracks, the game's high score and
-// one-shot hints (history, not setup), and the loaded media.
+// one-shot hints (history, not setup), the loaded media, and the device preferences from Settings
+// (KEYS.prefs: they describe this computer, not the setup).
 export const SECTIONS = {
   userScenes: { key: KEYS.userScenes, storage: 'json', schema: UserScenesSchema },
   sceneEdits: { key: KEYS.sceneEdits, storage: 'json', schema: SceneEditsSchema },

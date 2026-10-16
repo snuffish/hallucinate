@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — settings (2026-10-16)
+
+### Added
+
+- Settings (⚙ in the Hallucinate widget, ☰ → Settings…, or the , key): where Resolution starts, a pixel-density cap
+  for the main screen, the studio monitor and projectors, audio smoothing, the browser's microphone processing, how soon
+  the controls hide (or never), key badges on or off, and the assistant's reasoning toggle. Also export / import, clearing
+  the recently played lists and resetting the settings. They belong to this computer and stay out of Export; a change
+  in one tab reaches the others at once. See docs/settings.md.
+- Settings → Assistant: choose the connection (API key or Claude subscription), the model and the efforts from the app;
+  a save applies to the next reply without a restart. The desktop app can keep an API key, encrypted with the system
+  keychain and never sent back to the page. Environment variables still win and lock their field; `claude` and
+  `yt-dlp` paths stay environment-only, and settings can only be changed on the computer the server runs on.
+
 ## Unreleased — assistant token use (2026-10-16)
 
 ### Changed

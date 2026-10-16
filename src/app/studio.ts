@@ -146,8 +146,8 @@ export class StudioSession {
 
   // ---------- Lifecycle ----------
 
-  // The main window's hooks: Preview monitor + master fader every frame, autopilot on the beat, and
-  // the Parameters dock editing the selected show scene.
+  // The main window's hooks: Preview monitor + master fader every frame, autopilot on the beat, the
+  // Parameters dock editing the selected show scene, and the pixel-density setting for the monitor.
   attach(): () => void {
     return this.app.setHooks({
       onFrame: (dt, program) => { this.update(dt); this.renderPreview(program); },
@@ -159,6 +159,7 @@ export class StudioSession {
       master: () => this.master,
       autopilot: () => this.autopilot.on,
       paramsOverride: () => this.paramsOverride(),
+      onPrefs: (prefs) => this.previewRenderer?.setMaxPixelRatio(prefs.maxPixelRatio),
     });
   }
 
@@ -173,6 +174,7 @@ export class StudioSession {
       this.previewRenderer = new Renderer(previewCanvas, this.app.state.scenes);
       this.previewRenderer.setMedia(this.app.media);
       this.previewRenderer.setScale(0.6);
+      this.previewRenderer.setMaxPixelRatio(this.app.prefs.get().maxPixelRatio);
     }
     // Closing with a cue Live pins the Live slot: projectors keep it while the screen is free to
     // browse. Reopening puts Live back on the screen (the main canvas is the Live monitor).

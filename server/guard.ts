@@ -29,6 +29,14 @@ export function hostAllowed(host: string | undefined, extra: readonly string[] =
   return LOOPBACK.has(name) || name.endsWith('.localhost') || isIP(name) !== 0 || extra.includes(name);
 }
 
+// This computer by name or address, as opposed to a device on the network reaching an app started with
+// HOST=0.0.0.0 by its IP address or an ALLOWED_HOSTS name. Settings may only be changed from here.
+export function isLoopbackHost(host: string | undefined): boolean {
+  if (!host) return false;
+  const name = hostName(host);
+  return LOOPBACK.has(name) || name.endsWith('.localhost') || /^127\.\d+\.\d+\.\d+$/.test(name) || name === '::ffff:127.0.0.1';
+}
+
 // Why a request is refused, or null when it may go through.
 export function refusal(req: IncomingMessage, extra: readonly string[] = []): string | null {
   const host = req.headers.host;

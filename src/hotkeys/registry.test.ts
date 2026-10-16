@@ -3,7 +3,7 @@ import type { Overlay } from '../state/ui-state';
 import { CUE_DIGITS, CUE_DIGITS_WHEN, HOTKEYS, isEnabled, SCENE_DIGITS, SCENE_DIGITS_WHEN, type HotkeyContext, type HotkeyWhen } from './registry';
 
 // Every overlay (a missing one is a type error here), plus none.
-const OVERLAY_SET: Record<Exclude<Overlay, null>, true> = { library: true, editor: true, nodes: true, studio: true, soundcloud: true, youtube: true };
+const OVERLAY_SET: Record<Exclude<Overlay, null>, true> = { library: true, editor: true, nodes: true, studio: true, soundcloud: true, youtube: true, settings: true };
 const OVERLAYS: Overlay[] = [null, ...(Object.keys(OVERLAY_SET) as Exclude<Overlay, null>[])];
 
 function* contexts(): Generator<HotkeyContext> {

@@ -70,6 +70,7 @@ Press **?** in the app for help and every shortcut.
 | 📺 | **[Studio & projector](docs/studio.md)** · O | An OBS-style Preview / Live studio with projector windows, fades, an autopilot that counts beats, and an AI Director that plans the set. |
 | ✦ | **[AI assistant](docs/assistant.md)** · I | Claude writes and fixes scenes, sets parameters and runs the studio for you, across several conversations. |
 | 🪟 | **[Interface](docs/interface.md)** | Dockable, resizable widgets with a remembered layout, and help on every panel. |
+| ⚙ | **[Settings](docs/settings.md)** · , | Render quality, microphone processing and when the controls hide, for this computer. |
 | 💾 | **[Back up](docs/backup.md)** | Export everything you made to one file and import it elsewhere. |
 | 🖥 | **[Desktop app](docs/desktop.md)** | The whole app in its own window, with installers for macOS, Windows and Linux on the [releases page](https://github.com/snuffish/hallucinate/releases). |
 

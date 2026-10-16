@@ -16,7 +16,7 @@ import { formatTokens, totalTokens } from '../assistant/usage';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { chatPlacement, effective, type WidgetSize } from '../state/layout';
-import { KEYS, readString, writeString } from '../state/persistence';
+import { setShowThinking, useShowThinking } from '../state/prefs';
 import { Store, useStore } from '../state/store';
 import { ChatList } from './assistant/ChatList';
 import { Transcript, usageLabel, usageTitle } from './assistant/Transcript';
@@ -222,8 +222,6 @@ function ChatGrip() {
   );
 }
 
-const readThinking = () => readString(KEYS.assistantThinking) === '1';
-
 export function Assistant() {
   const app = useApp();
   const open = useUI((ui) => ui.assistantOpen);
@@ -237,8 +235,9 @@ export function Assistant() {
   const undo = useStore(session.undo.store, (u) => u);
   const [info, setInfo] = useState<Info | null>(STATIC_DEMO ? { backend: 'none', setup: STATIC_DEMO_NOTE } : null);
   const [listOpen, setListOpen] = useState(false);
+  const configVersion = useUI((ui) => ui.assistantConfig);
   const [searchTick, setSearchTick] = useState(0);
-  const [showThinking, setShowThinking] = useState(readThinking);
+  const showThinking = useShowThinking();
   const [now, setNow] = useState(() => Date.now());
   const log = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
@@ -246,7 +245,7 @@ export function Assistant() {
   useEffect(() => {
     if (STATIC_DEMO) return;
     fetch('/api/assistant/info').then((r) => r.json()).then((j) => { const p = InfoSchema.safeParse(j); if (p.success) { setInfo(p.data); session.setBackend(p.data.backend); } }).catch(() => {});
-  }, [session]);
+  }, [session, configVersion]);
 
   // Stick to the bottom while new text arrives, unless the user scrolled up to read.
   const pinned = useRef(true);
@@ -285,9 +284,7 @@ export function Assistant() {
       downloadFile(new Blob([md], { type: 'text/markdown' }), `hallucinate-chat-${slug}-${fileStamp()}.md`);
     });
   };
-  const toggleThinking = () => {
-    setShowThinking((v) => { writeString(KEYS.assistantThinking, v ? '0' : '1'); return !v; });
-  };
+  const toggleThinking = () => setShowThinking(!showThinking);
 
   // Panel shortcuts, while it is open (they work from the text box too).
   const hk = (def: { keys: string; label: string }, fn: () => void): UseHotkeyDefinition => ({

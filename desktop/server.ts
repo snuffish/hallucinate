@@ -9,6 +9,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import type { Handler } from '../server/guard';
+import type { ConfigStore } from '../server/config';
 import { apiRoutes } from '../server/routes';
 
 export const PREFERRED_PORT = 47741;
@@ -53,8 +54,8 @@ export function resolveStatic(root: string, urlPath: string): string | null {
 
 export interface AppServer { port: number; fellBack: boolean; server: Server; close(): Promise<void> }
 
-export function createHandler(dist: string, env: Record<string, string> = {}): Handler {
-  const routes = apiRoutes(env);
+export function createHandler(dist: string, env: Record<string, string> = {}, config?: ConfigStore): Handler {
+  const routes = apiRoutes({ env, config });
   return async (req, res) => {
     const path = (req.url ?? '/').split('?')[0]!;
     const route = routes.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`));
@@ -93,8 +94,8 @@ function listen(server: Server, port: number): Promise<number> {
   });
 }
 
-export async function startServer({ dist, preferredPort = PREFERRED_PORT, env }: { dist: string; preferredPort?: number; env?: Record<string, string> }): Promise<AppServer> {
-  const server = createServer(createHandler(dist, env));
+export async function startServer({ dist, preferredPort = PREFERRED_PORT, env, config }: { dist: string; preferredPort?: number; env?: Record<string, string>; config?: ConfigStore }): Promise<AppServer> {
+  const server = createServer(createHandler(dist, env, config));
   let port: number;
   let fellBack = false;
   try {

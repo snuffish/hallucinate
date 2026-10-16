@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import type { AppController } from './controller';
 import { useStore } from '../state/store';
 import type { Layout } from '../state/layout';
+import type { Prefs } from '../state/prefs';
 import type { UIState } from '../state/ui-state';
 
 const AppContext = createContext<AppController | null>(null);
@@ -21,4 +22,9 @@ export function useUI<S>(selector: (ui: UIState) => S): S {
 // Subscribe to one slice of the widget layout.
 export function useLayout<S>(selector: (layout: Layout) => S): S {
   return useStore(useApp().layout, selector);
+}
+
+// Subscribe to one device preference (the Settings overlay).
+export function usePrefs<S>(selector: (prefs: Prefs) => S): S {
+  return useStore(useApp().prefs, selector);
 }

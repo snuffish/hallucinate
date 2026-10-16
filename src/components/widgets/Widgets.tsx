@@ -61,7 +61,7 @@ function WidgetFor({ id, entry, actions: a }: { id: WidgetId; entry: WidgetLayou
   }
 }
 
-// The title bar of the app: the shortcut sheet, the Widgets menu and H. It can't be closed, so the
+// The title bar of the app: the Widgets menu, Settings, the shortcut sheet and H. It can't be closed, so the
 // way back to every other widget is always on screen.
 function HubWidget({ entry }: { entry: WidgetLayout }) {
   const app = useApp();
@@ -69,6 +69,7 @@ function HubWidget({ entry }: { entry: WidgetLayout }) {
     <Widget id="hub" domId="hub" entry={entry} title="Hallucinate" closable={false} collapse={false} resizable={false}
       tools={<>
         <WidgetsMenu />
+        <button id="settings-btn" className="icon" title="Settings (,)" aria-label="Settings" onClick={() => app.toggleOverlay('settings')}>⚙<Kbd hotkey={HOTKEYS.settings} /></button>
         <HelpButton topic="sheet" />
         <button id="collapse" className="icon" title="Hide the controls (H)" onClick={() => app.toggleWidgets()}>–<Kbd hotkey={HOTKEYS.hidePanel} /></button>
       </>} />
@@ -112,6 +113,7 @@ function WidgetsMenu() {
         <button id="reset-layout" onClick={() => { menu.current?.hidePopover(); app.resetLayout(); }}>Reset layout<Kbd hotkey={HOTKEYS.resetLayout} /></button>
         <small>Drag a widget by its title bar. Drop it on an edge of the screen to dock it there.</small>
         <strong>Your setup</strong>
+        <button id="open-settings" onClick={() => { menu.current?.hidePopover(); app.setOverlay('settings'); }}>Settings…<Kbd hotkey={HOTKEYS.settings} /></button>
         <button id="export-settings" title="Save your scenes, show, parameters, favourites and layout to a file" onClick={() => { menu.current?.hidePopover(); app.exportSettings(); }}>Export scenes &amp; settings</button>
         <button id="import-settings" title="Replace them with an exported file (your current setup is downloaded first)" onClick={() => { menu.current?.hidePopover(); settingsFile.current?.click(); }}>Import…</button>
         <input type="file" id="settings-file" accept="application/json,.json" hidden ref={settingsFile}

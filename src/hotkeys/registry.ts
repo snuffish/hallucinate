@@ -72,6 +72,7 @@ export const HOTKEYS = {
   fullscreen: { id: 'fullscreen', keys: 'F', label: 'Fullscreen', group: 'Panels', when: 'always' },
   record: { id: 'record', keys: 'C', label: 'Record', group: 'Panels', when: 'noNodes' },
   help: { id: 'help', keys: '?', label: 'Help & shortcuts', group: 'Panels', when: 'always' },
+  settings: { id: 'settings', keys: ',', label: 'Settings', group: 'Panels', when: 'noNodes' },
   closeOverlay: { id: 'closeOverlay', keys: 'Escape', label: 'Close', group: 'Panels', when: 'overlayOpen', inInputs: true },
   deleteNode: { id: 'deleteNode', keys: 'Delete', label: 'Delete block', group: 'Panels', when: 'nodesOpen' },
   deleteNodeBackspace: { id: 'deleteNodeBackspace', keys: 'Backspace', label: 'Delete block', group: 'Panels', when: 'nodesOpen' },

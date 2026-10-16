@@ -33,6 +33,7 @@ export class AudioEngine {
   private output: GainNode | null = null;
   private volume = 1;
   private demoRate = 1;
+  private smoothing = 0.6;   // Settings → Audio (src/state/prefs.ts)
 
   private freq = new Uint8Array(0);
   private time = new Uint8Array(0);
@@ -52,7 +53,7 @@ export class AudioEngine {
     this.ctx = ctx;
     this.analyser = ctx.createAnalyser();
     this.analyser.fftSize = 2048;
-    this.analyser.smoothingTimeConstant = 0.6;
+    this.analyser.smoothingTimeConstant = this.smoothing;
     this.freq = new Uint8Array(this.analyser.frequencyBinCount);
     this.time = new Uint8Array(this.analyser.fftSize);
     // Byte spectrum value -> linear amplitude (the analyser stores dB scaled to 0..255).
@@ -68,6 +69,12 @@ export class AudioEngine {
   setVolume(v: number): void {
     this.volume = v;
     if (this.output && this.ctx) this.output.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02);
+  }
+
+  // How much each spectrum frame is averaged with the previous ones: higher is calmer, lower twitchier.
+  setSmoothing(value: number): void {
+    this.smoothing = value;
+    if (this.analyser) this.analyser.smoothingTimeConstant = value;
   }
 
   // Tempo of the demo loop (files use playbackRate instead).
@@ -105,11 +112,10 @@ export class AudioEngine {
     this.attach(node, 'file', true);
   }
 
-  async useMicrophone(): Promise<void> {
+  // The browser's voice processing is off by default: it would duck and gate the music.
+  async useMicrophone(constraints: MediaTrackConstraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false }): Promise<void> {
     await this.ready();
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-    });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
     this.detach();
     this.stream = stream;
     this.attach(this.ctx!.createMediaStreamSource(stream), 'mic', false);

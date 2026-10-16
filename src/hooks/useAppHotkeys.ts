@@ -8,7 +8,7 @@ import { CUE_DIGITS, CUE_DIGITS_WHEN, HOTKEYS, isEnabled, SCENE_DIGITS, SCENE_DI
 export interface HotkeyActions {
   playPause(): void; seek(seconds: number): void; changeVolume(delta: number): void; changeRate(delta: number): void; toggleMute(): void;
   stepScene(dir: number): void; pickScene(digit: number): void; steer(dir: number): void; restartGame(): void;
-  toggleLibrary(): void; toggleAssistant(): void; toggleHelp(): void; toggleEditor(): void; toggleVisualMaker(): void; toggleStudio(): void;
+  toggleLibrary(): void; toggleAssistant(): void; toggleHelp(): void; toggleEditor(): void; toggleVisualMaker(): void; toggleStudio(): void; toggleSettings(): void;
   toggleParams(): void; togglePanel(): void; resetLayout(): void; togglePerf(): void; toggleFullscreen(): void; toggleRecording(): void; toggleAuto(): void; randomize(): void; randomizeBack(): void;
   closeOverlay(): void; take(): void; blackout(): void; studioStep(dir: number): void; studioCue(n: number): void; game(): void;
   librarySearch(): void; libraryMove(dx: number, dy: number): void; libraryPick(): void; libraryTab(dir: number): void; deleteNode(): void;
@@ -53,6 +53,7 @@ export function useAppHotkeys(actions: HotkeyActions): void {
     fire(HOTKEYS.library, actions.toggleLibrary),
     fire(HOTKEYS.assistant, actions.toggleAssistant),
     fire(HOTKEYS.help, actions.toggleHelp),
+    fire(HOTKEYS.settings, actions.toggleSettings),
     fire(HOTKEYS.editor, actions.toggleEditor),
     fire(HOTKEYS.visualMaker, actions.toggleVisualMaker),
     fire(HOTKEYS.studio, actions.toggleStudio),

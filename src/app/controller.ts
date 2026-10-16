@@ -16,6 +16,7 @@ import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readString, remove, unfreeze, writeJSON, writeString } from '../state/persistence';
+import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
 import { appendScene, buildSceneList, discardParked, paramKey, saveUserScenes, userScene, type ParkedScenes } from '../state/scene-list';
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
@@ -61,6 +62,8 @@ export interface ControllerHooks {
   escape?: () => boolean;
   // Visual maker: Delete removes the selected block.
   deleteNode?: () => void;
+  // A device preference changed (the studio's Preview renderer follows the pixel density).
+  onPrefs?: (prefs: Prefs) => void;
 }
 
 // What a SoundCloud / YouTube picker offers the rest of the app: its results double as the play queue.
@@ -70,6 +73,7 @@ export interface PickerApi {
   readonly hasQueue: boolean;
   readonly busy: boolean;
   cancel(): void;
+  clearRecent(): void;   // forgets the "Recently played" list
 }
 
 export class AppController {
@@ -94,6 +98,8 @@ export class AppController {
   libraryPrefs: LibraryPrefs = loadLibraryPrefs();
   readonly hooks: ControllerHooks = {};
   mediaSound = readString(KEYS.mediaSound) === '1';
+  // Device preferences (Settings overlay, src/state/prefs.ts).
+  readonly prefs = new Store<Prefs>(loadPrefs());
   // Where each frame's time goes (Shift+P, or ?perf / ?perf=trace in the URL). Off: one flag check per stage.
   readonly profiler = new FrameProfiler();
 
@@ -112,6 +118,7 @@ export class AppController {
   private readonly downloads = new Map<'sc' | 'yt', DownloadView>();
   private disposed = false;
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
+  private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly program: ProgramState;
   private readonly liveParams: Record<number, SceneUniforms> = {};
   private readonly profilerApi: ProfilerApi = {
@@ -122,7 +129,12 @@ export class AppController {
     setScene: (index) => this.setScene(index),
   };
   // Another tab imported settings: this one's state is stale, so it must not write, and reloads.
+  // Another tab changed a preference: take it over, so this tab's next write doesn't undo it.
   private readonly onStorage = (e: StorageEvent) => {
+    if (e.key === KEYS.prefs) {
+      if (this.prefs.set(loadPrefs())) this.applyPrefs();
+      return;
+    }
     if (e.key !== KEYS.importedAt) return;
     freeze();
     location.reload();
@@ -130,10 +142,12 @@ export class AppController {
   private readonly wake = () => {
     document.body.classList.remove('idle');
     clearTimeout(this.idleTimer);
+    const seconds = this.prefs.get().idleHideSeconds;
+    if (seconds === null) return;   // Settings → Interface: the controls never fade
     this.idleTimer = setTimeout(() => {
       const ui = this.ui.get();
       if (this.audio.kind && !ui.overlay && !ui.assistantOpen && !ui.assistantPeek && !ui.help && !ui.dragging && !this.pickers.sc?.busy && !this.pickers.yt?.busy) document.body.classList.add('idle');
-    }, 3000);
+    }, seconds * 1000);
   };
 
   constructor(canvas: HTMLCanvasElement) {
@@ -143,13 +157,14 @@ export class AppController {
     this.parked = list.parked;
     this.state = {
       scenes: list.scenes, gameIndex: list.gameIndex, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
-      look: defaultLook(), clock: defaultClock(), activeSource: null,
+      look: { ...defaultLook(), resolution: this.prefs.get().startResolution }, clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
     this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound });
     this.renderer.setMedia(this.media);
     this.renderer.setScale(this.state.look.resolution);
-    this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }));
+    this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
+    this.applyPrefs();
 
     this.player = document.createElement('audio');
     this.player.hidden = true;
@@ -206,6 +221,7 @@ export class AppController {
     clearTimeout(this.toastTimer);
     this.recorder?.stop();
     this.layoutWriter.dispose();
+    this.prefsWriter.dispose();
     this.transport.dispose();
     this.output.dispose();
     this.paramStore.dispose();
@@ -272,6 +288,44 @@ export class AppController {
     const hidden = !this.ui.get().widgetsHidden;
     this.ui.set({ widgetsHidden: hidden, help: null });
     if (hidden) this.toast('Press H to show the controls again', 2000);
+  }
+
+  // ---------- Device preferences (Settings overlay) ----------
+
+  setPref<K extends PrefKey>(key: K, value: Prefs[K]): void {
+    if (!this.prefs.set({ [key]: value } as Partial<Prefs>)) return;
+    this.prefsWriter.schedule();
+    this.applyPrefs();
+  }
+
+  resetPrefs(): void {
+    if (!this.prefs.set(DEFAULT_PREFS)) return;
+    this.prefsWriter.schedule();
+    this.applyPrefs();
+  }
+
+  // Pushes the preferences to whatever uses them: this renderer, the projectors, the studio's Preview
+  // monitor (its hook), the audio analysis, the badges and the idle timer. Start resolution is read once, at startup.
+  private applyPrefs(): void {
+    const p = this.prefs.get();
+    this.renderer.setMaxPixelRatio(p.maxPixelRatio);
+    this.output.sendPrefs(outputPrefs(p));
+    this.hooks.onPrefs?.(p);
+    this.audio.setSmoothing(p.audioSmoothing);
+    if (p.showKeyBadges) delete document.body.dataset.kbd; else document.body.dataset.kbd = 'off';
+    this.wake();   // the idle delay may have changed
+  }
+
+  // Settings → Assistant saved: the assistant's panel asks the server for the backend and model again.
+  assistantConfigChanged(): void { this.ui.set({ assistantConfig: this.ui.get().assistantConfig + 1 }); }
+
+  // The "Press ? for help" toast shows again at the next sound source.
+  resetHelpHint(): void { remove(KEYS.helpHint); }
+
+  clearRecentTracks(): void {
+    for (const id of ['sc', 'yt'] as const) this.pickers[id]?.clearRecent();
+    remove(KEYS.scRecent);
+    remove(KEYS.ytRecent);
   }
 
   // ---------- Layout ----------
@@ -598,7 +652,7 @@ export class AppController {
       if (kind === 'file') return pickFile?.();
       if (kind === 'soundcloud') return openSoundCloud?.();
       this.player.pause();
-      if (kind === 'mic') await this.audio.useMicrophone();
+      if (kind === 'mic') await this.audio.useMicrophone(micConstraints(this.prefs.get()));
       if (kind === 'display') await this.audio.useDisplayAudio();
       if (kind === 'demo') await this.audio.useDemo();
       this.onSourceStarted(SOURCE_LABELS[kind] ?? kind, kind);

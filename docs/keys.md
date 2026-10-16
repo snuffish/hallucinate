@@ -26,10 +26,11 @@ Press **?** in the app for the same list. Every button with a shortcut also show
 | Shift+R | back to the look before the last randomize (again to step further back) |
 | C | start / stop recording (downloads a .webm with audio) |
 | F | fullscreen |
-| H | hide the controls (they also auto-hide after 3 s of no mouse movement) |
+| H | hide the controls (they also auto-hide after 3 s of no mouse movement; change that in Settings) |
 | Shift+H | reset the widget layout |
 | Shift+P | performance monitor: where each frame's time goes, and a GPU test (see [PERF.md](../PERF.md)) |
 | ? | help & every shortcut |
+| , | [settings](settings.md) |
 | Esc | close the open panel (in the library: leave the search field first) |
 
 The shortcuts are defined in one place, `src/hotkeys/registry.ts`; see [ARCHITECTURE.md](../ARCHITECTURE.md) for how to
