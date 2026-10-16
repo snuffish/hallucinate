@@ -13,7 +13,8 @@ import { randomUUID } from 'node:crypto';
 import { EventType, type AdapterYieldChunk, type AnyTool } from '@tanstack/ai';
 import { z } from 'zod';
 import { TOOL_CALL_EVENT, ToolResultPostSchema, type ToolCallEvent, type ToolResult } from '../src/assistant/relay-wire';
-import { ClaudeCliAdapter, debug, MCP_SERVER, WORKDIR, type CliRun } from './claude-cli-adapter';
+import { ClaudeCliAdapter, MCP_SERVER, WORKDIR, type CliRun } from './claude-cli-adapter';
+import { debug } from './programs';
 
 const TOOL_TIMEOUT_MS = 120_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -24,6 +25,7 @@ export type SubRoute = (body: unknown, url: URL) => Reply | Promise<Reply>;
 export type Spawn = (bin: string, args: string[], options: { cwd: string }) => ChildProcess;
 
 export interface CliBridgeOptions {
+  claudeBin?: string;       // the CLI program (CLAUDE_BIN, see programs.ts), else `claude`
   spawn?: Spawn;            // how the CLI is started (tests pass a fake one)
   workdir?: string;         // where its sessions and MCP configs live
   toolTimeoutMs?: number;   // how long a tool call waits for the browser
@@ -96,12 +98,14 @@ export class CliSession {
 }
 
 export class CliBridge {
+  readonly claudeBin: string;
   readonly spawn: Spawn;
   readonly workdir: string;
   private readonly timeoutMs: number;
   private readonly sessions = new Map<string, CliSession>();   // threadId -> session
 
   constructor(o: CliBridgeOptions = {}) {
+    this.claudeBin = o.claudeBin ?? 'claude';
     this.spawn = o.spawn ?? ((bin, args, { cwd }) => nodeSpawn(bin, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] }));
     this.workdir = o.workdir ?? WORKDIR;
     this.timeoutMs = o.toolTimeoutMs ?? TOOL_TIMEOUT_MS;

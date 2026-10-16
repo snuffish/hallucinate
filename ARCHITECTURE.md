@@ -68,8 +68,10 @@ small Node server on `127.0.0.1` that serves the built `dist/` and mounts the sa
 then loads it in a window. The renderer doesn't know it's in Electron: relative URLs, the projector pop-up and the
 BroadcastChannel work as in a browser. The main process answers what a browser would ask the user (microphone,
 screen capture, display access, which pop-ups may open) and imports the login shell's `PATH` and the app's own
-settings (`SHELL_VARS` in `desktop/env.ts`: the API key, `CLAUDE_BIN`, `YTDLP`, `ASSISTANT_*`) so they work from the
-Dock too. The port is fixed (47741) because the storage origin includes it. `vite.desktop.config.ts`
+settings (`SHELL_VARS` in `desktop/env.ts`: the API key, `CLAUDE_BIN`, `YTDLP`, `ASSISTANT_*`, derived from what the
+server reads, `ENV_NAMES` in `server/config.ts` and `PROGRAM_ENV` in `server/programs.ts`) so they work from the Dock too.
+It imports the server before it asks the shell, so the server reads its environment when `apiRoutes()` builds the
+routes, never when a module loads. The port is fixed (47741) because the storage origin includes it. `vite.desktop.config.ts`
 bundles the main process and the server code into `dist-desktop/main.js`; `electron-builder.yml` packages `dist/` and
 `dist-desktop/` without `node_modules`.
 
@@ -124,7 +126,8 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
    What a route and the browser exchange is declared once, in a zod-only leaf both ends parse with:
    `src/assistant/relay-wire.ts` for the tool round trip, `src/remote/wire.ts` for the yt-dlp bridges (whose browser
    side is `remoteSite()` in `src/remote/client.ts`; the bridge takes its yt-dlp runner, so its tests drive that client
-   against a scripted one).
+   against a scripted one), `src/assistant/settings-wire.ts` for `/api/settings` and `/api/assistant/info` (the e2e
+   fake of the settings server is typed by it too).
 10. **Only the app may call `/api`.** Every route is wrapped in `guarded()` (`server/guard.ts`): the Host must be
    a loopback name or an IP literal (or listed in `ALLOWED_HOSTS`), a browser request must come from the app's
    own origin, and a POST must be JSON. The CLI reaches the MCP endpoint at the server's own socket address,
@@ -193,11 +196,13 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
   `outputPrefs` and `OutputPrefs` with an applier in `src/engine/output-link.ts` (it doesn't compile without one): the
   main canvas, the studio's Preview monitor and projector windows all apply them with `applyRendererPrefs`, and the
   prefs test fails if `outputPrefs` and `APPLIES` disagree. Preferences are not exported.
-- **A server setting** (how the server reaches Claude): add it to `StoredConfigSchema` and `effectiveConfig` in
-  `server/config.ts` (the environment wins, then Settings, then the default), accept it in the patch schema of
-  `server/settings-route.ts` and give it a control in `src/components/SettingsAssistant.tsx`. Never make a program path
-  settable over HTTP: the server runs it, and `/api` admits non-browser clients. Writes are allowed from a loopback host
-  only (`isLoopbackHost`).
+- **A server setting** (how the server reaches Claude): add it to `StoredConfigSchema`, `effectiveConfig` and
+  `ENV_NAMES` in `server/config.ts` (the environment wins, then Settings, then the default; the desktop app copies the
+  variable from the login shell by itself), to the view and the patch in `src/assistant/settings-wire.ts` (the route
+  and the e2e fake don't compile until they answer it), and give it a control in `src/components/SettingsAssistant.tsx`.
+  Never make a program path settable over HTTP: those live in `server/programs.ts`, read from the environment only,
+  since the server runs them and `/api` admits non-browser clients. Writes are allowed from a loopback host only
+  (`isLoopbackHost`).
 
 ## Checks
 

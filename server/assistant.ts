@@ -13,6 +13,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { chat, chatParamsFromRequestBody, maxIterations, toServerSentEventsResponse } from '@tanstack/ai';
+import type { AssistantInfo } from '../src/assistant/settings-wire';
 import { DIRECTOR_TOOLS, TOOL_DEFINITIONS } from '../src/assistant/tools';
 import { apiModel, createAdapter, NO_BACKEND, type AssistantConfig, type Backend } from './adapters';
 import { CliBridge } from './cli-bridge';
@@ -47,7 +48,7 @@ export function createAssistant(config: AssistantConfig, cli = new CliBridge()) 
     const route = url.pathname.replace(/^\/api\/assistant/, '').replace(/\/$/, '') || '/';
     const b = await config.backend();
     const cfg = config.current();
-    if (route === '/info') return json(res, 200, { backend: b, model: b === 'api' ? apiModel(cfg) : cfg.model.value, ...(b === 'none' && { setup: NO_BACKEND }) });
+    if (route === '/info') return json(res, 200, { backend: b, model: b === 'api' ? apiModel(cfg) : cfg.model.value, ...(b === 'none' && { setup: NO_BACKEND }) } satisfies AssistantInfo);
     if (req.method !== 'POST') return json(res, 405, { error: 'POST only' });
     let body: unknown;
     try {

@@ -14,6 +14,7 @@ import { KEYS } from '../state/persistence';
 import { Store } from '../state/store';
 import { Chat, forgetThread } from './chat';
 import { createToolRunner, UndoConflict, type ToolRunner } from './executor';
+import type { Backend } from './settings-wire';
 import { HISTORY_CAP, indexedDBTranscripts, loadTranscript, prune, readIndex, transcriptWriter, writeIndex, type ChatMeta, type TranscriptBackend, type TranscriptWriter } from './history-store';
 import { createLock, serialized, type Lock } from './lock';
 import { codeHash, resumeNote, undoNote, withNotes, type ScreenNow } from './notes';
@@ -261,7 +262,7 @@ export class AssistantSession {
   }
 
   // The backend decides how many conversations may run at once.
-  setBackend(backend: 'api' | 'claude-code' | 'none'): void {
+  setBackend(backend: Backend): void {
     this.maxRunning = backend === 'claude-code' ? MAX_RUNNING_CLI : Infinity;
     for (const c of this.chats.values()) c.pump();
   }

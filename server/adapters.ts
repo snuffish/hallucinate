@@ -6,24 +6,24 @@
 
 import { execFile } from 'node:child_process';
 import { anthropicText, createAnthropicChat, type ANTHROPIC_MODELS } from '@tanstack/ai-anthropic';
-import { CLAUDE_BIN } from './claude-cli-adapter';
+import type { Backend } from '../src/assistant/settings-wire';
 import type { CliBridge } from './cli-bridge';
 import { DEFAULT_MODEL, effectiveConfig, type ConfigStore, type EffectiveConfig } from './config';
 
-export type Backend = 'api' | 'claude-code' | 'none';
+export type { Backend };
 
 export const NO_BACKEND = 'The assistant needs Claude. With a Claude subscription: install Claude Code (the `claude` command) and sign in once. With an API key: add it in Settings → Assistant (desktop app), or export ANTHROPIC_API_KEY=sk-ant-… and restart the dev server.';
 
-export function claudeCodeAvailable(): Promise<string | null> {
-  return new Promise((resolve) => execFile(CLAUDE_BIN, ['--version'], { timeout: 15_000 }, (err, out) => resolve(err ? null : String(out).trim())));
+export function claudeCodeAvailable(claudeBin: string): Promise<string | null> {
+  return new Promise((resolve) => execFile(claudeBin, ['--version'], { timeout: 15_000 }, (err, out) => resolve(err ? null : String(out).trim())));
 }
 
-// `auto` takes the API when there is a key, else the subscription when the CLI is installed.
-export async function detectBackend(cfg: EffectiveConfig): Promise<Backend> {
+// `auto` takes the API when there is a key, else the subscription when the CLI (`claudeBin`) is installed.
+export async function detectBackend(cfg: EffectiveConfig, claudeBin: string): Promise<Backend> {
   const choice = cfg.backend.value;
   if (choice === 'api' || choice === 'claude-code') return choice;
   if (cfg.apiKey.value) return 'api';
-  return (await claudeCodeAvailable()) ? 'claude-code' : 'none';
+  return (await claudeCodeAvailable(claudeBin)) ? 'claude-code' : 'none';
 }
 
 // The settings as they are now, and the backend they lead to. Detection probes the CLI, so it is
@@ -34,13 +34,13 @@ export interface AssistantConfig {
   resetBackend(): void;
 }
 
-export function assistantConfig(config: ConfigStore, env: NodeJS.ProcessEnv = process.env): AssistantConfig {
+export function assistantConfig(config: ConfigStore, { env = process.env, claudeBin = 'claude' }: { env?: NodeJS.ProcessEnv; claudeBin?: string } = {}): AssistantConfig {
   let backend: Promise<Backend> | undefined;
   const current = () => effectiveConfig(env, config.read(), config.secrets);
   config.onChange(() => { backend = undefined; });
   return {
     current,
-    backend: () => (backend ??= detectBackend(current())),
+    backend: () => (backend ??= detectBackend(current(), claudeBin)),
     resetBackend: () => { backend = undefined; },
   };
 }

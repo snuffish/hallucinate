@@ -14,15 +14,12 @@ import { basename, extname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { filePath, sitePrefix, type FetchEvent, type FetchEventName, type Progress, type RemoteTrack, type SearchResponse, type SiteName } from '../src/remote/wire';
 
-export const YTDLP = process.env.YTDLP || 'yt-dlp';
 const TYPES: Record<string, string> = {
   '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.opus': 'audio/ogg', '.ogg': 'audio/ogg',
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska',
 };
 const MISSING = 'yt-dlp is not installed. Install it with "sudo pacman -S yt-dlp" (or "pip install yt-dlp"), then restart the server.';
 const FORBIDDEN = 'YouTube refused the download (HTTP 403). Update yt-dlp (e.g. "sudo pacman -Syu yt-dlp yt-dlp-ejs") — YouTube changes often — and try again.';
-// Each site's cache is trimmed (oldest first) to this size after every download.
-const CACHE_LIMIT = Number(process.env.YTDLP_CACHE_MB || 2048) * 1024 * 1024;
 
 type Env = Record<string, string>;
 type HttpError = Error & { status?: number };
@@ -59,12 +56,16 @@ export const SITES = {
 export const safeFileName = (name: string): boolean => /^[\w-][\w.-]*$/.test(name) && !name.includes('..');
 
 export interface BridgeOptions {
-  env?: Env;           // added to yt-dlp's environment (the desktop app uses it, see jsRuntime())
-  run?: YtDlp;         // instead of spawning yt-dlp with `env`
-  cacheDir?: string;   // where the files go, else a folder per site in the temp directory
+  ytdlp?: string;         // the program (YTDLP, see programs.ts), else `yt-dlp`
+  env?: Env;              // added to its environment (the desktop app uses it, see jsRuntime())
+  run?: YtDlp;            // instead of spawning `ytdlp` with `env`
+  cacheDir?: string;      // where the files go, else a folder per site in the temp directory
+  cacheBytes?: number;    // trimmed (oldest first) to this size after every download
 }
 
-export function createBridge(name: SiteName, { env, run = spawnYtDlp(env), cacheDir }: BridgeOptions = {}) {
+const DEFAULT_CACHE_BYTES = 2048 * 1024 * 1024;
+
+export function createBridge(name: SiteName, { ytdlp = 'yt-dlp', env, run = spawnYtDlp(ytdlp, env), cacheDir, cacheBytes = DEFAULT_CACHE_BYTES }: BridgeOptions = {}) {
   const site: Site = SITES[name];
   const cache = cacheDir ?? join(tmpdir(), `hallucinate-${name}`);
   const prefix = sitePrefix(name);
@@ -140,7 +141,7 @@ export function createBridge(name: SiteName, { env, run = spawnYtDlp(env), cache
       }
     }
     if (!file) throw httpError('Nothing was downloaded (live streams aren\'t supported).', 502);
-    await trimCache(cache, basename(file), CACHE_LIMIT).catch(() => {});
+    await trimCache(cache, basename(file), cacheBytes).catch(() => {});
     return filePath(name, basename(file));
   }
 
@@ -287,10 +288,10 @@ export async function trimCache(dir: string, keep: string, limit: number): Promi
   }
 }
 
-// Runs the yt-dlp program, with `env` added to its environment.
-export const spawnYtDlp = (env?: Env): YtDlp => (args, { timeoutMs, onLine, signal }) =>
+// Runs the yt-dlp program `bin`, with `env` added to its environment.
+export const spawnYtDlp = (bin: string, env?: Env): YtDlp => (args, { timeoutMs, onLine, signal }) =>
   new Promise((resolve, reject) => {
-    const proc = spawn(YTDLP, args, { stdio: ['ignore', 'pipe', 'pipe'], signal, env: env ? { ...process.env, ...env } : process.env });
+    const proc = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'], signal, env: env ? { ...process.env, ...env } : process.env });
     let stdout = '', stderr = '';
     const lines = (stream: NodeJS.ReadableStream, append: (d: string) => void) => {
       let rest = '';

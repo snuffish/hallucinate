@@ -4,12 +4,12 @@
 // The panel resizes from its corner like a widget, and can show the assistant's reasoning.
 
 import { createRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { z } from 'zod';
 import { useApp, useLayout, useUI } from '../app/AppContext';
 import { downloadFile, fileStamp } from '../app/download';
 import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
 import { useSessions } from '../app/sessions';
 import { LONG_CHAT_TOKENS } from '../assistant/conversations';
+import { AssistantInfoSchema, INFO_URL, type AssistantInfo } from '../assistant/settings-wire';
 import { toMarkdown } from '../assistant/transcript';
 import { formatTokens, totalTokens } from '../assistant/usage';
 import { HOTKEYS } from '../hotkeys/registry';
@@ -25,8 +25,6 @@ import { rectOf } from './widgets/drop';
 import { usePointerDrag } from './widgets/usePointerDrag';
 import { Grip, useFloatPlacement, useNarrow } from './widgets/Widget';
 
-const InfoSchema = z.object({ backend: z.enum(['api', 'claude-code', 'none']), model: z.string().nullable().optional(), setup: z.string().optional() });
-type Info = z.infer<typeof InfoSchema>;
 
 const EXAMPLES: [label: string, prompt: string][] = [
   ['Create a jellyfish scene', 'Create a new scene: a slowly rotating field of glowing jellyfish that pulse with the bass.'],
@@ -233,7 +231,7 @@ export function Assistant() {
   const view = useStore(chat.store, (v) => v);
   const meta = sv.chats.find((c) => c.id === sv.activeId);
   const undo = useStore(session.undo.store, (u) => u);
-  const [info, setInfo] = useState<Info | null>(STATIC_DEMO ? { backend: 'none', setup: STATIC_DEMO_NOTE } : null);
+  const [info, setInfo] = useState<AssistantInfo | null>(STATIC_DEMO ? { backend: 'none', setup: STATIC_DEMO_NOTE } : null);
   const [listOpen, setListOpen] = useState(false);
   const configVersion = useUI((ui) => ui.assistantConfig);
   const [searchTick, setSearchTick] = useState(0);
@@ -244,7 +242,7 @@ export function Assistant() {
 
   useEffect(() => {
     if (STATIC_DEMO) return;
-    fetch('/api/assistant/info').then((r) => r.json()).then((j) => { const p = InfoSchema.safeParse(j); if (p.success) { setInfo(p.data); session.setBackend(p.data.backend); } }).catch(() => {});
+    fetch(INFO_URL).then((r) => r.json()).then((j) => { const p = AssistantInfoSchema.safeParse(j); if (p.success) { setInfo(p.data); session.setBackend(p.data.backend); } }).catch(() => {});
   }, [session, configVersion]);
 
   // Stick to the bottom while new text arrives, unless the user scrolled up to read.

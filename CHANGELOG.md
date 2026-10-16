@@ -8,6 +8,9 @@
   parameter values: it fades out as it was on Live. Two show scenes of the same scene no longer fade the new values in
   only at the very end; the new ones show at once, as they do with the studio open.
 - Opening the library no longer breaks the controls with "'ArrowLeft' is already registered".
+- The desktop app started from the Dock or Finder now uses `CLAUDE_BIN`, `YTDLP`, `YTDLP_CACHE_MB` and `ASSISTANT_DEBUG`
+  from the login shell. Before, they were read before the shell was asked, so only `PATH` and the assistant's settings
+  came through.
 
 ## Unreleased — SoundCloud and YouTube (2026-10-16)
 

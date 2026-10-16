@@ -4,27 +4,20 @@
 //         environment locks it; the API key only as "set" or not, never its value; what there is to
 //         choose from; the program paths, read-only.
 //   POST  { backend?, model?, effort?, directorEffort?, apiKey? }, null clears one. Answers like GET.
+// Both shapes are declared in src/assistant/settings-wire.ts, which the browser parses them with.
 //
 // Writing is only for this computer: with HOST=0.0.0.0 or ALLOWED_HOSTS the app is reachable from the
 // network, and a device there may look but not change how the server reaches Claude.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ANTHROPIC_MODELS } from '@tanstack/ai-anthropic';
-import { z } from 'zod';
-import type { Backend } from './adapters';
-import { BACKEND_CHOICES, DEFAULT_MODEL, EFFORTS, ENV_NAMES, MODEL_PATTERN, effectiveConfig, type ConfigStore, type EffectiveConfig, type StoredConfig } from './config';
+import { SettingsPatchSchema, type Backend, type SettingsPatch, type SettingsView } from '../src/assistant/settings-wire';
+import { BACKEND_CHOICES, DEFAULT_MODEL, EFFORTS, ENV_NAMES, effectiveConfig, type ConfigStore, type EffectiveConfig, type Field, type StoredConfig } from './config';
 import { isLoopbackHost } from './guard';
 
 const MAX_BODY = 16 * 1024;
 
-const PatchSchema = z.object({
-  backend: z.enum(BACKEND_CHOICES).nullable().optional(),
-  model: z.string().regex(MODEL_PATTERN).nullable().optional(),
-  effort: z.enum(EFFORTS).nullable().optional(),
-  directorEffort: z.enum(EFFORTS).nullable().optional(),
-  apiKey: z.string().trim().regex(/^\S{20,400}$/, 'That doesn\'t look like an API key.').nullable().optional(),
-}).strict();
-export type SettingsPatch = z.infer<typeof PatchSchema>;
+export type { SettingsPatch, SettingsView };
 type FieldId = keyof SettingsPatch;
 
 export interface SettingsRouteOptions {
@@ -34,8 +27,8 @@ export interface SettingsRouteOptions {
   paths: { claudeBin: string; ytdlp: string };
 }
 
-export function settingsView(cfg: EffectiveConfig, config: ConfigStore, backend: Backend, paths: SettingsRouteOptions['paths'], canWrite: boolean) {
-  const field = <T>(f: { value: T; source: string }) => ({ value: f.value, source: f.source, locked: f.source === 'env' });
+export function settingsView(cfg: EffectiveConfig, config: ConfigStore, backend: Backend, paths: SettingsRouteOptions['paths'], canWrite: boolean): SettingsView {
+  const field = <T>(f: Field<T>) => ({ value: f.value, source: f.source, locked: f.source === 'env' });
   return {
     backend: field(cfg.backend),
     model: field(cfg.model),
@@ -55,7 +48,6 @@ export function settingsView(cfg: EffectiveConfig, config: ConfigStore, backend:
     paths,
   };
 }
-export type SettingsView = ReturnType<typeof settingsView>;
 
 export function createSettingsRoute(config: ConfigStore, { env = process.env, backend, paths }: SettingsRouteOptions) {
   const effective = (stored = config.read()) => effectiveConfig(env, stored, config.secrets);
@@ -68,7 +60,7 @@ export function createSettingsRoute(config: ConfigStore, { env = process.env, ba
 
     let patch: SettingsPatch;
     try {
-      const parsed = PatchSchema.safeParse(JSON.parse(await readBody(req)));
+      const parsed = SettingsPatchSchema.safeParse(JSON.parse(await readBody(req)));
       if (!parsed.success) return json(res, 400, { error: parsed.error.issues[0]?.message ?? 'Bad settings' });
       patch = parsed.data;
     } catch (err) {

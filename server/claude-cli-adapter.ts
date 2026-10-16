@@ -16,16 +16,14 @@ import { join } from 'node:path';
 import { EventType, type AdapterYieldChunk, type DefaultMessageMetadataByModality, type ModelMessage, type TextOptions } from '@tanstack/ai';
 import { BaseTextAdapter, type StructuredOutputOptions } from '@tanstack/ai/adapters';
 import type { CliBridge } from './cli-bridge';
+import { debug } from './programs';
 
-export const CLAUDE_BIN = process.env.CLAUDE_BIN || 'claude';
 export const MCP_SERVER = 'hallucinate';
 const PREFIX = `mcp__${MCP_SERVER}__`;
 // Keeps these sessions apart from the user's projects. It stays the same across restarts (the CLI files
 // its sessions by working directory, so `--resume` needs that) and only this user can read it: it
 // holds the MCP configs, whose tokens let a caller run the app's tools.
 export const WORKDIR = join(tmpdir(), `hallucinate-assistant-${userInfo().username}`);
-const DEBUG = !!process.env.ASSISTANT_DEBUG;   // log the CLI arguments, MCP traffic and stderr
-export const debug = (...args: unknown[]) => { if (DEBUG) console.error('[assistant]', ...args); };
 
 // What one run tells the adapter besides chat()'s options.
 export interface CliRun {
@@ -224,8 +222,8 @@ export class ClaudeCliAdapter extends BaseTextAdapter<string, NoOptions, readonl
     let proc: ChildProcess;
     const launch = (resume: boolean, prompt: string, retried: boolean) => {
       const args = argsFor(resume);
-      debug('spawn', CLAUDE_BIN, args.map((a) => (a.length > 200 ? `${a.slice(0, 200)}…` : a)));
-      const p = this.bridge.spawn(CLAUDE_BIN, args, { cwd: workdir });
+      debug('spawn', this.bridge.claudeBin, args.map((a) => (a.length > 200 ? `${a.slice(0, 200)}…` : a)));
+      const p = this.bridge.spawn(this.bridge.claudeBin, args, { cwd: workdir });
       proc = p;
       session.launched(p);
       p.stdin!.end(prompt);
