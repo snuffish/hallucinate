@@ -102,7 +102,8 @@ export async function loadTranscript(backend: TranscriptBackend, id: string): Pr
 }
 
 // One debounced writer per conversation: `schedule` keeps only the latest state, `flush` writes now.
-export interface TranscriptWriter { schedule(value: Transcript): void; flush(): Promise<void>; dispose(): void }
+// `cancel` drops a write that hasn't happened yet (the conversation is being deleted).
+export interface TranscriptWriter { schedule(value: Transcript): void; flush(): Promise<void>; cancel(): void; dispose(): void }
 
 export function transcriptWriter(backend: TranscriptBackend, id: string, onError?: (err: Error) => void, delay = WRITE_MS): TranscriptWriter {
   let pending: Transcript | null = null;
@@ -126,6 +127,10 @@ export function transcriptWriter(backend: TranscriptBackend, id: string, onError
       timer ??= setTimeout(() => void flush(), delay);   // at most one write per `delay`, not one per token
     },
     flush,
+    cancel() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      pending = null;
+    },
     dispose() {
       void flush();
       if (hasDom) {

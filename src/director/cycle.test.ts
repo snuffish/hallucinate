@@ -4,6 +4,7 @@ import type { ConnectionAdapter } from '@tanstack/ai-client';
 import type { AppController } from '../app/controller';
 import { StudioSession } from '../app/studio';
 import { Store } from '../state/store';
+import { createLock } from '../assistant/lock';
 import { Director } from './director';
 
 // One director cycle against a scripted connection: the digest goes out on a fresh thread with
@@ -101,6 +102,23 @@ describe('a director cycle', () => {
     const size = (s: Seen) => JSON.stringify(s.messages).length;
     expect(Math.abs(size(seen[2]!) - size(seen[0]!)) / size(seen[0]!)).toBeLessThan(0.1);
     expect(director.history.decisions.map((d) => d.note)).toEqual(['plan 1', 'plan 2']);
+  });
+
+  it('waits for its tool calls to finish, even ones queued behind another chat\'s on the shared lock', async () => {
+    const app = fakeApp();
+    const studio = new StudioSession(app as unknown as AppController, () => {});
+    studio.attach();
+    studio.add({ name: 'Alpha', scene: 'Alpha', values: {}, look: {} });
+    studio.add({ name: 'Beta', scene: 'Beta', values: {}, look: {} });
+    const lock = createLock();
+    void lock(() => new Promise((r) => setTimeout(r, 1000)));   // a conversation's tool is running
+    const seen: Seen[] = [];
+    const director = new Director(app as unknown as AppController, studio, { connection: scriptedConnection(seen), forgetThread: () => {}, lock });
+    director.setOn(true);
+    await settled(director);
+    expect(studio.plan?.note).toBe('plan 1');   // it landed inside the cycle
+    expect(director.view.lastNote).toBe('plan 1');
+    expect(seen).toHaveLength(2);
   });
 
   it('waits while the chat is busy, the music is off or the show is too small', async () => {

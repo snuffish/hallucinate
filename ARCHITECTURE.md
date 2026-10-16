@@ -127,7 +127,8 @@ API key: the conversation's `ChatClient` → `POST /api/assistant` (AG-UI body) 
 resumes with the result.
 
 Conversations: `AssistantSession` (`src/assistant/conversations.ts`, created by `sessions.ts` like the studio) owns one
-`ChatClient` per conversation, so several run at once and keep running while another is on screen. They share one
+`Chat` per conversation (`chat.ts`: one `ChatClient`, its tools, when a run is over, sealing on Stop, and a final
+dispose; the director's cycles use the same), so several run at once and keep running while another is on screen. They share one
 tool lock with each other and the director (`lock.ts`: their tools act on one app, one at a time) and one undo stack (an undo closure restores a
 snapshot, so only the newest change can be undone safely; the entry says whose it was). The session publishes
 `assistantBusy` / `assistantRunning` / `assistantUnread` / `assistantPeek` for the bubble and the director. History:

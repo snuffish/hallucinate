@@ -289,4 +289,23 @@ describe('assistant conversations', () => {
     expect(s.view.activeId).not.toBe(c.id);
     s.dispose();
   });
+
+  it('deletes a running conversation for good: nothing writes it back or brings it back later', async () => {
+    const transcripts = memoryTranscripts();
+    const gate = { release: () => {}, wait: Promise.resolve() };
+    gate.wait = new Promise<void>((r) => { gate.release = r; });
+    const { app, s } = session([], { transcripts, gate });
+    const c = s.active;
+    await c.load(false);
+    c.send('slow question');
+    await until(() => c.running);
+    await s.remove(c.id);
+    gate.release();
+    await new Promise((r) => setTimeout(r, 1500));   // past the settle delay and the transcript writer's
+    expect(transcripts.data.has(c.id)).toBe(false);
+    expect(s.view.live[c.id]).toBeUndefined();
+    expect(app.ui.get().assistantPeek).toBeNull();
+    expect(app.ui.get().assistantBusy).toBe(false);
+    s.dispose();
+  });
 });

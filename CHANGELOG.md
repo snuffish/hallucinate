@@ -10,6 +10,9 @@
 - Undoing a plan also switches the autopilot back off when the plan switched it on.
 - Undoing a parameter change resets only the parameters the assistant set, not every parameter of the scene.
 - Undoing a new scene leaves it alone once you edited its code.
+- Deleting a conversation while it is replying deletes it for good: its transcript is no longer written back a moment
+  later, and it no longer comes back as an unread badge or a peek.
+- Stop on a conversation that is waiting for a free slot sets it back to idle.
 
 ## Unreleased — settings (2026-10-16)
 
