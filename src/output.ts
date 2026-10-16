@@ -2,13 +2,11 @@
 // at this window's own resolution. Put it on the projector and go fullscreen.
 // Plain TypeScript on purpose: two overlays and a canvas don't need a framework.
 
-import { Renderer, type SceneSource, type SceneUniforms } from './engine/renderer';
-import { applyRendererPrefs, CHANNEL, type OutputMessage } from './engine/output-link';
+import { Renderer, type SceneSource } from './engine/renderer';
+import { broadcastPort, ProjectorView } from './engine/output-link';
 import { MediaLayer, StaleMediaLoad } from './engine/media';
 
 const $ = (id: string) => document.getElementById(id)!;
-const id = crypto.randomUUID();
-const channel = new BroadcastChannel(CHANNEL);
 const scenes: SceneSource[] = [];
 const media = new MediaLayer();
 let renderer: Renderer;
@@ -20,43 +18,22 @@ try {
 }
 renderer.setMedia(media);
 
-let pending: Extract<OutputMessage, { type: 'frame' }> | null = null;   // newest frame not yet drawn
-let lastFrameAt = -1e9;
-let resolution = 0;
-let frames = 0, fps = 0;
+const view = new ProjectorView(broadcastPort(), renderer, media, scenes, {
+  id: crypto.randomUUID(),
+  onIdentify: () => identify(),
+  onError: (err) => { if (!(err instanceof StaleMediaLoad)) console.error(err); },
+});
+view.start();
 
-channel.onmessage = ({ data: m }: MessageEvent<OutputMessage>) => {
-  if (m.type === 'scenes') scenes.splice(0, scenes.length, ...m.scenes);
-  if (m.type === 'scene') scenes[m.index] = m.scene;
-  if (m.type === 'frame') { pending = m; lastFrameAt = performance.now(); }
-  if (m.type === 'identify') identify();
-  if (m.type === 'prefs') applyRendererPrefs(renderer, m.prefs);
-  if (m.type === 'media') { if (m.source) media.load(m.source).catch((err) => { if (!(err instanceof StaleMediaLoad)) console.error(err); }); else media.clear(); }
-};
-channel.postMessage({ type: 'hello', id } satisfies OutputMessage);
-
-// Draw each frame once as it arrives, so trails advance at the main window's pace.
 function loop(): void {
-  if (pending) {
-    const m = pending;
-    pending = null;
-    for (const [index, uniforms] of Object.entries(m.params)) renderer.setParams(Number(index), uniforms as SceneUniforms);
-    if (m.resolution !== resolution) renderer.setScale((resolution = m.resolution));
-    media.follow({ currentTime: m.state.mediaTime ?? 0, paused: m.state.mediaPaused ?? false, playbackRate: m.state.mediaRate ?? 1 });
-    renderer.render(m.state);
-    frames++;
-  }
-  $('waiting').hidden = performance.now() - lastFrameAt < 2000;
+  view.draw();
+  $('waiting').hidden = !view.waiting;
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
-setInterval(() => {
-  fps = frames;
-  frames = 0;
-  channel.postMessage({ type: 'status', id, w: renderer.size[0], h: renderer.size[1], fullscreen: !!document.fullscreenElement, fps } satisfies OutputMessage);
-}, 1000);
-window.addEventListener('pagehide', () => channel.postMessage({ type: 'bye', id } satisfies OutputMessage));
+setInterval(() => view.report(!!document.fullscreenElement), 1000);
+window.addEventListener('pagehide', () => view.bye());
 
 let identifyTimer: ReturnType<typeof setTimeout> | undefined;
 function identify(): void {

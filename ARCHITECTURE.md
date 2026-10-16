@@ -28,6 +28,9 @@ browser                                              dev server (Vite middleware
   listeners) has `dispose()`. `src/engine/look.ts` turns the look sliders and the sound into one frame's state
   (`applyLook`); the main output, the studio's Preview monitor and the pinned Live slot all use it, and
   `crossfade` is the one rule for how far a transition is.
+- **The projector link** (`src/engine/output-link.ts`) holds both ends: the main window's `OutputLink` and each
+  projector window's `ProjectorView` (`src/output.ts` only wires it to its canvas and overlays). They talk through an
+  `OutputPort`, a `BroadcastChannel` between windows and an in-memory bus in the tests, which run both ends together.
 - **AppController** (`src/app/controller.ts`) is created once the canvas exists. It owns the engines, the
   shared scene list, the look sliders, the clock and the `requestAnimationFrame` loop, and exposes every
   action the UI calls (`setScene`, `startSource`, `setParam`, `toggleRecording`, …).
