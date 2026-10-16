@@ -173,6 +173,13 @@ export function appendScene(scenes: readonly Scene[], scene: Scene): number {
   return (scenes as Scene[]).push(scene) - 1;
 }
 
+// ← / →: the next scene in list order (key order), wrapping at both ends and skipping deleted ones.
+export function stepScene(scenes: readonly Scene[], from: number, dir: number): number {
+  let i = from;
+  do i = (i + dir + scenes.length) % scenes.length; while (scenes[i]!.removed && i !== from);
+  return i;
+}
+
 export const sceneByName = (scenes: readonly Scene[], name: string): number => scenes.findIndex((s) => s.name === name && !s.removed);
 
 // Per-scene key for stored parameter values.

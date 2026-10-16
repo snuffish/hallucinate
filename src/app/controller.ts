@@ -18,7 +18,7 @@ import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from 
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
-import { buildSceneList, paramKey, takeRenameReport } from '../state/scene-list';
+import { buildSceneList, paramKey, stepScene, takeRenameReport } from '../state/scene-list';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { applyWrites, buildBundle, parseBundle } from './bundle';
@@ -419,10 +419,7 @@ export class AppController {
 
   // ← / → step through every scene, skipping deleted ones.
   stepScene(dir: number): void {
-    const scenes = this.state.scenes;
-    let i = this.state.clock.scene;
-    do i = (i + dir + scenes.length) % scenes.length; while (scenes[i]!.removed);
-    this.setScene(i);
+    this.setScene(stepScene(this.state.scenes, this.state.clock.scene, dir));
   }
 
   // `fade` is the crossfade time (0 = cut). Changing scene this way (not as a show scene, see
