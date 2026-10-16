@@ -9,6 +9,7 @@ import { RING_RUN } from './ring-run';
 import { WIRE_SOLID } from './wire-solid';
 import { SPECTRUM_RAYS } from './spectrum-rays';
 import { CONTOUR_LINES } from './contour-lines';
+import { POINT_STORM } from './point-storm';
 
 export { COMMON } from './header';
 export { TEMPLATE } from './template';
@@ -21,4 +22,5 @@ export const SCENES: readonly Scene[] = [
   WIRE_SOLID,    // 4
   SPECTRUM_RAYS, // 5
   CONTOUR_LINES, // 6
+  POINT_STORM,   // 7
 ];

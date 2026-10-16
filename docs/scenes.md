@@ -17,6 +17,7 @@ brightens more than a quarter of the frame. The set is still growing; the number
 | 4 | **Wire Solid** | Geometry | A wireframe polyhedron of beams turning in perspective. It becomes the next solid every 4 ticks, swells with the bass, a spark steps from vertex to vertex on each tick, and its front edges flare on kicks. |
 | 5 | **Spectrum Rays** | Beams | A star of beams from the centre, one per frequency (bass at the top, treble at the bottom), each as long as its band is loud. It turns slowly, steps one ray on each tick and strobes a third of its rays on kicks. |
 | 6 | **Contour Lines** | Fields | Glowing contour lines over a slowly drifting island of terrain. The bass lifts the land, the lines climb a step on each tick, and a kick lights every third one. |
+| 7 | **Point Storm** | Geometry | Hundreds of laser dots on three nested rings holding a polygon or star. A kick throws them outwards, they loosen between ticks and pull into a new shape on each tick; the bass, mids and treble each light a ring. |
 
 They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has
 scenes. You can also play the [Node Scene](visual-maker.md), **My Shader** and your own saved scenes (*Mine*).
