@@ -9,7 +9,7 @@ export interface HotkeyActions {
   playPause(): void; seek(seconds: number): void; changeVolume(delta: number): void; changeRate(delta: number): void; toggleMute(): void;
   stepScene(dir: number): void; pickScene(digit: number): void; steer(dir: number): void; restartGame(): void;
   toggleLibrary(): void; toggleAssistant(): void; toggleHelp(): void; toggleEditor(): void; toggleVisualMaker(): void; toggleStudio(): void;
-  toggleParams(): void; togglePanel(): void; resetLayout(): void; toggleFullscreen(): void; toggleRecording(): void; toggleAuto(): void; randomize(): void; randomizeBack(): void;
+  toggleParams(): void; togglePanel(): void; resetLayout(): void; togglePerf(): void; toggleFullscreen(): void; toggleRecording(): void; toggleAuto(): void; randomize(): void; randomizeBack(): void;
   closeOverlay(): void; take(): void; blackout(): void; studioStep(dir: number): void; studioCue(n: number): void; game(): void;
   librarySearch(): void; libraryMove(dx: number, dy: number): void; libraryPick(): void; libraryTab(dir: number): void; deleteNode(): void;
 }
@@ -62,6 +62,7 @@ export function useAppHotkeys(actions: HotkeyActions): void {
     fire(HOTKEYS.game, actions.game),
     fire(HOTKEYS.hidePanel, actions.togglePanel),
     fire(HOTKEYS.resetLayout, actions.resetLayout),
+    fire(HOTKEYS.perf, actions.togglePerf),
     fire(HOTKEYS.fullscreen, actions.toggleFullscreen),
     fire(HOTKEYS.record, actions.toggleRecording),
     fire(HOTKEYS.auto, actions.toggleAuto),

@@ -68,6 +68,7 @@ export const HOTKEYS = {
   params: { id: 'params', keys: 'P', label: 'Collapse parameters', group: 'Panels', when: 'paramsVisible' },
   hidePanel: { id: 'hidePanel', keys: 'H', label: 'Hide controls', group: 'Panels', when: 'noNodes' },
   resetLayout: { id: 'resetLayout', keys: 'Shift+H', label: 'Reset layout', group: 'Panels', when: 'noNodes' },
+  perf: { id: 'perf', keys: 'Shift+P', label: 'Performance monitor', group: 'Panels', when: 'noNodes' },
   fullscreen: { id: 'fullscreen', keys: 'F', label: 'Fullscreen', group: 'Panels', when: 'always' },
   record: { id: 'record', keys: 'C', label: 'Record', group: 'Panels', when: 'noNodes' },
   help: { id: 'help', keys: '?', label: 'Help & shortcuts', group: 'Panels', when: 'always' },

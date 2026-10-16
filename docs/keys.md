@@ -28,6 +28,7 @@ Press **?** in the app for the same list. Every button with a shortcut also show
 | F | fullscreen |
 | H | hide the controls (they also auto-hide after 3 s of no mouse movement) |
 | Shift+H | reset the widget layout |
+| Shift+P | performance monitor: where each frame's time goes, and a GPU test (see [PERF.md](../PERF.md)) |
 | ? | help & every shortcut |
 | Esc | close the open panel (in the library: leave the search field first) |
 

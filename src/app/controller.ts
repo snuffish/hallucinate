@@ -8,6 +8,7 @@ import { applyLook, programState, smoothstep } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
 import { OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
+import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState, type SceneUniforms } from '../engine/renderer';
 import type { Scene } from '../engine/scenes';
 import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
@@ -26,6 +27,7 @@ import { Transport } from './transport';
 
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
 const DRIFT_PUBLISH_FRAMES = 6;
+const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second, however slow the frames
 
 const SOURCE_LABELS: Record<string, string> = { mic: 'Microphone / line-in', display: 'Tab / system audio', demo: 'Demo beat (124 BPM)' };
 const COOL = [0.7, 0.85, 1.35];
@@ -92,11 +94,14 @@ export class AppController {
   libraryPrefs: LibraryPrefs = loadLibraryPrefs();
   readonly hooks: ControllerHooks = {};
   mediaSound = readString(KEYS.mediaSound) === '1';
+  // Where each frame's time goes (Shift+P, or ?perf / ?perf=trace in the URL). Off: one flag check per stage.
+  readonly profiler = new FrameProfiler();
 
   private raf = 0;
   private frameError: string | null = null;   // the last per-frame error reported (each is logged once)
   private last = 0;
   private meterTick = 0;
+  private perfPublishedAt = 0;
   private recorder: MediaRecorder | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -109,6 +114,13 @@ export class AppController {
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly program: ProgramState;
   private readonly liveParams: Record<number, SceneUniforms> = {};
+  private readonly profilerApi: ProfilerApi = {
+    report: () => (this.profiler.on ? this.perfReport() : null),
+    fillTest: () => this.runFillTest(),
+    reset: () => this.profiler.reset(),
+    scenes: () => this.state.scenes.flatMap((s, index) => (s.removed || index === this.state.gameIndex ? [] : [{ index, name: s.name }])),
+    setScene: (index) => this.setScene(index),
+  };
   // Another tab imported settings: this one's state is stale, so it must not write, and reloads.
   private readonly onStorage = (e: StorageEvent) => {
     if (e.key !== KEYS.importedAt) return;
@@ -156,6 +168,8 @@ export class AppController {
     this.audio.onBeat = () => this.beat();
     this.program = { ...programState(this.audio.spectrum), scene: this.state.clock.scene };
     this.publishScene();
+    const perf = new URLSearchParams(location.search).get('perf');
+    if (perf !== null) this.setPerf(true, perf === 'trace');
   }
 
   // ---------- Lifecycle ----------
@@ -185,6 +199,7 @@ export class AppController {
     if (this.disposed) return;
     this.disposed = true;
     cancelAnimationFrame(this.raf);
+    this.setPerf(false);   // restores the resolution if a GPU test is running
     for (const ev of ['mousemove', 'mousedown', 'keydown', 'touchstart']) window.removeEventListener(ev, this.wake);
     window.removeEventListener('storage', this.onStorage);
     clearTimeout(this.idleTimer);
@@ -358,6 +373,10 @@ export class AppController {
     const c = this.state.clock;
     const scene = this.state.scenes[i];
     if (i === c.scene || !scene || scene.removed) return;
+    if (this.profiler.fillRunning) {   // a GPU test measures one scene
+      this.profiler.cancelFill();
+      this.toast('GPU test stopped: the scene changed. Turn auto-switch off (A) to test one scene.', 4500);
+    }
     c.fade = fade;
     if (i === this.state.gameIndex) { this.game.reset(); this.toast('Beat Racer: walls drop on the beat. ← → to steer, Enter to restart', 4500); }
     c.prevScene = c.scene;
@@ -503,7 +522,10 @@ export class AppController {
     const r = LOOK_RANGES[key];
     const v = Math.min(r.max, Math.max(r.min, value));
     this.state.look[key] = v;
-    if (key === 'resolution') this.renderer.setScale(v);
+    if (key === 'resolution') {
+      this.profiler.cancelFill();   // a GPU test measures one resolution
+      this.renderer.setScale(v);
+    }
     this.ui.set({ look: { ...this.state.look } });
   }
 
@@ -785,18 +807,56 @@ export class AppController {
     this.toast('Recording… press C or click "Stop rec" to save');
   }
 
+  // ---------- Performance ----------
+
+  togglePerf(): void { this.setPerf(!this.profiler.on); }
+
+  setPerf(on: boolean, trace = false): void {
+    this.profiler.setOn(on, trace);
+    if (on) {
+      installGlobal(this.profilerApi);
+      this.ui.set({ perf: this.perfReport() });   // show it now ("Collecting frames…"), not at the first update
+    } else {
+      uninstallGlobal(this.profilerApi);
+      this.ui.set({ perf: null });
+    }
+  }
+
+  // The GPU test: about 1.5 s at the current resolution, then 1.5 s at half of it (visible: softer,
+  // the trails restart), then back. Resolves with null if it was cut short.
+  runFillTest(): Promise<FillResult | null> {
+    if (!this.profiler.on) this.setPerf(true);
+    const done = this.profiler.startFill((s) => this.renderer.setScale(s), () => this.state.look.resolution, this.state.clock.scene);
+    this.ui.set({ perf: this.perfReport() });
+    return done;
+  }
+
+  private perfReport(): PerfReport {
+    return this.profiler.report({
+      size: this.renderer.size,
+      scale: this.renderer.scale,
+      resolution: this.state.look.resolution,
+      scene: this.state.clock.scene,
+      projectors: this.ui.get().outputs.length,
+      preview: this.ui.get().overlay === 'studio',
+    });
+  }
+
   // ---------- Main loop ----------
 
   // The loop re-arms first, so one frame that throws (a hook, a scene) can't stop the show for good.
   private readonly frame = (now: number): void => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.frame);
+    this.profiler.frameStart(now);
     try {
       this.step(now);
     } catch (err) {
       if (this.frameError === (err as Error).message) return;   // report each new problem once, not every frame
       this.frameError = (err as Error).message;
       console.error(err);
+    } finally {
+      this.profiler.frameEnd();
     }
   };
 
@@ -808,6 +868,7 @@ export class AppController {
     c.clock += dt;
 
     const f = this.audio.update(dt, c.clock);
+    this.profiler.lap(Stage.audio);
     const R = look.reactivity;
     const bass = Math.min(1.5, f.bass * R);
     const mid = Math.min(1.5, f.mid * R);
@@ -847,12 +908,14 @@ export class AppController {
     p.warp = bass;
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
+    this.profiler.lap(Stage.logic);
     // Live is pinned (studio closed after a take): projectors get it; the screen shows it too when
     // the Screen widget is set to Live, otherwise it stays your preview.
     const showLive = this.ui.get().screenMode === 'live';
     const pinned = this.output.connected || showLive ? this.hooks.liveProgram?.(p) : null;
     if (pinned && showLive) this.renderer.render(pinned.program, pinned.params);
     else this.renderer.render(p);
+    this.profiler.lap(Stage.render);
     if (this.output.connected) {
       if (pinned) this.output.sendFrame(pinned.program, pinned.params, look.resolution);
       else {
@@ -863,7 +926,9 @@ export class AppController {
         this.output.sendFrame(p, live, look.resolution);
       }
     }
+    this.profiler.lap(Stage.output);
     this.hooks.onFrame?.(dt, p);
+    this.profiler.lap(Stage.studio);
 
     if (++this.meterTick % 2 === 0) {
       const tone = f.bright < 0.35 ? 'dark' : f.bright > 0.65 ? 'bright' : 'balanced';
@@ -875,6 +940,11 @@ export class AppController {
         toneTitle: `Timbral brightness: ${tone} (spectral centroid ≈ ${(f.centroid / 1000).toFixed(1)} kHz)`,
         ...(inGame && { hud: this.game.hud() }),
       });
+    }
+    this.profiler.lap(Stage.ui);
+    if (this.profiler.on && now - this.perfPublishedAt >= PERF_PUBLISH_MS) {
+      this.perfPublishedAt = now;
+      this.ui.set({ perf: this.perfReport() });
     }
   }
 }

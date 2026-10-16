@@ -1,16 +1,21 @@
 // Baseline / after-port performance probe. Run with the dev server up:
-//   node perf/measure.mjs http://localhost:5199/ perf/results/<name>.json
-// Headless Chromium with SwiftShader: GPU numbers are not representative, main-thread
+//   node perf/measure.mjs http://localhost:5199/ perf/results/<name>.json [--gpu]
+// Default: headless Chromium with SwiftShader. GPU numbers are not representative, main-thread
 // numbers (long tasks, layouts, style recalcs, localStorage writes, frame cadence) are.
+// --gpu: a visible window on the real GPU (headless Chromium falls back to SwiftShader), the app's
+// own profiler (?perf) per scenario, and a GPU test of every scene, ranked slowest first.
 import { chromium } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const url = process.argv[2] ?? 'http://localhost:5199/';
-const out = process.argv[3] ?? 'perf/results/result.json';
+const gpu = process.argv.includes('--gpu');
+const [url = 'http://localhost:5199/', out = 'perf/results/result.json'] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const results = {};
 
-const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const autoplay = '--autoplay-policy=no-user-gesture-required';
+const browser = await chromium.launch(gpu
+  ? { headless: false, args: [autoplay] }
+  : { args: [autoplay, '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 await page.addInitScript(() => {
   window.__perf = { lsWrites: 0, longTasks: [] };
@@ -41,10 +46,15 @@ async function sample(name, ms) {
     lsWrites: p.lsWrites, heapMB: +(m1.JSHeapUsedSize / 1e6).toFixed(1),
   };
   console.log(name, JSON.stringify(results[name]));
+  if (gpu) {
+    const r = await page.evaluate(() => window.__profiler?.report());
+    results[name].profiler = r;
+    if (r) console.log('  profiler', r.verdict.kind, '·', r.verdict.text);
+  }
 }
 
 page.on('pageerror', (e) => console.log('pageerror', e.message));
-await page.goto(url);
+await page.goto(gpu ? `${url}${url.includes('?') ? '&' : '?'}perf` : url);
 await page.click('#start [data-source="demo"]');
 await page.waitForTimeout(1500);
 await sample('demo-first-scene', 8000);
@@ -83,6 +93,37 @@ await page.waitForTimeout(1500);
 results['editor-keystroke-compile'] = await page.evaluate(() => ({ longTasks: window.__perf.longTasks.length, longTaskMaxMs: +Math.max(0, ...window.__perf.longTasks).toFixed(1) }));
 console.log('editor', JSON.stringify(results['editor-keystroke-compile']));
 await page.keyboard.press('Escape');
+
+// Every scene at full and half resolution on a 4K canvas (a projector-sized load: at laptop sizes most
+// scenes sit at the display's refresh, and a capped frame rate can't get faster). Slowest first.
+if (gpu) {
+  const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 });
+  const stress = await ctx.newPage();
+  await stress.goto(`${url}${url.includes('?') ? '&' : '?'}perf`);
+  await stress.click('#start [data-source="demo"]');
+  await stress.waitForTimeout(1500);
+  // A scene change cuts a GPU test short. A DOM click: the idle fade may have made the widgets unclickable.
+  await stress.evaluate(() => { const auto = document.getElementById('auto'); if (auto.checked) auto.click(); });
+  await stress.evaluate(() => {   // the native setter, so React sees the change
+    const el = document.getElementById('resolution');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, el.max);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  console.log('ranking on', JSON.stringify(await stress.evaluate(() => { const r = window.__profiler.report(); return { canvas: r.size, scale: r.scale }; })));
+  const ranking = [];
+  for (const { index, name } of await stress.evaluate(() => window.__profiler.scenes())) {
+    await stress.evaluate((i) => window.__profiler.setScene(i), index);
+    await stress.waitForTimeout(2500);   // past the crossfade and the background compile
+    const fill = await stress.evaluate(() => window.__profiler.fillTest());
+    const r = await stress.evaluate(() => window.__profiler.report());
+    const row = { index, name, baseFps: fill && +fill.baseFps.toFixed(1), halfFps: fill && +fill.reducedFps.toFixed(1), gain: fill && +fill.gain.toFixed(2), cpuMs: +r.cpuMean.toFixed(2) };
+    ranking.push(row);
+    console.log('fill', JSON.stringify(row));
+  }
+  ranking.sort((a, b) => (a.baseFps ?? Infinity) - (b.baseFps ?? Infinity));
+  results['scene-fill-ranking'] = { ...(await stress.evaluate(() => { const r = window.__profiler.report(); return { canvas: r.size, scale: r.scale }; })), scenes: ranking };
+  await ctx.close();
+}
 
 await fs.mkdir(path.dirname(out), { recursive: true });
 await fs.writeFile(out, JSON.stringify({ date: new Date().toISOString(), url, results }, null, 2));
