@@ -12,6 +12,7 @@ brightens more than a quarter of the frame. The set is still growing; the number
 | Key | Scene | Category | What it does |
 | --- | --- | --- | --- |
 | 1 | **Beam Fan** | Beams | A fan of thin beams rising from the bottom edge. It sweeps, opens with the bass, strobes on kicks and chases one beam along on each tick. |
+| 7 | **Point Storm** | Geometry | Hundreds of laser dots on three nested rings holding a polygon or star. A kick throws them outwards, they loosen between ticks and pull into a new shape on each tick; the bass, mids and treble each light a ring. |
 
 They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has
 scenes. You can also play the [Node Scene](visual-maker.md), **My Shader** and your own saved scenes (*Mine*).
