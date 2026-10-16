@@ -17,11 +17,9 @@ const press = async (key, ms = 400) => { await page.keyboard.press(key); await s
 const wake = async () => { await page.mouse.move(700, 450); await page.mouse.move(720, 460); await settle(250); };
 
 await page.goto(url);
-await settle(2500);                                   // the start screen, cropped to a banner around the title
-await shot('start', { clip: { x: 0, y: 250, width: 1440, height: 400 } });
-
+await settle(2500);
 await page.getByRole('button', { name: 'Play demo beat' }).click();
-await press('2', 3500);                               // Hyper Tunnel
+await press('1', 3500);                               // Beam Fan
 await wake();
 await shot('main');                                   // widgets + scene + parameters
 
@@ -34,26 +32,36 @@ await page.evaluate(() => {
   for (let el = document.querySelector('#drift'); el; el = el.parentElement) el.scrollTop = 0;   // checking it scrolled the panel
 });
 
-// Parameter groups: Aurora Veil, with two of its groups unfolded.
+// Parameter groups: Ring Run, with both of its groups unfolded.
 await press('l', 600); await press('/', 200);
-await page.keyboard.type('Aurora'); await settle(300); await press('Enter', 3500);
+await page.keyboard.type('Ring Run'); await settle(300); await press('Enter', 3500);
 await wake();
-for (const g of ['Curtains', 'Colour']) await page.click(`.param-group[data-group="${g}"] .param-group-head`);
+for (const g of ['Rings', 'Look']) await page.click(`.param-group[data-group="${g}"] .param-group-head`);
 await settle(300); await wake();
 await shot('params-groups');
 
-// Gallery: a few scenes, controls hidden, trails built up.
+// Gallery: every built-in scene, in key order, controls hidden. Scan Trace last, with a picture loaded
+// (with nothing loaded its lines lie flat): a soft bright disc and a ring, made in the page.
 await page.addStyleTag({ content: '#widgets, #toast { display: none !important; }' });
-const gallery = [['2', 'hyper-tunnel'], ['3', 'mandala-bloom'], ['8', 'voronoi-glass'], ['0', 'neon-loop']];
+const gallery = [['1', 'beam-fan'], ['2', 'light-sheet'], ['3', 'ring-run'], ['4', 'wire-solid'], ['5', 'spectrum-rays'], ['6', 'contour-lines'], ['7', 'point-storm']];
 for (const [key, name] of gallery) { await press(key, 3500); await shot(name); }
-await press('ArrowRight', 4500); await shot('star-nest');   // index 10, after Neon Loop
-await press('ArrowRight', 300); await press('ArrowRight', 3500); await shot('liquid-blobs');
+const picture = await page.evaluate(() => {
+  const c = document.createElement('canvas'); c.width = 640; c.height = 400;
+  const g = c.getContext('2d');
+  const disc = g.createRadialGradient(320, 200, 10, 320, 200, 190);
+  disc.addColorStop(0, '#fff'); disc.addColorStop(1, '#000');
+  g.fillStyle = disc; g.fillRect(0, 0, 640, 400);
+  g.strokeStyle = '#fff'; g.lineWidth = 18; g.beginPath(); g.arc(320, 200, 150, 0, Math.PI * 2); g.stroke();
+  return c.toDataURL('image/png').split(',')[1];
+});
+await page.locator('#media-file').setInputFiles({ name: 'disc.png', mimeType: 'image/png', buffer: Buffer.from(picture, 'base64') });
+await settle(3500); await shot('scan-trace');      // loading a picture plays Scan Trace
 await page.addStyleTag({ content: '#widgets, #toast { display: revert !important; }' });
 
-await press('2', 2500);
+await press('1', 2500);
 await wake();
 await press('l', 100);
-await page.fill('#lib-search', ''); await page.evaluate(() => document.activeElement?.blur());   // the Aurora search above sticks
+await page.fill('#lib-search', ''); await page.evaluate(() => document.activeElement?.blur());   // the Ring Run search above sticks
 // Previews render a couple per frame; wait until the cards have their pictures.
 await page.waitForFunction(() => { const imgs = [...document.querySelectorAll('#lib-grid img')]; return imgs.length > 0 && imgs.every((i) => i.src); }, null, { timeout: 60_000 }).catch(() => {});
 await settle(500);
@@ -67,11 +75,11 @@ const hidden = async (selector, fn) => {
 };
 await wake(); await press('e', 600); await hidden('#params', () => shot('editor')); await press('Escape');
 await wake(); await press('n', 1200); await hidden('#widgets, #assistant-bubble', () => shot('visual-maker')); await press('Escape');
-await press('2', 2500); await wake();                 // back to Hyper Tunnel (the visual maker switched to the Node Scene)
+await press('1', 2500); await wake();                 // back to Beam Fan (the visual maker switched to the Node Scene)
 await press('o', 600);
 await page.selectOption('#st-add', '@live'); await settle(300);
-await page.selectOption('#st-add', 'Star Nest'); await settle(300);
-await page.selectOption('#st-add', 'Neon Loop'); await settle(1500);
+await page.selectOption('#st-add', 'Wire Solid'); await settle(300);
+await page.selectOption('#st-add', 'Point Storm'); await settle(1500);
 await wake();
 await hidden('#assistant-bubble', () => shot('studio'));
 await press('Escape');

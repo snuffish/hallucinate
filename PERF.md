@@ -56,7 +56,9 @@ node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json --gpu
 monitor's report with each scenario, and runs Test GPU on every scene on a 4K canvas at full resolution, the load
 of a 4K projector, ranked slowest first. At laptop sizes most scenes sit at the refresh rate, which can't get
 faster, so the ranking would be a tie. On an M2 MacBook (2026-10-16), the main thread used about 1 ms per frame
-everywhere, and these scenes fell below 60 fps at 3840×2160:
+everywhere, and these scenes fell below 60 fps at 3840×2160. This ranking predates the laser-show set: these were
+the old built-in scenes, all since replaced ([ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md)), and the
+eight new scenes have not been ranked yet:
 
 | Scene | fps | at half resolution | gain |
 | --- | --- | --- | --- |
@@ -81,7 +83,7 @@ scenes held 60 fps.
 | --- | --- | --- | --- |
 | First scene, demo beat, 8 s | frame time p50 / p95 | 33 ms / 100 ms | 33 ms / 100 ms |
 | | layouts / style recalcs | 96 / 292 | 87 / 175 |
-| Star Nest (raymarch), 8 s | frame time p50 / p95 | 83 ms / 217 ms | 83 ms / 183 ms |
+| Star Nest (raymarch, an old scene), 8 s | frame time p50 / p95 | 83 ms / 217 ms | 83 ms / 183 ms |
 | Library open (40 previews), 6 s | long tasks (count / longest) | 19 / 236 ms | 2 / 225 ms |
 | | frame time p50 | 50 ms | 17 ms |
 | | layouts | 20 | 1 |
@@ -123,6 +125,6 @@ Raw results: `perf/results/baseline.json` (old app) and `perf/results/after-port
   previews render in a few milliseconds each. Measure on real hardware before chasing it.
 - The studio renders a second full pipeline for the Preview monitor every frame (as before).
 - The projector protocol still posts the whole frame state over the `BroadcastChannel` every frame (as before).
-- All forty GLSL sources ship in the main bundle (as before).
-- At 4K, Spirograph, Lissajous Knot, Tesseract and Neon Jacks are far below 60 fps on an M2 (table above): their
-  shaders are the cost, not the pipeline.
+- All the built-in GLSL sources ship in the main bundle (as before).
+- At 4K, the heaviest of the old scenes were far below 60 fps on an M2 (table above): their shaders were the cost,
+  not the pipeline. Rank the laser-show set with `--gpu` before chasing any one of its scenes.

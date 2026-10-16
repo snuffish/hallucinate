@@ -7,7 +7,7 @@
 The built-in scenes are a **laser show**: thin luminous lines, beams and points on pure black (see
 [ADR 0001](adr/0001-replace-all-built-in-scenes.md)). Every one reacts to the kicks, the ticks of the tempo and the
 bands, takes its colour from the hue slider and colour cycling, and keeps the background pure black. A kick never
-brightens more than a quarter of the frame. The set is still growing; the number keys play them in this order:
+brightens more than a quarter of the frame. There are eight; the number keys play them in this order:
 
 | Key | Scene | Category | What it does |
 | --- | --- | --- | --- |
@@ -20,7 +20,7 @@ brightens more than a quarter of the frame. The set is still growing; the number
 | 7 | **Point Storm** | Geometry | Hundreds of laser dots on three nested rings holding a polygon or star. A kick throws them outwards, they loosen between ticks and pull into a new shape on each tick; the bass, mids and treble each light a ring. |
 | 8 | **Scan Trace** | Media | Your video or camera redrawn as horizontal laser scan lines, each pushed up by the brightness beneath it. A scan beam runs down the lines on each tick and kicks flash every third line; with nothing loaded the lines lie flat. |
 
-They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has
+They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only while it has
 scenes. You can also play the [Node Scene](visual-maker.md), **My Shader** and your own saved scenes (*Mine*).
 
 A show you saved that uses a removed scene keeps that show scene, marked *missing scene* in the [Studio](studio.md):

@@ -59,9 +59,9 @@ await page.click('#start [data-source="demo"]');
 await page.waitForTimeout(1500);
 await sample('demo-first-scene', 8000);
 
-for (let i = 0; i < 10; i++) { await page.keyboard.press('ArrowRight'); await page.waitForTimeout(50); }   // Star Nest (index 10)
+await page.keyboard.press('7');   // Point Storm (the slider scenarios below drag its parameters)
 await page.waitForTimeout(2500);
-await sample('star-nest', 8000);
+await sample('point-storm', 8000);
 
 await page.keyboard.press('l');
 await page.waitForTimeout(100);
