@@ -5,7 +5,7 @@
 import { AudioEngine } from '../engine/audio';
 import { BeatRacer } from '../engine/game';
 import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
-import { applyLook, crossfade, programState } from '../engine/look';
+import { composeFrame, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
 import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
@@ -33,8 +33,6 @@ const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back
 const DRIFT_PUBLISH_FRAMES = 6;
 const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second, however slow the frames
 
-const COOL = [0.7, 0.85, 1.35];
-const WARM = [1.3, 1.05, 0.7];
 const viewport = (): L.Size => ({ width: window.innerWidth, height: window.innerHeight });
 
 // Hooks other panels plug in. All optional; the controller works without them.
@@ -158,7 +156,7 @@ export class AppController {
     this.renderer.setScale(this.state.look.resolution);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
     this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what));
-    this.live = new LiveSlot({ state: this.state, specs: (i) => this.library.specs(i), stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
+    this.live = new LiveSlot({ state: this.state, hearing: this.listener.hearing, specs: (i) => this.library.specs(i), stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
     this.applyPrefs();
 
     this.player = document.createElement('audio');
@@ -600,23 +598,6 @@ export class AppController {
     this.toast(`Back to the previous look${left ? ` (${left} more)` : ''}`, 1500);
   }
 
-  // Crossmodal correspondences: dark/muffled sound reads as dim, cool and soft; bright/crisp sound
-  // as light, warm and sharp. Fast, energetic music reads as saturated and warm; slow as muted and cool.
-  private colourGrade(bright: number): void {
-    const look = this.state.look;
-    const A = look.synesthesia;
-    const mood = look.mood ? this.listener.hearing.mood : 0.5;
-    const warmth = look.mood ? bright * 0.6 + mood * 0.4 : bright;
-    const g = this.program.grade;
-    const tint = g.tint;
-    for (let i = 0; i < 3; i++) tint[i] = COOL[i]! + (WARM[i]! - COOL[i]!) * warmth;
-    const luma = tint[0]! * 0.299 + tint[1]! * 0.587 + tint[2]! * 0.114;   // tint shifts colour, not brightness
-    for (let i = 0; i < 3; i++) tint[i] = 1 + A * (tint[i]! / luma - 1);
-    g.exposure = 1 + A * (bright - 0.5) * 0.9;
-    g.contrast = 1 + A * (bright - 0.5) * 0.3;
-    g.saturation = 1 + A * (mood - 0.5) * 0.8;
-  }
-
   // ---------- Sources ----------
 
   // A source button: a file and SoundCloud open their pickers; a video's sound starts from the media panel.
@@ -744,12 +725,11 @@ export class AppController {
   // ---------- Beats ----------
 
   // What a kick and a tick do, in this order, once the frame's sound is heard and before the frame is
-  // composed: a kick jumps the hue, drops the game's walls and counts towards auto-switch (kicks, not
-  // ticks: a breakdown holds the scene); a tick is the studio's and the director's beat.
+  // composed: a kick drops the game's walls and counts towards auto-switch (kicks, not ticks: a breakdown
+  // holds the scene; each output's hue jumps in composeFrame); a tick is the studio's and the director's beat.
   private onBeats(h: Readonly<Hearing>): void {
     const c = this.state.clock;
     if (h.kick) {
-      c.huePhase += 0.03 * this.state.look.reactivity;
       c.beatsInScene++;
       if (c.scene === this.state.gameIndex) this.game.onBeat();
       if (this.autoSwitching() && c.beatsInScene >= BEATS_PER_SCENE) this.nextRandomScene();
@@ -882,18 +862,6 @@ export class AppController {
     const f = this.listener.hear(this.audio.read(), this.music.playing, elapsed, now / 1000);
     this.onBeats(f);
     this.profiler.lap(Stage.audio);
-    const R = look.reactivity;
-    const bass = Math.min(1.5, f.bass * R);
-    const mid = Math.min(1.5, f.mid * R);
-    const high = Math.min(1.5, f.high * R);
-    const level = Math.min(1.5, f.level * R);
-    const beat = Math.min(1.5, f.beat * R);
-
-    // Ease the clock's speed instead of jumping it on every beat, so motion stays fluid.
-    const targetRate = look.speed * (0.55 + level * 0.9 + beat * 0.35);
-    c.timeRate += (targetRate - c.timeRate) * (1 - Math.exp(-dt * 3));
-    c.time += dt * c.timeRate;
-    c.huePhase += dt * look.cycle * 0.06;
     if (look.drift) {
       this.drift.step(look, dt, look.driftSpeed);
       if (++this.driftFrames % DRIFT_PUBLISH_FRAMES === 0) this.ui.set({ look: { ...look } });   // the sliders follow at ~10 Hz
@@ -901,26 +869,17 @@ export class AppController {
     if (this.state.activeSource === 'media') this.media.follow(this.player);
 
     if (this.autoSwitching() && this.music.playing && c.clock - c.sceneStart > MAX_SECONDS_PER_SCENE) this.nextRandomScene();
-    const inGame = c.scene === this.state.gameIndex;
-    if (inGame) this.game.update(dt, level);
-    const mix = crossfade(c, c.clock);
-
     const p = this.program;
-    p.scene = c.scene; p.prevScene = c.prevScene; p.mix = mix;
-    p.time = c.time; p.bass = bass; p.mid = mid; p.high = high; p.level = level; p.beat = beat;
+    composeFrame(p, c, f, look, this.currentScene.trails ?? 1, dt);   // the main screen's motion is the clock's
+    const inGame = c.scene === this.state.gameIndex;
+    if (inGame) this.game.update(dt, p.level);
+    p.scene = c.scene; p.prevScene = c.prevScene; p.mix = crossfade(c, c.clock);
     p.extra = inGame ? this.game.uniforms() : p.extra;
-    p.bright = f.bright; p.mood = f.mood;
-    this.colourGrade(f.bright);
-    applyLook(p, look, c.huePhase, this.currentScene.trails ?? 1);
-    p.zoom = 1.006 + bass * 0.025;
-    p.rotation = look.spin * (0.003 * Math.sin(c.time * 0.1) + mid * 0.01);
-    p.hueDrift = 0.01 + high * 0.03;
-    p.warp = bass;
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
     this.profiler.lap(Stage.logic);
     // Live pinned (studio closed after a take): projectors get it, and the screen too when set to Live.
-    const out = this.live.route(p, this.output.connected);
+    const out = this.live.route(p, this.output.connected, dt);
     this.renderer.render(out.screen.program, out.screen.params);
     this.profiler.lap(Stage.render);
     if (out.projector) this.output.sendFrame(out.projector.program, out.projector.params, look.resolution);

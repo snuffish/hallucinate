@@ -11,6 +11,10 @@
   below 10 fps.
 - When nothing plays, the tone drifts back to neutral like the mood does, so the picture no longer stays warm or cool
   from the last track.
+- A show scene's own reactivity, speed and colour cycle now apply on Live and in Preview. Before, with the studio
+  closed, moving the main Reactivity or Speed slider while browsing changed what the projectors showed, and Preview
+  showed a show scene with the main sliders' reactivity while Take then applied its own.
+- With *Mood from tempo* off, shaders get a neutral `uMood` too, not only the colour grade.
 - The director reads the music's energy trend from how loud it is over seconds, so a build-up reads as rising; before,
   each band was measured against its own last few seconds and most of a build-up was evened out.
 

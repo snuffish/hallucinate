@@ -29,9 +29,12 @@ browser                                              dev server (Vite middleware
   beat); its `read()` hands the analyser's bins to the **Listener** (`src/engine/listener.ts`, the controller's
   `listener`), which hears what they sound like and owns every threshold and time constant behind it: the bands,
   kicks, the tempo (BPM and the `TempoClock` behind the ticks), the tone and the mood. It returns one `Hearing` a
-  frame, read by everything else (the sessions as `app.hearing`), and is tested with synthetic bins. `src/engine/look.ts` turns the look sliders and the sound into one frame's state
-  (`applyLook`); the main output, the studio's Preview monitor and the pinned Live slot all use it, and
-  `crossfade` is the one rule for how far a transition is.
+  frame, read by everything else (the sessions as `app.hearing`), and is tested with synthetic bins.
+  `src/engine/look.ts` holds every rule from the sound to the picture: `composeFrame` turns a `Hearing`, a look and
+  an output's `Motion` (its time, the time's pace, the hue's walk) into that output's frame state (reactivity, the
+  synesthesia grade, trails, fringing, zoom, spin, warp). The main screen (whose motion is the clock's), the pinned
+  Live slot and the studio's Preview monitor each compose their own, and `crossfade` is the one rule for how far a
+  transition is.
 - **The projector link** (`src/engine/output-link.ts`) holds both ends: the main window's `OutputLink` and each
   projector window's `ProjectorView` (`src/output.ts` only wires it to its canvas and overlays). They talk through an
   `OutputPort`, a `BroadcastChannel` between windows and an in-memory bus in the tests, which run both ends together.
@@ -47,7 +50,9 @@ browser                                              dev server (Vite middleware
   it there. Projectors keep it, and crossfade from it on the next take with each show scene's own values, while the
   screen is free to browse (or shows Live too, from the Screen widget). `route()` decides each frame what the main
   canvas and the projectors draw; the studio's Preview monitor is composed by the same code (`preview()`), and the
-  slot publishes `liveName` and `screenMode`. The tests' fake app uses the real one.
+  slot publishes `liveName` and `screenMode`. Live and Preview compose with their show scene's own look (reactivity,
+  speed and colour cycle included) and keep their own `Motion`: Live starts from the screen's when first pinned and
+  hands its own back on unpin, so nothing jumps. The tests' fake app uses the real one.
 - **UI store** (`src/state/store.ts`, `ui-state.ts`): an immutable snapshot published by the controller.
   The loop publishes meters, BPM and the like every second frame; actions publish immediately. Components
   subscribe with selectors (`useUI(ui => ui.sceneName)`), so nothing per-frame goes through React state.
@@ -155,7 +160,8 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
 `AudioEngine.read` → the bins → `Listener.hear` (on real time, so the tempo reads right at any frame rate) → the
 `Hearing`: bands, kick and tick, BPM, tone, mood → `AppController.onBeats`: a kick jumps the hue, drops Beat Racer's
 walls and counts towards auto-switch, a tick is the studio's and the director's beat (both before the frame is
-composed) → `AppController.step` eases the clock and the colour grade, fills one reused `ProgramState` (`applyLook`) → `LiveSlot.route` decides what the screen and the
+composed) → `composeFrame` fills one reused `ProgramState` for the main screen (on the clock's motion) →
+`LiveSlot.route` composes Live (on its own motion) and decides what the screen and the
 projectors draw → `Renderer.render` (scene pass → feedback pass → display pass) → `OutputLink.sendFrame` when a
 projector is connected → `hooks.onFrame` (studio preview and master
 fader) → every second frame: publish meters to the UI store. `FrameProfiler` (Shift+P, `?perf`) laps between these stages;

@@ -128,7 +128,7 @@ export class StudioSession {
   // Parameters dock editing the selected show scene, and the pixel-density setting for the monitor.
   attach(): () => void {
     return this.app.setHooks({
-      onFrame: (dt, program) => { this.update(dt); this.renderPreview(program); },
+      onFrame: (dt, program) => { this.update(dt); this.renderPreview(program, dt); },
       onTempoBeat: () => this.onBeat(),   // the autopilot follows the tempo clock, not raw kicks
       // Changing scene by hand inside the studio means Live no longer shows a show scene. Outside the
       // studio the screen is a preview and Live stays pinned.
@@ -461,12 +461,12 @@ export class StudioSession {
 
   // ---------- Monitors ----------
 
-  private renderPreview(base: ProgramState): void {
+  private renderPreview(base: ProgramState, dt: number): void {
     const r = this.previewRenderer;
     if (!this.open || !r) return;
     const cue = this.preview;
     const index = this.sceneIndex(cue);
-    const f = this.app.live.preview(base, cue && index >= 0 ? this.shot(cue, index) : null);
+    const f = this.app.live.preview(base, cue && index >= 0 ? this.shot(cue, index) : null, dt);
     r.render(f.program, f.params);
   }
 

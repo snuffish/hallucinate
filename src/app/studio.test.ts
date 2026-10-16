@@ -204,7 +204,7 @@ describe('StudioSession plan executor', () => {
 describe('StudioSession pinned Live', () => {
   const { params: GLOW } = parseParams('uniform float uGlow; // @param min=0 max=3');
   const glowing = (name: string, v: number) => ({ ...cue(name), values: { uGlow: v } });
-  const projector = (app: Fake) => app.live.route({ ...programState(), scene: app.state.clock.scene }, true).projector!;
+  const projector = (app: Fake) => app.live.route({ ...programState(), scene: app.state.clock.scene }, true, 0).projector!;
 
   it('keeps Live for the projectors when the studio closes, and crossfades a take from it', () => {
     const app = fakeApp({ scenes: [{ name: 'Alpha', trails: 1 }, { name: 'Beta', trails: 1 }], params: [GLOW, GLOW] });

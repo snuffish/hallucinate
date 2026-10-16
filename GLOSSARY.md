@@ -48,3 +48,35 @@ _Avoid_: level, loudness, volume
 **Mood**:
 How energetic the music feels, from calm to energetic: mostly its tempo, partly its energy.
 _Avoid_: vibe
+
+## The picture
+
+**Look**:
+The sliders that shape how a scene reacts and colours: reactivity, speed, trails, hue, colour cycling, fringing,
+synesthesia.
+_Avoid_: style, settings
+
+**Reactivity**:
+How strongly the picture follows the music's bands and kicks. The tone and the mood are not scaled by it.
+_Avoid_: sensitivity, gain
+
+**Synesthesia**:
+How strongly the tone and the mood grade the picture: dark sound dim, cool and lingering, bright sound light, warm
+and crisp, energetic music saturated.
+_Avoid_: colour grade (that is what it does)
+
+**Show scene**:
+A scene with its parameter values and the look it keeps, as the studio plays it.
+_Avoid_: cue (the code's name for it), preset
+
+**Live**:
+The show scene the audience sees: on the projectors, and on the screen while the studio is open.
+_Avoid_: program, output
+
+**Preview**:
+The show scene that would go Live at the next take, shown exactly as it will look there.
+_Avoid_: next, cue
+
+**Take**:
+Putting the Preview on Live, as a cut or a crossfade.
+_Avoid_: go, switch
