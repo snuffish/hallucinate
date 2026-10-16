@@ -6,7 +6,7 @@ import { AudioEngine } from '../engine/audio';
 import { BeatRacer } from '../engine/game';
 import { applyLook, programState, smoothstep } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
-import { OutputLink } from '../engine/output-link';
+import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState, type SceneUniforms } from '../engine/renderer';
@@ -301,7 +301,7 @@ export class AppController {
   // monitor (its hook), the audio analysis, the badges and the idle timer. Start resolution is read once, at startup.
   private applyPrefs(): void {
     const p = this.prefs.get();
-    this.renderer.setMaxPixelRatio(p.maxPixelRatio);
+    applyRendererPrefs(this.renderer, outputPrefs(p));
     this.output.sendPrefs(outputPrefs(p));
     this.hooks.onPrefs?.(p);
     this.audio.setSmoothing(p.audioSmoothing);

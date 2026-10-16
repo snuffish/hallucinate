@@ -3,7 +3,7 @@
 // Plain TypeScript on purpose: two overlays and a canvas don't need a framework.
 
 import { Renderer, type SceneSource, type SceneUniforms } from './engine/renderer';
-import { CHANNEL, type OutputMessage } from './engine/output-link';
+import { applyRendererPrefs, CHANNEL, type OutputMessage } from './engine/output-link';
 import { MediaLayer, StaleMediaLoad } from './engine/media';
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -30,7 +30,7 @@ channel.onmessage = ({ data: m }: MessageEvent<OutputMessage>) => {
   if (m.type === 'scene') scenes[m.index] = m.scene;
   if (m.type === 'frame') { pending = m; lastFrameAt = performance.now(); }
   if (m.type === 'identify') identify();
-  if (m.type === 'prefs') renderer.setMaxPixelRatio(m.prefs.maxPixelRatio);
+  if (m.type === 'prefs') applyRendererPrefs(renderer, m.prefs);
   if (m.type === 'media') { if (m.source) media.load(m.source).catch((err) => { if (!(err instanceof StaleMediaLoad)) console.error(err); }); else media.clear(); }
 };
 channel.postMessage({ type: 'hello', id } satisfies OutputMessage);

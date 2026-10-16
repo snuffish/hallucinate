@@ -7,14 +7,23 @@
 // shared scene list, so that list must never be filtered or re-ordered (soft-delete only).
 
 import type { RemoteMediaSource } from './media';
-import type { ProgramState, SceneUniforms } from './renderer';
+import type { ProgramState, Renderer, SceneUniforms } from './renderer';
 
 export const CHANNEL = 'hallucinate-output';
 const STALE_MS = 3000;
 
 export interface SceneSource { name: string; frag: string }
-// The device preferences (src/state/prefs.ts) a projector window applies to its own renderer.
+// The device preferences (src/state/prefs.ts) that reach every renderer: the main canvas, the studio's
+// Preview monitor and each projector window. All of them apply them with applyRendererPrefs, and
+// each one has its applier here (a field without one doesn't compile).
 export interface OutputPrefs { maxPixelRatio: number }
+type PrefTarget = Pick<Renderer, 'setMaxPixelRatio'>;
+const APPLIERS: { [K in keyof OutputPrefs]: (r: PrefTarget, value: OutputPrefs[K]) => void } = {
+  maxPixelRatio: (r, v) => r.setMaxPixelRatio(v),
+};
+export function applyRendererPrefs(renderer: PrefTarget, prefs: OutputPrefs): void {
+  for (const k of Object.keys(APPLIERS) as (keyof OutputPrefs)[]) APPLIERS[k](renderer, prefs[k]);
+}
 export interface OutputStatus { id: string; w: number; h: number; fullscreen: boolean; fps: number }
 interface SeenStatus extends OutputStatus { seen: number }
 

@@ -176,8 +176,10 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 - **A device preference** (how this computer renders, listens or shows the controls): add a field with a `.catch`
   default to `PrefsSchema` in `src/state/prefs.ts`, say in `APPLIES` when it takes effect, apply it in the
   controller's `applyPrefs`, and give it a control in `src/components/Settings.tsx`. A preference is a default that seeds
-  live state, never a second control for it. One that reaches every renderer (`all-renderers`) also goes into
-  `outputPrefs`, so projector windows get it; the prefs test fails otherwise. Preferences are not exported.
+  live state, never a second control for it. One that reaches every renderer (`all-renderers`) goes into
+  `outputPrefs` and `OutputPrefs` with an applier in `src/engine/output-link.ts` (it doesn't compile without one): the
+  main canvas, the studio's Preview monitor and projector windows all apply them with `applyRendererPrefs`, and the
+  prefs test fails if `outputPrefs` and `APPLIES` disagree. Preferences are not exported.
 - **A server setting** (how the server reaches Claude): add it to `StoredConfigSchema` and `effectiveConfig` in
   `server/config.ts` (the environment wins, then Settings, then the default), accept it in the patch schema of
   `server/settings-route.ts` and give it a control in `src/components/SettingsAssistant.tsx`. Never make a program path
