@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AppController } from '../app/controller';
+import { fakeApp } from '../app/fake-app';
+import type { Compiler } from '../app/scene-library';
 import { StudioSession } from '../app/studio';
 import { parseParams } from '../engine/params';
-import { SUPERSEDED } from '../app/editor';
 import { applyEdits, createToolRunner, resolveParam, UndoConflict } from './executor';
 import { UndoStack } from './undo';
 
@@ -45,14 +45,7 @@ describe('tool runner', () => {
   });
 
   function setup() {
-    const scenes = [{ name: 'Alpha', cat: 'Fractal' }, { name: 'Beta', cat: 'Space' }];
-    const app = {
-      state: { scenes, clock: { clock: 0, scene: 0, huePhase: 0 }, look: { hue: 0, cycle: 0.6, trails: 0.86, speed: 1, reactivity: 1, aberration: 0.012 } },
-      audio: { kind: null }, sceneParams: [[], []], sceneIndex: 0, tempo: { bpm: 120 },
-      ui: { set: vi.fn() }, paramStore: { setAll: vi.fn() }, setScene: vi.fn(), setLook: vi.fn(), pushParams: vi.fn(), paramValues: vi.fn(() => ({})), showParams: vi.fn(), toast: vi.fn(),
-      setHooks: vi.fn(() => () => {}),
-      sceneByName: (name: string) => scenes.findIndex((s) => s.name === name),
-    } as unknown as AppController;
+    const app = fakeApp({ audio: null });
     const studio = new StudioSession(app);
     const undo = new UndoStack();
     return { studio, undo, run: createToolRunner(app, undo, () => studio) };
@@ -87,6 +80,42 @@ describe('tool runner', () => {
     await expect(run('reorder_show', { order: ['not-an-id'] })).rejects.toThrow();
     expect(undo.last).toBeUndefined();
   });
+
+  it('undoes the transition and the autopilot under the same rule as the show', async () => {
+    const { run, studio, undo } = setup();
+    await run('set_transition', { mode: 'cut', seconds: 3 });
+    undo.pop()!.undo();
+    expect([studio.mode, studio.seconds]).toEqual(['fade', 1.5]);
+
+    await run('set_transition', { seconds: 3 });
+    studio.setSeconds(5);   // by hand
+    expect(() => undo.pop()!.undo()).toThrow(UndoConflict);
+    expect(studio.seconds).toBe(5);
+
+    await run('set_autopilot', { beats: 64 });
+    studio.setAutoBeats(16);
+    expect(() => undo.pop()!.undo()).toThrow(UndoConflict);
+    expect(studio.autopilot.beats).toBe(16);
+  });
+
+  it('undoes a plan together with the autopilot it switched on', async () => {
+    const { run, studio, undo } = setup();
+    await run('add_show_scene', { scene: 'Alpha' });
+    await run('add_show_scene', { scene: 'Beta' });
+    expect(studio.autopilot.on).toBe(false);
+    await run('set_autopilot_plan', { plan: { steps: [{ cue: 'Alpha', beats: 32 }, { cue: 'Beta', beats: 32 }] } });
+    expect([studio.plan?.steps.length, studio.autopilot.on]).toEqual([2, true]);
+    undo.pop()!.undo();
+    expect([studio.plan, studio.autopilot.on]).toEqual([null, false]);
+  });
+
+  it('has nothing to do when what a change touched is already back as it was', async () => {
+    const { run, studio, undo } = setup();
+    await run('set_transition', { mode: 'cut' });
+    studio.setMode('fade');   // put back by hand
+    expect(() => undo.pop()!.undo()).not.toThrow();
+    expect(studio.mode).toBe('fade');
+  });
 });
 
 describe('applyEdits', () => {
@@ -113,53 +142,94 @@ describe('applyEdits', () => {
 describe('scene code and parameter tools', () => {
   beforeEach(() => vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} }));
 
-  const { params: specs } = parseParams('uniform float uGlow; // @param min=0 max=3 label="Glow"\nuniform bool uMirror; // @param label="Mirror"');
+  // Alpha's code declares its parameters, as a scene's code does: a compile reads them from it.
+  const PARAMS = 'uniform float uGlow; // @param min=0 max=3 label="Glow"\nuniform bool uMirror; // @param label="Mirror"';
+  const { params: specs } = parseParams(PARAMS);
 
-  function setup(compileError: string | null | typeof SUPERSEDED = null) {
-    const scene = { name: 'Alpha', cat: 'Fractal', body: 'float k = 1.;\nvoid main() { fragColor = vec4(k); }', user: true };
-    const scenes = [scene, { name: 'Beta', cat: 'Fractal', edited: true }, { name: 'Maker', cat: 'Mine', kind: 'nodes' }, { name: 'Gone', cat: 'Space', removed: true }];
-    const values = { uGlow: 1.23456, uMirror: true };
-    const app = {
-      state: { scenes, clock: { scene: 0, bpm: 120, mood: 0.5, huePhase: 0 }, look: { hue: 0 }, activeSource: null },
-      audio: { kind: null, features: { bright: 0.5 } }, media: { el: null }, overlay: null,
-      sceneParams: [specs, [], [], []], sceneIndex: 0, currentScene: scene,
-      sceneByName: (name: string) => scenes.findIndex((s) => s.name === name),
-      setScene: vi.fn(), pushParams: vi.fn(), showParams: vi.fn(), paramValues: vi.fn(() => values),
-      paramStore: { set: vi.fn() },
-      editor: {
-        target: (i: number) => ({ index: i, name: scenes[i]!.name, kind: (scenes[i] as { kind?: string }).kind === 'nodes' ? 'nodes' : 'user', body: (scenes[i] as { body?: string }).body ?? '' }),
-        compileInto: vi.fn(async (_t: unknown, src: string) => { if (compileError) return compileError; scene.body = src; return null; }),
-      },
-    } as unknown as AppController & { editor: { compileInto: ReturnType<typeof vi.fn> } };
+  function setup(compiler: Partial<Compiler> = {}) {
+    const app = fakeApp({
+      scenes: [
+        { name: 'Alpha', cat: 'Fractal', body: `${PARAMS}\nfloat k = 1.;\nvoid main() { fragColor = vec4(k); }`, user: true },
+        { name: 'Beta', cat: 'Fractal', edited: true }, { name: 'Maker', cat: 'Mine', kind: 'nodes' }, { name: 'Gone', cat: 'Space', removed: true },
+      ],
+      params: [specs],
+      audio: null,
+      compiler,
+    });
+    app.library.setValues(0, { uGlow: 1.23456, uMirror: true });
     const undo = new UndoStack();
-    return { app, scene, undo, run: createToolRunner(app, undo) };
+    return {
+      app, scene: app.state.scenes[0]!, scenes: app.state.scenes, undo, run: createToolRunner(app, undo),
+      compileInto: vi.spyOn(app.editor, 'compileInto'), remove: vi.spyOn(app.library, 'remove'),
+    };
   }
 
   it('edit_scene_code compiles the edited code, returns the values only, and undoes to the old code', async () => {
-    const { app, scene, undo, run } = setup();
+    const { compileInto, scene, undo, run } = setup();
     const before = scene.body;
     const out = await run('edit_scene_code', { edits: [{ find: 'float k = 1.;', replace: 'float k = .5;' }] });
     expect(scene.body).toBe(before.replace('1.;', '.5;'));
     expect(out).toEqual({ compiled: true, scene: 'Alpha', nowPlaying: true, parameters: { uGlow: 1.235, uMirror: true } });
     expect(undo.last).toBe('Edited Alpha');
     undo.pop()!.undo();
-    expect(app.editor.compileInto).toHaveBeenLastCalledWith(expect.anything(), before);
+    expect(compileInto).toHaveBeenLastCalledWith(expect.anything(), before);
+  });
+
+  it('does not undo a code change once the scene\'s code was changed after it', async () => {
+    const { compileInto, scene, undo, run } = setup();
+    await run('edit_scene_code', { edits: [{ find: 'float k = 1.;', replace: 'float k = .5;' }] });
+    scene.body = 'void main() { fragColor = vec4(1.); }';   // the user's own edit
+    compileInto.mockClear();
+    expect(() => undo.pop()!.undo()).toThrow(UndoConflict);
+    expect(compileInto).not.toHaveBeenCalled();
+  });
+
+  it('undoes a new scene by removing it, but not once the user edited its code', async () => {
+    const { remove, scenes, undo, run } = setup();
+    await run('create_scene', { name: 'Neon Tide', code: 'void main() { fragColor = vec4(1.); }' });
+    undo.pop()!.undo();
+    expect(remove).toHaveBeenCalledWith(4);
+    expect(scenes[4]!.removed).toBe(true);
+
+    await run('create_scene', { name: 'Neon Tide 2', code: 'void main() { fragColor = vec4(1.); }' });
+    scenes[5]!.body = 'void main() { fragColor = vec4(.5); }';
+    remove.mockClear();
+    expect(() => undo.pop()!.undo()).toThrow(UndoConflict);
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('create_scene refuses a name that is taken, and code that does not compile', async () => {
+    const taken = setup();
+    await expect(taken.run('create_scene', { name: 'Beta', code: 'void main() {}' })).rejects.toThrow(/already exists \(a built-in one\)\. Pick another name/);
+    const broken = setup({ check: () => 'ERROR: 0:1: syntax error' });
+    await expect(broken.run('create_scene', { name: 'New', code: 'void main( {}' })).rejects.toThrow(/didn't compile, so nothing was created/);
+    expect(broken.scenes).toHaveLength(4);
   });
 
   it('edit_scene_code changes nothing when an edit misses or the result does not compile', async () => {
     const miss = setup();
     await expect(miss.run('edit_scene_code', { edits: [{ find: 'float q', replace: '' }] })).rejects.toThrow(/didn't match[\s\S]*Nothing was changed/);
-    expect(miss.app.editor.compileInto).not.toHaveBeenCalled();
+    expect(miss.compileInto).not.toHaveBeenCalled();
     expect(miss.undo.last).toBeUndefined();
 
-    const broken = setup('ERROR: 0:2: syntax error');
+    const broken = setup({ compileAsync: async () => 'ERROR: 0:2: syntax error' });
+    const before = broken.scene.body;
     await expect(broken.run('edit_scene_code', { edits: [{ find: 'vec4(k)', replace: 'vec4(k' }] })).rejects.toThrow(/didn't compile.*scene's code/);
     expect(broken.undo.last).toBeUndefined();
+    expect(broken.scene.body).toBe(before);
 
-    const raced = setup(SUPERSEDED);
+    // The user's own edit of the scene starts while the assistant's is still compiling: theirs wins.
+    const gates: (() => void)[] = [];
+    const raced = setup({ compileAsync: () => new Promise((resolve) => { gates.push(() => resolve(null)); }) });
     await expect(raced.run('edit_scene_code', { edits: [{ find: 'k', replace: 'j' }] })).rejects.toThrow(/matches 2 places/);
-    await expect(raced.run('edit_scene_code', { edits: [{ find: 'float k', replace: 'float j' }] })).rejects.toThrow(/replaced your code[\s\S]*Read the scene's code again/);
+    const edit = raced.run('edit_scene_code', { edits: [{ find: 'float k', replace: 'float j' }] });
+    await vi.waitFor(() => expect(gates).toHaveLength(1));
+    const theirs = raced.app.editor.compileInto(raced.app.editor.target(0), `${PARAMS}\nvoid main() { fragColor = vec4(1.); }`);
+    gates.forEach((open) => open());
+    await expect(edit).rejects.toThrow(/replaced your code[\s\S]*Read the scene's code again/);
+    await expect(theirs).resolves.toBeNull();
     expect(raced.undo.last).toBeUndefined();
+    expect(raced.scene.body).toContain('vec4(1.)');
   });
 
   it('refuses to edit a visual-maker scene', async () => {
@@ -172,6 +242,19 @@ describe('scene code and parameter tools', () => {
     const out = await run('set_parameters', { values: { Glow: 2, Nope: 1 } });
     expect(out).toEqual({ applied: { uGlow: 2 }, problems: ['"Nope" isn\'t a parameter of this scene'] });
     expect(JSON.stringify(out).length).toBeLessThan(300);
+  });
+
+  it('set_parameters undoes only the parameters it set, and not after they were changed again', async () => {
+    const { app, undo, run } = setup();
+    await run('set_parameters', { values: { Glow: 2 } });
+    app.library.setValues(0, { uMirror: false });   // another parameter, by hand: no conflict
+    undo.pop()!.undo();
+    expect(app.library.values(0)).toEqual({ uGlow: 1.23456, uMirror: false });
+
+    await run('set_parameters', { values: { Glow: 2 } });
+    app.library.setValues(0, { uGlow: 2.5 });   // the same one, by hand
+    expect(() => undo.pop()!.undo()).toThrow(UndoConflict);
+    expect(app.library.values(0).uGlow).toBe(2.5);
   });
 
   it('get_app_state keeps the playing scene\'s parameters in full and lists the library compactly', async () => {

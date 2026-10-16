@@ -5,15 +5,14 @@
 
 import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
+import { CONFIG_ENV_VARS } from '../server/config';
+import { PROGRAM_ENV } from '../server/programs';
 
 const MARK = '__HALLUCINATE_PATH__';
 
-// What the app reads from the environment (besides PATH). Only these are taken from the shell, and a
-// value the app was already started with wins.
-export const SHELL_VARS = [
-  'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_BIN', 'YTDLP', 'YTDLP_CACHE_MB',
-  'ASSISTANT_BACKEND', 'ASSISTANT_MODEL', 'ASSISTANT_EFFORT', 'ASSISTANT_DIRECTOR_EFFORT', 'ASSISTANT_DEBUG',
-] as const;
+// What the server reads from the environment (besides PATH): the assistant's settings and the programs it
+// runs. Only these are taken from the shell, and a value the app was already started with wins.
+export const SHELL_VARS: readonly string[] = [...CONFIG_ENV_VARS, ...Object.values(PROGRAM_ENV)];
 
 // Places tools usually live, as a fallback when the shell can't be asked.
 export function commonToolDirs(home: string, platform: NodeJS.Platform): string[] {

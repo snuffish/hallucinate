@@ -333,22 +333,6 @@ export class Renderer {
     return error;
   }
 
-  // Hot-swap a scene's shader (used by the editors). Resolves with the compile error, or null;
-  // on success the shared scene list gets the new source. The old program keeps running meanwhile.
-  async replaceSceneAsync(index: number, fragSrc: string): Promise<string | null> {
-    const scene = this.scenes[index];
-    const error = await this.compileAsync(fragSrc, scene?.name);
-    if (!error && scene) scene.frag = fragSrc;
-    return error;
-  }
-
-  replaceScene(index: number, fragSrc: string): string | null {
-    const scene = this.scenes[index];
-    const error = this.check(fragSrc, scene?.name);
-    if (!error && scene) scene.frag = fragSrc;
-    return error;
-  }
-
   private program(index: number, sync = false): WebGLProgram | null {
     const scene = this.scenes[index];
     if (!scene) return null;

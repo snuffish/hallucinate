@@ -1,37 +1,24 @@
 // Settings → Assistant: which way the server reaches Claude, the model and effort, and (in the desktop
 // app) an API key. They live on the server (server/config.ts, /api/settings): an environment variable
 // the server was started with wins and locks its field here; the key is sent once and never comes back.
+// What the server answers and takes is declared in src/assistant/settings-wire.ts.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { z } from 'zod';
 import { useApp } from '../app/AppContext';
 import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
+import { ErrorBodySchema, SETTINGS_URL, SettingsViewSchema, type Backend, type BackendChoice, type Effort, type SettingsPatch, type SettingsView as View } from '../assistant/settings-wire';
 
-const Source = z.enum(['env', 'settings', 'default']);
-const field = <T extends z.ZodType>(value: T) => z.object({ value, source: Source, locked: z.boolean() });
-const ViewSchema = z.object({
-  backend: field(z.enum(['auto', 'api', 'claude-code'])),
-  model: field(z.string().nullable()),
-  effort: field(z.string()),
-  directorEffort: field(z.string()),
-  apiKey: z.object({ set: z.boolean(), source: Source, locked: z.boolean(), editable: z.boolean(), unreadable: z.boolean() }),
-  detected: z.enum(['api', 'claude-code', 'none']),
-  canWrite: z.boolean(),
-  options: z.object({ efforts: z.array(z.string()), apiModels: z.array(z.string()), defaultModel: z.string() }),
-  env: z.record(z.string(), z.string()),
-  paths: z.object({ claudeBin: z.string(), ytdlp: z.string() }),
-});
-type View = z.infer<typeof ViewSchema>;
-type Patch = Partial<Record<'backend' | 'model' | 'effort' | 'directorEffort' | 'apiKey', string | null>>;
+const DETECTED: Record<Backend, string> = { 'api': 'the Anthropic API', 'claude-code': 'your Claude subscription (Claude Code)', 'none': 'nothing yet: Claude isn\'t set up' };
+const BACKENDS: Record<BackendChoice, string> = { 'auto': 'Automatic: an API key if there is one, else Claude Code', 'api': 'Anthropic API key', 'claude-code': 'Claude subscription (Claude Code)' };
 
-const DETECTED = { 'api': 'the Anthropic API', 'claude-code': 'your Claude subscription (Claude Code)', 'none': 'nothing yet: Claude isn\'t set up' } as const;
-const BACKENDS = { 'auto': 'Automatic: an API key if there is one, else Claude Code', 'api': 'Anthropic API key', 'claude-code': 'Claude subscription (Claude Code)' } as const;
-
-async function request(init?: RequestInit): Promise<View> {
-  const res = await fetch('/api/settings', init);
+async function request(patch?: SettingsPatch): Promise<View> {
+  const res = await fetch(SETTINGS_URL, patch && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
   const json: unknown = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((json as { error?: string }).error ?? `The server answered ${res.status}.`);
-  return ViewSchema.parse(json);
+  if (!res.ok) {
+    const e = ErrorBodySchema.safeParse(json);
+    throw new Error(e.success ? e.data.error : `The server answered ${res.status}.`);
+  }
+  return SettingsViewSchema.parse(json);
 }
 
 export function AssistantSettings() {
@@ -50,11 +37,11 @@ export function AssistantSettings() {
   if (STATIC_DEMO) return <><h3>Assistant</h3><p className="settings-note">{STATIC_DEMO_NOTE}</p></>;
   if (!view) return <><h3>Assistant</h3><p className={`settings-note${error ? ' error' : ''}`}>{error || 'Asking the server…'}</p></>;
 
-  const save = async (patch: Patch) => {
+  const save = async (patch: SettingsPatch) => {
     setBusy(true);
     setError('');
     try {
-      const next = await request({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
+      const next = await request(patch);
       setView(next);
       setModel(next.model.value ?? '');
       if ('apiKey' in patch) setKey('');
@@ -77,8 +64,8 @@ export function AssistantSettings() {
       {!view.canWrite && <p className="settings-note error">These can only be changed on the computer Hallucinate runs on.</p>}
 
       <Row label="Connection" note={lockedNote('backend', view.backend)}>
-        <select id="ai-backend" value={view.backend.value} disabled={off(view.backend)} onChange={(e) => void save({ backend: e.target.value === 'auto' ? null : e.target.value })}>
-          {(Object.keys(BACKENDS) as (keyof typeof BACKENDS)[]).map((b) => <option key={b} value={b}>{BACKENDS[b]}</option>)}
+        <select id="ai-backend" value={view.backend.value} disabled={off(view.backend)} onChange={(e) => void save({ backend: e.target.value === 'auto' ? null : e.target.value as BackendChoice })}>
+          {(Object.keys(BACKENDS) as BackendChoice[]).map((b) => <option key={b} value={b}>{BACKENDS[b]}</option>)}
         </select>
       </Row>
 
@@ -143,10 +130,10 @@ function Row({ label, note, children }: { label: string; note?: ReactNode; child
   );
 }
 
-function EffortSelect({ id, value, efforts, disabled, onChange }: { id: string; value: { value: string; source: string }; efforts: string[]; disabled: boolean; onChange: (v: string | null) => void }) {
+function EffortSelect({ id, value, efforts, disabled, onChange }: { id: string; value: { value: string; source: string }; efforts: readonly string[]; disabled: boolean; onChange: (v: Effort | null) => void }) {
   const current = value.source === 'default' ? '' : value.value;
   return (
-    <select id={id} value={current} disabled={disabled} onChange={(e) => onChange(e.target.value || null)}>
+    <select id={id} value={current} disabled={disabled} onChange={(e) => onChange((e.target.value || null) as Effort | null)}>
       <option value="">{value.source === 'default' ? `Default (${value.value})` : 'Default'}</option>
       {efforts.map((e) => <option key={e} value={e}>{e}</option>)}
       {current && !efforts.includes(current) && <option value={current}>{current}</option>}

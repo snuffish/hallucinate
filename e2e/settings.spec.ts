@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { SettingsPatchSchema, type SettingsView, type Source } from '../src/assistant/settings-wire';
 import { expect, test, type Page } from './fixtures';
 
 async function openApp(page: Page) {
@@ -104,28 +105,32 @@ test.describe('on a 2× screen', () => {
 });
 
 // The server's side (precedence, the keychain, locking) is unit-tested in server/settings-route.test.ts;
-// here it is stubbed, so a test never writes the developer's real ~/.config/hallucinate.
-function settingsServer(page: Page, initial: Record<string, unknown> = {}) {
-  const f = (value: unknown, source = 'default') => ({ value, source, locked: source === 'env' });
-  const state = {
+// here it is stubbed, so a test never writes the developer's real ~/.config/hallucinate. It answers in the
+// shapes of src/assistant/settings-wire.ts and takes only what the real one would.
+function settingsServer(page: Page, initial: Partial<SettingsView> = {}) {
+  const f = <T>(value: T, source: Source = 'default') => ({ value, source, locked: source === 'env' });
+  const state: SettingsView = {
     backend: f('auto'), model: f(null), effort: f('low', 'env'), directorEffort: f('low'),
     apiKey: { set: false, source: 'default', locked: false, editable: true, unreadable: false },
     detected: 'claude-code', canWrite: true,
-    options: { efforts: ['low', 'medium', 'high', 'xhigh', 'max'], apiModels: ['claude-opus-5-5', 'claude-haiku-5-5'], defaultModel: 'claude-opus-5-5' },
+    options: { backends: ['auto', 'api', 'claude-code'], efforts: ['low', 'medium', 'high', 'xhigh', 'max'], apiModels: ['claude-opus-5-5', 'claude-haiku-5-5'], defaultModel: 'claude-opus-5-5' },
     env: { backend: 'ASSISTANT_BACKEND', model: 'ASSISTANT_MODEL', effort: 'ASSISTANT_EFFORT', directorEffort: 'ASSISTANT_DIRECTOR_EFFORT', apiKey: 'ANTHROPIC_API_KEY' },
     paths: { claudeBin: 'claude', ytdlp: 'yt-dlp' },
     ...initial,
   };
-  const posts: Record<string, unknown>[] = [];
+  const posts: unknown[] = [];
   let infoRequests = 0;
   void page.route('**/api/assistant/info', (route) => { infoRequests++; return route.fulfill({ json: { backend: state.detected, model: null } }); });
   void page.route('**/api/settings', async (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: state });
-    const patch = route.request().postDataJSON() as Record<string, unknown>;
-    posts.push(patch);
+    const body: unknown = route.request().postDataJSON();
+    posts.push(body);
+    const parsed = SettingsPatchSchema.safeParse(body);
+    if (!parsed.success) return route.fulfill({ status: 400, json: { error: 'Bad settings' } });
+    const patch = parsed.data;
     if ('model' in patch && patch.model === 'gpt-5') return route.fulfill({ status: 400, json: { error: '"gpt-5" isn\'t a model the Anthropic API offers.' } });
     if ('backend' in patch) { state.backend = f(patch.backend ?? 'auto', patch.backend ? 'settings' : 'default'); state.detected = patch.backend === 'api' ? 'api' : 'claude-code'; }
-    if ('model' in patch) state.model = f(patch.model, patch.model ? 'settings' : 'default');
+    if ('model' in patch) state.model = f(patch.model ?? null, patch.model ? 'settings' : 'default');
     if ('apiKey' in patch) state.apiKey = { ...state.apiKey, set: patch.apiKey !== null, source: patch.apiKey ? 'settings' : 'default' };
     return route.fulfill({ json: state });
   });

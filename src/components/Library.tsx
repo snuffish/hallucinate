@@ -7,6 +7,7 @@ import { encodeJpeg } from '../engine/jpeg';
 import type { SnapshotUniforms } from '../engine/renderer';
 import { CATEGORIES, type Scene } from '../engine/scenes';
 import { HOTKEYS } from '../hotkeys/registry';
+import { useHotkeyActions } from '../hooks/useAppHotkeys';
 import { Kbd } from '../hotkeys/Kbd';
 import { inRotation, isFav, listedScenes, togglePref } from '../state/library-prefs';
 import { HelpButton } from './Help';
@@ -85,37 +86,43 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
   const focusedRef = useRef(focused);
   const tabsRef = useRef({ tabs, activeFilter });
   useEffect(() => { shownRef.current = shown; focusedRef.current = focused; tabsRef.current = { tabs, activeFilter }; });
-  useEffect(() => app.setHooks({
+  // Escape leaves the search field first; a second Escape closes the library.
+  useEffect(() => app.setHooks({ escape: () => { if (document.activeElement === search.current) { search.current?.blur(); return true; } return false; } }), [app]);
+  const move = (dx: number, dy: number) => {
+    const cards = grid.current ? [...grid.current.querySelectorAll<HTMLElement>('.lib-card')] : [];
+    const columns = Math.max(1, cards.filter((c) => c.offsetTop === cards[0]?.offsetTop).length);
+    const n = shownRef.current.length;
+    if (!n) return;
+    const cur = focusedRef.current;
+    const next = cur < 0 ? 0 : Math.min(n - 1, Math.max(0, cur + dx + dy * columns));
+    setFocused(next);
+    cards[next]?.scrollIntoView({ block: 'nearest' });
+  };
+  const tab = (dir: number) => {
+    const { tabs, activeFilter } = tabsRef.current;
+    const i = tabs.indexOf(activeFilter);
+    setFilter(tabs[(i + dir + tabs.length) % tabs.length]!);
+    setFocused(-1);
+  };
+  useHotkeyActions<'library'>({
     librarySearch: () => { search.current?.focus(); search.current?.select(); },
-    // Escape leaves the search field first; a second Escape closes the library.
-    escape: () => { if (document.activeElement === search.current) { search.current?.blur(); return true; } return false; },
-    libraryMove: (dx, dy) => {
-      const cards = grid.current ? [...grid.current.querySelectorAll<HTMLElement>('.lib-card')] : [];
-      const columns = Math.max(1, cards.filter((c) => c.offsetTop === cards[0]?.offsetTop).length);
-      const n = shownRef.current.length;
-      if (!n) return;
-      const cur = focusedRef.current;
-      const next = cur < 0 ? 0 : Math.min(n - 1, Math.max(0, cur + dx + dy * columns));
-      setFocused(next);
-      cards[next]?.scrollIntoView({ block: 'nearest' });
-    },
+    libraryLeft: () => move(-1, 0),
+    libraryRight: () => move(1, 0),
+    libraryUp: () => move(0, -1),
+    libraryDown: () => move(0, 1),
     libraryPick: () => {
       const list = shownRef.current;
       const i = focusedRef.current >= 0 ? focusedRef.current : 0;
       const hit = list[i];
       if (hit) pick(hit.i);
     },
-    libraryTab: (dir) => {
-      const { tabs, activeFilter } = tabsRef.current;
-      const i = tabs.indexOf(activeFilter);
-      setFilter(tabs[(i + dir + tabs.length) % tabs.length]!);
-      setFocused(-1);
-    },
-  }), [app]);   // eslint-disable-line react-hooks/exhaustive-deps
+    libraryTabNext: () => tab(1),
+    libraryTabPrev: () => tab(-1),
+  });
   const remove = (i: number) => {
     const s = app.state.scenes[i]!;
     if (!confirm(`Delete "${s.name}" from the library?`)) return;
-    app.removeUserScene(i);
+    app.library.remove(i);
   };
 
   return (
@@ -177,7 +184,7 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
 function Parked() {
   const app = useApp();
   useUI((ui) => ui.sceneVersion);   // re-render when the parked set changes
-  const { userScenes, sceneEdits } = app.parked;
+  const { userScenes, sceneEdits } = app.library.parked;
   const edits = Object.keys(sceneEdits);
   if (!userScenes.length && !edits.length) return null;
   return (
@@ -189,13 +196,13 @@ function Parked() {
           <li key={`scene:${name}`} data-parked-scene={name}>
             <span>{name}</span>
             <button title="Load it into My Shader to fix it, then Save to library under the same name" onClick={() => app.openParkedInEditor(name)}>Fix in editor</button>
-            <button onClick={() => { if (confirm(`Delete "${name}" for good?`)) app.discardParked('scene', name); }}>Delete</button>
+            <button onClick={() => { if (confirm(`Delete "${name}" for good?`)) app.library.discardParked('scene', name); }}>Delete</button>
           </li>
         ))}
         {edits.map((name) => (
           <li key={`edit:${name}`} data-parked-edit={name}>
             <span>Your edit of {name}</span>
-            <button onClick={() => { if (confirm(`Discard your edit of "${name}"?`)) app.discardParked('edit', name); }}>Discard edit</button>
+            <button onClick={() => { if (confirm(`Discard your edit of "${name}"?`)) app.library.discardParked('edit', name); }}>Discard edit</button>
           </li>
         ))}
       </ul>

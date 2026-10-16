@@ -4,7 +4,7 @@
 import type { UIMessage } from '@tanstack/ai-client';
 import { splitFollowUps } from './follow-ups';
 import { splitNotes } from './notes';
-import { DONE_VERBS, type ToolName } from './tools';
+import { toolLabel } from './tools';
 
 export const NOT_RUN = 'Not run: the app was closed before this finished.';
 export const OMITTED = '(screenshot omitted)';
@@ -119,8 +119,7 @@ export function toMarkdown(title: string, messages: UIMessage[], opts: { reasoni
         if (p.type === 'text') { const t = splitFollowUps(p.content).text; if (t) out.push(t); }
         if (p.type === 'tool-call') {
           const result = m.parts.find((q): q is ToolResult => q.type === 'tool-result' && q.toolCallId === p.id);
-          const verb = DONE_VERBS[p.name as ToolName];
-          const label = verb ? verb((p.input ?? {}) as Record<string, unknown>) : p.name;
+          const label = toolLabel(p.name, (p.input ?? {}) as Record<string, unknown>, true);
           out.push(`> ${result?.state === 'error' ? '✗' : '✓'} ${label}`);
         }
       }

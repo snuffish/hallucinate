@@ -27,7 +27,12 @@ export interface HotkeyDef {
   when: HotkeyWhen;
   // Fires even while a text field has focus (Escape and the like).
   inInputs?: boolean;
+  // The panel that registers it with its action (useHotkeyActions); the app's own when absent.
+  owner?: PanelOwner;
 }
+
+type PanelOwner = 'library' | 'nodes' | 'assistant';
+export type HotkeyOwner = 'app' | PanelOwner;
 
 export const HOTKEYS = {
   playPause: { id: 'playPause', keys: 'Space', label: 'Play / pause', group: 'Playback', when: 'noNodes' },
@@ -42,14 +47,14 @@ export const HOTKEYS = {
   scenePrev: { id: 'scenePrev', keys: 'ArrowLeft', label: 'Previous scene', group: 'Scenes', when: 'noOverlay' },
   sceneNext: { id: 'sceneNext', keys: 'ArrowRight', label: 'Next scene', group: 'Scenes', when: 'noOverlay' },
   library: { id: 'library', keys: 'L', label: 'Scene library', group: 'Scenes', when: 'noNodes' },
-  librarySearch: { id: 'librarySearch', keys: '/', label: 'Search scenes', group: 'Scenes', when: 'library' },
-  libraryLeft: { id: 'libraryLeft', keys: 'ArrowLeft', label: 'Previous hit', group: 'Scenes', when: 'library', inInputs: true },
-  libraryRight: { id: 'libraryRight', keys: 'ArrowRight', label: 'Next hit', group: 'Scenes', when: 'library', inInputs: true },
-  libraryTabNext: { id: 'libraryTabNext', keys: 'Tab', label: 'Next category', group: 'Scenes', when: 'library', inInputs: true },
-  libraryTabPrev: { id: 'libraryTabPrev', keys: 'Shift+Tab', label: 'Previous category', group: 'Scenes', when: 'library', inInputs: true },
-  libraryUp: { id: 'libraryUp', keys: 'ArrowUp', label: 'Hit above', group: 'Scenes', when: 'library', inInputs: true },
-  libraryDown: { id: 'libraryDown', keys: 'ArrowDown', label: 'Hit below', group: 'Scenes', when: 'library', inInputs: true },
-  libraryPick: { id: 'libraryPick', keys: 'Enter', label: 'Play the highlighted scene', group: 'Scenes', when: 'library', inInputs: true },
+  librarySearch: { id: 'librarySearch', keys: '/', label: 'Search scenes', group: 'Scenes', when: 'library', owner: 'library' },
+  libraryLeft: { id: 'libraryLeft', keys: 'ArrowLeft', label: 'Previous hit', group: 'Scenes', when: 'library', inInputs: true, owner: 'library' },
+  libraryRight: { id: 'libraryRight', keys: 'ArrowRight', label: 'Next hit', group: 'Scenes', when: 'library', inInputs: true, owner: 'library' },
+  libraryTabNext: { id: 'libraryTabNext', keys: 'Tab', label: 'Next category', group: 'Scenes', when: 'library', inInputs: true, owner: 'library' },
+  libraryTabPrev: { id: 'libraryTabPrev', keys: 'Shift+Tab', label: 'Previous category', group: 'Scenes', when: 'library', inInputs: true, owner: 'library' },
+  libraryUp: { id: 'libraryUp', keys: 'ArrowUp', label: 'Hit above', group: 'Scenes', when: 'library', inInputs: true, owner: 'library' },
+  libraryDown: { id: 'libraryDown', keys: 'ArrowDown', label: 'Hit below', group: 'Scenes', when: 'library', inInputs: true, owner: 'library' },
+  libraryPick: { id: 'libraryPick', keys: 'Enter', label: 'Play the highlighted scene', group: 'Scenes', when: 'library', inInputs: true, owner: 'library' },
   auto: { id: 'auto', keys: 'A', label: 'Auto-switch', group: 'Scenes', when: 'noNodes' },
   randomize: { id: 'randomize', keys: 'R', label: 'Randomize', group: 'Look', when: 'noNodes' },
   randomizeBack: { id: 'randomizeBack', keys: 'Shift+R', label: 'Back to the previous random look', group: 'Look', when: 'noNodes' },
@@ -59,10 +64,10 @@ export const HOTKEYS = {
   restartGame: { id: 'restartGame', keys: 'Enter', label: 'Race again', group: 'Game', when: 'game' },
 
   assistant: { id: 'assistant', keys: 'I', label: 'AI assistant', group: 'Panels', when: 'noNodes' },
-  assistantNew: { id: 'assistantNew', keys: 'Alt+N', label: 'New conversation', group: 'Panels', when: 'assistantOpen', inInputs: true },
-  assistantPrev: { id: 'assistantPrev', keys: 'Alt+ArrowUp', label: 'Previous conversation', group: 'Panels', when: 'assistantOpen', inInputs: true },
-  assistantNext: { id: 'assistantNext', keys: 'Alt+ArrowDown', label: 'Next conversation', group: 'Panels', when: 'assistantOpen', inInputs: true },
-  assistantSearch: { id: 'assistantSearch', keys: 'Mod+K', label: 'Find a conversation', group: 'Panels', when: 'assistantOpen', inInputs: true },
+  assistantNew: { id: 'assistantNew', keys: 'Alt+N', label: 'New conversation', group: 'Panels', when: 'assistantOpen', inInputs: true, owner: 'assistant' },
+  assistantPrev: { id: 'assistantPrev', keys: 'Alt+ArrowUp', label: 'Previous conversation', group: 'Panels', when: 'assistantOpen', inInputs: true, owner: 'assistant' },
+  assistantNext: { id: 'assistantNext', keys: 'Alt+ArrowDown', label: 'Next conversation', group: 'Panels', when: 'assistantOpen', inInputs: true, owner: 'assistant' },
+  assistantSearch: { id: 'assistantSearch', keys: 'Mod+K', label: 'Find a conversation', group: 'Panels', when: 'assistantOpen', inInputs: true, owner: 'assistant' },
   editor: { id: 'editor', keys: 'E', label: 'Shader editor', group: 'Panels', when: 'always' },
   visualMaker: { id: 'visualMaker', keys: 'N', label: 'Visual maker', group: 'Panels', when: 'always' },
   params: { id: 'params', keys: 'P', label: 'Collapse parameters', group: 'Panels', when: 'paramsVisible' },
@@ -74,8 +79,8 @@ export const HOTKEYS = {
   help: { id: 'help', keys: '?', label: 'Help & shortcuts', group: 'Panels', when: 'always' },
   settings: { id: 'settings', keys: ',', label: 'Settings', group: 'Panels', when: 'noNodes' },
   closeOverlay: { id: 'closeOverlay', keys: 'Escape', label: 'Close', group: 'Panels', when: 'overlayOpen', inInputs: true },
-  deleteNode: { id: 'deleteNode', keys: 'Delete', label: 'Delete block', group: 'Panels', when: 'nodesOpen' },
-  deleteNodeBackspace: { id: 'deleteNodeBackspace', keys: 'Backspace', label: 'Delete block', group: 'Panels', when: 'nodesOpen' },
+  deleteNode: { id: 'deleteNode', keys: 'Delete', label: 'Delete block', group: 'Panels', when: 'nodesOpen', owner: 'nodes' },
+  deleteNodeBackspace: { id: 'deleteNodeBackspace', keys: 'Backspace', label: 'Delete block', group: 'Panels', when: 'nodesOpen', owner: 'nodes' },
 
   studio: { id: 'studio', keys: 'O', label: 'Studio & projector', group: 'Studio', when: 'noNodes' },
   take: { id: 'take', keys: 'T', label: 'Take', group: 'Studio', when: 'noNodes' },
@@ -85,6 +90,12 @@ export const HOTKEYS = {
 } as const satisfies Record<string, HotkeyDef>;
 
 export type HotkeyId = keyof typeof HOTKEYS;
+
+// The bindings an owner registers, and its actions for them: one per binding, so a binding nobody
+// gives an action doesn't compile.
+type OwnerOf<K extends HotkeyId> = (typeof HOTKEYS)[K] extends { owner: infer O } ? O : 'app';
+export type HotkeyIdOf<O extends HotkeyOwner> = { [K in HotkeyId]: OwnerOf<K> extends O ? K : never }[HotkeyId];
+export type HotkeyActions<O extends HotkeyOwner> = Record<HotkeyIdOf<O>, () => void>;
 
 // Scene number keys: 1–9 and 0 outside the studio, cue keys 1–9 inside it.
 export const SCENE_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'] as const;

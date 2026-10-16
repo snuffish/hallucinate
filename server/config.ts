@@ -3,22 +3,18 @@
 // locks the field in the Settings overlay, as the desktop app's shell variables always have), the value
 // saved from Settings, or the default.
 //
-// Program paths (CLAUDE_BIN, YTDLP) are deliberately not here: the server runs them, and /api admits
-// non-browser clients, so a path settable over HTTP would let any of them run a program of its choosing.
+// Program paths (CLAUDE_BIN, YTDLP) are deliberately not here but in programs.ts: the server runs them, and
+// /api admits non-browser clients, so a path settable over HTTP would let any of them run a program of its choosing.
 
 import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
+import { BACKEND_CHOICES, EFFORTS, MODEL_PATTERN, type BackendChoice, type Effort, type Source } from '../src/assistant/settings-wire';
 
-export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;   // `claude --effort`, and TanStack's reasoning levels
-export type Effort = (typeof EFFORTS)[number];
-export const BACKEND_CHOICES = ['auto', 'api', 'claude-code'] as const;
-export type BackendChoice = (typeof BACKEND_CHOICES)[number];
+export { BACKEND_CHOICES, EFFORTS, MODEL_PATTERN, type BackendChoice, type Effort };
 export const DEFAULT_MODEL = 'claude-opus-5-5';   // on the API; the CLI uses its own default
 export const DEFAULT_EFFORT: Effort = 'high';
-// A model id or a CLI alias (`opus`, `sonnet[1m]`). It is passed to the CLI as one argument, never through a shell.
-export const MODEL_PATTERN = /^[a-z0-9][a-z0-9.\-[\]]{0,63}$/i;
 
 export const StoredConfigSchema = z.object({
   v: z.literal(1),
@@ -99,7 +95,7 @@ export function memoryConfigStore(initial: StoredConfig = EMPTY, secrets: Secret
   };
 }
 
-export type Source = 'env' | 'settings' | 'default';
+export type { Source };
 export interface Field<T> { value: T; source: Source }
 
 export interface EffectiveConfig {
@@ -122,9 +118,9 @@ function pick<T>(fromEnv: T | undefined, fromSettings: T | undefined, fallback: 
 // environment variable counts as unset, as it always has.
 export function effectiveConfig(env: NodeJS.ProcessEnv, stored: StoredConfig, secrets: Secrets | null): EffectiveConfig {
   const e = (name: string) => env[name] || undefined;
-  const forced = e('ASSISTANT_BACKEND');
-  const effort = pick<string>(e('ASSISTANT_EFFORT'), stored.effort, DEFAULT_EFFORT);
-  const envKey = e('ANTHROPIC_API_KEY') ?? e('ANTHROPIC_AUTH_TOKEN');
+  const forced = e(ENV_NAMES.backend);
+  const effort = pick<string>(e(ENV_NAMES.effort), stored.effort, DEFAULT_EFFORT);
+  const envKey = e(ENV_NAMES.apiKey) ?? e(AUTH_TOKEN);
   let apiKey: EffectiveConfig['apiKey'] = { value: null, source: 'default' };
   if (envKey) apiKey = { value: envKey, source: 'env' };
   else if (stored.apiKey) {
@@ -134,11 +130,11 @@ export function effectiveConfig(env: NodeJS.ProcessEnv, stored: StoredConfig, se
   }
   return {
     backend: pick<BackendChoice>(forced === 'api' || forced === 'claude-code' ? forced : undefined, stored.backend, 'auto'),
-    model: pick<string | null>(e('ASSISTANT_MODEL'), stored.model, null),
+    model: pick<string | null>(e(ENV_NAMES.model), stored.model, null),
     effort,
     // The director's cycles may run at a lower effort than the chat; the chat's unless set.
-    directorEffort: e('ASSISTANT_DIRECTOR_EFFORT') !== undefined
-      ? { value: e('ASSISTANT_DIRECTOR_EFFORT')!, source: 'env' }
+    directorEffort: e(ENV_NAMES.directorEffort) !== undefined
+      ? { value: e(ENV_NAMES.directorEffort)!, source: 'env' }
       : stored.directorEffort !== undefined ? { value: stored.directorEffort, source: 'settings' } : { value: effort.value, source: 'default' },
     apiKey,
   };
@@ -152,3 +148,7 @@ export const ENV_NAMES = {
   directorEffort: 'ASSISTANT_DIRECTOR_EFFORT',
   apiKey: 'ANTHROPIC_API_KEY',
 } as const satisfies Record<keyof EffectiveConfig, string>;
+const AUTH_TOKEN = 'ANTHROPIC_AUTH_TOKEN';   // the key's other name, as the Anthropic SDK reads it
+
+// Every variable effectiveConfig reads (the desktop app copies them from the login shell).
+export const CONFIG_ENV_VARS: readonly string[] = [...Object.values(ENV_NAMES), AUTH_TOKEN];

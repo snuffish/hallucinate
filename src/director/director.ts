@@ -4,15 +4,14 @@
 // start, and a cycle that drops is simply redone at the next tick. Tools run here in the browser,
 // like the assistant panel's, and the director never takes Live by itself.
 
-import { ChatClient, createChatClientOptions, fetchServerSentEvents, type ConnectionAdapter } from '@tanstack/ai-client';
-import type { AppController } from '../app/controller';
+import { fetchServerSentEvents, type ConnectionAdapter } from '@tanstack/ai-client';
+import type { AppPort } from '../app/app-port';
 import type { StudioSession } from '../app/studio';
-import { clientTools } from '../assistant/client-tools';
+import { Chat, forgetThread } from '../assistant/chat';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
 import { createLock, serialized, type Lock } from '../assistant/lock';
-import { relayToolCalls } from '../assistant/relay';
-import { UndoStack } from '../assistant/undo';
-import { usageOf } from '../assistant/usage';
+import type { Usage } from '../assistant/usage';
+import { soundNow } from '../state/app-state';
 import { Store } from '../state/store';
 import { buildDigest, type DigestInput } from './digest';
 import { DirectorHistory } from './history';
@@ -51,15 +50,15 @@ export class Director {
   readonly store = new Store<DirectorView>({ on: false, cycling: false, cycles: 0, lastNote: '', lastAt: null, beatsToCycle: 0, secondsToCycle: 0, tokens: { prompt: 0, completion: 0 }, error: null, hidden: false });
   readonly history = new DirectorHistory();
   private readonly runner: ToolRunner;
-  private readonly undo = new UndoStack();   // the director's own; its changes aren't undone from the panel
   private beatsSince = 0;
   private lastCycleAt = 0;
   private startedAt = 0;
-  private client: ChatClient | null = null;
+  private chat: Chat | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly app: AppController, private readonly studio: StudioSession, private readonly opts: DirectorOptions = {}) {
-    this.runner = serialized(createToolRunner(app, this.undo, () => studio), opts.lock ?? createLock());
+  constructor(private readonly app: AppPort, private readonly studio: StudioSession, private readonly opts: DirectorOptions = {}) {
+    // The director's changes aren't undone from the panel: nothing keeps their undo steps.
+    this.runner = serialized(createToolRunner(app, { push: () => {} }, () => studio), opts.lock ?? createLock());
   }
 
   get view(): DirectorView { return this.store.get(); }
@@ -93,7 +92,7 @@ export class Director {
       this.store.set({ on: true, error: null, cycles: 0, tokens: { prompt: 0, completion: 0 }, beatsToCycle: this.beatsToCycle(), secondsToCycle: this.secondsToCycle() });
       void this.cycleNow();
     } else {
-      this.client?.stop();
+      this.chat?.stop();
       this.store.set({ on: false, cycling: false, beatsToCycle: 0, secondsToCycle: 0 });
     }
   }
@@ -138,33 +137,19 @@ export class Director {
     this.history.markCycle();
     const planBefore = this.studio.plan;
     this.store.set({ cycling: true, error: null });
-    let loading = false;
-    const client = new ChatClient(createChatClientOptions({
-      connection: this.opts.connection ?? fetchServerSentEvents('/api/assistant'),
-      tools: clientTools,
-      context: { run: this.runner },
-      threadId,
-      body: { mode: 'director' },
-      onCustomEvent: relayToolCalls(this.runner),   // subscription backend: the tool calls arrive as events
-      onLoadingChange: (v) => { loading = v; },
-      onChunk: (chunk) => this.countUsage(chunk),
-      onError: (err) => this.store.set({ error: err.message }),
-    }));
-    this.client = client;
-    const started = Date.now();
+    const chat = new Chat({ connection: this.opts.connection ?? fetchServerSentEvents('/api/assistant'), runner: this.runner, threadId, body: { mode: 'director' } }, {
+      usage: (u) => this.countUsage(u),
+      error: (message) => this.store.set({ error: message }),
+    });
+    this.chat = chat;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<true>((resolve) => { timer = setTimeout(() => resolve(true), MAX_CYCLE_MS); });
     try {
-      await client.sendMessage(digest);
-      // Browser-run tools continue the run after the stream ends: wait until it has settled for a moment.
-      let quiet = 0;
-      while (quiet < 3 && Date.now() - started < MAX_CYCLE_MS) {
-        await new Promise((r) => setTimeout(r, 200));
-        quiet = loading ? 0 : quiet + 1;
-      }
-      if (Date.now() - started >= MAX_CYCLE_MS) { client.stop(); this.store.set({ error: 'The director took too long; trying again at the next cycle.' }); }
-    } catch (err) {
-      this.store.set({ error: (err as Error).message });
+      if (await Promise.race([chat.send(digest).then(() => false), late])) this.store.set({ error: 'The director took too long; trying again at the next cycle.' });
     } finally {
-      if (this.client === client) this.client = null;
+      clearTimeout(timer);
+      chat.dispose();
+      if (this.chat === chat) this.chat = null;
       (this.opts.forgetThread ?? forgetThread)(threadId);
       const plan = this.studio.plan;
       const at = (Date.now() - this.startedAt) / 1000;
@@ -175,9 +160,7 @@ export class Director {
     }
   }
 
-  private countUsage(chunk: { type: string; usage?: unknown }): void {
-    const u = usageOf(chunk);
-    if (!u) return;
+  private countUsage(u: Usage): void {
     const t = this.view.tokens;
     this.store.set({ tokens: { prompt: t.prompt + u.prompt, completion: t.completion + u.completion } });
   }
@@ -185,14 +168,9 @@ export class Director {
   // The digest's input, read from the app and the studio.
   collect(): DigestInput {
     const app = this.app, s = this.studio;
-    const c = app.state.clock;
-    const bright = app.audio.features.bright;
     const scenes = app.state.scenes;
     return {
-      bpm: c.bpm,
-      mood: !app.audio.kind ? null : c.mood < 0.35 ? 'calm' : c.mood > 0.65 ? 'energetic' : 'groovy',
-      tone: !app.audio.kind ? null : bright < 0.35 ? 'dark' : bright > 0.65 ? 'bright' : 'balanced',
-      source: app.state.activeSource ?? app.audio.kind ?? 'none',
+      ...soundNow(app.state, app.audio),
       elapsedSeconds: this.startedAt ? (Date.now() - this.startedAt) / 1000 : 0,
       media: !!app.media.el,
       trend: this.history.trend(),
@@ -208,9 +186,4 @@ export class Director {
       userTouched: s.userTouched,
     };
   }
-}
-
-// The subscription backend keeps a CLI session per thread: drop it once the cycle is over.
-function forgetThread(threadId: string): void {
-  fetch('/api/assistant/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId }) }).catch(() => {});
 }

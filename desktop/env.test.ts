@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { memoryConfigStore } from '../server/config';
+import { apiRoutes } from '../server/routes';
 import { adoptShellVars, extractMarked, mergePath, parseEnv } from './env';
 
 describe('mergePath', () => {
@@ -47,5 +51,25 @@ describe('shell variables', () => {
     const shell = new Map([['ANTHROPIC_API_KEY', 'sk'], ['CLAUDE_BIN', '/shell/claude'], ['AWS_SECRET_ACCESS_KEY', 'x'], ['YTDLP', '']]);
     expect(adoptShellVars(env, shell)).toEqual(['ANTHROPIC_API_KEY']);
     expect(env).toEqual({ CLAUDE_BIN: '/mine/claude', ANTHROPIC_API_KEY: 'sk' });
+  });
+});
+
+// desktop/main.ts imports the server before fixEnv() runs, as this file imports it before the test.
+describe('the login shell\'s variables reach the server', () => {
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it('reads the programs when the routes are built, after the shell was asked', async () => {
+    vi.stubEnv('CLAUDE_BIN', '');
+    vi.stubEnv('YTDLP', '');
+    adoptShellVars(process.env, new Map([['CLAUDE_BIN', '/shell/claude'], ['YTDLP', '/shell/yt-dlp']]));
+    const routes = new Map(apiRoutes({ config: memoryConfigStore() }));
+    const server = createServer((req, res) => void routes.get('/api/settings')!(req, res));
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    try {
+      const res = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/`);
+      expect((await res.json()).paths).toEqual({ claudeBin: '/shell/claude', ytdlp: '/shell/yt-dlp' });
+    } finally {
+      server.close();
+    }
   });
 });

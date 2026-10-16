@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventType } from '@tanstack/ai';
 import type { ConnectConnectionAdapter, UIMessage } from '@tanstack/ai-client';
-import type { AppController } from '../app/controller';
+import { fakeApp, type FakeApp } from '../app/fake-app';
+import { parseParams } from '../engine/params';
 import { KEYS } from '../state/persistence';
-import { Store } from '../state/store';
+import { SETTLE_MS } from './chat';
 import { AssistantSession, MAX_RUNNING_CLI, type Conversation } from './conversations';
 import type { Transcript, TranscriptBackend } from './history-store';
 import { codeHash } from './notes';
@@ -18,15 +19,6 @@ beforeEach(() => {
   storage.clear();
   vi.stubGlobal('localStorage', { getItem: (k: string) => storage.get(k) ?? null, setItem: (k: string, v: string) => { storage.set(k, v); }, removeItem: (k: string) => { storage.delete(k); } });
 });
-
-function fakeApp() {
-  const look = { hue: 0, cycle: 0.6, trails: 0.86, speed: 1, reactivity: 1, aberration: 0.012, synesthesia: 0 };
-  return {
-    state: { look },
-    setLook: vi.fn((k: keyof typeof look, v: number) => { look[k] = v; }),
-    ui: new Store({ assistantOpen: false, assistantBusy: false, assistantRunning: 0, assistantUnread: 0, assistantPeek: null as null | { chatId: string; text: string }, assistantFocus: null as string | null }),
-  };
-}
 
 function memoryTranscripts(): TranscriptBackend & { data: Map<string, Transcript> } {
   const data = new Map<string, Transcript>();
@@ -82,28 +74,56 @@ const until = async (cond: () => boolean, ms = 4000) => {
   }
 };
 
-function session(seen: Seen[], extra: { transcripts?: TranscriptBackend; gate?: { wait: Promise<void> }; app?: ReturnType<typeof fakeApp> } = {}) {
+function session(seen: Seen[], extra: { transcripts?: TranscriptBackend; gate?: { wait: Promise<void> }; app?: FakeApp } = {}) {
   const app = extra.app ?? fakeApp();
   const forgotten: string[] = [];
-  const s = new AssistantSession(app as unknown as AppController, { connection: scripted(seen, extra.gate), transcripts: extra.transcripts ?? memoryTranscripts(), locks: null, forgetThread: (id) => forgotten.push(id) });
+  const s = new AssistantSession(app, { connection: scripted(seen, extra.gate), transcripts: extra.transcripts ?? memoryTranscripts(), locks: null, forgetThread: (id) => forgotten.push(id) });
   s.attach();
   return { app, s, forgotten };
 }
 
 describe('assistant conversations', () => {
+  it('a peek can be dismissed, the reply staying unread, and clicking one opens its conversation, read', async () => {
+    const { app, s } = session([]);
+    const a = s.active;
+    await a.load();
+    a.send('first');
+    await until(() => !a.running && a.view.messages.length === 2);
+    expect(app.ui.get().assistantPeek).toMatchObject({ chatId: a.id });
+    s.dismissPeek();
+    expect(app.ui.get().assistantPeek).toBeNull();
+    expect(s.view.live[a.id]!.unread).toBe(true);
+
+    s.newChat();
+    await until(() => s.active !== a);
+    const b = s.active;
+    await b.load();
+    b.send('second');
+    await until(() => !b.running && b.view.messages.length === 2);
+    expect(app.ui.get().assistantPeek).toMatchObject({ chatId: b.id });
+    // A click on a's line in the list does what a peek click does (toggleAssistant): focus it, then open.
+    app.ui.set({ assistantFocus: a.id });
+    app.ui.set({ assistantOpen: true });
+    await until(() => s.view.activeId === a.id);
+    expect(s.view.live[a.id]!.unread).toBe(false);
+    expect(app.ui.get().assistantPeek).toBeNull();
+    expect(app.ui.get().assistantUnread).toBe(1);   // b's reply is still unread
+    s.dispose();
+  });
+
   it('runs two conversations at once; each counts its tokens; replies with the panel closed are unread and peek', async () => {
     const seen: Seen[] = [];
     const gate = { release: () => {}, wait: Promise.resolve() };
     gate.wait = new Promise<void>((r) => { gate.release = r; });
     const { app, s } = session(seen, { gate });
     const a = s.active;
-    await a.load(false);
+    await a.load();
     a.send('slow question');
     await until(() => a.running);
     s.newChat();
     await until(() => s.active !== a);
     const b = s.active;
-    await b.load(false);
+    await b.load();
     b.send('quick question');
     await until(() => !b.running && b.view.messages.length === 2);
 
@@ -130,7 +150,7 @@ describe('assistant conversations', () => {
     const seen: Seen[] = [];
     const { app, s } = session(seen);
     const c = s.active;
-    await c.load(false);
+    await c.load();
     c.send('look brighter');
     await until(() => !c.running && seen.length === 2);   // the run, and the continuation after the tool ran
     expect(app.state.look.hue).toBe(0.5);
@@ -151,13 +171,35 @@ describe('assistant conversations', () => {
     s.dispose();
   });
 
+  it('refuses to undo a change while the conversation that made it is still working', async () => {
+    const seen: Seen[] = [];
+    const gate = { release: () => {}, wait: Promise.resolve() };
+    gate.wait = new Promise<void>((r) => { gate.release = r; });
+    const { app, s } = session(seen, { gate });
+    const c = s.active;
+    await c.load();
+    c.send('look brighter');
+    await until(() => !c.running && seen.length === 2);
+    c.send('slow follow-up');
+    await until(() => c.running);
+    expect(s.undoBlocked).toBe(true);
+    expect(s.undoLast()).toEqual({ label: 'Adjusted the look', error: expect.stringContaining('still working') });
+    expect(app.state.look.hue).toBe(0.5);                  // nothing undone, nothing dropped
+    expect(s.undo.store.get().labels).toEqual(['Adjusted the look']);
+    gate.release();
+    await until(() => !c.running);
+    expect(s.undoLast()).toEqual({ label: 'Adjusted the look' });
+    expect(app.state.look.hue).toBe(0);
+    s.dispose();
+  });
+
   it('queues what is typed while a run is going and sends it next', async () => {
     const seen: Seen[] = [];
     const gate = { release: () => {}, wait: Promise.resolve() };
     gate.wait = new Promise<void>((r) => { gate.release = r; });
     const { s } = session(seen, { gate });
     const c = s.active;
-    await c.load(false);
+    await c.load();
     c.send('slow one');
     await until(() => c.running);
     c.send('second');
@@ -182,7 +224,7 @@ describe('assistant conversations', () => {
       await until(() => !convs.includes(s.active));
       const c = s.active;
       convs.push(c);
-      await c.load(false);
+      await c.load();
       c.send(`slow ${i}`);
     }
     await until(() => convs.filter((c) => c.running).length === MAX_RUNNING_CLI);
@@ -213,7 +255,7 @@ describe('assistant conversations', () => {
 
     c.send('hello again');
     await until(() => seen.length >= 1 && !c.running);
-    expect(app.setLook).not.toHaveBeenCalled();           // the stale call did not run
+    expect(app.state.look.hue).toBe(0);                   // the stale call (hue 0.9) did not run
     expect(seen).toHaveLength(1);
     expect(seen[0]!.text).toMatch(/^\(This conversation was reopened on .*get_app_state.*\)\n\nhello again$/);
     expect(JSON.stringify(seen[0]!.messages)).toContain(NOT_RUN);
@@ -222,11 +264,13 @@ describe('assistant conversations', () => {
 
   it('remembers what was on screen when a reply finished, and a reopened conversation hears whether that scene changed', async () => {
     const transcripts = memoryTranscripts();
-    const scene = { name: 'Alpha', body: 'void main() { fragColor = vec4(1.); }' };
-    const app = Object.assign(fakeApp(), { sceneIndex: 0, currentScene: scene, editor: { target: () => ({ body: scene.body }) }, paramValues: () => ({ uGlow: 1.23456 }) });
+    const { params } = parseParams('uniform float uGlow; // @param min=0 max=3');
+    const app = fakeApp({ scenes: [{ name: 'Alpha', body: 'void main() { fragColor = vec4(1.); }' }], params: [params] });
+    app.library.setValues(0, { uGlow: 1.23456 });
+    const scene = app.state.scenes[0]!;
     const first = session([], { transcripts, app });
     const c = first.s.active;
-    await c.load(false);
+    await c.load();
     c.send('hello');
     await until(() => !c.running && c.view.messages.length === 2);
     expect(first.s.meta(c.id)!.seen).toEqual({ scene: 'Alpha', hash: codeHash(scene.body) });
@@ -263,7 +307,7 @@ describe('assistant conversations', () => {
 
     const first = session([], { transcripts: slow });
     first.s.dispose();
-    await new Promise((r) => setTimeout(r, 1200));   // past the transcript writer's delay
+    await new Promise((r) => setTimeout(r, 80));   // past the slow read: nothing is written before it, nor after a close
     expect(stored.data.get(id)?.messages).toEqual(messages);
 
     const second = session([], { transcripts: slow });
@@ -277,7 +321,7 @@ describe('assistant conversations', () => {
     const seen: Seen[] = [];
     const { s, forgotten } = session(seen, { transcripts });
     const c = s.active;
-    await c.load(false);
+    await c.load();
     c.send('hello');
     await until(() => !c.running && c.view.messages.length === 2);
     await until(() => transcripts.data.has(c.id));
@@ -287,6 +331,25 @@ describe('assistant conversations', () => {
     expect(JSON.parse(storage.get(KEYS.assistantChats)!).chats).toHaveLength(0);
     expect(forgotten).toEqual([c.id]);
     expect(s.view.activeId).not.toBe(c.id);
+    s.dispose();
+  });
+
+  it('deletes a running conversation for good: nothing writes it back or brings it back later', async () => {
+    const transcripts = memoryTranscripts();
+    const gate = { release: () => {}, wait: Promise.resolve() };
+    gate.wait = new Promise<void>((r) => { gate.release = r; });
+    const { app, s } = session([], { transcripts, gate });
+    const c = s.active;
+    await c.load();
+    c.send('slow question');
+    await until(() => c.running);
+    await s.remove(c.id);
+    gate.release();
+    await new Promise((r) => setTimeout(r, SETTLE_MS + 100));   // past the run's settle (nothing writes after a delete)
+    expect(transcripts.data.has(c.id)).toBe(false);
+    expect(s.view.live[c.id]).toBeUndefined();
+    expect(app.ui.get().assistantPeek).toBeNull();
+    expect(app.ui.get().assistantBusy).toBe(false);
     s.dispose();
   });
 });

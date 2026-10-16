@@ -10,7 +10,7 @@ import { ParamDataSchema } from '../engine/params';
 import { SCENES } from '../engine/scenes';
 import { StoredLayoutSchema, parseLayout } from '../state/layout';
 import { PrefsSchema } from '../state/library-prefs';
-import { KEYS, commitRaw, readString } from '../state/persistence';
+import { KEYS, commitRaw, flagText, readFlag, readString } from '../state/persistence';
 import { SceneEditsSchema, UserScenesSchema } from '../state/scene-list';
 import { ShowSchema } from './studio';
 import { PlayerSettingsSchema } from './transport';
@@ -23,9 +23,9 @@ export const MAX_BUNDLE_BYTES = 5_000_000;
 type Storage = 'json' | 'text' | 'flag';
 interface Section { key: string; storage: Storage; schema: ZodType; normalise?: (value: unknown) => unknown }
 
-// What an export contains. Left out on purpose: recently played tracks, the game's high score and
-// one-shot hints (history, not setup), the loaded media, and the device preferences from Settings
-// (KEYS.prefs: they describe this computer, not the setup).
+// What an export contains: every key KEY_CLASS calls `setup` (the bundle test checks it). Left out:
+// history (recently played, the high score, hints, conversations), the loaded media, and this
+// computer's preferences from Settings.
 export const SECTIONS = {
   userScenes: { key: KEYS.userScenes, storage: 'json', schema: UserScenesSchema },
   sceneEdits: { key: KEYS.sceneEdits, storage: 'json', schema: SceneEditsSchema },
@@ -65,7 +65,7 @@ export function buildBundle(now = new Date()): Bundle {
     const raw = readString(key);
     if (raw === null) continue;
     if (storage === 'text') data[id] = raw;
-    else if (storage === 'flag') data[id] = raw === '1';
+    else if (storage === 'flag') data[id] = readFlag(key);
     else try { data[id] = JSON.parse(raw); } catch { /* unreadable: skip */ }
   }
   return { format: BUNDLE_FORMAT, version: BUNDLE_VERSION, exportedAt: now.toISOString(), appVersion, data };
@@ -114,7 +114,7 @@ export function parseBundle(text: string): { ok: true; bundle: ParsedBundle } | 
   const writes = SECTION_IDS.filter((id) => id in values).map((id): [string, string] => {
     const { key, storage } = SECTIONS[id] as Section;
     const value = values[id];
-    return [key, storage === 'text' ? value as string : storage === 'flag' ? (value ? '1' : '0') : JSON.stringify(value)];
+    return [key, storage === 'text' ? value as string : storage === 'flag' ? flagText(value as boolean) : JSON.stringify(value)];
   });
   return { ok: true, bundle: { writes, summary: describe(values) } };
 }

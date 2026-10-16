@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { OutputPrefs } from '../engine/output-link';
+import { applyRendererPrefs, type OutputPrefs } from '../engine/output-link';
 import { KEYS } from './persistence';
 import { APPLIES, DEFAULT_PREFS, PrefsSchema, loadPrefs, micConstraints, outputPrefs, type PrefKey } from './prefs';
 
@@ -46,6 +46,13 @@ describe('device preferences', () => {
     const everyRenderer = (Object.keys(APPLIES) as PrefKey[]).filter((k) => APPLIES[k] === 'all-renderers').sort();
     const sent = Object.keys(outputPrefs(DEFAULT_PREFS)) as (keyof OutputPrefs)[];
     expect(sent.sort()).toEqual(everyRenderer);
+  });
+
+  it('applies every preference a renderer gets, the same way for each renderer', () => {
+    const prefs = outputPrefs({ ...DEFAULT_PREFS, maxPixelRatio: 1.5 });
+    const seen: Partial<OutputPrefs> = {};
+    applyRendererPrefs({ setMaxPixelRatio: (v) => { seen.maxPixelRatio = v; } }, prefs);
+    expect(seen).toEqual(prefs);
   });
 
   it('turns the microphone settings into track constraints', () => {

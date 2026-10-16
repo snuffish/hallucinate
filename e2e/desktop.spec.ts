@@ -72,6 +72,7 @@ test('desktop: opens a projector window that connects to the studio', async () =
   const [projector] = await Promise.all([app.waitForEvent('window'), page.locator('#st-open').click()]);
   await expect(projector).toHaveTitle('Hallucinate — Projector');
   await expect(page.locator('#st-out-status')).toContainText('Projector live', { timeout: 15_000 });
+  await expect(projector.locator('#waiting')).toHaveAttribute('hidden', '');   // frames arrive (it fades out, so check the attribute)
   expect(app.windows()).toHaveLength(2);
 });
 

@@ -1,30 +1,31 @@
 // The assistant panel's conversations, outside React (like the studio and the director): several can
-// run at once, each on its own TanStack ChatClient, and they keep running while the panel shows
+// run at once, each on its own Chat (chat.ts), and they keep running while the panel shows
 // another one or is closed. The session keeps the history index, decides which conversation may
 // start a run (the subscription backend runs a `claude` process per run), and publishes what the
-// bubble needs (running, unread, the peek card) to the UI store.
+// bubble needs (running, unread, the peek card) to the UI store. It is the only writer of the peek:
+// a reply with the panel closed shows it; opening the panel, reading that conversation or dismissing
+// the card (its timer, its ×) clears it.
 //
 // Shared between conversations: one tool lock (their tools act on one app) and one undo stack (an
 // undo closure restores a snapshot, so only the newest change can be undone safely).
 
-import { ChatClient, createChatClientOptions, fetchServerSentEvents, type ConnectConnectionAdapter, type ConnectionAdapter, type UIMessage } from '@tanstack/ai-client';
-import type { AppController } from '../app/controller';
+import { fetchServerSentEvents, type ConnectConnectionAdapter, type ConnectionAdapter, type UIMessage } from '@tanstack/ai-client';
+import type { AppPort } from '../app/app-port';
 import type { StudioSession } from '../app/studio';
 import { KEYS } from '../state/persistence';
 import { Store } from '../state/store';
-import { clientTools } from './client-tools';
+import { Chat, forgetThread } from './chat';
 import { createToolRunner, UndoConflict, type ToolRunner } from './executor';
-import { HISTORY_CAP, indexedDBTranscripts, loadTranscript, prune, readIndex, transcriptWriter, writeIndex, type ChatMeta, type TranscriptBackend, type TranscriptWriter } from './history-store';
+import type { Backend } from './settings-wire';
+import { HISTORY_CAP, indexedDBTranscripts, prune, readIndex, storedTranscript, writeIndex, type ChatMeta, type StoredTranscript, type TranscriptBackend } from './history-store';
 import { createLock, serialized, type Lock } from './lock';
 import { codeHash, resumeNote, undoNote, withNotes, type ScreenNow } from './notes';
-import { relayToolCalls } from './relay';
-import { previewOf, prepareForSend, sealInterrupted, titleFrom } from './transcript';
+import { previewOf, prepareForSend, titleFrom } from './transcript';
 import { UndoStack } from './undo';
-import { addUsage, contextOf, NO_USAGE, usageOf, type Usage } from './usage';
+import { addUsage, NO_USAGE, type Usage } from './usage';
 
 export const MAX_RUNNING_CLI = 3;     // subscription backend: one `claude -p` per running conversation
 export const LONG_CHAT_TOKENS = 80_000;   // context size: every step of every message resends it
-const SETTLE_MS = 400;                // browser-run tools continue a run after its stream ends: wait this long for quiet
 
 export type ChatStatus = 'idle' | 'running' | 'waiting';
 export interface Outgoing { id: string; text: string }
@@ -74,28 +75,26 @@ const sortChats = (chats: ChatMeta[]) => [...chats].sort((a, b) => b.updatedAt -
 
 export class Conversation {
   readonly store: Store<ChatView>;
-  private client: ChatClient | null = null;
-  private loading = false;
-  private inflight = 0;
-  private settleTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly writer: TranscriptWriter;
+  private chat: Chat | null = null;
+  private readonly stored: StoredTranscript;
   private release: (() => void) | null = null;
   private loadPromise: Promise<void> | null = null;
   private restored = false;     // came from history: the first send says so
 
   constructor(readonly id: string, private readonly session: AssistantSession) {
     this.store = new Store<ChatView>({ id, loaded: false, messages: [], replyUsage: {}, status: 'idle', error: null, outbox: [], notes: [], draft: '', readOnly: false, runStartedAt: null, runTools: 0 });
-    this.writer = transcriptWriter(session.transcripts, id, () => session.storageFailed());
+    this.stored = storedTranscript(session.transcripts, id, { exists: () => !!session.meta(id), onError: () => session.storageFailed() });
   }
 
   get view(): ChatView { return this.store.get(); }
   get running(): boolean { return this.view.status === 'running'; }
 
-  // Reads the stored transcript (sealed) and takes this tab's lock on the conversation. Once.
-  load(stored: boolean): Promise<void> {
+  // Reads the stored transcript (sealed, if the history lists one) and takes this tab's lock on the
+  // conversation. Once.
+  load(): Promise<void> {
     this.loadPromise ??= (async () => {
       this.release = await this.session.lock(this.id, () => this.store.set({ readOnly: true }));
-      const t = stored ? await loadTranscript(this.session.transcripts, this.id) : null;
+      const t = await this.stored.read();
       if (t && t.messages.length) this.restored = true;
       this.store.set({ loaded: true, ...(t && { messages: t.messages, replyUsage: t.replyUsage }) });
     })();
@@ -133,108 +132,78 @@ export class Conversation {
     this.restored = false;
     this.store.set({ outbox: rest, notes: [], status: 'running', error: null, runStartedAt: this.session.now(), runTools: 0 });
     this.session.started(this, next!.text);
-    const client = this.ensureClient();
     const continued = v.messages.some((m) => m.role === 'assistant');
-    client.sendMessage(withNotes(notes, next!.text), { continued })
-      .catch((err: Error) => { if (err?.name !== 'AbortError') this.store.set({ error: err.message }); })
-      .finally(() => this.check());
+    void this.ensureChat().send(withNotes(notes, next!.text), { continued });
   }
 
   stop(): void {
-    this.store.set({ outbox: [] });
-    this.client?.stop();
-    this.seal();
-    this.check();
+    this.store.set({ outbox: [], ...(this.view.status === 'waiting' && { status: 'idle' }) });
+    this.session.changed(this);
+    this.chat?.stop();
   }
 
   // Re-sends the last request after an error.
   retry(): void {
-    if (!this.client || this.running || this.view.readOnly) return;
+    if (!this.chat || this.running || this.view.readOnly) return;
     if (!this.session.mayStart(this)) { this.store.set({ error: 'Waiting for another conversation to finish. Try again in a moment.' }); return; }
     this.store.set({ status: 'running', error: null, runStartedAt: this.session.now(), runTools: 0 });
     this.session.changed(this);
-    this.client.reload().catch((err: Error) => this.store.set({ error: err.message })).finally(() => this.check());
+    void this.chat.retry();
   }
 
-  // `save`: keep the transcript (false when the conversation is being deleted). A conversation whose
-  // stored transcript hasn't been read yet has nothing of its own to save, and must not overwrite it.
-  dispose(save = true): void {
-    if (this.settleTimer) clearTimeout(this.settleTimer);
-    this.client?.stop();
-    this.seal();
-    if (save && this.view.loaded) this.writer.schedule(this.transcript());
-    this.writer.dispose();
-    this.client?.dispose();
-    this.client = null;
-    this.release?.();
-    this.release = null;
+  // Closes the conversation, keeping its transcript (a run cut off is sealed first).
+  dispose(): void {
+    const sealed = this.end();
+    if (sealed) this.store.set({ messages: sealed });
+    this.stored.update(this.transcript());
+    this.stored.close();
+  }
+
+  // Deletes it: nothing is written after this, not even a reply still streaming in.
+  delete(): Promise<void> {
+    this.end();
+    return this.stored.destroy();
   }
 
   // ---- internals ----
 
   private transcript() { return { messages: this.view.messages, replyUsage: this.view.replyUsage }; }
 
-  // Gives every tool call without a result an error result (see sealInterrupted).
-  private seal(): void {
-    const sealed = sealInterrupted(this.view.messages);
-    if (sealed === this.view.messages) return;
-    this.client?.setMessagesManually(sealed);
-    this.store.set({ messages: sealed });
+  // Ends the Chat (it reports nothing after) and lets go of this tab's lock; the sealed messages of a run it cut off.
+  private end(): UIMessage[] | undefined {
+    const sealed = this.chat?.dispose();
+    this.chat = null;
+    this.release?.();
+    this.release = null;
+    return sealed;
   }
 
-  private ensureClient(): ChatClient {
-    if (this.client) return this.client;
-    const runner = this.session.runnerFor(this.id);
-    const counted: ToolRunner = (name, input) => {
-      this.inflight++;
-      this.store.set({ runTools: this.view.runTools + 1 });
-      this.check();
-      return runner(name, input).finally(() => { this.inflight--; this.check(); });
-    };
-    this.client = new ChatClient(createChatClientOptions({
-      connection: this.session.connection,
-      tools: clientTools,
-      context: { run: counted },
-      threadId: this.id,
-      initialMessages: this.view.messages,
-      onCustomEvent: relayToolCalls(counted),   // subscription backend: tool calls arrive as stream events
-      onMessagesChange: (messages) => {
+  private ensureChat(): Chat {
+    this.chat ??= new Chat({ connection: this.session.connection, runner: this.session.runnerFor(this.id), threadId: this.id, messages: this.view.messages }, {
+      messages: (messages) => {
         this.store.set({ messages });
-        this.writer.schedule(this.transcript());
+        this.stored.update(this.transcript());
       },
-      onLoadingChange: (loading) => {
-        this.loading = loading;
-        if (!loading) { this.writer.schedule(this.transcript()); void this.writer.flush(); }   // a reply is complete: keep it now
-        this.check();
-      },
-      onChunk: (chunk) => this.countUsage(chunk),
-      onError: (err) => { if (err.name !== 'AbortError') this.store.set({ error: err.message }); },
-    }));
-    return this.client;
+      replied: () => void this.stored.commit(this.transcript()),   // a reply is complete: keep it now
+      tool: () => this.store.set({ runTools: this.view.runTools + 1 }),
+      usage: (u, context) => this.countUsage(u, context),
+      error: (message) => this.store.set({ error: message }),
+      settled: () => this.settled(),
+    });
+    return this.chat;
   }
 
-  private countUsage(chunk: { type: string; usage?: unknown }): void {
-    const u = usageOf(chunk);
-    if (!u) return;
+  private countUsage(u: Usage, context: number): void {
     const reply = [...this.view.messages].reverse().find((m) => m.role === 'assistant');
     if (reply) this.store.set({ replyUsage: { ...this.view.replyUsage, [reply.id]: addUsage(this.view.replyUsage[reply.id] ?? NO_USAGE, u) } });
-    this.session.usage(this, u, contextOf(chunk));
+    this.session.usage(this, u, context);
   }
 
-  // A run is over when the stream is closed and no tool is running, for a moment.
-  private check(): void {
-    if (this.settleTimer) { clearTimeout(this.settleTimer); this.settleTimer = null; }
-    if (this.loading || this.inflight > 0) return;
-    if (this.view.status !== 'running') return;
-    this.settleTimer = setTimeout(() => {
-      this.settleTimer = null;
-      if (this.loading || this.inflight > 0) return;
-      this.seal();
-      this.store.set({ status: 'idle', runStartedAt: null });
-      void this.writer.flush().then(() => this.writer.schedule(this.transcript())).then(() => this.writer.flush());
-      this.session.settled(this);
-      this.pump();
-    }, SETTLE_MS);
+  private settled(): void {
+    this.store.set({ status: 'idle', runStartedAt: null });
+    void this.stored.commit(this.transcript());
+    this.session.settled(this);
+    this.pump();
   }
 }
 
@@ -255,7 +224,7 @@ export class AssistantSession {
   private baseTitle = typeof document !== 'undefined' ? document.title : '';
   private readonly disposers: (() => void)[] = [];
 
-  constructor(private readonly app: AppController, private readonly opts: SessionOptions = {}) {
+  constructor(private readonly app: AppPort, private readonly opts: SessionOptions = {}) {
     this.now = opts.now ?? Date.now;
     this.lockTools = opts.lock ?? createLock();
     this.transcripts = opts.transcripts ?? indexedDBTranscripts();
@@ -285,7 +254,7 @@ export class AssistantSession {
     off.push(this.app.ui.subscribe(() => {
       const ui = this.app.ui.get();
       if (ui.assistantFocus) { this.app.ui.set({ assistantFocus: null }); this.select(ui.assistantFocus); }
-      if (ui.assistantOpen) { this.markRead(this.view.activeId); if (ui.assistantPeek) this.app.ui.set({ assistantPeek: null }); }
+      if (ui.assistantOpen) { this.markRead(this.view.activeId); this.dismissPeek(); }
     }));
     void this.open(this.view.activeId);
     const detach = () => { for (const f of off.splice(0)) f(); };
@@ -305,7 +274,7 @@ export class AssistantSession {
   }
 
   // The backend decides how many conversations may run at once.
-  setBackend(backend: 'api' | 'claude-code' | 'none'): void {
+  setBackend(backend: Backend): void {
     this.maxRunning = backend === 'claude-code' ? MAX_RUNNING_CLI : Infinity;
     for (const c of this.chats.values()) c.pump();
   }
@@ -315,7 +284,7 @@ export class AssistantSession {
   async open(id: string): Promise<void> {
     const c = this.conversation(id);
     this.setActive(id);
-    await c.load(!!this.meta(id));
+    await c.load();
     c.pump();
   }
 
@@ -347,7 +316,7 @@ export class AssistantSession {
 
   async remove(id: string): Promise<void> {
     const c = this.chats.get(id);
-    c?.dispose(false);
+    const removed = c ? c.delete() : storedTranscript(this.transcripts, id).destroy();
     this.chats.delete(id);
     this.runners.delete(id);
     const { [id]: _gone, ...live } = this.view.live;
@@ -355,7 +324,7 @@ export class AssistantSession {
     this.store.set({ chats, live });
     this.saveIndex();
     (this.opts.forgetThread ?? forgetThread)(id);
-    try { await this.transcripts.remove(id); } catch { /* storage unavailable */ }
+    await removed;
     if (this.view.activeId === id) void this.open(chats[0]?.id ?? newId());
     this.publish();
   }
@@ -364,9 +333,16 @@ export class AssistantSession {
     for (const id of this.view.chats.map((c) => c.id)) await this.remove(id);   // removing the active one opens the next, finally a new one
   }
 
-  // Undo reverts the newest change any conversation made, and tells that conversation. A show change
-  // that something else built on since can't be undone safely: it is dropped and `error` says why.
+  // Undo reverts the newest change any conversation made, and tells that conversation. A change that
+  // something else built on since can't be undone safely: it is dropped and `error` says why.
+  // Not while the conversation that made the change is still running: its next step may build on it.
+  get undoBlocked(): boolean {
+    const owner = this.undo.store.get().lastChat;
+    return !!owner && this.isRunning(owner);
+  }
+
   undoLast(): { label: string; error?: string } | null {
+    if (this.undoBlocked) return { label: this.undo.last ?? '', error: 'That change\'s conversation is still working. Undo it once it has finished.' };
     const step = this.undo.pop();
     if (!step) return null;
     try {
@@ -436,7 +412,7 @@ export class AssistantSession {
   screen(): ScreenNow | null {
     try {
       const i = this.app.sceneIndex;
-      return { scene: this.app.currentScene.name, hash: codeHash(this.app.editor.target(i).body), values: this.app.paramValues(i) };
+      return { scene: this.app.currentScene.name, hash: codeHash(this.app.editor.target(i).body), values: this.app.library.values(i) };
     } catch {
       return null;
     }
@@ -465,7 +441,8 @@ export class AssistantSession {
     if (this.app.ui.get().assistantPeek?.chatId === id) this.app.ui.set({ assistantPeek: null });
   }
 
-  dismissPeek(): void { this.app.ui.set({ assistantPeek: null }); }
+  // The card goes; the reply stays unread.
+  dismissPeek(): void { if (this.app.ui.get().assistantPeek) this.app.ui.set({ assistantPeek: null }); }
 
   dispose(): void {
     for (const c of this.chats.values()) c.dispose();
@@ -525,10 +502,6 @@ export class AssistantSession {
     if (typeof document === 'undefined') return;
     document.title = document.hidden && unread ? `(${unread}) ${this.baseTitle}` : this.baseTitle;
   }
-}
-
-function forgetThread(threadId: string): void {
-  fetch('/api/assistant/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId }) }).catch(() => {});
 }
 
 export type { ChatMeta };

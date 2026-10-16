@@ -4,27 +4,22 @@
 //         environment locks it; the API key only as "set" or not, never its value; what there is to
 //         choose from; the program paths, read-only.
 //   POST  { backend?, model?, effort?, directorEffort?, apiKey? }, null clears one. Answers like GET.
+// Both shapes are declared in src/assistant/settings-wire.ts, which the browser parses them with.
 //
 // Writing is only for this computer: with HOST=0.0.0.0 or ALLOWED_HOSTS the app is reachable from the
 // network, and a device there may look but not change how the server reaches Claude.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ANTHROPIC_MODELS } from '@tanstack/ai-anthropic';
-import { z } from 'zod';
-import type { Backend } from './adapters';
-import { BACKEND_CHOICES, DEFAULT_MODEL, EFFORTS, ENV_NAMES, MODEL_PATTERN, effectiveConfig, type ConfigStore, type EffectiveConfig, type StoredConfig } from './config';
+import { SettingsPatchSchema, type Backend, type SettingsPatch, type SettingsView } from '../src/assistant/settings-wire';
+import { BACKEND_CHOICES, DEFAULT_MODEL, EFFORTS, ENV_NAMES, effectiveConfig, type ConfigStore, type EffectiveConfig, type Field, type StoredConfig } from './config';
 import { isLoopbackHost } from './guard';
+import { readBody, sendJSON } from './http';
 
 const MAX_BODY = 16 * 1024;
+const NO_STORE = { 'Cache-Control': 'no-store' };   // a settings answer is never reused
 
-const PatchSchema = z.object({
-  backend: z.enum(BACKEND_CHOICES).nullable().optional(),
-  model: z.string().regex(MODEL_PATTERN).nullable().optional(),
-  effort: z.enum(EFFORTS).nullable().optional(),
-  directorEffort: z.enum(EFFORTS).nullable().optional(),
-  apiKey: z.string().trim().regex(/^\S{20,400}$/, 'That doesn\'t look like an API key.').nullable().optional(),
-}).strict();
-export type SettingsPatch = z.infer<typeof PatchSchema>;
+export type { SettingsPatch, SettingsView };
 type FieldId = keyof SettingsPatch;
 
 export interface SettingsRouteOptions {
@@ -34,8 +29,8 @@ export interface SettingsRouteOptions {
   paths: { claudeBin: string; ytdlp: string };
 }
 
-export function settingsView(cfg: EffectiveConfig, config: ConfigStore, backend: Backend, paths: SettingsRouteOptions['paths'], canWrite: boolean) {
-  const field = <T>(f: { value: T; source: string }) => ({ value: f.value, source: f.source, locked: f.source === 'env' });
+export function settingsView(cfg: EffectiveConfig, config: ConfigStore, backend: Backend, paths: SettingsRouteOptions['paths'], canWrite: boolean): SettingsView {
+  const field = <T>(f: Field<T>) => ({ value: f.value, source: f.source, locked: f.source === 'env' });
   return {
     backend: field(cfg.backend),
     model: field(cfg.model),
@@ -55,31 +50,30 @@ export function settingsView(cfg: EffectiveConfig, config: ConfigStore, backend:
     paths,
   };
 }
-export type SettingsView = ReturnType<typeof settingsView>;
 
 export function createSettingsRoute(config: ConfigStore, { env = process.env, backend, paths }: SettingsRouteOptions) {
   const effective = (stored = config.read()) => effectiveConfig(env, stored, config.secrets);
   const view = async (req: IncomingMessage) => settingsView(effective(), config, await backend.get(), paths, isLoopbackHost(req.headers.host));
 
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    if (req.method === 'GET') return json(res, 200, await view(req));
-    if (req.method !== 'POST') return json(res, 405, { error: 'GET or POST' });
-    if (!isLoopbackHost(req.headers.host)) return json(res, 403, { error: 'Settings can only be changed on the computer Hallucinate runs on.' });
+    if (req.method === 'GET') return sendJSON(res, 200, await view(req), NO_STORE);
+    if (req.method !== 'POST') return sendJSON(res, 405, { error: 'GET or POST' }, NO_STORE);
+    if (!isLoopbackHost(req.headers.host)) return sendJSON(res, 403, { error: 'Settings can only be changed on the computer Hallucinate runs on.' }, NO_STORE);
 
     let patch: SettingsPatch;
     try {
-      const parsed = PatchSchema.safeParse(JSON.parse(await readBody(req)));
-      if (!parsed.success) return json(res, 400, { error: parsed.error.issues[0]?.message ?? 'Bad settings' });
+      const parsed = SettingsPatchSchema.safeParse(JSON.parse(await readBody(req, MAX_BODY)));
+      if (!parsed.success) return sendJSON(res, 400, { error: parsed.error.issues[0]?.message ?? 'Bad settings' }, NO_STORE);
       patch = parsed.data;
     } catch (err) {
-      return json(res, 400, { error: `Bad request: ${(err as Error).message}` });
+      return sendJSON(res, 400, { error: `Bad request: ${(err as Error).message}` }, NO_STORE);
     }
 
     const now = effective();
     for (const id of Object.keys(patch) as FieldId[]) {
-      if (now[id].source === 'env') return json(res, 409, { error: `${ENV_NAMES[id]} is set in the environment Hallucinate was started with, and that wins. Remove it there to change this here.` });
+      if (now[id].source === 'env') return sendJSON(res, 409, { error: `${ENV_NAMES[id]} is set in the environment Hallucinate was started with, and that wins. Remove it there to change this here.` }, NO_STORE);
     }
-    if (patch.apiKey && !config.secrets) return json(res, 400, { error: 'This server can\'t store an API key safely. Set ANTHROPIC_API_KEY in its environment instead.' });
+    if (patch.apiKey && !config.secrets) return sendJSON(res, 400, { error: 'This server can\'t store an API key safely. Set ANTHROPIC_API_KEY in its environment instead.' }, NO_STORE);
 
     const stored = config.read();
     const next: StoredConfig = { ...stored };
@@ -94,37 +88,18 @@ export function createSettingsRoute(config: ConfigStore, { env = process.env, ba
     const after = effective(next);
     const model = after.model.value;
     if (model && usesApi(after) && !(ANTHROPIC_MODELS as readonly string[]).includes(model)) {
-      return json(res, 400, { error: `"${model}" isn't a model the Anthropic API offers. Pick one from the list.` });
+      return sendJSON(res, 400, { error: `"${model}" isn't a model the Anthropic API offers. Pick one from the list.` }, NO_STORE);
     }
 
     try {
       config.write(next);
     } catch (err) {
-      return json(res, 500, { error: `Couldn't save the settings: ${(err as Error).message}` });
+      return sendJSON(res, 500, { error: `Couldn't save the settings: ${(err as Error).message}` }, NO_STORE);
     }
     backend.reset();
-    return json(res, 200, await view(req));
+    return sendJSON(res, 200, await view(req), NO_STORE);
   };
 }
 
 // Whether `cfg` reaches Claude through the API (the same rule as detectBackend in adapters.ts).
 export const usesApi = (cfg: EffectiveConfig): boolean => cfg.backend.value === 'api' || (cfg.backend.value === 'auto' && cfg.apiKey.value !== null);
-
-function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let size = 0;
-    const chunks: Buffer[] = [];
-    req.on('data', (c: Buffer) => {
-      size += c.length;
-      if (size > MAX_BODY) { reject(new Error('too large')); req.destroy(); return; }
-      chunks.push(c);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    req.on('error', reject);
-  });
-}
-
-function json(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-  res.end(JSON.stringify(body));
-}

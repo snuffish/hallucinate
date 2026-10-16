@@ -3,17 +3,17 @@
 // the panel is closed; the bubble shows when they work and when a reply is waiting, with a peek at it.
 // The panel resizes from its corner like a widget, and can show the assistant's reasoning.
 
-import { useHotkeys, type UseHotkeyDefinition } from '@tanstack/react-hotkeys';
 import { createRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { z } from 'zod';
 import { useApp, useLayout, useUI } from '../app/AppContext';
 import { downloadFile, fileStamp } from '../app/download';
 import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
 import { useSessions } from '../app/sessions';
 import { LONG_CHAT_TOKENS } from '../assistant/conversations';
+import { AssistantInfoSchema, INFO_URL, type AssistantInfo } from '../assistant/settings-wire';
 import { toMarkdown } from '../assistant/transcript';
 import { formatTokens, totalTokens } from '../assistant/usage';
 import { HOTKEYS } from '../hotkeys/registry';
+import { useHotkeyActions } from '../hooks/useAppHotkeys';
 import { Kbd } from '../hotkeys/Kbd';
 import { chatPlacement, effective, type WidgetSize } from '../state/layout';
 import { setShowThinking, useShowThinking } from '../state/prefs';
@@ -25,8 +25,6 @@ import { rectOf } from './widgets/drop';
 import { usePointerDrag } from './widgets/usePointerDrag';
 import { Grip, useFloatPlacement, useNarrow } from './widgets/Widget';
 
-const InfoSchema = z.object({ backend: z.enum(['api', 'claude-code', 'none']), model: z.string().nullable().optional(), setup: z.string().optional() });
-type Info = z.infer<typeof InfoSchema>;
 
 const EXAMPLES: [label: string, prompt: string][] = [
   ['Create a jellyfish scene', 'Create a new scene: a slowly rotating field of glowing jellyfish that pulse with the bass.'],
@@ -63,6 +61,7 @@ function unplaceChat(sizedH: number | null): void {
 // The card beside the bubble when a reply lands with the panel closed. Click opens that conversation.
 function Peek({ bubble }: { bubble: HTMLElement | null }) {
   const app = useApp();
+  const session = useSessions().assistant;
   const peek = useUI((ui) => ui.assistantPeek);
   const card = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState(false);
@@ -77,9 +76,9 @@ function Peek({ bubble }: { bubble: HTMLElement | null }) {
   }, [peek, bubble]);
   useEffect(() => {
     if (!peek || hover) return;
-    const t = setTimeout(() => app.ui.set({ assistantPeek: null }), 6000);
+    const t = setTimeout(() => session.dismissPeek(), 6000);
     return () => clearTimeout(t);
-  }, [app, peek, hover]);
+  }, [session, peek, hover]);
   if (!peek) return null;
   return (
     <div id="ai-peek" ref={card} className={`ai-peek${peek.error ? ' error' : ''}`} role="status" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
@@ -87,7 +86,7 @@ function Peek({ bubble }: { bubble: HTMLElement | null }) {
         <strong>{peek.title}</strong>
         <span>{peek.text}</span>
       </button>
-      <button type="button" className="icon" aria-label="Dismiss" title="Dismiss" onClick={() => app.ui.set({ assistantPeek: null })}>×</button>
+      <button type="button" className="icon" aria-label="Dismiss" title="Dismiss" onClick={() => session.dismissPeek()}>×</button>
     </div>
   );
 }
@@ -233,7 +232,7 @@ export function Assistant() {
   const view = useStore(chat.store, (v) => v);
   const meta = sv.chats.find((c) => c.id === sv.activeId);
   const undo = useStore(session.undo.store, (u) => u);
-  const [info, setInfo] = useState<Info | null>(STATIC_DEMO ? { backend: 'none', setup: STATIC_DEMO_NOTE } : null);
+  const [info, setInfo] = useState<AssistantInfo | null>(STATIC_DEMO ? { backend: 'none', setup: STATIC_DEMO_NOTE } : null);
   const [listOpen, setListOpen] = useState(false);
   const configVersion = useUI((ui) => ui.assistantConfig);
   const [searchTick, setSearchTick] = useState(0);
@@ -244,7 +243,7 @@ export function Assistant() {
 
   useEffect(() => {
     if (STATIC_DEMO) return;
-    fetch('/api/assistant/info').then((r) => r.json()).then((j) => { const p = InfoSchema.safeParse(j); if (p.success) { setInfo(p.data); session.setBackend(p.data.backend); } }).catch(() => {});
+    fetch(INFO_URL).then((r) => r.json()).then((j) => { const p = AssistantInfoSchema.safeParse(j); if (p.success) { setInfo(p.data); session.setBackend(p.data.backend); } }).catch(() => {});
   }, [session, configVersion]);
 
   // Stick to the bottom while new text arrives, unless the user scrolled up to read.
@@ -277,7 +276,7 @@ export function Assistant() {
   const exportChat = (id: string) => {
     const m = session.meta(id);
     const c = session.conversation(id);
-    void c.load(!!m).then(() => {
+    void c.load().then(() => {
       const title = m?.title ?? 'Conversation';
       const md = toMarkdown(title, c.view.messages, { reasoning: showThinking });
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'conversation';
@@ -287,16 +286,12 @@ export function Assistant() {
   const toggleThinking = () => setShowThinking(!showThinking);
 
   // Panel shortcuts, while it is open (they work from the text box too).
-  const hk = (def: { keys: string; label: string }, fn: () => void): UseHotkeyDefinition => ({
-    hotkey: def.keys as UseHotkeyDefinition['hotkey'], callback: fn,
-    options: { enabled: open, preventDefault: true, ignoreInputs: false, meta: { name: def.label, group: 'Panels' } },
+  useHotkeyActions<'assistant'>({
+    assistantNew: () => { session.newChat(); setListOpen(false); },
+    assistantPrev: () => session.step(-1),
+    assistantNext: () => session.step(1),
+    assistantSearch: () => { setListOpen(true); setSearchTick((n) => n + 1); },
   });
-  useHotkeys([
-    hk(HOTKEYS.assistantNew, () => { session.newChat(); setListOpen(false); }),
-    hk(HOTKEYS.assistantPrev, () => session.step(-1)),
-    hk(HOTKEYS.assistantNext, () => session.step(1)),
-    hk(HOTKEYS.assistantSearch, () => { setListOpen(true); setSearchTick((n) => n + 1); }),
-  ].filter((d) => d.options?.enabled));
 
   const running = view.status === 'running';
   const idle = info?.backend === 'claude-code' ? 'Using your Claude subscription (via Claude Code)' : info?.backend === 'api' ? `Anthropic API${info.model ? ` · ${info.model}` : ''}` : '';
@@ -306,7 +301,7 @@ export function Assistant() {
   const usage = meta?.usage;
   const long = (meta?.lastPrompt ?? 0) >= LONG_CHAT_TOKENS;
   const undoOwner = undo.lastChat ? session.meta(undo.lastChat)?.title : undefined;
-  const undoBusy = !!undo.lastChat && session.isRunning(undo.lastChat);
+  const undoBusy = session.undoBlocked;
   const othersWorking = Object.entries(sv.live).filter(([id, l]) => id !== sv.activeId && l.status !== 'idle').length;
   const othersUnread = Object.entries(sv.live).filter(([id, l]) => id !== sv.activeId && l.unread).length;
   const sendLabel = running ? (view.draft.trim() ? 'Queue' : 'Stop') : 'Send';

@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import type { AudioEngine } from '../engine/audio';
-import { KEYS, readJSON, writeJSON } from '../state/persistence';
+import { KEYS, readWithDefaults, writeJSON } from '../state/persistence';
 import type { TransportView } from '../state/ui-state';
 
 export const PlayerSettingsSchema = z.object({ volume: z.number().min(0).max(1).default(0.8), pitchFollows: z.boolean().default(false) });
@@ -27,7 +27,7 @@ export class Transport {
     private readonly publish: (view: TransportView) => void,
     private readonly hooks: { onPrev: () => boolean; onNext: () => boolean },
   ) {
-    const saved = readJSON(KEYS.player, PlayerSettingsSchema, { volume: 0.8, pitchFollows: false });
+    const saved = readWithDefaults(KEYS.player, PlayerSettingsSchema);
     this.volume = saved.volume;
     this.pitchFollows = saved.pitchFollows;
     const on = (ev: string, fn: () => void) => { el.addEventListener(ev, fn); this.unlisten.push(() => el.removeEventListener(ev, fn)); };

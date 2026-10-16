@@ -34,6 +34,21 @@ export const KEYS = {
   importReport: 'hallucinate.importReport',
 } as const;
 
+// What each stored key holds, which decides whether Export / Import (src/app/bundle.ts) carries it:
+// `setup` is what you built and configured, and travels; `device` describes this computer; `history`
+// is what you did (recently played, high score, hints, conversations); `migration` is read once and
+// removed; `import` belongs to the import itself. A key without a class doesn't compile, and the
+// bundle test checks that the export holds exactly the setup keys.
+export type KeyClass = 'setup' | 'device' | 'history' | 'migration' | 'import';
+export const KEY_CLASS: Record<keyof typeof KEYS, KeyClass> = {
+  sceneEdits: 'setup', userScenes: 'setup', library: 'setup', params: 'setup', customShader: 'setup', nodeGraph: 'setup',
+  show: 'setup', player: 'setup', mediaSound: 'setup', layout: 'setup',
+  prefs: 'device', assistantThinking: 'device',
+  scRecent: 'history', ytRecent: 'history', lastScene: 'history', assistantChats: 'history', paramGroups: 'history', best: 'history', helpHint: 'history',
+  paramsCollapsed: 'migration', paramsPos: 'migration',
+  importedAt: 'import', importReport: 'import',
+};
+
 // While an import replaces the stored state, nothing else may write: a stale in-memory value
 // (a debounced writer flushing on pagehide, a panel saving on unmount) would overwrite what was
 // just imported. Only `commitRaw` writes while frozen.
@@ -49,6 +64,11 @@ export function writeString(key: string, value: string): void {
   if (frozen) return;
   try { localStorage.setItem(key, value); } catch { /* storage unavailable */ }
 }
+
+// An on / off flag, stored as '1' or '0' (an export carries it as true / false).
+export const flagText = (on: boolean): string => (on ? '1' : '0');
+export const readFlag = (key: string): boolean => readString(key) === '1';
+export const writeFlag = (key: string, on: boolean): void => writeString(key, flagText(on));
 
 export function remove(key: string): void {
   if (frozen) return;
@@ -73,6 +93,12 @@ export function readJSON<T>(key: string, schema: ZodType<T>, fallback: T): T {
   try { parsed = JSON.parse(raw); } catch { return fallback; }
   const result = schema.safeParse(parsed);
   return result.success ? result.data : fallback;
+}
+
+// For a schema whose every field has a default: a missing or unreadable value reads as those defaults,
+// so they are written once, in the schema.
+export function readWithDefaults<T>(key: string, schema: ZodType<T>): T {
+  return readJSON(key, schema, schema.parse({}));
 }
 
 export function writeJSON(key: string, value: unknown): void {

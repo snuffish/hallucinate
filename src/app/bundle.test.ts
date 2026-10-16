@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EXAMPLES } from '../engine/nodes';
 import { SCENES } from '../engine/scenes';
 import { resetLayout } from '../state/layout';
-import { KEYS } from '../state/persistence';
-import { BUNDLE_VERSION, MAX_BUNDLE_BYTES, applyWrites, buildBundle, parseBundle } from './bundle';
+import { KEY_CLASS, KEYS } from '../state/persistence';
+import { BUNDLE_VERSION, MAX_BUNDLE_BYTES, SECTIONS, applyWrites, buildBundle, parseBundle } from './bundle';
 
 const SHOW = { cues: [{ id: 'c1', name: 'Opener', scene: 'Mine', values: {}, look: {} }], mode: 'cut', seconds: 2, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120 };
 
@@ -24,6 +25,7 @@ describe('settings bundle', () => {
     store.set(KEYS.userScenes, JSON.stringify([{ name: 'Mine', body: 'void main(){}' }, { name: 'Broken here', body: 'nope' }]));
     store.set(KEYS.sceneEdits, JSON.stringify({ [SCENES[0]!.name]: 'edited' }));
     store.set(KEYS.customShader, 'void main() { /* mine */ }');
+    store.set(KEYS.nodeGraph, JSON.stringify(EXAMPLES[0]!.graph));
     store.set(KEYS.params, JSON.stringify({ 'user:Mine': { uGlow: { v: 2, def: 1 } } }));
     store.set(KEYS.show, JSON.stringify(SHOW));
     store.set(KEYS.library, JSON.stringify({ favs: ['Mine'], off: [] }));
@@ -40,7 +42,7 @@ describe('settings bundle', () => {
     seed();
     const exported = new Map(store);
     const bundle = buildBundle();
-    expect(Object.keys(bundle.data).sort()).toEqual(['customShader', 'layout', 'library', 'mediaSound', 'params', 'player', 'sceneEdits', 'show', 'userScenes']);
+    expect(Object.keys(bundle.data).sort()).toEqual(['customShader', 'layout', 'library', 'mediaSound', 'nodeGraph', 'params', 'player', 'sceneEdits', 'show', 'userScenes']);
     expect(bundle.data.mediaSound).toBe(true);
     store.clear();
     const parsed = parseBundle(JSON.stringify(bundle));
@@ -51,7 +53,12 @@ describe('settings bundle', () => {
       if (key === KEYS.scRecent || key === KEYS.best || key === KEYS.prefs) expect(store.has(key)).toBe(false);
       else expect(decode(key, store.get(key))).toEqual(decode(key, value));
     }
-    expect(parsed.bundle.summary).toBe('2 scenes, 1 edited built-in, My Shader, parameter values, a show with 1 cue, favourites, player settings, layout');
+    expect(parsed.bundle.summary).toBe('2 scenes, 1 edited built-in, My Shader, the visual maker graph, parameter values, a show with 1 cue, favourites, player settings, layout');
+  });
+
+  it('carries exactly the keys that hold setup; everything else stays on this computer', () => {
+    const setup = (Object.keys(KEY_CLASS) as (keyof typeof KEYS)[]).filter((k) => KEY_CLASS[k] === 'setup').map((k) => KEYS[k]);
+    expect(Object.values(SECTIONS).map((s) => s.key).sort()).toEqual(setup.sort());
   });
 
   it('exports what is stored, including scenes that do not compile on this device', () => {

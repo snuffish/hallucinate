@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased — studio Live (2026-10-16)
+
+### Fixed
+
+- With the studio closed, a fade between two show scenes no longer starts the outgoing one with the main screen's
+  parameter values: it fades out as it was on Live. Two show scenes of the same scene no longer fade the new values in
+  only at the very end; the new ones show at once, as they do with the studio open.
+- Opening the library no longer breaks the controls with "'ArrowLeft' is already registered".
+- When a shared tab stops sharing (or the microphone goes away), the player says so instead of still showing
+  "▶ Tab / system audio", and the source button is no longer lit.
+- A conversation's transcript is saved in order: a reply's final state can no longer be overwritten by an older one
+  that was still being written, and deleting a conversation while a save is in flight no longer leaves it stored.
+- The desktop app started from the Dock or Finder now uses `CLAUDE_BIN`, `YTDLP`, `YTDLP_CACHE_MB` and `ASSISTANT_DEBUG`
+  from the login shell. Before, they were read before the shell was asked, so only `PATH` and the assistant's settings
+  came through.
+
+## Unreleased — SoundCloud and YouTube (2026-10-16)
+
+### Fixed
+
+- A search no longer fails with "Unexpected answer from the local server" when one result has no duration or artwork
+  (live sets, some uploads), and the download bar no longer stalls on updates that don't know the speed or size yet.
+
+## Unreleased — assistant undo (2026-10-16)
+
+### Fixed
+
+- Undoing the assistant's transition, autopilot, parameter, look or code change refuses (with a message) once you or
+  the director changed the same thing after it, instead of silently overwriting your change. Before, only show edits
+  were checked.
+- Undoing a plan also switches the autopilot back off when the plan switched it on.
+- Undoing a parameter change resets only the parameters the assistant set, not every parameter of the scene.
+- Undoing a new scene leaves it alone once you edited its code.
+- Deleting a conversation while it is replying deletes it for good: its transcript is no longer written back a moment
+  later, and it no longer comes back as an unread badge or a peek.
+- Stop on a conversation that is waiting for a free slot sets it back to idle.
+- With the Claude subscription, a reply that uses the same tool twice shows each call's input on its own step while it
+  streams in, instead of the second one's on the first.
+
 ## Unreleased — settings (2026-10-16)
 
 ### Added

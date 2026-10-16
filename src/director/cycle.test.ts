@@ -1,32 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventType } from '@tanstack/ai';
 import type { ConnectionAdapter } from '@tanstack/ai-client';
-import type { AppController } from '../app/controller';
+import { fakeApp } from '../app/fake-app';
 import { StudioSession } from '../app/studio';
-import { Store } from '../state/store';
+import { createLock } from '../assistant/lock';
 import { Director } from './director';
 
 // One director cycle against a scripted connection: the digest goes out on a fresh thread with
 // mode "director", the model's set_autopilot_plan call runs here (as a client tool) and the plan
 // lands in the studio, the thread is forgotten, and the next cycle starts from scratch again.
 
-function fakeApp() {
-  const scenes = [{ name: 'Alpha', cat: 'Fractal' }, { name: 'Beta', cat: 'Space' }];
-  const app = {
-    state: { scenes, clock: { clock: 0, scene: 0, huePhase: 0, bpm: 124, mood: 0.7 }, look: { hue: 0, cycle: 0.6, trails: 0.86, speed: 1, reactivity: 1, aberration: 0.012 }, activeSource: 'demo' },
-    audio: { kind: 'demo' as string | null, features: { level: 0.5, bass: 0.4, bright: 0.6 } },
-    media: { el: null },
-    sceneParams: [[], []],
-    sceneIndex: 0,
-    tempo: { bpm: 124 },
-    ui: new Store({ assistantBusy: false }),
-    paramStore: { setAll: vi.fn() },
-    setScene: vi.fn(), setLook: vi.fn(), pushParams: vi.fn(), paramValues: vi.fn(() => ({})), showParams: vi.fn(), toast: vi.fn(),
-    setHooks: vi.fn(() => () => {}),
-    sceneByName: (name: string) => scenes.findIndex((s) => s.name === name),
-  };
-  return app;
-}
 
 const storage = new Map<string, string>();
 beforeEach(() => {
@@ -65,13 +48,13 @@ const settled = async (d: Director) => { for (let i = 0; i < 200 && d.view.cycli
 describe('a director cycle', () => {
   it('sends the digest on a fresh director thread, runs the plan tool here, forgets the thread, and stays flat', async () => {
     const app = fakeApp();
-    const studio = new StudioSession(app as unknown as AppController, () => {});
+    const studio = new StudioSession(app, () => {});
     studio.attach();
     studio.add({ name: 'Alpha', scene: 'Alpha', values: {}, look: { hue: 0.1 } });
     studio.add({ name: 'Beta', scene: 'Beta', values: {}, look: { hue: 0.6 } });
     const seen: Seen[] = [];
     const forgotten: string[] = [];
-    const director = new Director(app as unknown as AppController, studio, { connection: scriptedConnection(seen), forgetThread: (id) => forgotten.push(id) });
+    const director = new Director(app, studio, { connection: scriptedConnection(seen), forgetThread: (id) => forgotten.push(id) });
 
     director.setOn(true);                     // turns the autopilot on and runs the first cycle
     expect(studio.autopilot.on).toBe(true);
@@ -103,12 +86,29 @@ describe('a director cycle', () => {
     expect(director.history.decisions.map((d) => d.note)).toEqual(['plan 1', 'plan 2']);
   });
 
+  it('waits for its tool calls to finish, even ones queued behind another chat\'s on the shared lock', async () => {
+    const app = fakeApp();
+    const studio = new StudioSession(app, () => {});
+    studio.attach();
+    studio.add({ name: 'Alpha', scene: 'Alpha', values: {}, look: {} });
+    studio.add({ name: 'Beta', scene: 'Beta', values: {}, look: {} });
+    const lock = createLock();
+    void lock(() => new Promise((r) => setTimeout(r, 1000)));   // a conversation's tool is running
+    const seen: Seen[] = [];
+    const director = new Director(app, studio, { connection: scriptedConnection(seen), forgetThread: () => {}, lock });
+    director.setOn(true);
+    await settled(director);
+    expect(studio.plan?.note).toBe('plan 1');   // it landed inside the cycle
+    expect(director.view.lastNote).toBe('plan 1');
+    expect(seen).toHaveLength(2);
+  });
+
   it('waits while the chat is busy, the music is off or the show is too small', async () => {
     const app = fakeApp();
-    const studio = new StudioSession(app as unknown as AppController, () => {});
+    const studio = new StudioSession(app, () => {});
     studio.attach();
     const seen: Seen[] = [];
-    const director = new Director(app as unknown as AppController, studio, { connection: scriptedConnection(seen), forgetThread: () => {} });
+    const director = new Director(app, studio, { connection: scriptedConnection(seen), forgetThread: () => {} });
     director.setOn(true);
     await settled(director);
     expect(seen).toHaveLength(0);             // one show scene: nothing to plan

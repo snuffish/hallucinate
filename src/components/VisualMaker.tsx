@@ -4,9 +4,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import type { AppController } from '../app/controller';
-import { SUPERSEDED, type CompileResult } from '../app/editor';
+import { SUPERSEDED, type CompileResult } from '../app/scene-library';
 import { CATEGORIES, EXAMPLES, GraphSchema, NODE_TYPES, compileGraph, defaultParams, emptyGraph, type Graph, type GraphNode, type PortType } from '../engine/nodes';
 import { HOTKEYS } from '../hotkeys/registry';
+import { useHotkeyActions } from '../hooks/useAppHotkeys';
 import { Kbd } from '../hotkeys/Kbd';
 import { KEYS, debouncedWriter, readJSON } from '../state/persistence';
 import { HelpButton } from './Help';
@@ -118,7 +119,8 @@ export function VisualMaker() {
 
   // ---------- Opening & shortcuts ----------
   useEffect(() => { if (open) app.setScene(app.state.nodesIndex); }, [open, app]);
-  useEffect(() => app.setHooks({ deleteNode: () => { if (selected != null) removeNode(selected); } }), [app, selected, graph]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const deleteSelected = () => { if (selected != null) removeNode(selected); };
+  useHotkeyActions<'nodes'>({ deleteNode: deleteSelected, deleteNodeBackspace: deleteSelected });
 
   // ---------- Geometry ----------
   const toWorld = (clientX: number, clientY: number): Pt => {

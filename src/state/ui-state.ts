@@ -6,7 +6,7 @@ import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
 import type { PerfReport } from '../engine/profiler';
 import type { HelpTopicId } from '../help/topics';
-import type { Look, SourceButton } from './app-state';
+import type { Look, MoodWord, SourceButton } from './app-state';
 import type { WidgetId } from './layout';
 
 export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | 'settings' | null;
@@ -18,7 +18,7 @@ export type HelpId = HelpTopicId | 'sheet';
 export type DragId = WidgetId | 'bubble' | 'resize';
 
 export interface Meters { bass: number; mid: number; high: number; bright: number; centroid: number; beat: number }
-export type MoodLabel = '' | 'mood: calm' | 'mood: groovy' | 'mood: energetic';
+export type MoodLabel = '' | `mood: ${MoodWord}`;
 
 export interface TransportView {
   mode: 'element' | 'demo' | null;
@@ -36,7 +36,7 @@ export interface DownloadView { id: 'sc' | 'yt'; title: string; percent: number;
 export interface ParamsView {
   title: string;
   key: string;              // the scene's `paramKey`: which scene's folded groups apply
-  specs: ParamSpec[];
+  specs: readonly ParamSpec[];
   values: ParamValues;
   inStudio: boolean;        // shown in the studio's parameters dock (and editing the Preview slot there)
 }

@@ -4,64 +4,56 @@
 
 import { AudioEngine } from '../engine/audio';
 import { BeatRacer } from '../engine/game';
-import { applyLook, programState, smoothstep } from '../engine/look';
+import { applyLook, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
-import { OutputLink } from '../engine/output-link';
+import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
-import { Renderer, type ProgramState, type SceneUniforms } from '../engine/renderer';
+import { Renderer, type ProgramState } from '../engine/renderer';
 import type { Scene } from '../engine/scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, moodWord, toneWord, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
 import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
-import { KEYS, debouncedWriter, flushAll, freeze, readString, remove, unfreeze, writeJSON, writeString } from '../state/persistence';
+import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
-import { appendScene, buildSceneList, discardParked, paramKey, saveUserScenes, userScene, type ParkedScenes } from '../state/scene-list';
+import { buildSceneList, paramKey } from '../state/scene-list';
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
-import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type ScreenMode, type UIState } from '../state/ui-state';
+import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { applyWrites, buildBundle, parseBundle } from './bundle';
 import { downloadFile, fileStamp } from './download';
 import { EditorCore } from './editor';
+import { LiveSlot } from './live-slot';
+import { MusicSource } from './music-source';
+import { SceneLibrary, type SceneChange } from './scene-library';
 import { Transport } from './transport';
 
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
 const DRIFT_PUBLISH_FRAMES = 6;
 const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second, however slow the frames
 
-const SOURCE_LABELS: Record<string, string> = { mic: 'Microphone / line-in', display: 'Tab / system audio', demo: 'Demo beat (124 BPM)' };
 const COOL = [0.7, 0.85, 1.35];
 const WARM = [1.3, 1.05, 0.7];
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const viewport = (): L.Size => ({ width: window.innerWidth, height: window.innerHeight });
 
 // Hooks other panels plug in. All optional; the controller works without them.
+// A scene with its parameter values and look sliders (only the keys a show scene keeps: LOOK_KEYS).
+export interface SceneSnapshot { scene: number; values: ParamValues; look: Readonly<Record<string, number>> }
+
 export interface ControllerHooks {
-  // The code editor follows the scene on screen while it's open.
-  onSceneChanged?: (index: number) => void;
   // The studio draws its Preview monitor and glides its master fader every frame.
   onFrame?: (dt: number, program: ProgramState) => void;
-  onBeat?: () => void;          // a detected bass hit
   onTempoBeat?: () => void;     // a tick of the tempo clock (keeps going through breakdowns)
   // Studio mode: Program no longer shows a show scene after a manual switch.
   onManualSceneChange?: () => void;
   // Studio dock: which parameters the overlay edits.
-  paramsOverride?: () => { title: string; key: string; specs: ParamSpec[]; values: ParamValues; onChange: (spec: ParamSpec, v: ParamValue) => void; onReset: () => void } | null;
+  paramsOverride?: () => { title: string; key: string; specs: readonly ParamSpec[]; values: ParamValues; onChange: (spec: ParamSpec, v: ParamValue) => void; onReset: () => void } | null;
   master?: () => number;
   autopilot?: () => boolean;
-  // Studio: while the Live slot is pinned (studio closed after a take), projectors get this instead
-  // of what the main window shows.
-  liveProgram?: (base: ProgramState) => { program: ProgramState; params: Record<number, SceneUniforms> } | null;
-  // Scene library keyboard navigation.
-  librarySearch?: () => void;
-  libraryMove?: (dx: number, dy: number) => void;
-  libraryPick?: () => void;
-  libraryTab?: (dir: number) => void;
   // First Escape inside an overlay may just leave a text field; returns true when it was consumed.
   escape?: () => boolean;
-  // Visual maker: Delete removes the selected block.
-  deleteNode?: () => void;
   // A device preference changed (the studio's Preview renderer follows the pixel density).
   onPrefs?: (prefs: Prefs) => void;
 }
@@ -80,24 +72,26 @@ export class AppController {
   readonly audio = new AudioEngine();
   readonly media = new MediaLayer();
   readonly game = new BeatRacer();
-  readonly paramStore = new ParamStore();
   readonly renderer: Renderer;
   readonly output: OutputLink;
+  // The pinned Live slot (studio closed after a take): what projectors and the screen show, see live-slot.ts.
+  readonly live: LiveSlot;
   readonly state: AppState;
   readonly ui: Store<UIState>;
   // Where every control widget and the assistant bubble sit; persisted, see src/state/layout.ts.
   readonly layout = new Store<L.Layout>(this.initialLayout());
   readonly player: HTMLAudioElement;
   readonly transport: Transport;
-  readonly sceneParams: ParamSpec[][] = [];
-  // Saved scenes / edits that didn't compile on this device; kept stored, listed in the library.
-  readonly parked: ParkedScenes;
+  // What the music is: the source playing, the "now playing" line, play / pause (music-source.ts).
+  readonly music: MusicSource;
+  // Each scene's code, @params and stored values; adding, compiling and removing scenes (scene-library.ts).
+  readonly library: SceneLibrary;
   readonly tempo = new TempoClock();
   readonly editor: EditorCore;
   readonly pickers: Partial<Record<'sc' | 'yt', PickerApi>> = {};
   libraryPrefs: LibraryPrefs = loadLibraryPrefs();
   readonly hooks: ControllerHooks = {};
-  mediaSound = readString(KEYS.mediaSound) === '1';
+  mediaSound = readFlag(KEYS.mediaSound);
   // Device preferences (Settings overlay, src/state/prefs.ts).
   readonly prefs = new Store<Prefs>(loadPrefs());
   // Where each frame's time goes (Shift+P, or ?perf / ?perf=trace in the URL). Off: one flag check per stage.
@@ -120,7 +114,7 @@ export class AppController {
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly program: ProgramState;
-  private readonly liveParams: Record<number, SceneUniforms> = {};
+  private readonly paramStore = new ParamStore();
   private readonly profilerApi: ProfilerApi = {
     report: () => (this.profiler.on ? this.perfReport() : null),
     fillTest: () => this.runFillTest(),
@@ -154,7 +148,6 @@ export class AppController {
     const scenes: Scene[] = [];   // the one shared list: the renderer holds it, buildSceneList fills it
     this.renderer = new Renderer(canvas, scenes);
     const list = buildSceneList(scenes, (frag, name) => this.renderer.check(frag, name));
-    this.parked = list.parked;
     this.state = {
       scenes: list.scenes, gameIndex: list.gameIndex, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
       look: { ...defaultLook(), resolution: this.prefs.get().startResolution }, clock: defaultClock(), activeSource: null,
@@ -164,6 +157,8 @@ export class AppController {
     this.renderer.setMedia(this.media);
     this.renderer.setScale(this.state.look.resolution);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
+    this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what));
+    this.live = new LiveSlot({ state: this.state, specs: (i) => this.library.specs(i), stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
     this.applyPrefs();
 
     this.player = document.createElement('audio');
@@ -176,9 +171,15 @@ export class AppController {
       onPrev: () => !!this.queueFor(this.state.activeSource)?.playPrev(),
       onNext: () => !!this.queueFor(this.state.activeSource)?.playNext(),
     });
+    this.music = new MusicSource({
+      audio: this.audio, player: this.player, state: this.state, transport: this.transport,
+      publish: (view) => this.ui.set(view),
+      started: (source) => this.sourceStarted(source),
+    });
 
     this.state.clock.scene = this.lastScene();   // before the params below, which publish the scene on screen's
-    list.scenes.forEach((s, i) => this.setSceneParams(i, s.params ?? []));
+    list.scenes.forEach((_, i) => this.pushParams(i));
+    this.showParams();
     this.editor = new EditorCore(this);
     this.audio.onBeat = () => this.beat();
     this.program = { ...programState(this.audio.spectrum), scene: this.state.clock.scene };
@@ -261,12 +262,12 @@ export class AppController {
   }
 
   // The assistant floats in its own bubble and can stay open next to any overlay. `chatId` opens it on
-  // that conversation (the bubble's peek card was clicked).
+  // that conversation (the bubble's peek card was clicked). The session clears the peek once it's open.
   toggleAssistant(open = !this.ui.get().assistantOpen, chatId?: string): void {
-    if (chatId) this.ui.set({ assistantFocus: chatId, assistantPeek: null });
+    if (chatId) this.ui.set({ assistantFocus: chatId });
     if (this.ui.get().assistantOpen === open) return;
     if (!open && document.activeElement instanceof HTMLElement && document.activeElement.closest('#ai')) document.activeElement.blur();
-    this.ui.set({ assistantOpen: open, help: null, ...(open && { assistantPeek: null }) });
+    this.ui.set({ assistantOpen: open, help: null });
     this.wake();
   }
 
@@ -308,7 +309,7 @@ export class AppController {
   // monitor (its hook), the audio analysis, the badges and the idle timer. Start resolution is read once, at startup.
   private applyPrefs(): void {
     const p = this.prefs.get();
-    this.renderer.setMaxPixelRatio(p.maxPixelRatio);
+    applyRendererPrefs(this.renderer, outputPrefs(p));
     this.output.sendPrefs(outputPrefs(p));
     this.hooks.onPrefs?.(p);
     this.audio.setSmoothing(p.audioSmoothing);
@@ -420,10 +421,14 @@ export class AppController {
     this.setScene(i);
   }
 
-  // `fade` is the crossfade time (0 = cut). Changing scene outside the studio means Program no
-  // longer shows a show scene.
-  setScene(i: number, fade = CROSSFADE_SECONDS, fromStudio = false): void {
-    if (!fromStudio) this.hooks.onManualSceneChange?.();
+  // `fade` is the crossfade time (0 = cut). Changing scene this way (not as a show scene, see
+  // applyScene) means Program no longer shows a show scene.
+  setScene(i: number, fade = CROSSFADE_SECONDS): void {
+    this.hooks.onManualSceneChange?.();
+    this.showScene(i, fade);
+  }
+
+  private showScene(i: number, fade: number): void {
     const c = this.state.clock;
     const scene = this.state.scenes[i];
     if (i === c.scene || !scene || scene.removed) return;
@@ -441,7 +446,6 @@ export class AppController {
     c.beatsInScene = 0;
     this.publishScene();
     this.showParams();
-    this.hooks.onSceneChanged?.(i);
   }
 
   // The scene that was on screen when the page closed (by name, not index: the list can change in
@@ -469,39 +473,23 @@ export class AppController {
     this.bumpScenes();
   }
 
-  // Appends a saved scene (editor "Save to library", assistant create_scene). Returns the index or an error.
-  addUserScene(name: string, body: string): { index: number } | { error: string } {
-    if (this.sceneByName(name) >= 0) return { error: `A scene called "${name}" already exists.` };
-    if (this.parked.userScenes.some((p) => p.name === name)) return { error: `A scene called "${name}" already exists (it doesn't compile on this device).` };
-    const scene = userScene(name, body);
-    const error = this.renderer.check(scene.frag, name);
-    if (error) return { error };
-    const index = appendScene(this.state.scenes, scene);
-    this.setSceneParams(index, scene.params);
-    saveUserScenes(this.state.scenes, this.parked);
-    this.bumpScenes();
-    return { index };
-  }
-
-  removeUserScene(index: number): void {
-    const s = this.state.scenes[index];
-    if (!s?.user) return;
-    s.removed = true;
-    saveUserScenes(this.state.scenes, this.parked);
-    if (this.state.clock.scene === index) this.setScene(0);
-    this.bumpScenes();
-  }
-
-  // A parked scene or edit (didn't compile here) is deleted for good.
-  discardParked(kind: 'scene' | 'edit', name: string): void {
-    discardParked(this.parked, kind, name, this.state.scenes);
-    this.bumpScenes();
+  // What a change in the library means on screen: new code reaches the renderer, the projector
+  // and the library list, new values the renderer; the Parameters panel follows the scene on screen.
+  private sceneChanged(i: number, what: SceneChange): void {
+    if (what === 'list') {
+      if (i === this.state.clock.scene && this.state.scenes[i]?.removed) this.setScene(0);
+      this.bumpScenes();
+      return;
+    }
+    this.pushParams(i);
+    if (what === 'code') { this.output.sendScene(i); this.bumpScenes(); }   // code edits reach the projector live
+    if (i === this.state.clock.scene) this.showParams();
   }
 
   // Loads a parked scene into "My Shader" so it can be fixed; "Save to library" under the same name
   // then replaces the parked copy. Nothing is stored until it compiles.
   openParkedInEditor(name: string): void {
-    const p = this.parked.userScenes.find((x) => x.name === name);
+    const p = this.library.parked.userScenes.find((x) => x.name === name);
     if (!p) return;
     this.editor.customCode = p.body;
     this.editor.libraryName = name;
@@ -509,37 +497,36 @@ export class AppController {
     this.setOverlay('editor');
   }
 
-  // ---------- Screen: preview or Live ----------
+  // ---------- A scene as a whole: which one, its parameter values, the look ----------
 
-  // Only matters while Live is pinned; with nothing pinned the screen is Live anyway.
-  setScreenMode(mode: ScreenMode): void {
-    if (mode === this.ui.get().screenMode) return;
-    this.ui.set({ screenMode: mode });
-    if (this.ui.get().liveName) this.toast(mode === 'live' ? `Screen shows Live: ${this.ui.get().liveName}` : 'Screen shows your preview', 1500);
+  // A scene as a show scene keeps it: its parameter values and the look sliders, as they are now.
+  captureScene(i = this.state.clock.scene): SceneSnapshot {
+    const look: Record<string, number> = {};
+    for (const k of LOOK_KEYS) look[k] = this.state.look[k];
+    return { scene: i, values: this.library.values(i), look };
+  }
+
+  // Puts a scene on screen in one step, as the studio takes it: the look sliders it has, its values,
+  // then the scene, crossfading for `fade` seconds. Not a manual scene change.
+  applyScene(snap: SceneSnapshot, fade: number): void {
+    const scene = this.state.scenes[snap.scene];
+    if (!scene || scene.removed) return;
+    for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) this.setLook(k, snap.look[k]!);
+    this.library.replaceValues(snap.scene, snap.values);
+    this.showScene(snap.scene, fade);
   }
 
   // ---------- Live parameters ----------
 
-  setSceneParams(i: number, specs: ParamSpec[]): void {
-    this.sceneParams[i] = specs;
-    this.pushParams(i);
-    this.output.sendScene(i);   // code edits reach the projector live
-    if (i === this.state.clock.scene) this.showParams();
+  // A scene's values as the renderer's uniforms.
+  private pushParams(i: number): void {
+    if (!this.state.scenes[i]) return;
+    const values = this.library.values(i);
+    this.renderer.setParams(i, Object.fromEntries(this.library.specs(i).map((s) => [s.name, toUniform(s, values[s.name]!)])));
   }
 
-  pushParams(i: number): void {
-    const scene = this.state.scenes[i];
-    if (!scene) return;
-    const specs = this.sceneParams[i] ?? [];
-    const values = this.paramStore.values(paramKey(scene), specs);
-    this.renderer.setParams(i, Object.fromEntries(specs.map((s) => [s.name, toUniform(s, values[s.name]!)])));
-  }
-
-  paramValues(i: number): ParamValues {
-    const scene = this.state.scenes[i];
-    return scene ? this.paramStore.values(paramKey(scene), this.sceneParams[i] ?? []) : {};
-  }
-
+  // Publishes what the Parameters panel edits: the studio's choice while it has one (it calls this
+  // when that changes), else the scene on screen. Every change made through the controller calls it.
   showParams(): void {
     const override = this.hooks.paramsOverride?.();
     if (override) {
@@ -547,27 +534,21 @@ export class AppController {
       return;
     }
     const i = this.state.clock.scene;
-    const specs = this.sceneParams[i] ?? [];
+    const specs = this.library.specs(i);
     const inStudio = this.overlay === 'studio';
-    this.ui.set({ params: { title: inStudio ? `${this.currentScene.name} — live` : this.currentScene.name, key: paramKey(this.currentScene), specs, values: this.paramValues(i), inStudio }, paramsVisible: specs.length > 0 });
+    this.ui.set({ params: { title: inStudio ? `${this.currentScene.name} — live` : this.currentScene.name, key: paramKey(this.currentScene), specs, values: this.library.values(i), inStudio }, paramsVisible: specs.length > 0 });
   }
 
   setParam(spec: ParamSpec, value: ParamValue): void {
     const override = this.hooks.paramsOverride?.();
     if (override) return override.onChange(spec, value);
-    const i = this.state.clock.scene;
-    this.paramStore.set(paramKey(this.currentScene), spec, value);
-    this.pushParams(i);
-    this.showParams();
+    this.library.setValues(this.state.clock.scene, { [spec.name]: value });
   }
 
   resetParams(): void {
     const override = this.hooks.paramsOverride?.();
     if (override) return override.onReset();
-    const i = this.state.clock.scene;
-    this.paramStore.reset(paramKey(this.currentScene));
-    this.pushParams(i);
-    this.showParams();
+    this.library.resetValues(this.state.clock.scene);
   }
 
   // ---------- Look ----------
@@ -647,21 +628,18 @@ export class AppController {
 
   // ---------- Sources ----------
 
+  // A source button: a file and SoundCloud open their pickers; a video's sound starts from the media panel.
   async startSource(kind: SourceButton, pickFile?: () => void, openSoundCloud?: () => void): Promise<void> {
-    try {
-      if (kind === 'file') return pickFile?.();
-      if (kind === 'soundcloud') return openSoundCloud?.();
-      this.player.pause();
-      if (kind === 'mic') await this.audio.useMicrophone(micConstraints(this.prefs.get()));
-      if (kind === 'display') await this.audio.useDisplayAudio();
-      if (kind === 'demo') await this.audio.useDemo();
-      this.onSourceStarted(SOURCE_LABELS[kind] ?? kind, kind);
-      this.transport.setMode(kind === 'demo' ? 'demo' : null);
-    } catch (err) {
-      const e = err as Error;
-      if (e.name === 'NotAllowedError') this.toast('Permission denied or capture cancelled.');
-      else this.toast(e.message || String(err));
-    }
+    if (kind === 'file') return pickFile?.();
+    if (kind === 'soundcloud') return openSoundCloud?.();
+    if (kind === 'media') return;
+    await this.music.start(kind, micConstraints(this.prefs.get())).catch((err) => this.sourceFailed(err));
+  }
+
+  private sourceFailed(err: unknown): void {
+    const e = err as Error;
+    if (e.name === 'NotAllowedError') this.toast('Permission denied or capture cancelled.');
+    else this.toast(e.message || String(err));
   }
 
   async playFile(file: File | undefined): Promise<void> {
@@ -676,30 +654,21 @@ export class AppController {
   async playUrl(src: string, label: string, sourceButton: SourceButton): Promise<void> {
     const player = this.player;
     if (player.src.startsWith('blob:') && player.src !== this.media.url) URL.revokeObjectURL(player.src);
-    player.src = src;
     try {
-      await this.audio.useElement(player);
-      await player.play();
-      this.onSourceStarted(label, sourceButton);
-      this.transport.setMode('element', { hasQueue: !!this.queueFor(sourceButton)?.hasQueue });
+      await this.music.play(src, label, sourceButton, { hasQueue: !!this.queueFor(sourceButton)?.hasQueue });
     } catch (err) {
       this.toast(`Couldn't play this: ${(err as Error).message}`);
     }
   }
 
-  togglePlay(): void {
-    const kind = this.audio.kind;
-    if (kind === 'file') { if (this.player.paused) this.player.play().catch(() => {}); else this.player.pause(); }
-    else if (kind === 'demo') { this.audio.detach(); this.ui.set({ nowText: '❚❚ Demo beat paused' }); this.transport.setMode('demo'); }
-    else if (!kind && this.ui.get().nowText.includes('Demo')) void this.startSource('demo');
-  }
+  togglePlay(): void { this.music.toggle().catch((err) => this.sourceFailed(err)); }
 
-  private onSourceStarted(label: string, sourceButton: SourceButton): void {
-    this.state.activeSource = sourceButton;
-    if (sourceButton !== 'media' && this.mediaSound) this.setMediaSound(false, { quiet: true });   // another source is the music now
-    this.ui.set({ nowText: `▶ ${label}`, started: true, activeSource: sourceButton });
+  // A source began playing (MusicSource): the tempo starts over.
+  private sourceStarted(source: SourceButton): void {
+    if (source !== 'media' && this.mediaSound) this.setMediaSound(false, { quiet: true });   // another source is the music now
+    this.ui.set({ started: true });
     document.body.classList.add('started');
-    if (readString(KEYS.helpHint) !== '1') { writeString(KEYS.helpHint, '1'); this.toast('Press ? for help & shortcuts', 4000); }
+    if (!readFlag(KEYS.helpHint)) { writeFlag(KEYS.helpHint, true); this.toast('Press ? for help & shortcuts', 4000); }
     this.state.clock.beatTimes = [];
     this.state.clock.bpm = null;
     this.tempo.reset();
@@ -747,15 +716,11 @@ export class AppController {
   // tempo and volume work) and the picture follows it.
   setMediaSound(on: boolean, { quiet = false } = {}): void {
     this.mediaSound = on;
-    writeString(KEYS.mediaSound, on ? '1' : '0');
+    writeFlag(KEYS.mediaSound, on);
     this.ui.set({ mediaSound: on });
     if (quiet) return;
     if (on && this.media.kind === 'video') void this.linkMediaSound();
-    else if (!on && this.state.activeSource === 'media') {
-      this.player.pause();
-      this.state.activeSource = null;
-      this.ui.set({ nowText: '❚❚ Video sound off — pick a music source', activeSource: null });
-    }
+    else if (!on && this.music.active === 'media') this.music.stop('❚❚ Video sound off — pick a music source');
   }
 
   private async linkMediaSound(): Promise<void> {
@@ -800,7 +765,6 @@ export class AppController {
     if (bpm) { c.bpm = bpm; this.tempo.setBpm(bpm); }
     if (c.scene === this.state.gameIndex) this.game.onBeat();
     if (this.autoSwitching() && c.beatsInScene >= BEATS_PER_SCENE) this.nextRandomScene();
-    this.hooks.onBeat?.();
     if (this.tempo.onDetectedBeat(c.clock)) this.hooks.onTempoBeat?.();
   }
 
@@ -946,8 +910,7 @@ export class AppController {
     if (this.audio.kind && this.tempo.advance(c.clock)) this.hooks.onTempoBeat?.();   // scheduled tick (no kick needed)
     const inGame = c.scene === this.state.gameIndex;
     if (inGame) this.game.update(dt, level);
-    const mix = c.fade > 0 ? smoothstep((c.clock - c.transitionStart) / c.fade) : 1;
-    if (mix >= 1) c.prevScene = -1;
+    const mix = crossfade(c, c.clock);
 
     const p = this.program;
     p.scene = c.scene; p.prevScene = c.prevScene; p.mix = mix;
@@ -963,30 +926,18 @@ export class AppController {
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
     this.profiler.lap(Stage.logic);
-    // Live is pinned (studio closed after a take): projectors get it; the screen shows it too when
-    // the Screen widget is set to Live, otherwise it stays your preview.
-    const showLive = this.ui.get().screenMode === 'live';
-    const pinned = this.output.connected || showLive ? this.hooks.liveProgram?.(p) : null;
-    if (pinned && showLive) this.renderer.render(pinned.program, pinned.params);
-    else this.renderer.render(p);
+    // Live pinned (studio closed after a take): projectors get it, and the screen too when set to Live.
+    const out = this.live.route(p, this.output.connected);
+    this.renderer.render(out.screen.program, out.screen.params);
     this.profiler.lap(Stage.render);
-    if (this.output.connected) {
-      if (pinned) this.output.sendFrame(pinned.program, pinned.params, look.resolution);
-      else {
-        const live = this.liveParams;
-        for (const k in live) delete live[k];
-        live[c.scene] = this.renderer.sceneParams[c.scene] ?? {};
-        if (c.prevScene >= 0) live[c.prevScene] = this.renderer.sceneParams[c.prevScene] ?? {};
-        this.output.sendFrame(p, live, look.resolution);
-      }
-    }
+    if (out.projector) this.output.sendFrame(out.projector.program, out.projector.params, look.resolution);
     this.profiler.lap(Stage.output);
     this.hooks.onFrame?.(dt, p);
     this.profiler.lap(Stage.studio);
 
     if (++this.meterTick % 2 === 0) {
-      const tone = f.bright < 0.35 ? 'dark' : f.bright > 0.65 ? 'bright' : 'balanced';
-      const moodLabel: MoodLabel = !look.mood || !this.audio.kind ? '' : c.mood < 0.35 ? 'mood: calm' : c.mood > 0.65 ? 'mood: energetic' : 'mood: groovy';
+      const tone = toneWord(f.bright);
+      const moodLabel: MoodLabel = !look.mood || !this.audio.kind ? '' : `mood: ${moodWord(c.mood)}`;
       this.ui.set({
         meters: { bass: f.bass, mid: f.mid, high: f.high, bright: f.bright, centroid: f.centroid, beat: f.beat },
         bpm: c.bpm,
