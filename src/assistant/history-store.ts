@@ -91,52 +91,88 @@ export function indexedDBTranscripts(): TranscriptBackend {
   };
 }
 
-// Reads a transcript, sealed so that nothing in it can run again.
-export async function loadTranscript(backend: TranscriptBackend, id: string): Promise<Transcript | null> {
-  try {
-    const t = await backend.get(id);
-    return t && { ...t, messages: sealInterrupted(t.messages) };
-  } catch {
-    return null;   // IndexedDB unavailable (private mode) or the record is unreadable
-  }
+// One conversation's stored transcript, kept in step with the conversation under the two rules above,
+// plus these:
+//   - nothing is written before the stored one was read (`read`), so a conversation closed before its
+//     transcript loaded (StrictMode mounts twice) never overwrites it with nothing;
+//   - writes go out in order, one at a time, so a reply's final state is never overtaken by an older one;
+//   - after `destroy` nothing is written, not even a reply still streaming in, and a write already in
+//     flight lands before the record is removed.
+export interface StoredTranscript {
+  // The stored transcript, sealed; null when there is none (`exists` says) or it can't be read.
+  read(): Promise<Transcript | null>;
+  // The conversation changed: the newest state is written at most once per `delay`.
+  update(t: Transcript): void;
+  // A reply is complete: written now, after any write in flight.
+  commit(t: Transcript): Promise<void>;
+  // The conversation closes: what is pending is written, and the page-hide listeners go.
+  close(): void;
+  // The conversation is deleted: nothing pending is written, and the record goes.
+  destroy(): Promise<void>;
 }
 
-// One debounced writer per conversation: `schedule` keeps only the latest state, `flush` writes now.
-// `cancel` drops a write that hasn't happened yet (the conversation is being deleted).
-export interface TranscriptWriter { schedule(value: Transcript): void; flush(): Promise<void>; cancel(): void; dispose(): void }
+export interface StoredTranscriptOptions {
+  exists?: () => boolean;            // whether there is one to read (the index lists it); default yes
+  onError?: (err: Error) => void;    // a write failed (storage unavailable or full)
+  delay?: number;
+}
 
-export function transcriptWriter(backend: TranscriptBackend, id: string, onError?: (err: Error) => void, delay = WRITE_MS): TranscriptWriter {
+export function storedTranscript(backend: TranscriptBackend, id: string, { exists = () => true, onError, delay = WRITE_MS }: StoredTranscriptOptions = {}): StoredTranscript {
+  let readDone = false, gone = false;
   let pending: Transcript | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  const flush = async () => {
+  let writes: Promise<void> = Promise.resolve();
+  const write = (): Promise<void> => {
     if (timer) { clearTimeout(timer); timer = null; }
     const value = pending;
     pending = null;
-    if (!value) return;
-    try { await backend.set(id, value); } catch (err) { onError?.(err as Error); }
+    if (!value) return writes;
+    writes = writes.then(() => (gone ? undefined : backend.set(id, value))).catch((err: Error) => onError?.(err));
+    return writes;
   };
-  const onHide = () => { if (document.visibilityState === 'hidden') void flush(); };
+  const onHide = () => { if (document.visibilityState === 'hidden') void write(); };
+  const onPageHide = () => void write();
   const hasDom = typeof document !== 'undefined' && typeof window !== 'undefined';
   if (hasDom) {
     document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pagehide', flush);
+    window.addEventListener('pagehide', onPageHide);
   }
+  const detach = () => {
+    if (!hasDom) return;
+    document.removeEventListener('visibilitychange', onHide);
+    window.removeEventListener('pagehide', onPageHide);
+  };
+  const writable = () => readDone && !gone;
   return {
-    schedule(value) {
-      pending = value;
-      timer ??= setTimeout(() => void flush(), delay);   // at most one write per `delay`, not one per token
-    },
-    flush,
-    cancel() {
-      if (timer) { clearTimeout(timer); timer = null; }
-      pending = null;
-    },
-    dispose() {
-      void flush();
-      if (hasDom) {
-        document.removeEventListener('visibilitychange', onHide);
-        window.removeEventListener('pagehide', flush);
+    async read() {
+      let t: Transcript | null = null;
+      if (exists()) {
+        try { t = await backend.get(id); } catch { /* IndexedDB unavailable (private mode) or the record is unreadable */ }
       }
+      readDone = true;
+      return t && { ...t, messages: sealInterrupted(t.messages) };
+    },
+    update(t) {
+      if (!writable()) return;
+      pending = t;
+      timer ??= setTimeout(() => void write(), delay);   // at most one write per `delay`, not one per token
+    },
+    commit(t) {
+      if (!writable()) return writes;
+      pending = t;
+      return write();
+    },
+    close() {
+      void write();
+      detach();
+    },
+    destroy() {
+      gone = true;
+      pending = null;
+      if (timer) { clearTimeout(timer); timer = null; }
+      detach();
+      writes = writes.then(() => backend.remove(id)).catch(() => { /* storage unavailable */ });
+      return writes;
     },
   };
 }

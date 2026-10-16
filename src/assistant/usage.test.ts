@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HISTORY_CAP, loadTranscript, parseIndex, prune, transcriptWriter, type ChatMeta, type Transcript, type TranscriptBackend } from './history-store';
+import { HISTORY_CAP, parseIndex, prune, storedTranscript, type ChatMeta, type Transcript, type TranscriptBackend } from './history-store';
 import { createLock, serialized } from './lock';
 import { NOT_RUN } from './transcript';
 import { addUsage, contextOf, formatCost, formatTokens, newInput, NO_USAGE, usageOf } from './usage';
@@ -86,28 +86,85 @@ describe('transcripts', () => {
     return { data, writes, backend };
   };
 
-  it('writes at most once a second however often the transcript changes, and at once on flush', async () => {
+  const t = (id: string): Transcript => ({ messages: [{ id, role: 'assistant', parts: [] }], replyUsage: {} });
+  const microtasks = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };   // a queued write starts
+
+  it('writes at most once a second however often the transcript changes, and at once when a reply completes', async () => {
     vi.useFakeTimers();
     const { data, writes, backend } = memory();
-    const w = transcriptWriter(backend, 'x');
-    for (let i = 0; i < 50; i++) w.schedule({ messages: [{ id: `m${i}`, role: 'assistant', parts: [] }], replyUsage: {} });   // 50 streamed tokens
+    const st = storedTranscript(backend, 'x', { exists: () => false });
+    await st.read();
+    for (let i = 0; i < 50; i++) st.update(t(`m${i}`));   // 50 streamed tokens
     expect(writes).toEqual([]);
     await vi.advanceTimersByTimeAsync(1000);
     expect(writes).toEqual(['x']);
     expect(data.get('x')!.messages[0]!.id).toBe('m49');   // only the newest state
-    w.schedule({ messages: [], replyUsage: {} });
-    await w.flush();
+    await st.commit(t('done'));
     expect(writes).toEqual(['x', 'x']);
-    await w.flush();                                       // nothing pending: no write
+    await vi.advanceTimersByTimeAsync(1000);              // nothing pending: no write
     expect(writes).toHaveLength(2);
-    w.dispose();
+    st.close();
   });
 
   it('reads a transcript sealed, and survives a broken store', async () => {
     const { data, backend } = memory();
     data.set('x', { messages: [{ id: 'a', role: 'assistant', parts: [{ type: 'tool-call', id: 'c', name: 'set_look', arguments: '{}', state: 'input-complete' }] }], replyUsage: {} });
-    const t = await loadTranscript(backend, 'x');
-    expect(t!.messages[0]!.parts.at(-1)).toMatchObject({ type: 'tool-result', content: NOT_RUN });
-    expect(await loadTranscript({ ...backend, get: () => Promise.reject(new Error('no IndexedDB')) }, 'x')).toBeNull();
+    const read = await storedTranscript(backend, 'x').read();
+    expect(read!.messages[0]!.parts.at(-1)).toMatchObject({ type: 'tool-result', content: NOT_RUN });
+    expect(await storedTranscript({ ...backend, get: () => Promise.reject(new Error('no IndexedDB')) }, 'x').read()).toBeNull();
+    expect(await storedTranscript(backend, 'x', { exists: () => false }).read()).toBeNull();   // not in the index: not asked
+  });
+
+  it('never writes before the stored one was read, so closing early keeps it', async () => {
+    const { data, writes, backend } = memory();
+    data.set('x', t('keep me'));
+    const st = storedTranscript(backend, 'x');
+    st.update(t('empty'));
+    await st.commit(t('empty'));
+    st.close();
+    expect(writes).toEqual([]);
+    expect(data.get('x')!.messages[0]!.id).toBe('keep me');
+  });
+
+  it('writes in order, so a completed reply is never overtaken by an older state', async () => {
+    const { data, backend } = memory();
+    let release!: () => void;
+    const slow: TranscriptBackend = { ...backend, set: (id, v) => (v.messages[0]!.id === 'older' ? new Promise((r) => { release = () => r(backend.set(id, v)); }) : backend.set(id, v)) };
+    const st = storedTranscript(slow, 'x', { exists: () => false });
+    await st.read();
+    void st.commit(t('older'));
+    const final = st.commit(t('final'));
+    await microtasks();
+    release();
+    await final;
+    expect(data.get('x')!.messages[0]!.id).toBe('final');
+  });
+
+  it('after destroy writes nothing, and a write in flight lands before the record goes', async () => {
+    vi.useFakeTimers();
+    const { data, backend } = memory();
+    let release!: () => void;
+    const slow: TranscriptBackend = { ...backend, set: (id, v) => new Promise((r) => { release = () => r(backend.set(id, v)); }) };
+    const st = storedTranscript(slow, 'x', { exists: () => false });
+    await st.read();
+    void st.commit(t('in flight'));
+    await microtasks();
+    st.update(t('pending'));
+    const gone = st.destroy();
+    release();
+    await gone;
+    st.update(t('streamed in after'));
+    await st.commit(t('streamed in after'));
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(data.has('x')).toBe(false);
+  });
+
+  it('reports a failed write', async () => {
+    const { backend } = memory();
+    const errors: string[] = [];
+    const st = storedTranscript({ ...backend, set: () => Promise.reject(new Error('quota')) }, 'x', { exists: () => false, onError: (e) => errors.push(e.message) });
+    await st.read();
+    await st.commit(t('a'));
+    expect(errors).toEqual(['quota']);
   });
 });

@@ -159,8 +159,10 @@ dispose; the director's cycles use the same), so several run at once and keep ru
 tool lock with each other and the director (`lock.ts`: their tools act on one app, one at a time) and one undo stack (an undo closure restores a
 snapshot, so only the newest change can be undone safely; the entry says whose it was). The session publishes
 `assistantBusy` / `assistantRunning` / `assistantUnread` / `assistantPeek` for the bubble and the director. History:
-an index under `KEYS.assistantChats`, transcripts in IndexedDB (`history-store.ts`), written at most once a second and
-at once when a reply ends. A transcript is *sealed* when read and on Stop (`sealInterrupted`): a tool call without a
+an index under `KEYS.assistantChats`, transcripts in IndexedDB (`history-store.ts`). Each conversation keeps its
+transcript through one `storedTranscript` handle, which holds every rule for it: read once, sealed; never written
+before that read (a conversation closed early doesn't overwrite it); written at most once a second and at once when a
+reply ends, in order; nothing written after a delete. A transcript is *sealed* when read and on Stop (`sealInterrupted`): a tool call without a
 result gets one saying the app closed first. Notes for Claude (undo, reopened later) ride at the start of the next
 user message (`notes.ts`). Before a send, screenshots older than the newest three are replaced by a short note
 (`prepareForSend`). The connection has no `joinRun` on purpose: a run is never rejoined.

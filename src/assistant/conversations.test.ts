@@ -4,6 +4,7 @@ import type { ConnectConnectionAdapter, UIMessage } from '@tanstack/ai-client';
 import { fakeApp, type FakeApp } from '../app/fake-app';
 import { parseParams } from '../engine/params';
 import { KEYS } from '../state/persistence';
+import { SETTLE_MS } from './chat';
 import { AssistantSession, MAX_RUNNING_CLI, type Conversation } from './conversations';
 import type { Transcript, TranscriptBackend } from './history-store';
 import { codeHash } from './notes';
@@ -88,13 +89,13 @@ describe('assistant conversations', () => {
     gate.wait = new Promise<void>((r) => { gate.release = r; });
     const { app, s } = session(seen, { gate });
     const a = s.active;
-    await a.load(false);
+    await a.load();
     a.send('slow question');
     await until(() => a.running);
     s.newChat();
     await until(() => s.active !== a);
     const b = s.active;
-    await b.load(false);
+    await b.load();
     b.send('quick question');
     await until(() => !b.running && b.view.messages.length === 2);
 
@@ -121,7 +122,7 @@ describe('assistant conversations', () => {
     const seen: Seen[] = [];
     const { app, s } = session(seen);
     const c = s.active;
-    await c.load(false);
+    await c.load();
     c.send('look brighter');
     await until(() => !c.running && seen.length === 2);   // the run, and the continuation after the tool ran
     expect(app.state.look.hue).toBe(0.5);
@@ -148,7 +149,7 @@ describe('assistant conversations', () => {
     gate.wait = new Promise<void>((r) => { gate.release = r; });
     const { s } = session(seen, { gate });
     const c = s.active;
-    await c.load(false);
+    await c.load();
     c.send('slow one');
     await until(() => c.running);
     c.send('second');
@@ -173,7 +174,7 @@ describe('assistant conversations', () => {
       await until(() => !convs.includes(s.active));
       const c = s.active;
       convs.push(c);
-      await c.load(false);
+      await c.load();
       c.send(`slow ${i}`);
     }
     await until(() => convs.filter((c) => c.running).length === MAX_RUNNING_CLI);
@@ -219,7 +220,7 @@ describe('assistant conversations', () => {
     const scene = app.state.scenes[0]!;
     const first = session([], { transcripts, app });
     const c = first.s.active;
-    await c.load(false);
+    await c.load();
     c.send('hello');
     await until(() => !c.running && c.view.messages.length === 2);
     expect(first.s.meta(c.id)!.seen).toEqual({ scene: 'Alpha', hash: codeHash(scene.body) });
@@ -256,7 +257,7 @@ describe('assistant conversations', () => {
 
     const first = session([], { transcripts: slow });
     first.s.dispose();
-    await new Promise((r) => setTimeout(r, 1200));   // past the transcript writer's delay
+    await new Promise((r) => setTimeout(r, 80));   // past the slow read: nothing is written before it, nor after a close
     expect(stored.data.get(id)?.messages).toEqual(messages);
 
     const second = session([], { transcripts: slow });
@@ -270,7 +271,7 @@ describe('assistant conversations', () => {
     const seen: Seen[] = [];
     const { s, forgotten } = session(seen, { transcripts });
     const c = s.active;
-    await c.load(false);
+    await c.load();
     c.send('hello');
     await until(() => !c.running && c.view.messages.length === 2);
     await until(() => transcripts.data.has(c.id));
@@ -289,12 +290,12 @@ describe('assistant conversations', () => {
     gate.wait = new Promise<void>((r) => { gate.release = r; });
     const { app, s } = session([], { transcripts, gate });
     const c = s.active;
-    await c.load(false);
+    await c.load();
     c.send('slow question');
     await until(() => c.running);
     await s.remove(c.id);
     gate.release();
-    await new Promise((r) => setTimeout(r, 1500));   // past the settle delay and the transcript writer's
+    await new Promise((r) => setTimeout(r, SETTLE_MS + 100));   // past the run's settle (nothing writes after a delete)
     expect(transcripts.data.has(c.id)).toBe(false);
     expect(s.view.live[c.id]).toBeUndefined();
     expect(app.ui.get().assistantPeek).toBeNull();

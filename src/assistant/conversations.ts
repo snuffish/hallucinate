@@ -15,7 +15,7 @@ import { Store } from '../state/store';
 import { Chat, forgetThread } from './chat';
 import { createToolRunner, UndoConflict, type ToolRunner } from './executor';
 import type { Backend } from './settings-wire';
-import { HISTORY_CAP, indexedDBTranscripts, loadTranscript, prune, readIndex, transcriptWriter, writeIndex, type ChatMeta, type TranscriptBackend, type TranscriptWriter } from './history-store';
+import { HISTORY_CAP, indexedDBTranscripts, prune, readIndex, storedTranscript, writeIndex, type ChatMeta, type StoredTranscript, type TranscriptBackend } from './history-store';
 import { createLock, serialized, type Lock } from './lock';
 import { codeHash, resumeNote, undoNote, withNotes, type ScreenNow } from './notes';
 import { previewOf, prepareForSend, titleFrom } from './transcript';
@@ -74,24 +74,25 @@ const sortChats = (chats: ChatMeta[]) => [...chats].sort((a, b) => b.updatedAt -
 export class Conversation {
   readonly store: Store<ChatView>;
   private chat: Chat | null = null;
-  private readonly writer: TranscriptWriter;
+  private readonly stored: StoredTranscript;
   private release: (() => void) | null = null;
   private loadPromise: Promise<void> | null = null;
   private restored = false;     // came from history: the first send says so
 
   constructor(readonly id: string, private readonly session: AssistantSession) {
     this.store = new Store<ChatView>({ id, loaded: false, messages: [], replyUsage: {}, status: 'idle', error: null, outbox: [], notes: [], draft: '', readOnly: false, runStartedAt: null, runTools: 0 });
-    this.writer = transcriptWriter(session.transcripts, id, () => session.storageFailed());
+    this.stored = storedTranscript(session.transcripts, id, { exists: () => !!session.meta(id), onError: () => session.storageFailed() });
   }
 
   get view(): ChatView { return this.store.get(); }
   get running(): boolean { return this.view.status === 'running'; }
 
-  // Reads the stored transcript (sealed) and takes this tab's lock on the conversation. Once.
-  load(stored: boolean): Promise<void> {
+  // Reads the stored transcript (sealed, if the history lists one) and takes this tab's lock on the
+  // conversation. Once.
+  load(): Promise<void> {
     this.loadPromise ??= (async () => {
       this.release = await this.session.lock(this.id, () => this.store.set({ readOnly: true }));
-      const t = stored ? await loadTranscript(this.session.transcripts, this.id) : null;
+      const t = await this.stored.read();
       if (t && t.messages.length) this.restored = true;
       this.store.set({ loaded: true, ...(t && { messages: t.messages, replyUsage: t.replyUsage }) });
     })();
@@ -148,31 +149,40 @@ export class Conversation {
     void this.chat.retry();
   }
 
-  // `save`: keep the transcript (false when the conversation is being deleted: nothing is written
-  // after that, not even a reply still streaming in). A conversation whose stored transcript hasn't
-  // been read yet has nothing of its own to save, and must not overwrite it.
-  dispose(save = true): void {
-    const sealed = this.chat?.dispose();
-    this.chat = null;
-    if (save && sealed) this.store.set({ messages: sealed });
-    if (save && this.view.loaded) this.writer.schedule(this.transcript());
-    else this.writer.cancel();
-    this.writer.dispose();
-    this.release?.();
-    this.release = null;
+  // Closes the conversation, keeping its transcript (a run cut off is sealed first).
+  dispose(): void {
+    const sealed = this.end();
+    if (sealed) this.store.set({ messages: sealed });
+    this.stored.update(this.transcript());
+    this.stored.close();
+  }
+
+  // Deletes it: nothing is written after this, not even a reply still streaming in.
+  delete(): Promise<void> {
+    this.end();
+    return this.stored.destroy();
   }
 
   // ---- internals ----
 
   private transcript() { return { messages: this.view.messages, replyUsage: this.view.replyUsage }; }
 
+  // Ends the Chat (it reports nothing after) and lets go of this tab's lock; the sealed messages of a run it cut off.
+  private end(): UIMessage[] | undefined {
+    const sealed = this.chat?.dispose();
+    this.chat = null;
+    this.release?.();
+    this.release = null;
+    return sealed;
+  }
+
   private ensureChat(): Chat {
     this.chat ??= new Chat({ connection: this.session.connection, runner: this.session.runnerFor(this.id), threadId: this.id, messages: this.view.messages }, {
       messages: (messages) => {
         this.store.set({ messages });
-        this.writer.schedule(this.transcript());
+        this.stored.update(this.transcript());
       },
-      replied: () => { this.writer.schedule(this.transcript()); void this.writer.flush(); },   // a reply is complete: keep it now
+      replied: () => void this.stored.commit(this.transcript()),   // a reply is complete: keep it now
       tool: () => this.store.set({ runTools: this.view.runTools + 1 }),
       usage: (u, context) => this.countUsage(u, context),
       error: (message) => this.store.set({ error: message }),
@@ -189,7 +199,7 @@ export class Conversation {
 
   private settled(): void {
     this.store.set({ status: 'idle', runStartedAt: null });
-    void this.writer.flush().then(() => this.writer.schedule(this.transcript())).then(() => this.writer.flush());
+    void this.stored.commit(this.transcript());
     this.session.settled(this);
     this.pump();
   }
@@ -272,7 +282,7 @@ export class AssistantSession {
   async open(id: string): Promise<void> {
     const c = this.conversation(id);
     this.setActive(id);
-    await c.load(!!this.meta(id));
+    await c.load();
     c.pump();
   }
 
@@ -304,7 +314,7 @@ export class AssistantSession {
 
   async remove(id: string): Promise<void> {
     const c = this.chats.get(id);
-    c?.dispose(false);
+    const removed = c ? c.delete() : storedTranscript(this.transcripts, id).destroy();
     this.chats.delete(id);
     this.runners.delete(id);
     const { [id]: _gone, ...live } = this.view.live;
@@ -312,7 +322,7 @@ export class AssistantSession {
     this.store.set({ chats, live });
     this.saveIndex();
     (this.opts.forgetThread ?? forgetThread)(id);
-    try { await this.transcripts.remove(id); } catch { /* storage unavailable */ }
+    await removed;
     if (this.view.activeId === id) void this.open(chats[0]?.id ?? newId());
     this.publish();
   }

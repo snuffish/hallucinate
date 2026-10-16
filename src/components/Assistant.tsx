@@ -275,7 +275,7 @@ export function Assistant() {
   const exportChat = (id: string) => {
     const m = session.meta(id);
     const c = session.conversation(id);
-    void c.load(!!m).then(() => {
+    void c.load().then(() => {
       const title = m?.title ?? 'Conversation';
       const md = toMarkdown(title, c.view.messages, { reasoning: showThinking });
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'conversation';
