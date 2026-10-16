@@ -8,6 +8,8 @@
   parameter values: it fades out as it was on Live. Two show scenes of the same scene no longer fade the new values in
   only at the very end; the new ones show at once, as they do with the studio open.
 - Opening the library no longer breaks the controls with "'ArrowLeft' is already registered".
+- When a shared tab stops sharing (or the microphone goes away), the player says so instead of still showing
+  "▶ Tab / system audio", and the source button is no longer lit.
 - A conversation's transcript is saved in order: a reply's final state can no longer be overwritten by an older one
   that was still being written, and deleting a conversation while a save is in flight no longer leaves it stored.
 - The desktop app started from the Dock or Finder now uses `CLAUDE_BIN`, `YTDLP`, `YTDLP_CACHE_MB` and `ASSISTANT_DEBUG`

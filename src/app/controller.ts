@@ -25,6 +25,7 @@ import { applyWrites, buildBundle, parseBundle } from './bundle';
 import { downloadFile, fileStamp } from './download';
 import { EditorCore } from './editor';
 import { LiveSlot } from './live-slot';
+import { MusicSource } from './music-source';
 import { SceneLibrary, type SceneChange } from './scene-library';
 import { Transport } from './transport';
 
@@ -32,7 +33,6 @@ const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back
 const DRIFT_PUBLISH_FRAMES = 6;
 const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second, however slow the frames
 
-const SOURCE_LABELS: Record<string, string> = { mic: 'Microphone / line-in', display: 'Tab / system audio', demo: 'Demo beat (124 BPM)' };
 const COOL = [0.7, 0.85, 1.35];
 const WARM = [1.3, 1.05, 0.7];
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
@@ -82,6 +82,8 @@ export class AppController {
   readonly layout = new Store<L.Layout>(this.initialLayout());
   readonly player: HTMLAudioElement;
   readonly transport: Transport;
+  // What the music is: the source playing, the "now playing" line, play / pause (music-source.ts).
+  readonly music: MusicSource;
   // Each scene's code, @params and stored values; adding, compiling and removing scenes (scene-library.ts).
   readonly library: SceneLibrary;
   readonly tempo = new TempoClock();
@@ -168,6 +170,11 @@ export class AppController {
     this.transport = new Transport(this.player, this.audio, (transport) => this.ui.set({ transport }), {
       onPrev: () => !!this.queueFor(this.state.activeSource)?.playPrev(),
       onNext: () => !!this.queueFor(this.state.activeSource)?.playNext(),
+    });
+    this.music = new MusicSource({
+      audio: this.audio, player: this.player, state: this.state, transport: this.transport,
+      publish: (view) => this.ui.set(view),
+      started: (source) => this.sourceStarted(source),
     });
 
     this.state.clock.scene = this.lastScene();   // before the params below, which publish the scene on screen's
@@ -621,21 +628,18 @@ export class AppController {
 
   // ---------- Sources ----------
 
+  // A source button: a file and SoundCloud open their pickers; a video's sound starts from the media panel.
   async startSource(kind: SourceButton, pickFile?: () => void, openSoundCloud?: () => void): Promise<void> {
-    try {
-      if (kind === 'file') return pickFile?.();
-      if (kind === 'soundcloud') return openSoundCloud?.();
-      this.player.pause();
-      if (kind === 'mic') await this.audio.useMicrophone(micConstraints(this.prefs.get()));
-      if (kind === 'display') await this.audio.useDisplayAudio();
-      if (kind === 'demo') await this.audio.useDemo();
-      this.onSourceStarted(SOURCE_LABELS[kind] ?? kind, kind);
-      this.transport.setMode(kind === 'demo' ? 'demo' : null);
-    } catch (err) {
-      const e = err as Error;
-      if (e.name === 'NotAllowedError') this.toast('Permission denied or capture cancelled.');
-      else this.toast(e.message || String(err));
-    }
+    if (kind === 'file') return pickFile?.();
+    if (kind === 'soundcloud') return openSoundCloud?.();
+    if (kind === 'media') return;
+    await this.music.start(kind, micConstraints(this.prefs.get())).catch((err) => this.sourceFailed(err));
+  }
+
+  private sourceFailed(err: unknown): void {
+    const e = err as Error;
+    if (e.name === 'NotAllowedError') this.toast('Permission denied or capture cancelled.');
+    else this.toast(e.message || String(err));
   }
 
   async playFile(file: File | undefined): Promise<void> {
@@ -650,28 +654,19 @@ export class AppController {
   async playUrl(src: string, label: string, sourceButton: SourceButton): Promise<void> {
     const player = this.player;
     if (player.src.startsWith('blob:') && player.src !== this.media.url) URL.revokeObjectURL(player.src);
-    player.src = src;
     try {
-      await this.audio.useElement(player);
-      await player.play();
-      this.onSourceStarted(label, sourceButton);
-      this.transport.setMode('element', { hasQueue: !!this.queueFor(sourceButton)?.hasQueue });
+      await this.music.play(src, label, sourceButton, { hasQueue: !!this.queueFor(sourceButton)?.hasQueue });
     } catch (err) {
       this.toast(`Couldn't play this: ${(err as Error).message}`);
     }
   }
 
-  togglePlay(): void {
-    const kind = this.audio.kind;
-    if (kind === 'file') { if (this.player.paused) this.player.play().catch(() => {}); else this.player.pause(); }
-    else if (kind === 'demo') { this.audio.detach(); this.ui.set({ nowText: '❚❚ Demo beat paused' }); this.transport.setMode('demo'); }
-    else if (!kind && this.ui.get().nowText.includes('Demo')) void this.startSource('demo');
-  }
+  togglePlay(): void { this.music.toggle().catch((err) => this.sourceFailed(err)); }
 
-  private onSourceStarted(label: string, sourceButton: SourceButton): void {
-    this.state.activeSource = sourceButton;
-    if (sourceButton !== 'media' && this.mediaSound) this.setMediaSound(false, { quiet: true });   // another source is the music now
-    this.ui.set({ nowText: `▶ ${label}`, started: true, activeSource: sourceButton });
+  // A source began playing (MusicSource): the tempo starts over.
+  private sourceStarted(source: SourceButton): void {
+    if (source !== 'media' && this.mediaSound) this.setMediaSound(false, { quiet: true });   // another source is the music now
+    this.ui.set({ started: true });
     document.body.classList.add('started');
     if (!readFlag(KEYS.helpHint)) { writeFlag(KEYS.helpHint, true); this.toast('Press ? for help & shortcuts', 4000); }
     this.state.clock.beatTimes = [];
@@ -725,11 +720,7 @@ export class AppController {
     this.ui.set({ mediaSound: on });
     if (quiet) return;
     if (on && this.media.kind === 'video') void this.linkMediaSound();
-    else if (!on && this.state.activeSource === 'media') {
-      this.player.pause();
-      this.state.activeSource = null;
-      this.ui.set({ nowText: '❚❚ Video sound off — pick a music source', activeSource: null });
-    }
+    else if (!on && this.music.active === 'media') this.music.stop('❚❚ Video sound off — pick a music source');
   }
 
   private async linkMediaSound(): Promise<void> {

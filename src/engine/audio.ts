@@ -29,6 +29,8 @@ export class AudioEngine {
   private readonly elementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
   kind: AudioKind | null = null;
   onBeat: (() => void) | null = null;
+  // A live input stopped by itself: a shared tab stopped sharing, the microphone went away.
+  onEnded: ((kind: AudioKind) => void) | null = null;
   recordDest: MediaStreamAudioDestinationNode | null = null;
   private output: GainNode | null = null;
   private volume = 1;
@@ -118,6 +120,7 @@ export class AudioEngine {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
     this.detach();
     this.stream = stream;
+    this.endWith(stream, 'mic');
     this.attach(this.ctx!.createMediaStreamSource(stream), 'mic', false);
   }
 
@@ -132,8 +135,17 @@ export class AudioEngine {
     stream.getVideoTracks().forEach((t) => t.stop());
     this.detach();
     this.stream = stream;
-    stream.getAudioTracks()[0]!.addEventListener('ended', () => { if (this.stream === stream) this.detach(); });
+    this.endWith(stream, 'display');
     this.attach(this.ctx!.createMediaStreamSource(stream), 'display', false);
+  }
+
+  // When the stream's audio ends while it is still the source, let go of it and say so.
+  private endWith(stream: MediaStream, kind: AudioKind): void {
+    stream.getAudioTracks()[0]?.addEventListener('ended', () => {
+      if (this.stream !== stream) return;
+      this.detach();
+      this.onEnded?.(kind);
+    });
   }
 
   async useDemo(): Promise<void> {
