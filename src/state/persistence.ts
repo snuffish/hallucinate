@@ -31,6 +31,8 @@ export const KEYS = {
   // once after the reload.
   importedAt: 'hallucinate.importedAt',
   importReport: 'hallucinate.importReport',
+  // Your scenes renamed on load because a built-in has their name (src/state/scene-list.ts), shown once.
+  renameReport: 'hallucinate.renameReport',
 } as const;
 
 // What each stored key holds, which decides whether Export / Import (src/app/bundle.ts) carries it:
@@ -43,7 +45,7 @@ export const KEY_CLASS: Record<keyof typeof KEYS, KeyClass> = {
   sceneEdits: 'setup', userScenes: 'setup', library: 'setup', params: 'setup', customShader: 'setup', nodeGraph: 'setup',
   show: 'setup', player: 'setup', mediaSound: 'setup', layout: 'setup',
   prefs: 'device', assistantThinking: 'device',
-  scRecent: 'history', ytRecent: 'history', lastScene: 'history', assistantChats: 'history', paramGroups: 'history', helpHint: 'history',
+  scRecent: 'history', ytRecent: 'history', lastScene: 'history', renameReport: 'history', assistantChats: 'history', paramGroups: 'history', helpHint: 'history',
   paramsCollapsed: 'migration', paramsPos: 'migration',
   importedAt: 'import', importReport: 'import',
 };

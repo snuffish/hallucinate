@@ -18,7 +18,7 @@ import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from 
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
-import { buildSceneList, paramKey } from '../state/scene-list';
+import { buildSceneList, paramKey, takeRenameReport } from '../state/scene-list';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { applyWrites, buildBundle, parseBundle } from './bundle';
@@ -86,7 +86,7 @@ export class AppController {
   readonly listener = new Listener();
   readonly editor: EditorCore;
   readonly pickers: Partial<Record<'sc' | 'yt', PickerApi>> = {};
-  libraryPrefs: LibraryPrefs = loadLibraryPrefs();
+  libraryPrefs: LibraryPrefs;   // read after the scene list is built: a rename on load moves entries in it
   readonly hooks: ControllerHooks = {};
   mediaSound = readFlag(KEYS.mediaSound);
   // Device preferences (Settings overlay, src/state/prefs.ts).
@@ -111,7 +111,7 @@ export class AppController {
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly program: ProgramState;
-  private readonly paramStore = new ParamStore();
+  private readonly paramStore: ParamStore;   // likewise
   private readonly profilerApi: ProfilerApi = {
     report: () => (this.profiler.on ? this.perfReport() : null),
     fillTest: () => this.runFillTest(),
@@ -151,6 +151,8 @@ export class AppController {
     const scenes: Scene[] = [];   // the one shared list: the renderer holds it, buildSceneList fills it
     this.renderer = new Renderer(canvas, scenes);
     const list = buildSceneList(scenes, (frag, name) => this.renderer.check(frag, name));
+    this.libraryPrefs = loadLibraryPrefs();
+    this.paramStore = new ParamStore();
     this.state = {
       scenes: list.scenes, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
       look: { ...defaultLook(), resolution: this.prefs.get().startResolution }, clock: defaultClock(), activeSource: null,
@@ -201,16 +203,17 @@ export class AppController {
     setTimeout(() => { if (!this.disposed) this.startupNotice(); }, 500);
   }
 
-  // What happened at startup: an import that just finished (its report is shown once) and saved
-  // scenes that don't compile here. Read late, so a controller disposed right away (StrictMode)
-  // doesn't swallow the report.
+  // What happened at startup, in one toast: an import that just finished (its report is shown once),
+  // your scenes renamed because a built-in has their name, and saved scenes that don't compile here.
+  // Read late, so a controller disposed right away (StrictMode) doesn't swallow a report.
   private startupNotice(): void {
     const imported = readString(KEYS.importReport);
     if (imported !== null) remove(KEYS.importReport);
     const errors = this.ui.get().startupErrors;
     const broken = errors.length ? `Couldn't compile your saved scene(s): ${errors.join(', ')} — kept in the library under "Doesn't compile here"` : '';
-    if (imported !== null) this.toast(`Imported ${imported}.${broken ? ` ${broken}.` : ''}`, broken ? 9000 : 5000);
-    else if (broken) this.toast(broken, 6000);
+    const notes = [takeRenameReport(), broken].filter(Boolean).map((n) => `${n}.`).join(' ');
+    if (imported !== null) this.toast(`Imported ${imported}.${notes ? ` ${notes}` : ''}`, notes ? 9000 : 5000);
+    else if (notes) this.toast(notes, 6000);
   }
 
   dispose(): void {
