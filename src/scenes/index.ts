@@ -14,7 +14,7 @@ import { SCAN_TRACE } from './scan-trace';
 
 export { COMMON } from './header';
 export { TEMPLATE } from './template';
-export { CATEGORIES, scene, type Scene, type SceneExtra, type SceneKind } from './scene';
+export { CATEGORIES, scene, userSceneId, type Scene, type SceneExtra, type SceneKind } from './scene';
 
 export const SCENES: readonly Scene[] = [
   BEAM_FAN,      // 1

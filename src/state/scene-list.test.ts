@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { scene } from '../scenes';
 import { KEYS } from './persistence';
-import { buildSceneList, type CompileCheck, discardParked, loadUserScenes, paramKey, saveSceneEdit, saveUserScenes, sceneByName, stepScene, takeRenameReport, userScene, type ParkedScenes } from './scene-list';
+import { buildSceneList, type CompileCheck, discardParked, isBuiltin, loadUserScenes, paramKey, saveSceneEdit, saveUserScenes, sceneByName, stepScene, userScene, type ParkedScenes } from './scene-list';
+import { takeRenameReport } from './scene-renames';
 
 // The scene list is the cross-window contract: indices must stay stable, so removal is a flag.
 describe('scene list', () => {
@@ -196,6 +197,12 @@ describe('scene list', () => {
       expect(list.renamed).toEqual([{ from: 'Beta', to: 'Beta (mine 2)' }, { from: 'Gamma', to: 'Gamma (mine 3)' }]);
       expect(loadUserScenes().map((s) => s.name)).toEqual(['Beta (mine)', 'Beta (mine 2)', 'Gamma (mine)', 'Gamma (mine 2)', 'Gamma (mine 3)']);
     });
+  });
+
+  it('tells the built-ins from your scenes and the editor slots', () => {
+    store.set(KEYS.userScenes, JSON.stringify(mine(1)));
+    const { scenes } = build();
+    expect(scenes.filter(isBuiltin).map((s) => s.name)).toEqual(['Alpha', 'Beta', 'Gamma']);
   });
 
   it('keys parameter values per scene kind', () => {

@@ -18,7 +18,8 @@ import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from 
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
-import { buildSceneList, paramKey, stepScene, takeRenameReport } from '../state/scene-list';
+import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
+import { takeRenameReport } from '../state/scene-renames';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { applyWrites, buildBundle, parseBundle } from './bundle';
@@ -116,7 +117,7 @@ export class AppController {
     report: () => (this.profiler.on ? this.perfReport() : null),
     fillTest: () => this.runFillTest(),
     reset: () => this.profiler.reset(),
-    scenes: () => this.state.scenes.flatMap((s, index) => (s.removed ? [] : [{ index, name: s.name, cat: s.cat, params: s.params.length, builtin: s.original !== undefined }])),
+    scenes: () => this.state.scenes.flatMap((s, index) => (s.removed ? [] : [{ index, name: s.name, cat: s.cat, params: s.params.length, builtin: isBuiltin(s) }])),
     setScene: (index) => this.setScene(index),
     still: async (index, { inputs = {}, silent = false } = {}) => {
       const s = this.state.scenes[index];
