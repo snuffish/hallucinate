@@ -36,6 +36,7 @@ A top-level \`// @group Name\` line puts the parameters after it under a heading
 # Making it feel musical
 - uBass, uMid, uHigh, uLevel and uBeat jump with every hit. Drive brightness, glow, colour and size with them, never position, phase, rotation or zoom: those make the picture jerk on every kick.
 - uTime already speeds up with the music, so motion driven by uTime stays smooth and still feels the beat.
+- uTick runs 0 → 1 through each beat of the tempo and uTicks counts the beats (mod(uTicks, 4.) for every 4th); both keep going through breakdowns. Use them for motion in time: a sweep per beat, a new shape every few beats.
 - spec(x) is the live spectrum (0 bass … 1 treble), wave(x) the waveform; uBright (dark … bright timbre) and uMood (calm … energetic) change slowly over seconds.
 - media(p) is an image or video the user dropped in (a test pattern otherwise); wrap a final colour built from it in untone() for true colours.
 

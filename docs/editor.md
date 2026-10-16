@@ -59,6 +59,9 @@ The editor's *Cheat sheet* has the full list. A few worth knowing:
 
 - `uBass`, `uMid`, `uHigh`, `uLevel`, `uBeat` – 0 to 1, up to 1.5 when Reactivity is turned up; `uBeat` follows the
   detected kicks.
+- `uTick`, `uTicks` – the music's tempo: `uTick` runs 0 → 1 through each tick (one beat) and `uTicks` counts them,
+  so `mod(uTicks, 4.)` changes something every four beats. Both keep going through breakdowns and hold still while
+  nothing plays.
 - `uBright`, `uMood` – the [synesthesia](audio.md#-synesthesia-sound--light-mapping) tone and mood, 0 to 1 and not
   scaled by Reactivity.
 - `media(p)`, `untone(col)` – sample the dropped image or video; see [Media](media.md#in-code-and-the-visual-maker).

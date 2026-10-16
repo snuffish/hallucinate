@@ -2,7 +2,7 @@
 //   1. scene shader(s)  -> scene targets (two while crossfading)
 //   2. feedback pass    -> mixes scene with a zoomed/rotated/hue-shifted copy of the
 //                          previous frame (ping-pong), giving Milkdrop-style trails
-//   3. display pass     -> tonemap, chromatic aberration, vignette, grain -> canvas
+//   3. display pass     -> tonemap, chromatic aberration, vignette, grain (not on black) -> canvas
 //
 // Programs compile in the background (KHR_parallel_shader_compile) so typing in the editor never
 // stalls the show; the previous program keeps running until the new one is ready. Media uploads go
@@ -77,7 +77,9 @@ void main() {
   float l = dot(col, vec3(.299, .587, .114));
   col = mix(vec3(l), col, 1.15 * uSat);
   col *= 1. - dot(c, c) * .6;
-  col += (hash(gl_FragCoord.xy + fract(uTime) * 100.) - .5) * .015;
+  // Grain fades out below a low brightness, so black stays exactly black on a projector.
+  float lit = smoothstep(0., .05, max(col.r, max(col.g, col.b)));
+  col += (hash(gl_FragCoord.xy + fract(uTime) * 100.) - .5) * .015 * lit;
   fragColor = vec4(clamp(col, 0., 1.) * uMaster, 1.);
 }
 `;
@@ -98,6 +100,8 @@ export interface ProgramState {
   high: number;
   level: number;
   beat: number;
+  tickPhase: number;
+  ticks: number;
   hue: number;
   spectrum: Uint8Array;
   bright: number;
