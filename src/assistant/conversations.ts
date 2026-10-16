@@ -335,7 +335,14 @@ export class AssistantSession {
 
   // Undo reverts the newest change any conversation made, and tells that conversation. A change that
   // something else built on since can't be undone safely: it is dropped and `error` says why.
+  // Not while the conversation that made the change is still running: its next step may build on it.
+  get undoBlocked(): boolean {
+    const owner = this.undo.store.get().lastChat;
+    return !!owner && this.isRunning(owner);
+  }
+
   undoLast(): { label: string; error?: string } | null {
+    if (this.undoBlocked) return { label: this.undo.last ?? '', error: 'That change\'s conversation is still working. Undo it once it has finished.' };
     const step = this.undo.pop();
     if (!step) return null;
     try {

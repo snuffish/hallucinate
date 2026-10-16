@@ -301,7 +301,7 @@ export function Assistant() {
   const usage = meta?.usage;
   const long = (meta?.lastPrompt ?? 0) >= LONG_CHAT_TOKENS;
   const undoOwner = undo.lastChat ? session.meta(undo.lastChat)?.title : undefined;
-  const undoBusy = !!undo.lastChat && session.isRunning(undo.lastChat);
+  const undoBusy = session.undoBlocked;
   const othersWorking = Object.entries(sv.live).filter(([id, l]) => id !== sv.activeId && l.status !== 'idle').length;
   const othersUnread = Object.entries(sv.live).filter(([id, l]) => id !== sv.activeId && l.unread).length;
   const sendLabel = running ? (view.draft.trim() ? 'Queue' : 'Stop') : 'Send';

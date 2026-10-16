@@ -171,6 +171,28 @@ describe('assistant conversations', () => {
     s.dispose();
   });
 
+  it('refuses to undo a change while the conversation that made it is still working', async () => {
+    const seen: Seen[] = [];
+    const gate = { release: () => {}, wait: Promise.resolve() };
+    gate.wait = new Promise<void>((r) => { gate.release = r; });
+    const { app, s } = session(seen, { gate });
+    const c = s.active;
+    await c.load();
+    c.send('look brighter');
+    await until(() => !c.running && seen.length === 2);
+    c.send('slow follow-up');
+    await until(() => c.running);
+    expect(s.undoBlocked).toBe(true);
+    expect(s.undoLast()).toEqual({ label: 'Adjusted the look', error: expect.stringContaining('still working') });
+    expect(app.state.look.hue).toBe(0.5);                  // nothing undone, nothing dropped
+    expect(s.undo.store.get().labels).toEqual(['Adjusted the look']);
+    gate.release();
+    await until(() => !c.running);
+    expect(s.undoLast()).toEqual({ label: 'Adjusted the look' });
+    expect(app.state.look.hue).toBe(0);
+    s.dispose();
+  });
+
   it('queues what is typed while a run is going and sends it next', async () => {
     const seen: Seen[] = [];
     const gate = { release: () => {}, wait: Promise.resolve() };
