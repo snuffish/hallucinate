@@ -12,6 +12,9 @@ brightens more than a quarter of the frame. The set is still growing; the number
 | Key | Scene | Category | What it does |
 | --- | --- | --- | --- |
 | 1 | **Beam Fan** | Beams | A fan of thin beams rising from the bottom edge. It sweeps, opens with the bass, strobes on kicks and chases one beam along on each tick. |
+| 3 | **Ring Run** | Geometry | Thin polygon rings flying towards you. A new ring is born on each tick, the rings glow with the spectrum and flare on kicks; the polygon and ring speed are parameters. |
+| 5 | **Spectrum Rays** | Beams | A star of beams from the centre, one per frequency (bass at the top, treble at the bottom), each as long as its band is loud. It turns slowly, steps one ray on each tick and strobes a third of its rays on kicks. |
+| 6 | **Contour Lines** | Fields | Glowing contour lines over a slowly drifting island of terrain. The bass lifts the land, the lines climb a step on each tick, and a kick lights every third one. |
 | 8 | **Scan Trace** | Media | Your video or camera redrawn as horizontal laser scan lines, each pushed up by the brightness beneath it. A scan beam runs down the lines on each tick and kicks flash every third line; with nothing loaded the lines lie flat. |
 
 They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has

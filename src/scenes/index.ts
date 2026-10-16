@@ -4,6 +4,9 @@
 
 import type { Scene } from './scene';
 import { BEAM_FAN } from './beam-fan';
+import { RING_RUN } from './ring-run';
+import { SPECTRUM_RAYS } from './spectrum-rays';
+import { CONTOUR_LINES } from './contour-lines';
 import { SCAN_TRACE } from './scan-trace';
 
 export { COMMON } from './header';
@@ -12,5 +15,8 @@ export { CATEGORIES, scene, type Scene, type SceneExtra, type SceneKind } from '
 
 export const SCENES: readonly Scene[] = [
   BEAM_FAN,      // 1
+  RING_RUN,      // 3
+  SPECTRUM_RAYS, // 5
+  CONTOUR_LINES, // 6
   SCAN_TRACE,    // 8
 ];
