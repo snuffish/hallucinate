@@ -580,12 +580,11 @@ export class AppController {
   // Rolls the Look widget's values (not Resolution: that's a performance setting), within ranges that
   // stay watchable. The scene only changes when "Also pick a random scene" is on.
   randomize(): void {
-    const { reactivity, speed, trails, hue, cycle, synesthesia, aberration, mood, spin } = this.state.look;
-    this.beforeRandom.push({ look: { reactivity, speed, trails, hue, cycle, synesthesia, aberration, mood, spin }, scene: this.state.clock.scene });
+    const { reactivity, speed, trails, hue, cycle, synesthesia, aberration, mood } = this.state.look;
+    this.beforeRandom.push({ look: { reactivity, speed, trails, hue, cycle, synesthesia, aberration, mood }, scene: this.state.clock.scene });
     if (this.beforeRandom.length > RANDOM_HISTORY) this.beforeRandom.shift();
     for (const [key, [min, max]] of Object.entries(RANDOM_RANGES)) this.setLook(key as DriftKey, min + Math.random() * (max - min));
     this.setLookFlag('mood', Math.random() < 0.5);
-    this.state.look.spin = Math.random() < 0.5 ? -1 : 1;
     if (this.state.look.randomScene) this.nextRandomScene();
   }
 
@@ -596,7 +595,6 @@ export class AppController {
     if (!prev) { this.toast('No earlier random look to go back to', 1500); return; }
     for (const key of ['reactivity', 'speed', 'trails', 'hue', 'cycle', 'synesthesia', 'aberration'] as const) this.setLook(key, prev.look[key]!);
     this.setLookFlag('mood', prev.look.mood!);
-    this.state.look.spin = prev.look.spin!;
     if (prev.scene !== this.state.clock.scene) this.setScene(prev.scene);
     const left = this.beforeRandom.length;
     this.toast(`Back to the previous look${left ? ` (${left} more)` : ''}`, 1500);

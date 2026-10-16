@@ -44,11 +44,12 @@ warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm col
 
 ## 🎨 The Look widget
 
-Look sliders: reactivity, speed, trails (feedback), colour, colour cycling, chromatic aberration, synesthesia, Drift
+Look sliders: reactivity, speed, trails, colour, colour cycling, chromatic aberration, synesthesia, Drift
 speed and render resolution (lower it if frames drop).
 
+- **Trails** – an afterglow: a line keeps glowing where it was drawn and fades there, without moving. At 0 there is
+  no afterglow; higher values fade more slowly. The trail keeps the line's colour.
 - **Drift** – the Look sliders glide to new random values on their own, each at its own pace, so the look keeps
   changing smoothly; *Drift speed* sets how fast. A slider you move by hand drifts on from there.
-- **Randomize** (R) jumps the Look sliders (not Resolution) to new values instead, and flips *Mood from tempo* and the
-  spin direction at random. Tick *Randomize also picks a random
+- **Randomize** (R) jumps the Look sliders (not Resolution) to new values instead, and flips *Mood from tempo* at random. Tick *Randomize also picks a random
   scene* to change the scene too. Shift+R steps back to the look (and scene) before each randomize, up to 20 steps.

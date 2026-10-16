@@ -2,15 +2,15 @@
 // studio's Preview monitor each compose their frame here, with their own look and their own motion, so
 // Preview shows exactly what Take puts on Live, and Live keeps a show scene's look while the main sliders
 // move. Every rule from the sound to the picture lives here: reactivity, the clock's pace, the hue's walk,
-// the synesthesia grade, trails, fringing, zoom, spin and warp.
+// the synesthesia grade, the trails' afterglow and fringing.
 
 import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
 
 // The sliders a frame is composed with: a show scene stores the numbers it keeps (LOOK_KEYS), the rest
-// (synesthesia, mood, spin) are the app's.
+// (synesthesia, mood) are the app's.
 export interface FrameLook {
-  reactivity: number; speed: number; cycle: number; spin: number;
+  reactivity: number; speed: number; cycle: number;
   hue: number; trails: number; aberration: number; synesthesia: number;
   mood: boolean;   // "Mood from tempo": off, the mood reads neutral to the grade and the shaders
 }
@@ -46,15 +46,12 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
   p.bright = h.bright;
   p.mood = look.mood ? h.mood : 0.5;
   grade(p, look);
-  // Dark sound lingers (longer trails), bright sound is crisp (shorter trails, more fringing).
+  // Trails are an afterglow: the previous frame fades in place by this much. Dark sound lingers (longer
+  // trails), bright sound is crisp (shorter trails, more fringing).
   const s = look.synesthesia;
   p.hue = look.hue + motion.huePhase;
   p.feedback = Math.min(0.97, look.trails * sceneTrails * (1 + s * (0.5 - p.bright) * 0.12));
   p.aberration = look.aberration * (1 + p.beat * 1.5) * (1 + s * (p.bright - 0.5) * 1.2);
-  p.zoom = 1.006 + bass * 0.025;
-  p.rotation = look.spin * (0.003 * Math.sin(motion.time * 0.1) + mid * 0.01);
-  p.hueDrift = 0.01 + high * 0.03;
-  p.warp = bass;
 }
 
 // Crossmodal correspondences: dark/muffled sound reads as dim, cool and soft; bright/crisp sound
@@ -90,6 +87,6 @@ export function programState(spectrum: Uint8Array = new Uint8Array(512)): Progra
     scene: -1, prevScene: -1, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, tickPhase: 0, ticks: 0, hue: 0,
     spectrum, bright: 0.5, mood: 0.5,
     grade: { exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] },
-    feedback: 0.86, zoom: 1, rotation: 0, hueDrift: 0, warp: 0, aberration: 0, master: 1,
+    feedback: 0.86, aberration: 0, master: 1,
   };
 }
