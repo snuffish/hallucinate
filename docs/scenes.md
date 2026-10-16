@@ -12,6 +12,7 @@ brightens more than a quarter of the frame. The set is still growing; the number
 | Key | Scene | Category | What it does |
 | --- | --- | --- | --- |
 | 1 | **Beam Fan** | Beams | A fan of thin beams rising from the bottom edge. It sweeps, opens with the bass, strobes on kicks and chases one beam along on each tick. |
+| 2 | **Light Sheet** | Beams | A laser ceiling: scan lines receding to a horizon, rippling with the spectrum (near lines = bass, far = treble). A bright front runs out to the horizon on each tick, a kick sends a wave from the near lines to the far ones, and haze glows around the lines. |
 
 They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has
 scenes. You can also play the [Node Scene](visual-maker.md), **My Shader** and your own saved scenes (*Mine*).
