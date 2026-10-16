@@ -12,6 +12,7 @@ brightens more than a quarter of the frame. The set is still growing; the number
 | Key | Scene | Category | What it does |
 | --- | --- | --- | --- |
 | 1 | **Beam Fan** | Beams | A fan of thin beams rising from the bottom edge. It sweeps, opens with the bass, strobes on kicks and chases one beam along on each tick. |
+| 5 | **Spectrum Rays** | Beams | A star of beams from the centre, one per frequency (bass at the top, treble at the bottom), each as long as its band is loud. It turns slowly, steps one ray on each tick and strobes a third of its rays on kicks. |
 | 7 | **Point Storm** | Geometry | Hundreds of laser dots on three nested rings holding a polygon or star. A kick throws them outwards, they loosen between ticks and pull into a new shape on each tick; the bass, mids and treble each light a ring. |
 
 They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has

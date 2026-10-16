@@ -5,6 +5,7 @@
 import type { Scene } from './scene';
 import { BEAM_FAN } from './beam-fan';
 import { POINT_STORM } from './point-storm';
+import { SPECTRUM_RAYS } from './spectrum-rays';
 
 export { COMMON } from './header';
 export { TEMPLATE } from './template';
@@ -12,5 +13,6 @@ export { CATEGORIES, scene, type Scene, type SceneExtra, type SceneKind } from '
 
 export const SCENES: readonly Scene[] = [
   BEAM_FAN,      // 1
+  SPECTRUM_RAYS, // 5
   POINT_STORM,   // 7
 ];
