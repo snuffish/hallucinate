@@ -15,7 +15,7 @@ import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS
 import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
-import { KEYS, debouncedWriter, flushAll, freeze, readString, remove, unfreeze, writeJSON, writeString } from '../state/persistence';
+import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
 import { appendScene, buildSceneList, discardParked, paramKey, saveUserScenes, userScene, type ParkedScenes } from '../state/scene-list';
 import { Store } from '../state/store';
@@ -90,7 +90,7 @@ export class AppController {
   readonly pickers: Partial<Record<'sc' | 'yt', PickerApi>> = {};
   libraryPrefs: LibraryPrefs = loadLibraryPrefs();
   readonly hooks: ControllerHooks = {};
-  mediaSound = readString(KEYS.mediaSound) === '1';
+  mediaSound = readFlag(KEYS.mediaSound);
   // Device preferences (Settings overlay, src/state/prefs.ts).
   readonly prefs = new Store<Prefs>(loadPrefs());
   // Where each frame's time goes (Shift+P, or ?perf / ?perf=trace in the URL). Off: one flag check per stage.
@@ -727,7 +727,7 @@ export class AppController {
     if (sourceButton !== 'media' && this.mediaSound) this.setMediaSound(false, { quiet: true });   // another source is the music now
     this.ui.set({ nowText: `▶ ${label}`, started: true, activeSource: sourceButton });
     document.body.classList.add('started');
-    if (readString(KEYS.helpHint) !== '1') { writeString(KEYS.helpHint, '1'); this.toast('Press ? for help & shortcuts', 4000); }
+    if (!readFlag(KEYS.helpHint)) { writeFlag(KEYS.helpHint, true); this.toast('Press ? for help & shortcuts', 4000); }
     this.state.clock.beatTimes = [];
     this.state.clock.bpm = null;
     this.tempo.reset();
@@ -775,7 +775,7 @@ export class AppController {
   // tempo and volume work) and the picture follows it.
   setMediaSound(on: boolean, { quiet = false } = {}): void {
     this.mediaSound = on;
-    writeString(KEYS.mediaSound, on ? '1' : '0');
+    writeFlag(KEYS.mediaSound, on);
     this.ui.set({ mediaSound: on });
     if (quiet) return;
     if (on && this.media.kind === 'video') void this.linkMediaSound();

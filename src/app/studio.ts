@@ -14,7 +14,7 @@ import { Renderer, type ProgramState, type SceneUniforms } from '../engine/rende
 import type { ScreenDetailed } from '../engine/output-link';
 import { LOOK_KEYS } from '../state/app-state';
 import { listedScenes } from '../state/library-prefs';
-import { KEYS, debouncedWriter, readJSON } from '../state/persistence';
+import { KEYS, debouncedWriter, readWithDefaults } from '../state/persistence';
 import { paramKey } from '../state/scene-list';
 import { LIST_MAX_SECONDS, PlanSchema, type Plan, type PlanStep } from '../state/show-plan';
 import type { AppPort } from './app-port';
@@ -109,7 +109,7 @@ export class StudioSession {
   private open = false;
 
   constructor(private readonly app: AppPort, private readonly notify: () => void = () => {}) {
-    const saved = readJSON(KEYS.show, ShowSchema, { cues: [], mode: 'fade', seconds: 1.5, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120 });
+    const saved = readWithDefaults(KEYS.show, ShowSchema);
     this.cues = saved.cues;
     this.mode = saved.mode;
     this.seconds = saved.seconds;

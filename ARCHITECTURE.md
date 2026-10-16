@@ -165,9 +165,10 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 - **A shortcut:** add it to `HOTKEYS` with a `when` condition (and an `owner` if a panel handles it), give it its
   action in that owner's map (`App.tsx`, or the panel's `useHotkeyActions`; the compiler points there), and put
   `<Kbd hotkey={HOTKEYS.x} />` on the control it triggers.
-- **A persisted value:** add the key to `KEYS`, a zod schema, and read it with `readJSON(key, schema, fallback)`.
-  Decide whether it is setup (add it to `SECTIONS` in `src/app/bundle.ts`, so Export / Import carry it) or history
-  (leave it out, and say so in the comment above `SECTIONS`).
+- **A persisted value:** add the key to `KEYS` and give it a class in `KEY_CLASS` (`src/state/persistence.ts`; it
+  doesn't compile without one). Read JSON with `readJSON(key, schema, fallback)`, or `readWithDefaults(key, schema)`
+  when every field has a default, and on / off flags with `readFlag` / `writeFlag`. A `setup` key also goes into
+  `SECTIONS` in `src/app/bundle.ts`, so Export / Import carry it; the bundle test fails until it does.
 - **A device preference** (how this computer renders, listens or shows the controls): add a field with a `.catch`
   default to `PrefsSchema` in `src/state/prefs.ts`, say in `APPLIES` when it takes effect, apply it in the
   controller's `applyPrefs`, and give it a control in `src/components/Settings.tsx`. A preference is a default that seeds

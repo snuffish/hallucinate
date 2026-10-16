@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 import type { OutputPrefs } from '../engine/output-link';
-import { KEYS, readJSON, readString, writeString } from './persistence';
+import { KEYS, readFlag, readJSON, writeFlag } from './persistence';
 import { Store, useStore } from './store';
 
 export const PIXEL_RATIOS = [1, 1.5, 2] as const;
@@ -55,9 +55,9 @@ export const micConstraints = (p: Prefs): MediaTrackConstraints => ({
 
 // The assistant panel's "Show reasoning" toggle, shared by the panel and Settings. Its own key, as
 // before (a UI convenience, not exported).
-const thinking = new Store({ on: readString(KEYS.assistantThinking) === '1' });
+const thinking = new Store({ on: readFlag(KEYS.assistantThinking) });
 export const useShowThinking = (): boolean => useStore(thinking, (s) => s.on);
 export function setShowThinking(on: boolean): void {
   thinking.set({ on });
-  writeString(KEYS.assistantThinking, on ? '1' : '0');
+  writeFlag(KEYS.assistantThinking, on);
 }
