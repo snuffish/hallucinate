@@ -22,7 +22,7 @@ export const STAGE_LABELS: Record<StageName, string> = {
 };
 
 const CAPACITY = 512;               // samples kept per series: 3 s even at 165 Hz
-const WINDOW_MS = 3000;             // reports cover the frames of the last 3 s, however slow they are
+const WINDOW_MS = 3000;             // reports cover the frames of the last 3 s (at least MIN_FRAMES), however slow they are
 const MAX_INTERVAL_MS = 1000;       // longer gaps are a background tab or a debugger, not a frame
 const MIN_FRAMES = 10;              // before this, the report says it's still warming up
 // Display refresh periods, longest first. The budget is the longest one the fastest frames fit in,
@@ -338,7 +338,8 @@ export class FrameProfiler {
     if (this.trace) this.timeline.clear();   // the spans live on in a recording; don't let the buffer grow
     // Each frame pushes about one sample to every series (not quite: the first frame after switching on,
     // or after a long gap, has stages but no interval), so the newest n of each cover about the same frames.
-    const n = this.intervals.newestSpanning(WINDOW_MS);
+    // Never fewer than MIN_FRAMES: below ~3 fps the window holds fewer, and the report would never warm up.
+    const n = Math.max(this.intervals.newestSpanning(WINDOW_MS), Math.min(MIN_FRAMES, this.intervals.size));
     const p10 = this.intervals.percentile(0.1, n);
     if (n >= MIN_FRAMES && p10 > 0) this.budget = Math.min(this.budget, REFRESH_MS.find((r) => r <= p10 * 1.1) ?? p10);
     const budget = Number.isFinite(this.budget) ? this.budget : REFRESH_MS[0]!;
