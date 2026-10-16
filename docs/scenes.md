@@ -12,6 +12,7 @@ brightens more than a quarter of the frame. The set is still growing; the number
 | Key | Scene | Category | What it does |
 | --- | --- | --- | --- |
 | 1 | **Beam Fan** | Beams | A fan of thin beams rising from the bottom edge. It sweeps, opens with the bass, strobes on kicks and chases one beam along on each tick. |
+| 4 | **Wire Solid** | Geometry | A wireframe polyhedron of beams turning in perspective. It becomes the next solid every 4 ticks, swells with the bass, a spark steps from vertex to vertex on each tick, and its front edges flare on kicks. |
 
 They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has
 scenes. You can also play the [Node Scene](visual-maker.md), **My Shader** and your own saved scenes (*Mine*).

@@ -4,6 +4,7 @@
 
 import type { Scene } from './scene';
 import { BEAM_FAN } from './beam-fan';
+import { WIRE_SOLID } from './wire-solid';
 
 export { COMMON } from './header';
 export { TEMPLATE } from './template';
@@ -11,4 +12,5 @@ export { CATEGORIES, scene, type Scene, type SceneExtra, type SceneKind } from '
 
 export const SCENES: readonly Scene[] = [
   BEAM_FAN,      // 1
+  WIRE_SOLID,    // 4
 ];
