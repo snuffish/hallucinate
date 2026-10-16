@@ -29,8 +29,23 @@ describe('the scene inputs', () => {
     expect(audio.help).toContain('tone: the tone');
   });
 
+  it('carries the tick to every scene: its phase and its count, on the Audio block too', () => {
+    const tick = SCENE_INPUTS.find((i) => i.uniform === 'uTick');
+    const ticks = SCENE_INPUTS.find((i) => i.uniform === 'uTicks');
+    expect(tick).toMatchObject({ field: 'tickPhase', node: 'tick' });
+    expect(ticks).toMatchObject({ field: 'ticks', node: 'ticks' });
+    expect(COMMON).toMatch(/uniform float uTick;/);
+    expect(COMMON).toMatch(/uniform float uTicks;/);
+    expect(NODE_TYPES.audio!.help).toContain('tick: ');
+  });
+
   it('gives still frames a value for every input', () => {
     expect(Object.keys(stillUniforms()).sort()).toEqual(SCENE_INPUTS.map((i) => i.uniform).sort());
     expect(stillUniforms({ uTime: 3 })).toMatchObject({ uTime: 3, uBass: 0.5 });
+    const { uTick, uTicks } = stillUniforms();
+    expect(uTick).toBeGreaterThan(0);
+    expect(uTick).toBeLessThan(1);
+    expect(Number.isInteger(uTicks)).toBe(true);
+    expect(uTicks).toBeGreaterThan(0);
   });
 });

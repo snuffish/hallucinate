@@ -50,7 +50,7 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
   };
   const setLook = (k: LookKey, v: number) => { const r = LOOK_RANGES[k]; look[k] = Math.min(r.max, Math.max(r.min, v)); };
 
-  const hearing: Hearing = { bass: 0.4, mid: 0.4, high: 0.4, level: 0.5, beat: 0, kick: false, tick: false, bpm: 120, bright: 0.6, centroid: 2500, energy: 0.5, mood: 0.5 };
+  const hearing: Hearing = { bass: 0.4, mid: 0.4, high: 0.4, level: 0.5, beat: 0, kick: false, tick: false, tickPhase: 0, ticks: 0, bpm: 120, bright: 0.6, centroid: 2500, energy: 0.5, mood: 0.5 };
 
   const app: FakeApp = {
     state, library, hooks, toasts,

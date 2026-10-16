@@ -15,6 +15,8 @@ export const SCENE_INPUTS = [
   { uniform: 'uHigh', field: 'high', node: 'high', range: BAND, help: 'loudness of the highs', still: 0.5 },
   { uniform: 'uLevel', field: 'level', node: 'level', range: BAND, help: 'loudness of the three bands together', still: 0.6 },
   { uniform: 'uBeat', field: 'beat', node: 'beat', range: BAND, help: '1 on each kick, fading out within half a second', still: 0.4 },
+  { uniform: 'uTick', field: 'tickPhase', node: 'tick', range: '0…1, back to 0 on each tick', help: "how far through the current tick (one beat of the music's tempo); keeps going through breakdowns, holds still while nothing plays", still: 0.3 },
+  { uniform: 'uTicks', field: 'ticks', node: 'ticks', range: 'whole ticks, counting up', help: 'how many ticks so far; mod() it to change things every few beats', still: 6 },
   { uniform: 'uHue', field: 'hue', node: null, range: '0…1, wraps', help: 'the colour slider plus colour cycling', still: 0 },
   { uniform: 'uBright', field: 'bright', node: 'tone', range: SLOW, help: 'the tone: 0 dark, muffled sound … 1 bright, crisp', still: 0.5 },
   { uniform: 'uMood', field: 'mood', node: 'mood', range: SLOW, help: 'the mood: 0 calm … 1 energetic', still: 0.5 },

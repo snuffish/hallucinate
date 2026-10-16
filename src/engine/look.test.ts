@@ -3,7 +3,7 @@ import { defaultLook } from '../state/app-state';
 import type { Hearing } from './listener';
 import { composeFrame, programState, type Motion } from './look';
 
-const sound = (o: Partial<Hearing> = {}): Hearing => ({ bass: 0.5, mid: 0.5, high: 0.5, level: 0.5, beat: 0, kick: false, tick: false, bpm: 120, bright: 0.5, centroid: 2500, energy: 0.5, mood: 0.5, ...o });
+const sound = (o: Partial<Hearing> = {}): Hearing => ({ bass: 0.5, mid: 0.5, high: 0.5, level: 0.5, beat: 0, kick: false, tick: false, tickPhase: 0, ticks: 0, bpm: 120, bright: 0.5, centroid: 2500, energy: 0.5, mood: 0.5, ...o });
 const still = (): Motion => ({ time: 0, timeRate: 1, huePhase: 0 });
 
 function frame(h: Hearing, look = defaultLook(), motion = still(), dt = 1 / 60) {
@@ -19,6 +19,12 @@ describe('composeFrame', () => {
     expect(p.mid).toBeCloseTo(0.4);
     expect(p.warp).toBe(1.5);
     expect(p.zoom).toBeCloseTo(1.006 + 1.5 * 0.025);
+  });
+
+  it('passes the tick phase and count to the shaders as heard, whatever the reactivity', () => {
+    const p = frame(sound({ tickPhase: 0.25, ticks: 37 }), { ...defaultLook(), reactivity: 2 });
+    expect(p.tickPhase).toBe(0.25);
+    expect(p.ticks).toBe(37);
   });
 
   it('leaves the tone and the mood unscaled', () => {
