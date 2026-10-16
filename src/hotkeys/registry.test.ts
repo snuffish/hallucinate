@@ -8,8 +8,8 @@ const OVERLAYS: Overlay[] = [null, ...(Object.keys(OVERLAY_SET) as Exclude<Overl
 
 function* contexts(): Generator<HotkeyContext> {
   const flags = [false, true];
-  for (const overlay of OVERLAYS) for (const inGame of flags) for (const assistantOpen of flags)
-    for (const helpOpen of flags) for (const paramsVisible of flags) yield { overlay, inGame, assistantOpen, helpOpen, paramsVisible };
+  for (const overlay of OVERLAYS) for (const assistantOpen of flags)
+    for (const helpOpen of flags) for (const paramsVisible of flags) yield { overlay, assistantOpen, helpOpen, paramsVisible };
 }
 
 const bindings: { id: string; keys: string; when: HotkeyWhen }[] = [
@@ -31,15 +31,13 @@ describe('hotkey registry', () => {
     }
   });
 
-  it('steers in the game, but the library takes the arrows when it is open over the game', () => {
-    const game: HotkeyContext = { overlay: null, inGame: true, assistantOpen: false, helpOpen: false, paramsVisible: false };
-    expect(isEnabled(HOTKEYS.steerLeft.when, game)).toBe(true);
-    expect(isEnabled(HOTKEYS.steerLeft.when, { ...game, overlay: 'library' })).toBe(false);
-    expect(isEnabled(HOTKEYS.libraryLeft.when, { ...game, overlay: 'library' })).toBe(true);
+  // G once played a removed scene (ADR 0001); it stays free rather than quietly doing something else.
+  it('leaves G unbound', () => {
+    expect(bindings.filter((b) => b.keys.toUpperCase() === 'G').map((b) => b.id)).toEqual([]);
   });
 
   it('changes scene with the arrows while the code editor is open', () => {
-    const editor: HotkeyContext = { overlay: 'editor', inGame: false, assistantOpen: false, helpOpen: false, paramsVisible: true };
+    const editor: HotkeyContext = { overlay: 'editor', assistantOpen: false, helpOpen: false, paramsVisible: true };
     expect(isEnabled(HOTKEYS.scenePrev.when, editor)).toBe(true);
     expect(isEnabled(HOTKEYS.sceneNext.when, editor)).toBe(true);
   });

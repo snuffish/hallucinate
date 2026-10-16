@@ -3,7 +3,6 @@
 // AppContext. Panels that need deeper hooks (editor, studio, assistant) register them here.
 
 import { AudioEngine } from '../engine/audio';
-import { BeatRacer } from '../engine/game';
 import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
 import { composeFrame, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
@@ -68,7 +67,6 @@ export interface PickerApi {
 export class AppController {
   readonly audio = new AudioEngine();
   readonly media = new MediaLayer();
-  readonly game = new BeatRacer();
   readonly renderer: Renderer;
   readonly output: OutputLink;
   // The pinned Live slot (studio closed after a take): what projectors and the screen show, see live-slot.ts.
@@ -117,7 +115,7 @@ export class AppController {
     report: () => (this.profiler.on ? this.perfReport() : null),
     fillTest: () => this.runFillTest(),
     reset: () => this.profiler.reset(),
-    scenes: () => this.state.scenes.flatMap((s, index) => (s.removed || index === this.state.gameIndex ? [] : [{ index, name: s.name }])),
+    scenes: () => this.state.scenes.flatMap((s, index) => (s.removed ? [] : [{ index, name: s.name }])),
     setScene: (index) => this.setScene(index),
   };
   // Another tab imported settings: this one's state is stale, so it must not write, and reloads.
@@ -147,7 +145,7 @@ export class AppController {
     this.renderer = new Renderer(canvas, scenes);
     const list = buildSceneList(scenes, (frag, name) => this.renderer.check(frag, name));
     this.state = {
-      scenes: list.scenes, gameIndex: list.gameIndex, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
+      scenes: list.scenes, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
       look: { ...defaultLook(), resolution: this.prefs.get().startResolution }, clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
@@ -393,7 +391,6 @@ export class AppController {
   keyFor(i: number): string {
     const s = this.state.scenes[i];
     if (!s) return '';
-    if (s.kind === 'game') return 'G';
     if (s.kind === 'custom') return 'E';
     if (s.kind === 'nodes') return 'N';
     const n = this.state.keyedScenes.indexOf(i);
@@ -405,7 +402,7 @@ export class AppController {
   private publishScene(): void {
     const i = this.state.clock.scene;
     const key = this.keyFor(i);
-    this.ui.set({ sceneIndex: i, sceneName: `${key ? `${key} · ` : ''}${this.state.scenes[i]?.name ?? ''}`, hud: i === this.state.gameIndex ? this.game.hud() : null });
+    this.ui.set({ sceneIndex: i, sceneName: `${key ? `${key} · ` : ''}${this.state.scenes[i]?.name ?? ''}` });
   }
 
   bumpScenes(): void { this.ui.set({ sceneVersion: this.ui.get().sceneVersion + 1 }); }
@@ -434,10 +431,9 @@ export class AppController {
       this.toast('GPU test stopped: the scene changed. Turn auto-switch off (A) to test one scene.', 4500);
     }
     c.fade = fade;
-    if (i === this.state.gameIndex) { this.game.reset(); this.toast('Beat Racer: walls drop on the beat. ← → to steer, Enter to restart', 4500); }
     c.prevScene = c.scene;
     c.scene = i;
-    if (i !== this.state.gameIndex) writeString(KEYS.lastScene, paramKey(scene));
+    writeString(KEYS.lastScene, paramKey(scene));
     c.transitionStart = c.clock;
     c.sceneStart = c.clock;
     c.beatsInScene = 0;
@@ -446,11 +442,11 @@ export class AppController {
   }
 
   // The scene that was on screen when the page closed (by name, not index: the list can change in
-  // between), or the first one. Never the game, which needs a fresh start.
+  // between), or the first one.
   private lastScene(): number {
     const key = readString(KEYS.lastScene);
     const i = key ? this.state.scenes.findIndex((s) => !s.removed && paramKey(s) === key) : -1;
-    return i >= 0 && i !== this.state.gameIndex ? i : 0;
+    return i >= 0 ? i : 0;
   }
 
   nextRandomScene(): void {
@@ -458,7 +454,7 @@ export class AppController {
     if (choices.length) this.setScene(choices[Math.floor(Math.random() * choices.length)]!);
   }
 
-  // Auto-switch only cycles the visual scenes; it never leaves the game or your own shader.
+  // Auto-switch only cycles the visual scenes; it never leaves your own shader.
   // It also holds still while you're editing the scene's code.
   private autoSwitching(): boolean {
     return this.state.look.auto && !this.hooks.autopilot?.() && this.overlay !== 'editor' && !this.currentScene.kind;
@@ -725,13 +721,12 @@ export class AppController {
   // ---------- Beats ----------
 
   // What a kick and a tick do, in this order, once the frame's sound is heard and before the frame is
-  // composed: a kick drops the game's walls and counts towards auto-switch (kicks, not ticks: a breakdown
+  // composed: a kick counts towards auto-switch (kicks, not ticks: a breakdown
   // holds the scene; each output's hue jumps in composeFrame); a tick is the studio's and the director's beat.
   private onBeats(h: Readonly<Hearing>): void {
     const c = this.state.clock;
     if (h.kick) {
       c.beatsInScene++;
-      if (c.scene === this.state.gameIndex) this.game.onBeat();
       if (this.autoSwitching() && c.beatsInScene >= BEATS_PER_SCENE) this.nextRandomScene();
     }
     if (h.tick) this.hooks.onTempoBeat?.();
@@ -871,10 +866,7 @@ export class AppController {
     if (this.autoSwitching() && this.music.playing && c.clock - c.sceneStart > MAX_SECONDS_PER_SCENE) this.nextRandomScene();
     const p = this.program;
     composeFrame(p, c, f, look, this.currentScene.trails ?? 1, dt);   // the main screen's motion is the clock's
-    const inGame = c.scene === this.state.gameIndex;
-    if (inGame) this.game.update(dt, p.level);
     p.scene = c.scene; p.prevScene = c.prevScene; p.mix = crossfade(c, c.clock);
-    p.extra = inGame ? this.game.uniforms() : p.extra;
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
     this.profiler.lap(Stage.logic);
@@ -895,7 +887,6 @@ export class AppController {
         bpm: f.bpm,
         moodLabel,
         toneTitle: `Timbral brightness: ${tone} (spectral centroid ≈ ${(f.centroid / 1000).toFixed(1)} kHz)`,
-        ...(inGame && { hud: this.game.hud() }),
       });
     }
     this.profiler.lap(Stage.ui);

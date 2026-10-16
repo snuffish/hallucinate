@@ -11,14 +11,13 @@ Press **?** in the app for the same list. Every button with a shortcut also show
 | ↑ / ↓ | volume |
 | [ / ] | tempo −5 % / +5 % |
 | M | mute |
-| ← / → , 1–9, 0 | change scene, also with the code editor open while the code itself isn't focused (← / → steer in the game, Enter races again) |
+| ← / → , 1–9, 0 | change scene, also with the code editor open while the code itself isn't focused |
 | L | scene library (inside: `/` search, Tab categories, arrows move, Enter play) |
 | I | AI assistant (inside: Alt+N new conversation, Alt+↑ / ↓ switch, Ctrl/⌘+K find one) |
 | O | studio & projector (inside: 1–9 / ← → preview, T take, Esc close) |
 | T | take Preview live |
 | B | blackout / restore |
 | P | collapse / expand the Parameters widget |
-| G | Beat Racer |
 | E | shader editor |
 | N | visual maker (node graph; Delete or Backspace removes a block) |
 | A | toggle auto-switch |

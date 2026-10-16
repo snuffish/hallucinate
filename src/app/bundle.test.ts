@@ -33,7 +33,7 @@ describe('settings bundle', () => {
     store.set(KEYS.layout, JSON.stringify(resetLayout()));
     store.set(KEYS.mediaSound, '1');
     store.set(KEYS.scRecent, '[]');      // history: never exported
-    store.set(KEYS.best, '12');
+    store.set(KEYS.helpHint, '1');
     store.set(KEYS.prefs, JSON.stringify({ v: 1, maxPixelRatio: 1 }));   // device preferences: never exported
   };
   const file = (data: unknown, extra: object = {}) => JSON.stringify({ format: 'hallucinate', version: BUNDLE_VERSION, data, ...extra });
@@ -50,7 +50,7 @@ describe('settings bundle', () => {
     applyWrites(parsed.bundle.writes);
     const decode = (key: string, value: string | undefined) => (key === KEYS.customShader || key === KEYS.mediaSound ? value : JSON.parse(value!));
     for (const [key, value] of exported) {
-      if (key === KEYS.scRecent || key === KEYS.best || key === KEYS.prefs) expect(store.has(key)).toBe(false);
+      if (key === KEYS.scRecent || key === KEYS.helpHint || key === KEYS.prefs) expect(store.has(key)).toBe(false);
       else expect(decode(key, store.get(key))).toEqual(decode(key, value));
     }
     expect(parsed.bundle.summary).toBe('2 scenes, 1 edited built-in, My Shader, the visual maker graph, parameter values, a show with 1 cue, favourites, player settings, layout');

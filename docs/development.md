@@ -41,7 +41,7 @@ See [ARCHITECTURE.md](../ARCHITECTURE.md) for the structure, the invariants and 
 shortcuts; [PERF.md](../PERF.md) for the performance work and measurements; [CHANGELOG.md](../CHANGELOG.md) for what
 changed in the React port. In short:
 
-- `src/engine/` – the engines (WebGL pipeline, audio analysis, scenes, `@param` parsing, visual-maker compiler, media, game, projector link), plain TypeScript classes.
+- `src/engine/` – the engines (WebGL pipeline, audio analysis, scenes, `@param` parsing, visual-maker compiler, media, projector link), plain TypeScript classes.
 - `src/app/` – the controller that owns them and the frame loop, the editor / studio / player logic, the React shell.
 - `src/components/` – the panels, with the dockable widgets in `src/components/widgets/`; `src/hotkeys/` – the shortcut
   registry and the key badge; `src/help/` – the help topics; `src/state/` – app state, UI store, widget layout, persistence.

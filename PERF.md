@@ -108,7 +108,7 @@ Raw results: `perf/results/baseline.json` (old app) and `perf/results/after-port
 - **Coalesced persistence** (`src/state/persistence.ts`, `debouncedWriter`): parameter and graph writes are
   batched and flushed on `visibilitychange` / `pagehide`.
 - **No per-frame allocation in the pipeline**: the frame state, uniform sets and the media uniforms are reused
-  objects; the game's uniform arrays are reused too.
+  objects.
 - **Studio monitors reuse their state** (2026-10-15): the Preview monitor and the pinned Live slot refill reused
   frame states through the same `applyLook` as the main output, and cache each show scene's uniforms, so they no
   longer allocate every frame. Slider drags on a show scene are coalesced like the other parameter writes.
