@@ -59,7 +59,7 @@ export function Studio() {
   }, [outputs]);
 
   const preview = studio.preview, live = studio.live;
-  const tempo = app.tempo.bpm;
+  const tempo = app.hearing.bpm;
   const missing = (cue: Cue) => studio.sceneIndex(cue) < 0;
   const scenes = studio.listScenes();
   void sceneVersion;

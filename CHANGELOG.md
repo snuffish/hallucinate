@@ -7,6 +7,12 @@
 - A paused, stopped or finished file (or SoundCloud track, or video's sound) no longer counts as music playing: the
   autopilot's beats, auto-switch, the director's cycles and the assistant's "mood / tone" wait for it to play again,
   instead of carrying on as if it still did. The assistant and the director say the source is "none" after a stop.
+- The tempo reads right at a low frame rate: kicks are timed on real time, not on the show's clock, which runs slow
+  below 10 fps.
+- When nothing plays, the tone drifts back to neutral like the mood does, so the picture no longer stays warm or cool
+  from the last track.
+- The director reads the music's energy trend from how loud it is over seconds, so a build-up reads as rising; before,
+  each band was measured against its own last few seconds and most of a build-up was evened out.
 
 ## Unreleased — studio Live (2026-10-16)
 

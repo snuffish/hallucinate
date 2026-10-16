@@ -2,6 +2,7 @@
 // UI store, parameter values, scene code, the pinned Live slot (the real one) and hooks behave like the
 // controller's; what needs a GPU, a window or real media (snapshots, projector windows) is a stub.
 
+import type { Hearing } from '../engine/listener';
 import type { MediaLayer } from '../engine/media';
 import { ParamStore, type ParamSpec } from '../engine/params';
 import type { Scene } from '../engine/scenes';
@@ -25,9 +26,8 @@ export interface FakeAppOptions {
 export type FakeApp = AppPort & {
   hooks: Partial<ControllerHooks>;
   toasts: string[];
-  audio: { features: AppPort['audio']['features'] };
+  hearing: Hearing;
   music: { playing: boolean };
-  tempo: { bpm: number | null };
 };
 
 export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
@@ -54,9 +54,8 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
     state, library, hooks, toasts,
     ui,
     live: new LiveSlot({ state, specs: (i) => library.specs(i), stored: [], ui, toast }),
-    audio: { features: { bass: 0.4, mid: 0.4, high: 0.4, level: 0.5, beat: 0, bright: 0.6, centroid: 0 } },
+    hearing: { bass: 0.4, mid: 0.4, high: 0.4, level: 0.5, beat: 0, kick: false, tick: false, bpm: 120, bright: 0.6, centroid: 2500, energy: 0.5, mood: 0.5 },
     music: { playing: opts.playing ?? true },
-    tempo: { bpm: 120 },
     media: { el: null, name: '', kind: null } as unknown as MediaLayer,   // only the studio's Preview renderer uses it, and tests never open one
     renderer: { snapshotAsync: () => Promise.reject(new Error('No GPU in tests.')) },
     output: { screens: async () => [], open: () => { throw new Error('No projector windows in tests.'); } },

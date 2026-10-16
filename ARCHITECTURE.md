@@ -23,9 +23,13 @@ browser                                              dev server (Vite middleware
 ```
 
 - **Engines** (`src/engine/`) are plain classes with no DOM access beyond the canvas, media elements and
-  `localStorage`: `Renderer`, `AudioEngine`, `MediaLayer`, `BeatRacer`, the `@param` parser and store, the
-  visual-maker compiler, the projector link. Each one that holds a resource (GL objects, audio nodes, media,
-  listeners) has `dispose()`. `src/engine/look.ts` turns the look sliders and the sound into one frame's state
+  `localStorage`: `Renderer`, `AudioEngine`, `Listener`, `MediaLayer`, `BeatRacer`, the `@param` parser and store,
+  the visual-maker compiler, the projector link. Each one that holds a resource (GL objects, audio nodes, media,
+  listeners) has `dispose()`. `AudioEngine` is the Web Audio graph only (sources, volume, recording, the demo
+  beat); its `read()` hands the analyser's bins to the **Listener** (`src/engine/listener.ts`, the controller's
+  `listener`), which hears what they sound like and owns every threshold and time constant behind it: the bands,
+  kicks, the tempo (BPM and the `TempoClock` behind the ticks), the tone and the mood. It returns one `Hearing` a
+  frame, read by everything else (the sessions as `app.hearing`), and is tested with synthetic bins. `src/engine/look.ts` turns the look sliders and the sound into one frame's state
   (`applyLook`); the main output, the studio's Preview monitor and the pinned Live slot all use it, and
   `crossfade` is the one rule for how far a transition is.
 - **The projector link** (`src/engine/output-link.ts`) holds both ends: the main window's `OutputLink` and each
@@ -148,8 +152,10 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
 
 ## Data flow per frame
 
-`AudioEngine.update` → band energies, beat → `AppController.step` eases the clock, updates mood and the
-colour grade, fills one reused `ProgramState` (`applyLook`) → `LiveSlot.route` decides what the screen and the
+`AudioEngine.read` → the bins → `Listener.hear` (on real time, so the tempo reads right at any frame rate) → the
+`Hearing`: bands, kick and tick, BPM, tone, mood → `AppController.onBeats`: a kick jumps the hue, drops Beat Racer's
+walls and counts towards auto-switch, a tick is the studio's and the director's beat (both before the frame is
+composed) → `AppController.step` eases the clock and the colour grade, fills one reused `ProgramState` (`applyLook`) → `LiveSlot.route` decides what the screen and the
 projectors draw → `Renderer.render` (scene pass → feedback pass → display pass) → `OutputLink.sendFrame` when a
 projector is connected → `hooks.onFrame` (studio preview and master
 fader) → every second frame: publish meters to the UI store. `FrameProfiler` (Shift+P, `?perf`) laps between these stages;

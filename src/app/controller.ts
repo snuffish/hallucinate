@@ -4,6 +4,7 @@
 
 import { AudioEngine } from '../engine/audio';
 import { BeatRacer } from '../engine/game';
+import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
 import { applyLook, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
 import { applyRendererPrefs, OutputLink } from '../engine/output-link';
@@ -11,7 +12,7 @@ import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValue
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState } from '../engine/renderer';
 import type { Scene } from '../engine/scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, moodWord, toneWord, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
 import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
@@ -19,7 +20,6 @@ import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, 
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
 import { buildSceneList, paramKey } from '../state/scene-list';
 import { Store } from '../state/store';
-import { TempoClock } from '../state/tempo-clock';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { applyWrites, buildBundle, parseBundle } from './bundle';
 import { downloadFile, fileStamp } from './download';
@@ -35,7 +35,6 @@ const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second
 
 const COOL = [0.7, 0.85, 1.35];
 const WARM = [1.3, 1.05, 0.7];
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const viewport = (): L.Size => ({ width: window.innerWidth, height: window.innerHeight });
 
 // Hooks other panels plug in. All optional; the controller works without them.
@@ -86,7 +85,8 @@ export class AppController {
   readonly music: MusicSource;
   // Each scene's code, @params and stored values; adding, compiling and removing scenes (scene-library.ts).
   readonly library: SceneLibrary;
-  readonly tempo = new TempoClock();
+  // What the music sounds like this frame: bands, kicks, tempo, tone, mood (listener.ts).
+  readonly listener = new Listener();
   readonly editor: EditorCore;
   readonly pickers: Partial<Record<'sc' | 'yt', PickerApi>> = {};
   libraryPrefs: LibraryPrefs = loadLibraryPrefs();
@@ -181,8 +181,7 @@ export class AppController {
     list.scenes.forEach((_, i) => this.pushParams(i));
     this.showParams();
     this.editor = new EditorCore(this);
-    this.audio.onBeat = () => this.beat();
-    this.program = { ...programState(this.audio.spectrum), scene: this.state.clock.scene };
+    this.program = { ...programState(this.listener.spectrum), scene: this.state.clock.scene };
     this.publishScene();
     const perf = new URLSearchParams(location.search).get('perf');
     if (perf !== null) this.setPerf(true, perf === 'trace');
@@ -606,7 +605,7 @@ export class AppController {
   private colourGrade(bright: number): void {
     const look = this.state.look;
     const A = look.synesthesia;
-    const mood = look.mood ? this.state.clock.mood : 0.5;
+    const mood = look.mood ? this.listener.hearing.mood : 0.5;
     const warmth = look.mood ? bright * 0.6 + mood * 0.4 : bright;
     const g = this.program.grade;
     const tint = g.tint;
@@ -616,14 +615,6 @@ export class AppController {
     g.exposure = 1 + A * (bright - 0.5) * 0.9;
     g.contrast = 1 + A * (bright - 0.5) * 0.3;
     g.saturation = 1 + A * (mood - 0.5) * 0.8;
-  }
-
-  private updateMood(dt: number): void {
-    const c = this.state.clock;
-    const tempo = c.bpm ? clamp01((c.bpm - 80) / 80) : 0.5;   // 80 BPM calm … 160 BPM energetic
-    const energy = clamp01((this.audio.avg.level - 0.15) / 0.4);
-    const target = this.music.playing ? tempo * 0.65 + energy * 0.35 : 0.5;
-    c.mood += (target - c.mood) * (1 - Math.exp(-dt / 4));
   }
 
   // ---------- Sources ----------
@@ -669,9 +660,7 @@ export class AppController {
     this.ui.set({ started: true });
     document.body.classList.add('started');
     if (!readFlag(KEYS.helpHint)) { writeFlag(KEYS.helpHint, true); this.toast('Press ? for help & shortcuts', 4000); }
-    this.state.clock.beatTimes = [];
-    this.state.clock.bpm = null;
-    this.tempo.reset();
+    this.listener.reset();
   }
 
   // Dropped anywhere: audio plays, pictures and videos become the media, a settings export is imported.
@@ -754,18 +743,18 @@ export class AppController {
 
   // ---------- Beats ----------
 
-  private beat(): void {
+  // What a kick and a tick do, in this order, once the frame's sound is heard and before the frame is
+  // composed: a kick jumps the hue, drops the game's walls and counts towards auto-switch (kicks, not
+  // ticks: a breakdown holds the scene); a tick is the studio's and the director's beat.
+  private onBeats(h: Readonly<Hearing>): void {
     const c = this.state.clock;
-    c.huePhase += 0.03 * this.state.look.reactivity;
-    c.beatsInScene++;
-    c.beatTimes.push(c.clock);
-    if (c.beatTimes.length > 12) c.beatTimes.shift();
-    // The tempo is held once known (the raw estimate expires two seconds after the last hit).
-    const bpm = estimateBpm(c.beatTimes, c.clock);
-    if (bpm) { c.bpm = bpm; this.tempo.setBpm(bpm); }
-    if (c.scene === this.state.gameIndex) this.game.onBeat();
-    if (this.autoSwitching() && c.beatsInScene >= BEATS_PER_SCENE) this.nextRandomScene();
-    if (this.tempo.onDetectedBeat(c.clock)) this.hooks.onTempoBeat?.();
+    if (h.kick) {
+      c.huePhase += 0.03 * this.state.look.reactivity;
+      c.beatsInScene++;
+      if (c.scene === this.state.gameIndex) this.game.onBeat();
+      if (this.autoSwitching() && c.beatsInScene >= BEATS_PER_SCENE) this.nextRandomScene();
+    }
+    if (h.tick) this.hooks.onTempoBeat?.();
   }
 
   // ---------- Settings export / import (src/app/bundle.ts) ----------
@@ -863,6 +852,8 @@ export class AppController {
   // ---------- Main loop ----------
 
   // The loop re-arms first, so one frame that throws (a hook, a scene) can't stop the show for good.
+  get hearing(): Readonly<Hearing> { return this.listener.hearing; }
+
   private readonly frame = (now: number): void => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.frame);
@@ -878,14 +869,18 @@ export class AppController {
     }
   };
 
+  // `dt` is capped for the show (a stall must not jump the motion); the listener hears on real time, so
+  // the tempo reads right at any frame rate.
   private step(now: number): void {
-    const dt = Math.min(0.1, (now - this.last) / 1000);
+    const elapsed = (now - this.last) / 1000;
+    const dt = Math.min(0.1, elapsed);
     this.last = now;
     const c = this.state.clock;
     const look = this.state.look;
     c.clock += dt;
 
-    const f = this.audio.update(dt, c.clock);
+    const f = this.listener.hear(this.audio.read(), this.music.playing, elapsed, now / 1000);
+    this.onBeats(f);
     this.profiler.lap(Stage.audio);
     const R = look.reactivity;
     const bass = Math.min(1.5, f.bass * R);
@@ -899,7 +894,6 @@ export class AppController {
     c.timeRate += (targetRate - c.timeRate) * (1 - Math.exp(-dt * 3));
     c.time += dt * c.timeRate;
     c.huePhase += dt * look.cycle * 0.06;
-    this.updateMood(dt);
     if (look.drift) {
       this.drift.step(look, dt, look.driftSpeed);
       if (++this.driftFrames % DRIFT_PUBLISH_FRAMES === 0) this.ui.set({ look: { ...look } });   // the sliders follow at ~10 Hz
@@ -907,7 +901,6 @@ export class AppController {
     if (this.state.activeSource === 'media') this.media.follow(this.player);
 
     if (this.autoSwitching() && this.music.playing && c.clock - c.sceneStart > MAX_SECONDS_PER_SCENE) this.nextRandomScene();
-    if (this.music.playing && this.tempo.advance(c.clock)) this.hooks.onTempoBeat?.();   // scheduled tick (no kick needed)
     const inGame = c.scene === this.state.gameIndex;
     if (inGame) this.game.update(dt, level);
     const mix = crossfade(c, c.clock);
@@ -916,7 +909,7 @@ export class AppController {
     p.scene = c.scene; p.prevScene = c.prevScene; p.mix = mix;
     p.time = c.time; p.bass = bass; p.mid = mid; p.high = high; p.level = level; p.beat = beat;
     p.extra = inGame ? this.game.uniforms() : p.extra;
-    p.bright = f.bright; p.mood = c.mood;
+    p.bright = f.bright; p.mood = f.mood;
     this.colourGrade(f.bright);
     applyLook(p, look, c.huePhase, this.currentScene.trails ?? 1);
     p.zoom = 1.006 + bass * 0.025;
@@ -937,10 +930,10 @@ export class AppController {
 
     if (++this.meterTick % 2 === 0) {
       const tone = toneWord(f.bright);
-      const moodLabel: MoodLabel = !look.mood || !this.music.playing ? '' : `mood: ${moodWord(c.mood)}`;
+      const moodLabel: MoodLabel = !look.mood || !this.music.playing ? '' : `mood: ${moodWord(f.mood)}`;
       this.ui.set({
-        meters: { bass: f.bass, mid: f.mid, high: f.high, bright: f.bright, centroid: f.centroid, beat: f.beat },
-        bpm: c.bpm,
+        meters: { bass: f.bass, mid: f.mid, high: f.high, bright: f.bright, beat: f.beat },
+        bpm: f.bpm,
         moodLabel,
         toneTitle: `Timbral brightness: ${tone} (spectral centroid ≈ ${(f.centroid / 1000).toFixed(1)} kHz)`,
         ...(inGame && { hud: this.game.hud() }),

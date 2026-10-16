@@ -35,7 +35,8 @@ warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm col
 
 - **Tone** – the spectral centroid (loudness-weighted average frequency) mapped from ~1.1 kHz (dark: piano,
   ambient) to ~5.5 kHz (bright: hi-hat-heavy house, psytrance) and smoothed over a few seconds. Shown in the panel.
-- **Mood** – tempo (80 → 160 BPM) plus overall energy, smoothed over ~4 s. Toggle with *Mood from tempo*.
+- **Mood** – tempo (80 → 160 BPM) plus how loud the music is over the last few seconds, smoothed over ~4 s more.
+  Toggle with *Mood from tempo*. When nothing plays, mood and tone both drift back to neutral.
 - **Synesthesia slider** – how strongly they grade every scene: dark sound → dimmer, cooler, hazier, longer trails;
   bright sound → lighter, warmer, crisper, more colour fringing; energetic mood → more saturated and warmer.
 - Both values are also available to your own shaders (`uBright`, `uMood`) and as *tone* / *mood* outputs on the

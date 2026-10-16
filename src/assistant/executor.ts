@@ -10,7 +10,8 @@ import { blobToBase64, encodeJpeg } from '../engine/jpeg';
 import type { ParamSpec, ParamValue, ParamValues } from '../engine/params';
 import type { SnapshotUniforms } from '../engine/renderer';
 import type { Scene } from '../engine/scenes';
-import { LOOK_KEYS, LOOK_RANGES, soundNow, type LookKey } from '../state/app-state';
+import { soundNow } from '../engine/listener';
+import { LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
 import { PlanSchema } from '../state/show-plan';
 import type { z } from 'zod';
 import type { UndoStack } from './undo';
@@ -160,8 +161,8 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
     preview: s.previewId, live: s.liveId,
     transition: { mode: s.mode, seconds: s.seconds },
     autopilot: s.autopilot.unit === 'seconds'
-      ? { on: s.autopilot.on, unit: 'seconds', seconds: s.autopilot.seconds, secondsElapsed: Math.round(s.secondsElapsed), bpm: app.tempo.bpm }
-      : { on: s.autopilot.on, unit: 'beats', beats: s.autopilot.beats, beatsElapsed: s.beatsElapsed, beatsToGo: Math.max(0, s.beatsTarget - s.beatsElapsed), bpm: app.tempo.bpm },
+      ? { on: s.autopilot.on, unit: 'seconds', seconds: s.autopilot.seconds, secondsElapsed: Math.round(s.secondsElapsed), bpm: app.hearing.bpm }
+      : { on: s.autopilot.on, unit: 'beats', beats: s.autopilot.beats, beatsElapsed: s.beatsElapsed, beatsToGo: Math.max(0, s.beatsTarget - s.beatsElapsed), bpm: app.hearing.bpm },
     plan: s.plan, planStep: s.plan ? s.planIndex : null,
     studioOpen: s.isOpen, livePinned: s.isPinned,
     userTouched: s.userTouched,
@@ -245,7 +246,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
   const lookAt = async (i: number, times: number[]): Promise<string[]> => {
     const out: string[] = [];
     for (const t of times) {
-      const uniforms: SnapshotUniforms = { uTime: t, uBass: 0.5, uMid: 0.5, uHigh: 0.5, uLevel: 0.6, uBeat: 0.4, uHue: app.state.look.hue + app.state.clock.huePhase, uBright: app.audio.features.bright, uMood: app.state.clock.mood };
+      const uniforms: SnapshotUniforms = { uTime: t, uBass: 0.5, uMid: 0.5, uHigh: 0.5, uLevel: 0.6, uBeat: 0.4, uHue: app.state.look.hue + app.state.clock.huePhase, uBright: app.hearing.bright, uMood: app.hearing.mood };
       const img = await app.renderer.snapshotAsync(i, uniforms, 512, 288);
       out.push(await blobToBase64(await encodeJpeg(img, 0.82)));
     }
@@ -258,7 +259,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
       return {
         playing: { name: s.name, kind: kindOf(s), category: s.cat || null, editedByUser: !!s.edited, parameters: paramSummary(i) },
         look: Object.fromEntries([...LOOK_KEYS, 'synesthesia'].map((k) => [k, app.state.look[k as LookKey]])),
-        audio: soundNow(app.state, app.music.playing, app.audio.features.bright),
+        audio: soundNow(app.hearing, app.music.playing, app.state.activeSource),
         media: app.media.el ? { name: app.media.name, kind: app.media.kind } : null,
         codeEditorOpen: app.overlay === 'editor',
         scenes: sceneList(scenes()),

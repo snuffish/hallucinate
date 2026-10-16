@@ -3,13 +3,11 @@
 // (fake-app.ts), so when the controller or the fake drifts from what the sessions need, it doesn't
 // compile.
 
-import type { AudioEngine } from '../engine/audio';
 import type { MediaLayer } from '../engine/media';
 import type { OutputLink } from '../engine/output-link';
 import type { Renderer } from '../engine/renderer';
 import type { Prefs } from '../state/prefs';
 import type { Store } from '../state/store';
-import type { TempoClock } from '../state/tempo-clock';
 import type { AppController } from './controller';
 import type { EditorCore } from './editor';
 import type { MusicSource } from './music-source';
@@ -17,11 +15,9 @@ import type { MusicSource } from './music-source';
 export type AppPort = Pick<AppController,
   | 'state' | 'ui' | 'live' | 'library' | 'sceneIndex' | 'currentScene' | 'overlay'
   | 'toast' | 'setHooks' | 'showParams' | 'setScene' | 'sceneByName' | 'setLook'
-  | 'captureScene' | 'applyScene'
+  | 'captureScene' | 'applyScene' | 'hearing'
 > & {
-  readonly audio: Pick<AudioEngine, 'features'>;
   readonly music: Pick<MusicSource, 'playing'>;
-  readonly tempo: Pick<TempoClock, 'bpm'>;
   readonly media: MediaLayer;                                     // the studio's Preview renderer shows it too
   readonly renderer: Pick<Renderer, 'snapshotAsync'>;
   readonly output: Pick<OutputLink, 'screens' | 'open'>;

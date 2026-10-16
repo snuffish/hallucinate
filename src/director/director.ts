@@ -11,7 +11,7 @@ import { Chat, forgetThread } from '../assistant/chat';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
 import { createLock, serialized, type Lock } from '../assistant/lock';
 import type { Usage } from '../assistant/usage';
-import { soundNow } from '../state/app-state';
+import { soundNow } from '../engine/listener';
 import { Store } from '../state/store';
 import { buildDigest, type DigestInput } from './digest';
 import { DirectorHistory } from './history';
@@ -103,8 +103,8 @@ export class Director {
   private due(): boolean { return cycleDue(this.studio.directorUnit, this.beatsSince, this.studio.directorBeats, Date.now() - this.lastCycleAt, this.studio.directorSeconds); }
 
   private onBeat(): void {
-    const f = this.app.audio.features;
-    this.history.sample({ level: f.level, bass: f.bass, bright: f.bright });
+    const h = this.app.hearing;
+    this.history.sample({ energy: h.energy, bass: h.bass, bright: h.bright });
     if (!this.view.on) return;
     this.beatsSince++;
     this.publishCountdown();
@@ -170,7 +170,7 @@ export class Director {
     const app = this.app, s = this.studio;
     const scenes = app.state.scenes;
     return {
-      ...soundNow(app.state, app.music.playing, app.audio.features.bright),
+      ...soundNow(app.hearing, app.music.playing, app.state.activeSource),
       elapsedSeconds: this.startedAt ? (Date.now() - this.startedAt) / 1000 : 0,
       media: !!app.media.el,
       trend: this.history.trend(),
