@@ -22,7 +22,7 @@ test('library: L opens it, / focuses search, arrows move through hits, Enter pla
   await page.keyboard.press('Shift+Tab');
   await expect(page.locator('#lib-filters button.active')).toHaveText('All');
   // Only the categories that have scenes get a tab.
-  await expect(page.locator('#lib-filters button')).toHaveText(['All', '★ Favourites', '⚙ Tweakable', 'Beams', 'Geometry', 'Mine']);
+  await expect(page.locator('#lib-filters button')).toHaveText(['All', '★ Favourites', '⚙ Tweakable', 'Beams', 'Geometry', 'Fields', 'Mine']);
   await page.keyboard.press('/');
   await page.keyboard.type('nest');
   await expect(page.locator('#lib-grid .lib-card')).toHaveCount(1);
