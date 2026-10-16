@@ -133,6 +133,18 @@ describe('FrameProfiler', () => {
     expect(r.verdict.kind).toBe('gpu-suspected');
   });
 
+  // Found on the CI runner (software WebGL): at 2-3 fps the last 3 s never held 10 frames, so the
+  // overlay said "Collecting frames…" for good — on exactly the machine that needs it.
+  it('warms up below 3 fps too', () => {
+    const p = new FrameProfiler(fakeClock().now, quietTimeline());
+    p.setOn(true);
+    let t = 0;
+    for (let i = 0; i < 30; i++) p.frameStart((t += 400));   // 2.5 fps
+    const r = p.report({ size: [1280, 720], scale: 1, resolution: 1, scene: 0, projectors: 0, preview: false });
+    expect(r.frameP50).toBeCloseTo(400);
+    expect(r.verdict.kind).toBe('gpu-suspected');
+  });
+
   it('only uses a fill result for the scene and resolution it ran on', async () => {
     const clock = fakeClock();
     const p = new FrameProfiler(clock.now, quietTimeline());
