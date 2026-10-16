@@ -255,3 +255,59 @@ export function loadLayout(): { layout: Layout; migrated: boolean } {
   remove(KEYS.paramsCollapsed);
   return { layout, migrated };
 }
+
+// ---------- Where a dragged widget lands ----------
+
+// An edge dock (at a position among the widgets there, with the preview the overlay draws: the whole
+// area of an empty dock, else a thin line where it would go), or a free float.
+export type DropTarget =
+  | { kind: 'dock'; zone: Zone; index: number; preview: Rect; line: boolean }
+  | { kind: 'float' };
+
+// One dock as the drag sees it: its rectangle, whether anything is docked there (the dragged widget
+// counts), and the rectangles of the other widgets in it, in order.
+export interface DockView { rect: Rect | null; occupied: boolean; items: Rect[] }
+
+export const DROP_EDGE = 56;   // how close to an edge of the screen counts as "dock here"
+const DROP_MARGIN = 16;
+const DROP_ROW_HEIGHT = 140;
+const DROP_LINE = 3;
+
+// The dock nearest an edge the pointer is close to, else the non-empty dock it is over, else a float.
+export function dropTarget(x: number, y: number, docks: Record<Zone, DockView>, view: Size, widths: Record<SideZone, number>): DropTarget {
+  const dist: Record<Zone, number> = { left: x, right: view.width - x, top: y, bottom: view.height - y };
+  const edge = ZONES.filter((z) => dist[z] <= DROP_EDGE).sort((a, b) => dist[a] - dist[b])[0];
+  const inside = (r: Rect) => x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height;
+  const over = edge ?? ZONES.find((z) => docks[z].items.length > 0 && !!docks[z].rect && inside(docks[z].rect!));
+  if (!over) return { kind: 'float' };
+  const items = docks[over].items;
+  if (!items.length) return { kind: 'dock', zone: over, index: 0, preview: emptyDockArea(over, docks, view, widths), line: false };
+  return { kind: 'dock', zone: over, ...dropSlot(over, items, x, y), line: true };
+}
+
+// The whole area a dock takes when it is empty. A top or bottom row runs between the side docks.
+function emptyDockArea(zone: Zone, docks: Record<Zone, DockView>, view: Size, widths: Record<SideZone, number>): Rect {
+  const m = DROP_MARGIN;
+  if (zone === 'left') return { left: m, top: m, width: widths.left, height: view.height - 2 * m };
+  if (zone === 'right') return { left: view.width - m - widths.right, top: m, width: widths.right, height: view.height - 2 * m };
+  const side = (z: SideZone) => (docks[z].occupied ? docks[z].rect : null);
+  const l = side('left'), r = side('right');
+  const left = l ? l.left + l.width + m : m;
+  const right = r ? r.left - m : view.width - m;
+  return { left, top: zone === 'top' ? m : view.height - m - DROP_ROW_HEIGHT, width: Math.max(0, right - left), height: DROP_ROW_HEIGHT };
+}
+
+// Inside a non-empty dock: the slot before the first widget whose middle is past the pointer.
+function dropSlot(zone: Zone, items: Rect[], x: number, y: number): { index: number; preview: Rect } {
+  const vertical = zone === 'left' || zone === 'right';
+  let index = items.findIndex((r) => (vertical ? y < r.top + r.height / 2 : x < r.left + r.width / 2));
+  if (index < 0) index = items.length;
+  const ref = items[Math.min(index, items.length - 1)]!;
+  const atEnd = index === items.length;
+  if (vertical) {
+    const top = atEnd ? ref.top + ref.height + 4 : ref.top - 4 - DROP_LINE;
+    return { index, preview: { left: ref.left, top, width: ref.width, height: DROP_LINE } };
+  }
+  const left = atEnd ? ref.left + ref.width + 4 : ref.left - 4 - DROP_LINE;
+  return { index, preview: { left, top: ref.top, width: DROP_LINE, height: ref.height } };
+}

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KEYS } from './persistence';
 import {
-  DEFAULT_LAYOUT, WIDGET_IDS, chatPlacement, dock, effective, float, floatToPx, loadLayout, moveBubble, parseLayout,
+  DEFAULT_LAYOUT, DROP_EDGE, WIDGET_IDS, chatPlacement, dock, dropTarget, type DockView, effective, float, floatToPx, loadLayout, moveBubble, parseLayout,
   CHAT_MIN_H, CHAT_MIN_W, DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetLayout, resetWidget, resize, resizeChat, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
 } from './layout';
 
@@ -223,5 +223,41 @@ describe('the chat window size', () => {
     const chat = { width: 400, height: 500 };
     expect(chatPlacement({ left: 20, top: 640, width: 54, height: 54 }, chat, VIEW)).toMatchObject({ growX: 'right', growY: 'up' });
     expect(chatPlacement({ left: 1200, top: 20, width: 54, height: 54 }, chat, VIEW)).toMatchObject({ growX: 'left', growY: 'down' });
+  });
+});
+
+describe('where a dragged widget lands', () => {
+  const none: DockView = { rect: null, occupied: false, items: [] };
+  const widths = { left: 300, right: 280 };
+  // The left dock holds two widgets, 100 px tall, one under the other; the rest are empty.
+  const docks = (left: Partial<DockView> = {}): Record<'left' | 'right' | 'top' | 'bottom', DockView> => ({
+    left: { rect: { left: 16, top: 16, width: 300, height: 220 }, occupied: true, items: [{ left: 16, top: 16, width: 300, height: 100 }, { left: 16, top: 126, width: 300, height: 100 }], ...left },
+    right: none, top: none, bottom: none,
+  });
+
+  it('floats away from the edges and the docks', () => {
+    expect(dropTarget(640, 360, docks(), VIEW, widths)).toEqual({ kind: 'float' });
+  });
+
+  it('docks at the nearest edge it is close to, previewing the whole of an empty dock', () => {
+    expect(dropTarget(VIEW.width - 10, 300, docks(), VIEW, widths)).toEqual({ kind: 'dock', zone: 'right', index: 0, line: false, preview: { left: VIEW.width - 16 - 280, top: 16, width: 280, height: VIEW.height - 32 } });
+    expect(dropTarget(VIEW.width - 10, VIEW.height - 5, docks(), VIEW, widths)).toMatchObject({ zone: 'bottom' });   // the nearer edge
+    expect(dropTarget(640, DROP_EDGE + 1, docks(), VIEW, widths)).toEqual({ kind: 'float' });
+  });
+
+  it('runs a top row between the side docks that hold something', () => {
+    const t = dropTarget(640, 10, docks(), VIEW, widths);
+    expect(t).toMatchObject({ zone: 'top', preview: { left: 16 + 300 + 16, top: 16, width: VIEW.width - 16 - (16 + 300 + 16), height: 140 } });
+  });
+
+  it('inside a dock with widgets, goes before the first one whose middle is past the pointer, with a line', () => {
+    expect(dropTarget(150, 60, docks(), VIEW, widths)).toEqual({ kind: 'dock', zone: 'left', index: 0, line: true, preview: { left: 16, top: 16 - 4 - 3, width: 300, height: 3 } });
+    expect(dropTarget(150, 140, docks(), VIEW, widths)).toMatchObject({ index: 1 });
+    expect(dropTarget(150, 200, docks(), VIEW, widths)).toMatchObject({ index: 2, preview: { top: 226 + 4 } });   // after the last
+  });
+
+  it('counts a dock whose only widget is the dragged one as empty', () => {
+    const t = dropTarget(10, 300, docks({ items: [] }), VIEW, widths);
+    expect(t).toMatchObject({ zone: 'left', index: 0, line: false });
   });
 });
