@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — studio Live (2026-10-16)
+
+### Fixed
+
+- With the studio closed, a fade between two show scenes no longer starts the outgoing one with the main screen's
+  parameter values: it fades out as it was on Live. Two show scenes of the same scene no longer fade the new values in
+  only at the very end; the new ones show at once, as they do with the studio open.
+- Opening the library no longer breaks the controls with "'ArrowLeft' is already registered".
+
 ## Unreleased — SoundCloud and YouTube (2026-10-16)
 
 ### Fixed

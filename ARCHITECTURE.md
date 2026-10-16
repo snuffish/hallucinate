@@ -26,10 +26,16 @@ browser                                              dev server (Vite middleware
   `localStorage`: `Renderer`, `AudioEngine`, `MediaLayer`, `BeatRacer`, the `@param` parser and store, the
   visual-maker compiler, the projector link. Each one that holds a resource (GL objects, audio nodes, media,
   listeners) has `dispose()`. `src/engine/look.ts` turns the look sliders and the sound into one frame's state
-  (`applyLook`); the main output, the studio's Preview monitor and the pinned Live slot all use it.
+  (`applyLook`); the main output, the studio's Preview monitor and the pinned Live slot all use it, and
+  `crossfade` is the one rule for how far a transition is.
 - **AppController** (`src/app/controller.ts`) is created once the canvas exists. It owns the engines, the
   shared scene list, the look sliders, the clock and the `requestAnimationFrame` loop, and exposes every
   action the UI calls (`setScene`, `startSource`, `setParam`, `toggleRecording`, …).
+- **The Live slot** (`src/app/live-slot.ts`, the controller's `live`): closing the studio with a show scene Live pins
+  it there. Projectors keep it, and crossfade from it on the next take with each show scene's own values, while the
+  screen is free to browse (or shows Live too, from the Screen widget). `route()` decides each frame what the main
+  canvas and the projectors draw; the studio's Preview monitor is composed by the same code (`preview()`), and the
+  slot publishes `liveName` and `screenMode`. The tests' fake app uses the real one.
 - **UI store** (`src/state/store.ts`, `ui-state.ts`): an immutable snapshot published by the controller.
   The loop publishes meters, BPM and the like every second frame; actions publish immediately. Components
   subscribe with selectors (`useUI(ui => ui.sceneName)`), so nothing per-frame goes through React state.
@@ -127,8 +133,9 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
 ## Data flow per frame
 
 `AudioEngine.update` → band energies, beat → `AppController.step` eases the clock, updates mood and the
-colour grade, fills one reused `ProgramState` (`applyLook`) → `Renderer.render` (scene pass → feedback pass → display
-pass) → `OutputLink.sendFrame` when a projector is connected → `hooks.onFrame` (studio preview and master
+colour grade, fills one reused `ProgramState` (`applyLook`) → `LiveSlot.route` decides what the screen and the
+projectors draw → `Renderer.render` (scene pass → feedback pass → display pass) → `OutputLink.sendFrame` when a
+projector is connected → `hooks.onFrame` (studio preview and master
 fader) → every second frame: publish meters to the UI store. `FrameProfiler` (Shift+P, `?perf`) laps between these stages;
 while it is off each lap is one flag check.
 

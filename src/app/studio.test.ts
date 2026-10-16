@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseParams } from '../engine/params';
+import { programState } from '../engine/look';
 import { fakeApp, type FakeApp } from './fake-app';
 import { StudioSession } from './studio';
 import { KEYS, flushAll } from '../state/persistence';
@@ -196,5 +198,36 @@ describe('StudioSession plan executor', () => {
     expect(saved.plan?.steps[0]?.maxSeconds).toBe(90);
     expect(saved.plan?.loop).toBe(true);
     expect(saved.directorBeats).toBe(64);
+  });
+});
+
+describe('StudioSession pinned Live', () => {
+  const { params: GLOW } = parseParams('uniform float uGlow; // @param min=0 max=3');
+  const glowing = (name: string, v: number) => ({ ...cue(name), values: { uGlow: v } });
+  const projector = (app: Fake) => app.live.route({ ...programState(), scene: app.state.clock.scene }, true).projector!;
+
+  it('keeps Live for the projectors when the studio closes, and crossfades a take from it', () => {
+    const app = fakeApp({ scenes: [{ name: 'Alpha', trails: 1 }, { name: 'Beta', trails: 1 }], params: [GLOW, GLOW] });
+    const s = session(app, { cues: [glowing('Alpha', 2), glowing('Beta', 1)], mode: 'fade', seconds: 2 });
+    s.setOpen(true, null);
+    s.take(s.cues[0]!);                        // open: on the main screen
+    s.setOpen(false, null);
+    expect(s.isPinned).toBe(true);
+    expect(app.ui.get().liveName).toBe('Alpha');
+    app.setScene(1);                            // browsing: the screen moves on, Live doesn't
+    expect(projector(app).program.scene).toBe(0);
+
+    s.take(s.cues[1]!);
+    app.state.clock.clock += 1;
+    const out = projector(app);
+    expect(out.program).toMatchObject({ scene: 1, prevScene: 0, mix: 0.5 });
+    expect(out.params).toEqual({ 1: { uGlow: 1 }, 0: { uGlow: 2 } });
+    expect(app.toasts).toContain('Live: Beta');
+
+    s.setOpen(true, null);                      // reopening puts Live back on the screen
+    expect(s.isPinned).toBe(false);
+    expect(app.ui.get().liveName).toBeNull();
+    expect(app.state.clock.scene).toBe(1);
+    expect(app.paramValues(1)).toEqual({ uGlow: 1 });
   });
 });

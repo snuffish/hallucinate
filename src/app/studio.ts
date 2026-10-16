@@ -8,17 +8,16 @@
 // latest values. The assistant's tools and the director are handed this session.
 
 import { z } from 'zod';
-import { toUniform, type ParamSpec, type ParamValue, ParamValueSchema, type ParamValues } from '../engine/params';
-import { applyLook, programState, smoothstep, type FrameLook } from '../engine/look';
-import { Renderer, type ProgramState, type SceneUniforms } from '../engine/renderer';
+import { type ParamSpec, type ParamValue, ParamValueSchema, type ParamValues } from '../engine/params';
+import { Renderer, type ProgramState } from '../engine/renderer';
 import { applyRendererPrefs, type ScreenDetailed } from '../engine/output-link';
 import { outputPrefs } from '../state/prefs';
-import { LOOK_KEYS } from '../state/app-state';
 import { listedScenes } from '../state/library-prefs';
 import { KEYS, debouncedWriter, readWithDefaults } from '../state/persistence';
 import { paramKey } from '../state/scene-list';
 import { LIST_MAX_SECONDS, PlanSchema, type Plan, type PlanStep } from '../state/show-plan';
 import type { AppPort } from './app-port';
+import type { Shot } from './live-slot';
 
 const CueSchema = z.object({
   id: z.string(),
@@ -53,17 +52,6 @@ export type TakeSource = 'user' | 'tool' | 'auto';
 export type StudioEvent = { type: 'beat' } | { type: 'take'; cue: Cue; source: TakeSource } | { type: 'changed' };
 export interface ShowSnapshot { cues: Cue[]; plan: Plan | null }
 
-// The Live slot while the studio is closed: what projectors render, whatever the main window shows.
-interface PinnedLive {
-  scene: number;
-  prevScene: number;
-  transitionStart: number;
-  fade: number;
-  look: Record<string, number>;
-  values: ParamValues;
-}
-const NO_SPECS: readonly ParamSpec[] = [];
-
 export class StudioSession {
   cues: Cue[];
   mode: 'cut' | 'fade';
@@ -97,16 +85,8 @@ export class StudioSession {
   private lastTimerTick = -1;
   private readonly listeners = new Set<(event: StudioEvent) => void>();
   private previewRenderer: Renderer | null = null;
-  private readonly previewState: ProgramState;
-  private readonly liveState: ProgramState;
-  private readonly liveParams: Record<number, SceneUniforms> = {};
-  private readonly liveResult: { program: ProgramState; params: Record<number, SceneUniforms> };
-  private readonly look: FrameLook = { hue: 0, trails: 0.86, aberration: 0, synesthesia: 0 };   // reused every frame
-  // A show scene's uniforms, per values object (a cue's values are replaced, never edited, so the
-  // object names one set of values): the monitors reuse them instead of rebuilding them every frame.
-  private readonly uniformCache = new WeakMap<ParamValues, { index: number; specs: readonly ParamSpec[]; uniforms: SceneUniforms }>();
+  private readonly shots = new WeakMap<Cue, Shot>();   // the Preview monitor's, per cue
   private readonly writer = debouncedWriter(KEYS.show, () => this.serialised(), 300);
-  private pinned: PinnedLive | null = null;
   private open = false;
 
   constructor(private readonly app: AppPort, private readonly notify: () => void = () => {}) {
@@ -121,9 +101,6 @@ export class StudioSession {
     this.directorSeconds = saved.directorSeconds;
     this.previewId = this.cues[0]?.id ?? null;
     this.lastShow = { cues: this.cues, plan: this.plan };
-    this.previewState = programState();
-    this.liveState = programState();
-    this.liveResult = { program: this.liveState, params: this.liveParams };
   }
 
   // Beats counted towards the next autopilot take, and how many it waits for (the plan step's, or the dial's).
@@ -139,7 +116,7 @@ export class StudioSession {
   }
   private emit(event: StudioEvent): void { for (const l of this.listeners) l(event); }
   // While the studio is closed and a cue is Live, the screen is only a preview.
-  get isPinned(): boolean { return this.pinned !== null; }
+  get isPinned(): boolean { return this.app.live.pinned; }
 
   get preview(): Cue | null { return this.cues.find((c) => c.id === this.previewId) ?? null; }
   get live(): Cue | null { return this.cues.find((c) => c.id === this.liveId) ?? null; }
@@ -156,7 +133,6 @@ export class StudioSession {
       // Changing scene by hand inside the studio means Live no longer shows a show scene. Outside the
       // studio the screen is a preview and Live stays pinned.
       onManualSceneChange: () => { if (this.open && this.liveId) { this.liveId = null; this.changed(false); } },
-      liveProgram: (base) => this.liveProgram(base),
       master: () => this.master,
       autopilot: () => this.autopilot.on,
       paramsOverride: () => this.paramsOverride(),
@@ -180,54 +156,21 @@ export class StudioSession {
     // Closing with a cue Live pins the Live slot: projectors keep it while the screen is free to
     // browse. Reopening puts Live back on the screen (the main canvas is the Live monitor).
     if (!open && this.liveId) this.pin();
-    if (open && this.pinned) this.unpin();
+    if (open && this.app.live.pinned) this.unpin();
     this.app.showParams();
     this.changed(false);
   }
 
+  // What is on screen stays Live for the projectors (the main canvas was the Live monitor).
   private pin(): void {
     const app = this.app;
-    const c = app.state.clock;
-    const { look, values } = app.captureScene(c.scene);
-    this.pinned = { scene: c.scene, prevScene: -1, transitionStart: c.clock, fade: 0, look: { ...look }, values };
-    app.ui.set({ liveName: this.live?.name ?? app.state.scenes[c.scene]?.name ?? null });
+    const i = app.state.clock.scene;
+    app.live.take(app.captureScene(i), this.live?.name ?? app.state.scenes[i]?.name ?? 'Live');
   }
 
   private unpin(): void {
-    const app = this.app;
-    const pin = this.pinned;
-    if (!pin) return;
-    this.pinned = null;
-    app.ui.set({ liveName: null });
-    app.applyScene({ scene: pin.scene, values: pin.values, look: pin.look }, 0);
-  }
-
-  // What projectors render while Live is pinned: the Live cue with the live audio, crossfading on a take.
-  private liveProgram(base: ProgramState): { program: ProgramState; params: Record<number, SceneUniforms> } | null {
-    const pin = this.pinned;
-    if (!pin) return null;
-    const app = this.app;
-    const p = Object.assign(this.liveState, base);
-    const mix = pin.fade > 0 ? smoothstep((app.state.clock.clock - pin.transitionStart) / pin.fade) : 1;
-    if (mix >= 1) pin.prevScene = -1;
-    p.scene = pin.scene; p.prevScene = pin.prevScene; p.mix = mix;
-    applyLook(p, this.frameLook(pin.look), app.state.clock.huePhase, app.state.scenes[pin.scene]?.trails ?? 1);
-    p.master = this.master;
-    const params = this.liveParams;
-    for (const k in params) delete params[k];
-    params[pin.scene] = this.uniformsFor(pin.scene, pin.values);
-    if (pin.prevScene >= 0) params[pin.prevScene] = app.renderer.sceneParams[pin.prevScene] ?? {};
-    return this.liveResult;
-  }
-
-  // A show scene's look, with the app's sliders for what it doesn't store (as Take does). Reused object.
-  private frameLook(look: Record<string, number>): FrameLook {
-    const app = this.app.state.look, l = this.look;
-    l.hue = look.hue ?? app.hue;
-    l.trails = look.trails ?? app.trails;
-    l.aberration = look.aberration ?? app.aberration;
-    l.synesthesia = app.synesthesia;
-    return l;
+    const shot = this.app.live.unpin();
+    if (shot) this.app.applyScene(shot, 0);
   }
 
   dispose(): void {
@@ -401,11 +344,8 @@ export class StudioSession {
     if (this.open) {
       app.applyScene({ scene: i, values: cue.values, look: cue.look }, fade);
     } else {
-      const now = app.captureScene(i).look;
-      const look = Object.fromEntries(LOOK_KEYS.map((k) => [k, cue.look[k] ?? now[k]!]));
-      this.pinned = { scene: i, prevScene: this.pinned?.scene ?? -1, transitionStart: app.state.clock.clock, fade, look, values: cue.values };
-      app.ui.set({ liveName: cue.name });
-      if (!this.open) app.toast(`Live: ${cue.name}`, 1500);
+      app.live.take({ scene: i, values: cue.values, look: cue.look }, cue.name, fade);
+      app.toast(`Live: ${cue.name}`, 1500);
     }
     this.liveId = cue.id;
     this.beatCount = 0;
@@ -521,26 +461,22 @@ export class StudioSession {
 
   // ---------- Monitors ----------
 
-  private uniformsFor(i: number, values: ParamValues): SceneUniforms {
-    const specs = this.app.sceneParams[i] ?? NO_SPECS;
-    const hit = this.uniformCache.get(values);
-    if (hit && hit.index === i && hit.specs === specs) return hit.uniforms;
-    const uniforms: SceneUniforms = Object.fromEntries(specs.map((s) => [s.name, toUniform(s, values[s.name] ?? s.def)]));
-    this.uniformCache.set(values, { index: i, specs, uniforms });
-    return uniforms;
-  }
-
   private renderPreview(base: ProgramState): void {
     const r = this.previewRenderer;
     if (!this.open || !r) return;
     const cue = this.preview;
     const index = this.sceneIndex(cue);
-    const p = Object.assign(this.previewState, base);
-    if (index < 0 || !cue) { p.scene = -1; p.prevScene = -1; p.mix = 1; p.master = 0; r.render(p); return; }
-    r.setParams(index, this.uniformsFor(index, cue.values));
-    p.scene = index; p.prevScene = -1; p.mix = 1; p.master = 1;
-    applyLook(p, this.frameLook(cue.look), this.app.state.clock.huePhase, this.app.state.scenes[index]!.trails ?? 1);
-    r.render(p);
+    const f = this.app.live.preview(base, cue && index >= 0 ? this.shot(cue, index) : null);
+    r.render(f.program, f.params);
+  }
+
+  // A cue as a shot, reused while the cue is (a cue is replaced, never edited): no allocation per frame.
+  private shot(cue: Cue, index: number): Shot {
+    const hit = this.shots.get(cue);
+    if (hit && hit.scene === index) return hit;
+    const shot = { scene: index, values: cue.values, look: cue.look };
+    this.shots.set(cue, shot);
+    return shot;
   }
 
   // The Parameters dock edits the selected (Preview) show scene by default, like OBS's Studio Mode:

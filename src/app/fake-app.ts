@@ -1,6 +1,6 @@
 // For tests: the app as the sessions see it (AppPort), in memory. Scenes, the clock, the look, the
-// UI store, parameter values, scene code and hooks behave like the controller's; what needs a GPU,
-// a window or real media (snapshots, projector windows) is a stub.
+// UI store, parameter values, scene code, the pinned Live slot (the real one) and hooks behave like the
+// controller's; what needs a GPU, a window or real media (snapshots, projector windows) is a stub.
 
 import type { AudioKind } from '../engine/audio';
 import type { ParamSpec, ParamValues } from '../engine/params';
@@ -12,6 +12,7 @@ import { initialUIState } from '../state/ui-state';
 import type { AppPort } from './app-port';
 import type { ControllerHooks } from './controller';
 import type { CompileResult, EditorKind } from './editor';
+import { LiveSlot } from './live-slot';
 import type { MediaLayer } from '../engine/media';
 
 export interface FakeAppOptions {
@@ -39,6 +40,8 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
   const stored = new Map<number, ParamValues>();
   const hooks: Partial<ControllerHooks> = {};
   const toasts: string[] = [];
+  const ui = new Store(initialUIState(look));
+  const toast = (text: string) => { toasts.push(text); };
 
   const paramValues = (i: number): ParamValues => {
     const saved = stored.get(i) ?? {};
@@ -55,11 +58,12 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
 
   const app: FakeApp = {
     state, sceneParams, hooks, toasts,
-    ui: new Store(initialUIState(look)),
+    ui,
+    live: new LiveSlot({ state, specs: sceneParams, stored: [], ui, toast }),
     audio: { kind: opts.audio === undefined ? 'demo' : opts.audio, features: { bass: 0.4, mid: 0.4, high: 0.4, level: 0.5, beat: 0, bright: 0.6, centroid: 0 } },
     tempo: { bpm: 120 },
     media: { el: null, name: '', kind: null } as unknown as MediaLayer,   // only the studio's Preview renderer uses it, and tests never open one
-    renderer: { sceneParams: [], snapshotAsync: () => Promise.reject(new Error('No GPU in tests.')) },
+    renderer: { snapshotAsync: () => Promise.reject(new Error('No GPU in tests.')) },
     output: { screens: async () => [], open: () => { throw new Error('No projector windows in tests.'); } },
     prefs: { get: () => DEFAULT_PREFS },
     editor: {
@@ -73,7 +77,7 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
     get sceneIndex() { return state.clock.scene; },
     get currentScene() { return scenes[state.clock.scene]!; },
     get overlay() { return app.ui.get().overlay; },
-    toast: (text) => { toasts.push(text); },
+    toast,
     setHooks: (h) => {
       Object.assign(hooks, h);
       return () => { for (const k of Object.keys(h) as (keyof ControllerHooks)[]) if (hooks[k] === h[k]) delete hooks[k]; };

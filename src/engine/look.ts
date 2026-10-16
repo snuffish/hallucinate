@@ -8,6 +8,17 @@ export interface FrameLook { hue: number; trails: number; aberration: number; sy
 
 export const smoothstep = (x: number): number => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 
+// A crossfade from `prevScene`, `fade` seconds long from `transitionStart`.
+export interface Transition { prevScene: number; transitionStart: number; fade: number }
+
+// How far the crossfade is at `now` (eased, 1 when done or a cut). Once it is done the previous scene
+// is let go (`prevScene` -1), so the renderer stops drawing it.
+export function crossfade(t: Transition, now: number): number {
+  const mix = t.fade > 0 ? smoothstep((now - t.transitionStart) / t.fade) : 1;
+  if (mix >= 1) t.prevScene = -1;
+  return mix;
+}
+
 // A new, neutral frame state. Each pipeline keeps one and refills it every frame.
 export function programState(spectrum: Uint8Array = new Uint8Array(512)): ProgramState {
   return {

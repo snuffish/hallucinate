@@ -14,14 +14,14 @@ import type { AppController } from './controller';
 import type { EditorCore } from './editor';
 
 export type AppPort = Pick<AppController,
-  | 'state' | 'ui' | 'sceneParams' | 'sceneIndex' | 'currentScene' | 'overlay'
+  | 'state' | 'ui' | 'live' | 'sceneParams' | 'sceneIndex' | 'currentScene' | 'overlay'
   | 'toast' | 'setHooks' | 'showParams' | 'setScene' | 'sceneByName' | 'setLook'
   | 'paramValues' | 'setParamValues' | 'captureScene' | 'applyScene' | 'addUserScene' | 'removeUserScene'
 > & {
   readonly audio: Pick<AudioEngine, 'kind' | 'features'>;
   readonly tempo: Pick<TempoClock, 'bpm'>;
   readonly media: MediaLayer;                                     // the studio's Preview renderer shows it too
-  readonly renderer: Pick<Renderer, 'sceneParams' | 'snapshotAsync'>;
+  readonly renderer: Pick<Renderer, 'snapshotAsync'>;
   readonly output: Pick<OutputLink, 'screens' | 'open'>;
   readonly editor: Pick<EditorCore, 'target' | 'compileInto'>;
   readonly prefs: Pick<Store<Prefs>, 'get'>;

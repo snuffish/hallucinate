@@ -4,12 +4,12 @@
 
 import { AudioEngine } from '../engine/audio';
 import { BeatRacer } from '../engine/game';
-import { applyLook, programState, smoothstep } from '../engine/look';
+import { applyLook, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
 import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
-import { Renderer, type ProgramState, type SceneUniforms } from '../engine/renderer';
+import { Renderer, type ProgramState } from '../engine/renderer';
 import type { Scene } from '../engine/scenes';
 import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, estimateBpm, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
 import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
@@ -20,10 +20,11 @@ import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, ty
 import { appendScene, buildSceneList, discardParked, paramKey, saveUserScenes, userScene, type ParkedScenes } from '../state/scene-list';
 import { Store } from '../state/store';
 import { TempoClock } from '../state/tempo-clock';
-import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type ScreenMode, type UIState } from '../state/ui-state';
+import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { applyWrites, buildBundle, parseBundle } from './bundle';
 import { downloadFile, fileStamp } from './download';
 import { EditorCore } from './editor';
+import { LiveSlot } from './live-slot';
 import { Transport } from './transport';
 
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
@@ -50,9 +51,6 @@ export interface ControllerHooks {
   paramsOverride?: () => { title: string; key: string; specs: ParamSpec[]; values: ParamValues; onChange: (spec: ParamSpec, v: ParamValue) => void; onReset: () => void } | null;
   master?: () => number;
   autopilot?: () => boolean;
-  // Studio: while the Live slot is pinned (studio closed after a take), projectors get this instead
-  // of what the main window shows.
-  liveProgram?: (base: ProgramState) => { program: ProgramState; params: Record<number, SceneUniforms> } | null;
   // First Escape inside an overlay may just leave a text field; returns true when it was consumed.
   escape?: () => boolean;
   // A device preference changed (the studio's Preview renderer follows the pixel density).
@@ -76,6 +74,8 @@ export class AppController {
   readonly paramStore = new ParamStore();
   readonly renderer: Renderer;
   readonly output: OutputLink;
+  // The pinned Live slot (studio closed after a take): what projectors and the screen show, see live-slot.ts.
+  readonly live: LiveSlot;
   readonly state: AppState;
   readonly ui: Store<UIState>;
   // Where every control widget and the assistant bubble sit; persisted, see src/state/layout.ts.
@@ -113,7 +113,6 @@ export class AppController {
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly program: ProgramState;
-  private readonly liveParams: Record<number, SceneUniforms> = {};
   private readonly profilerApi: ProfilerApi = {
     report: () => (this.profiler.on ? this.perfReport() : null),
     fillTest: () => this.runFillTest(),
@@ -157,6 +156,7 @@ export class AppController {
     this.renderer.setMedia(this.media);
     this.renderer.setScale(this.state.look.resolution);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
+    this.live = new LiveSlot({ state: this.state, specs: this.sceneParams, stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
     this.applyPrefs();
 
     this.player = document.createElement('audio');
@@ -503,15 +503,6 @@ export class AppController {
     this.editor.libraryName = name;
     this.setScene(this.state.customIndex);
     this.setOverlay('editor');
-  }
-
-  // ---------- Screen: preview or Live ----------
-
-  // Only matters while Live is pinned; with nothing pinned the screen is Live anyway.
-  setScreenMode(mode: ScreenMode): void {
-    if (mode === this.ui.get().screenMode) return;
-    this.ui.set({ screenMode: mode });
-    if (this.ui.get().liveName) this.toast(mode === 'live' ? `Screen shows Live: ${this.ui.get().liveName}` : 'Screen shows your preview', 1500);
   }
 
   // ---------- A scene as a whole: which one, its parameter values, the look ----------
@@ -973,8 +964,7 @@ export class AppController {
     if (this.audio.kind && this.tempo.advance(c.clock)) this.hooks.onTempoBeat?.();   // scheduled tick (no kick needed)
     const inGame = c.scene === this.state.gameIndex;
     if (inGame) this.game.update(dt, level);
-    const mix = c.fade > 0 ? smoothstep((c.clock - c.transitionStart) / c.fade) : 1;
-    if (mix >= 1) c.prevScene = -1;
+    const mix = crossfade(c, c.clock);
 
     const p = this.program;
     p.scene = c.scene; p.prevScene = c.prevScene; p.mix = mix;
@@ -990,23 +980,11 @@ export class AppController {
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
     this.profiler.lap(Stage.logic);
-    // Live is pinned (studio closed after a take): projectors get it; the screen shows it too when
-    // the Screen widget is set to Live, otherwise it stays your preview.
-    const showLive = this.ui.get().screenMode === 'live';
-    const pinned = this.output.connected || showLive ? this.hooks.liveProgram?.(p) : null;
-    if (pinned && showLive) this.renderer.render(pinned.program, pinned.params);
-    else this.renderer.render(p);
+    // Live pinned (studio closed after a take): projectors get it, and the screen too when set to Live.
+    const out = this.live.route(p, this.output.connected);
+    this.renderer.render(out.screen.program, out.screen.params);
     this.profiler.lap(Stage.render);
-    if (this.output.connected) {
-      if (pinned) this.output.sendFrame(pinned.program, pinned.params, look.resolution);
-      else {
-        const live = this.liveParams;
-        for (const k in live) delete live[k];
-        live[c.scene] = this.renderer.sceneParams[c.scene] ?? {};
-        if (c.prevScene >= 0) live[c.prevScene] = this.renderer.sceneParams[c.prevScene] ?? {};
-        this.output.sendFrame(p, live, look.resolution);
-      }
-    }
+    if (out.projector) this.output.sendFrame(out.projector.program, out.projector.params, look.resolution);
     this.profiler.lap(Stage.output);
     this.hooks.onFrame?.(dt, p);
     this.profiler.lap(Stage.studio);

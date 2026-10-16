@@ -135,7 +135,7 @@ export function ScreenBody() {
       <div className="seg" role="group" aria-label="What the screen shows">
         {(['preview', 'live'] as const).map((m) => (
           <button key={m} id={`screen-${m}`} className={mode === m ? 'active' : undefined} aria-pressed={mode === m} disabled={studioOpen}
-            onClick={() => app.setScreenMode(m)}>{m === 'live' ? '● Live' : 'Preview'}</button>
+            onClick={() => app.live.setScreenMode(m)}>{m === 'live' ? '● Live' : 'Preview'}</button>
         ))}
       </div>
       <small id="screen-status" className="screen-status">{status}</small>
