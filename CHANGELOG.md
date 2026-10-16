@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — performance monitor (2026-10-16)
+
+### Added
+
+- A performance monitor (Shift+P, or `?perf` in the URL): frame rate against the display's refresh, the main thread's
+  time per stage of the frame (audio analysis, look, draw calls, projector link, studio, React), and one sentence on what
+  holds the frame rate back. **Test GPU** renders at half resolution for a moment to tell a GPU-bound scene from
+  everything else. `?perf=trace` adds the stages to a DevTools Performance recording, and
+  `node perf/measure.mjs … --gpu` runs on the real GPU and ranks every scene by how hard it is on it. See PERF.md.
+
 ## Unreleased — fixes from the architecture review (2026-10-15)
 
 ### Fixed

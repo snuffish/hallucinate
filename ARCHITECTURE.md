@@ -114,7 +114,8 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
 `AudioEngine.update` → band energies, beat → `AppController.step` eases the clock, updates mood and the
 colour grade, fills one reused `ProgramState` (`applyLook`) → `Renderer.render` (scene pass → feedback pass → display
 pass) → `OutputLink.sendFrame` when a projector is connected → `hooks.onFrame` (studio preview and master
-fader) → every second frame: publish meters to the UI store.
+fader) → every second frame: publish meters to the UI store. `FrameProfiler` (Shift+P, `?perf`) laps between these stages;
+while it is off each lap is one flag check.
 
 ## Assistant flow
 

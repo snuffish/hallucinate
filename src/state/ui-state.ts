@@ -4,6 +4,7 @@
 import type { GameHud } from '../engine/game';
 import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
+import type { PerfReport } from '../engine/profiler';
 import type { HelpTopicId } from '../help/topics';
 import type { Look, SourceButton } from './app-state';
 import type { WidgetId } from './layout';
@@ -73,6 +74,7 @@ export interface UIState {
   paramsVisible: boolean;
   params: ParamsView;
   hud: GameHud | null;
+  perf: PerfReport | null;  // Shift+P: the performance overlay, ~2 Hz while on; null = off (not persisted)
   recording: boolean;
   transport: TransportView;
   media: MediaView;
@@ -110,6 +112,7 @@ export const initialUIState = (look: Look): UIState => ({
   paramsVisible: false,
   params: { title: 'Parameters', key: '', specs: [], values: {}, inStudio: false },
   hud: null,
+  perf: null,
   recording: false,
   transport: { mode: null, hasQueue: false, playing: false, currentTime: 0, duration: 0, loop: false },
   media: { name: '', kind: null, width: 1, height: 1, loaded: false },

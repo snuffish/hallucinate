@@ -13,6 +13,7 @@ import { SessionsProvider, useSessions } from './sessions';
 import { HelpLayer } from '../components/Help';
 import { Hud } from '../components/Hud';
 import { Library } from '../components/Library';
+import { PerfOverlay } from '../components/PerfOverlay';
 import { SoundCloudPicker, YouTubePicker } from '../components/Pickers';
 import { StartScreen } from '../components/StartScreen';
 import { Studio } from '../components/Studio';
@@ -88,6 +89,7 @@ function Shell({ app }: { app: AppController }) {
       <SoundCloudPicker />
       <YouTubePicker />
       <Hud />
+      <PerfOverlay />
       <Toast />
       <HelpLayer />
       <Hotkeys />
@@ -121,6 +123,7 @@ function Hotkeys() {
     toggleParams: () => app.toggleWidgetCollapsed('params'),
     togglePanel: () => app.toggleWidgets(),
     resetLayout: () => app.resetLayout(),
+    togglePerf: () => app.togglePerf(),
     toggleFullscreen: () => app.toggleFullscreen(),
     toggleRecording: () => app.toggleRecording(),
     toggleAuto: () => app.toggleAuto(),

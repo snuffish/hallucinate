@@ -30,6 +30,7 @@ npm run test:e2e    # Playwright: boot, scenes, every panel, library keys, widge
 npm run test:e2e:desktop   # builds the desktop app and drives it (needs a GPU, so not in CI; lint, typecheck, unit and e2e are)
 ASSISTANT_E2E=1 npx playwright test e2e/assistant.spec.ts   # one real assistant round-trip (uses your Claude backend)
 node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json   # performance probe, with the dev server running
+node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json --gpu   # same on the real GPU (opens a window), plus a GPU test of every scene
 ```
 
 The README screenshots are taken by `scripts/screenshots.mjs` (run it with the dev server up).
