@@ -56,6 +56,8 @@ floated anywhere (see [Widgets & layout](interface.md)). It appears once a sourc
 
 The editor's *Cheat sheet* has the full list. A few worth knowing:
 
-- `uBright`, `uMood` – the [synesthesia](audio.md#-synesthesia-sound--light-mapping) tone and mood.
-- `uBeat` – follows the detected kicks.
+- `uBass`, `uMid`, `uHigh`, `uLevel`, `uBeat` – 0 to 1, up to 1.5 when Reactivity is turned up; `uBeat` follows the
+  detected kicks.
+- `uBright`, `uMood` – the [synesthesia](audio.md#-synesthesia-sound--light-mapping) tone and mood, 0 to 1 and not
+  scaled by Reactivity.
 - `media(p)`, `untone(col)` – sample the dropped image or video; see [Media](media.md#in-code-and-the-visual-maker).

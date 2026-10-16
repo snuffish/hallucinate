@@ -59,7 +59,7 @@ export function Studio() {
   }, [outputs]);
 
   const preview = studio.preview, live = studio.live;
-  const tempo = app.tempo.bpm;
+  const tempo = app.hearing.bpm;
   const missing = (cue: Cue) => studio.sceneIndex(cue) < 0;
   const scenes = studio.listScenes();
   void sceneVersion;
@@ -71,7 +71,7 @@ export function Studio() {
     : dir.error ? dir.error
     : !dir.on ? (plan?.note ? `Plan: ${plan.note}` : 'Off — Claude plans the show for you; the autopilot follows the plan on the beat')
     : dir.cycling ? 'Planning…'
-    : !app.audio.kind ? 'Waiting for the music'
+    : !app.music.playing ? 'Waiting for the music'
     : studio.cues.length < 2 ? 'Add at least two show scenes'
     : `${dir.lastNote || 'Waiting for the first plan'} · next in ${directorTimer ? `${dir.secondsToCycle} s` : `${dir.beatsToCycle} beats`}${tokens ? ` · ${Math.round(tokens / 1000)}k tokens` : ''}`;
 

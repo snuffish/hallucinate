@@ -128,7 +128,7 @@ export class StudioSession {
   // Parameters dock editing the selected show scene, and the pixel-density setting for the monitor.
   attach(): () => void {
     return this.app.setHooks({
-      onFrame: (dt, program) => { this.update(dt); this.renderPreview(program); },
+      onFrame: (dt, program) => { this.update(dt); this.renderPreview(program, dt); },
       onTempoBeat: () => this.onBeat(),   // the autopilot follows the tempo clock, not raw kicks
       // Changing scene by hand inside the studio means Live no longer shows a show scene. Outside the
       // studio the screen is a preview and Live stays pinned.
@@ -456,17 +456,17 @@ export class StudioSession {
       if (elapsed >= this.autopilot.seconds) { this.advance(); return; }
       const tick = Math.floor(elapsed * 2);   // the timer bar, a few times a second, not every frame
       if (tick !== this.lastTimerTick) { this.lastTimerTick = tick; if (this.open) this.changed(false); }
-    } else if (this.app.audio.kind && elapsed > (this.currentStep?.maxSeconds ?? LIST_MAX_SECONDS)) this.advance();
+    } else if (this.app.music.playing && elapsed > (this.currentStep?.maxSeconds ?? LIST_MAX_SECONDS)) this.advance();
   }
 
   // ---------- Monitors ----------
 
-  private renderPreview(base: ProgramState): void {
+  private renderPreview(base: ProgramState, dt: number): void {
     const r = this.previewRenderer;
     if (!this.open || !r) return;
     const cue = this.preview;
     const index = this.sceneIndex(cue);
-    const f = this.app.live.preview(base, cue && index >= 0 ? this.shot(cue, index) : null);
+    const f = this.app.live.preview(base, cue && index >= 0 ? this.shot(cue, index) : null, dt);
     r.render(f.program, f.params);
   }
 

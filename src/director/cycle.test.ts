@@ -118,10 +118,10 @@ describe('a director cycle', () => {
     await director.cycleNow();
     expect(seen).toHaveLength(0);             // the panel is talking: wait
     app.ui.set({ assistantBusy: false });
-    app.audio.kind = null;
+    app.music.playing = false;
     await director.cycleNow();
     expect(seen).toHaveLength(0);             // no music
-    app.audio.kind = 'demo';
+    app.music.playing = true;
     await director.cycleNow();
     await settled(director);
     expect(seen.length).toBeGreaterThan(0);

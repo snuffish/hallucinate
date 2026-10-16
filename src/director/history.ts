@@ -1,8 +1,9 @@
 // What the director remembers between cycles, since every cycle is a fresh conversation: energy
 // samples (one per beat) grouped by cycle, so the digest can say where the music is heading, and
-// the last few decisions with their notes.
+// the last few decisions with their notes. `energy` is the steady loudness (the one the mood uses), so
+// a build-up reads as rising; the bass is against its last few seconds.
 
-export interface EnergySample { level: number; bass: number; bright: number }
+export interface EnergySample { energy: number; bass: number; bright: number }
 export interface Decision { at: number; note: string }   // `at` in set seconds
 
 const MAX_SAMPLES = 4096;
@@ -10,7 +11,7 @@ const MAX_DECISIONS = 8;
 const WINDOWS = 4;
 
 export type Direction = 'rising' | 'falling' | 'steady' | 'unknown';
-export interface Trend { level: number[]; bass: number[]; bright: number[]; direction: Direction }
+export interface Trend { energy: number[]; bass: number[]; bright: number[]; direction: Direction }
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 const round = (x: number) => Math.round(x * 100) / 100;
@@ -44,15 +45,15 @@ export class DirectorHistory {
       const w = this.samples.slice(bounds[i]!, bounds[i + 1]!);
       if (w.length) windows.unshift(w);
     }
-    const level = windows.map((w) => round(mean(w.map((s) => s.level))));
+    const energy = windows.map((w) => round(mean(w.map((s) => s.energy))));
     const bass = windows.map((w) => round(mean(w.map((s) => s.bass))));
     const bright = windows.map((w) => round(mean(w.map((s) => s.bright))));
     let direction: Direction = 'unknown';
-    if (level.length >= 2) {
-      const d = level[level.length - 1]! - level[0]!;
+    if (energy.length >= 2) {
+      const d = energy[energy.length - 1]! - energy[0]!;
       direction = d > 0.08 ? 'rising' : d < -0.08 ? 'falling' : 'steady';
     }
-    return { level, bass, bright, direction };
+    return { energy, bass, bright, direction };
   }
 
   clear(): void { this.samples = []; this.marks = []; this.decisions.length = 0; }

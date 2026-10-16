@@ -5,8 +5,9 @@ import type { GameHud } from '../engine/game';
 import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
 import type { PerfReport } from '../engine/profiler';
+import type { MoodWord } from '../engine/listener';
 import type { HelpTopicId } from '../help/topics';
-import type { Look, MoodWord, SourceButton } from './app-state';
+import type { Look, SourceButton } from './app-state';
 import type { WidgetId } from './layout';
 
 export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | 'settings' | null;
@@ -17,7 +18,7 @@ export type HelpId = HelpTopicId | 'sheet';
 // What is being dragged around the screen ('resize': a widget's or a dock's resize grip).
 export type DragId = WidgetId | 'bubble' | 'resize';
 
-export interface Meters { bass: number; mid: number; high: number; bright: number; centroid: number; beat: number }
+export interface Meters { bass: number; mid: number; high: number; bright: number; beat: number }
 export type MoodLabel = '' | `mood: ${MoodWord}`;
 
 export interface TransportView {
@@ -94,7 +95,7 @@ export const initialUIState = (look: Look): UIState => ({
   sceneName: '',
   sceneVersion: 0,
   look,
-  meters: { bass: 0, mid: 0, high: 0, bright: 0.5, centroid: 0, beat: 0 },
+  meters: { bass: 0, mid: 0, high: 0, bright: 0.5, beat: 0 },
   bpm: null,
   moodLabel: '',
   toneTitle: '',

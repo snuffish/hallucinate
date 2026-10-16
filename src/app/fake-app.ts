@@ -2,7 +2,7 @@
 // UI store, parameter values, scene code, the pinned Live slot (the real one) and hooks behave like the
 // controller's; what needs a GPU, a window or real media (snapshots, projector windows) is a stub.
 
-import type { AudioKind } from '../engine/audio';
+import type { Hearing } from '../engine/listener';
 import type { MediaLayer } from '../engine/media';
 import { ParamStore, type ParamSpec } from '../engine/params';
 import type { Scene } from '../engine/scenes';
@@ -19,15 +19,15 @@ import { SceneLibrary, type Compiler } from './scene-library';
 export interface FakeAppOptions {
   scenes?: (Partial<Scene> & { name: string })[];
   params?: ParamSpec[][];                              // per scene index: its @params
-  audio?: AudioKind | null;                            // what is playing, or nothing (default: the demo)
+  playing?: boolean;                                   // whether music sounds (default: it does)
   compiler?: Partial<Compiler>;                        // the GPU's answers (default: everything compiles)
 }
 
 export type FakeApp = AppPort & {
   hooks: Partial<ControllerHooks>;
   toasts: string[];
-  audio: { kind: AudioKind | null; features: AppPort['audio']['features'] };
-  tempo: { bpm: number | null };
+  hearing: Hearing;
+  music: { playing: boolean };
 };
 
 export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
@@ -50,12 +50,14 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
   };
   const setLook = (k: LookKey, v: number) => { const r = LOOK_RANGES[k]; look[k] = Math.min(r.max, Math.max(r.min, v)); };
 
+  const hearing: Hearing = { bass: 0.4, mid: 0.4, high: 0.4, level: 0.5, beat: 0, kick: false, tick: false, bpm: 120, bright: 0.6, centroid: 2500, energy: 0.5, mood: 0.5 };
+
   const app: FakeApp = {
     state, library, hooks, toasts,
     ui,
-    live: new LiveSlot({ state, specs: (i) => library.specs(i), stored: [], ui, toast }),
-    audio: { kind: opts.audio === undefined ? 'demo' : opts.audio, features: { bass: 0.4, mid: 0.4, high: 0.4, level: 0.5, beat: 0, bright: 0.6, centroid: 0 } },
-    tempo: { bpm: 120 },
+    live: new LiveSlot({ state, hearing, specs: (i) => library.specs(i), stored: [], ui, toast }),
+    hearing,
+    music: { playing: opts.playing ?? true },
     media: { el: null, name: '', kind: null } as unknown as MediaLayer,   // only the studio's Preview renderer uses it, and tests never open one
     renderer: { snapshotAsync: () => Promise.reject(new Error('No GPU in tests.')) },
     output: { screens: async () => [], open: () => { throw new Error('No projector windows in tests.'); } },

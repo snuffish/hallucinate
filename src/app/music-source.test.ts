@@ -94,6 +94,29 @@ describe('MusicSource', () => {
     expect(shown.at(-1)).toBe('❚❚ The microphone stopped — pick a source');
   });
 
+  it('is playing only while the music sounds: paused, stopped or ended, it is not', async () => {
+    const { m, audio, player } = music();
+    expect(m.playing).toBe(false);
+    await m.play('blob:a', 'Track', 'file');
+    expect(m.playing).toBe(true);
+    await m.toggle();
+    expect(m.playing).toBe(false);            // a paused file is still the source, but not playing
+    await m.toggle();
+    player.paused = true;                     // the track reached its end
+    expect(m.playing).toBe(false);
+    await m.start('demo');
+    expect(m.playing).toBe(true);
+    await m.toggle();
+    expect(m.playing).toBe(false);            // the demo beat paused
+    await m.start('mic');
+    expect(m.playing).toBe(true);
+    audio.end();
+    expect(m.playing).toBe(false);
+    await m.play('v.mp4', 'Clip', 'media');
+    m.stop('❚❚ Video sound off — pick a music source');
+    expect(m.playing).toBe(false);
+  });
+
   it('stops being the music with the reason it gives', async () => {
     const { m, player, state, shown } = music();
     await m.play('v.mp4', 'Clip', 'media');

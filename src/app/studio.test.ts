@@ -87,7 +87,7 @@ describe('StudioSession plan executor', () => {
     expect(s.live?.name).toBe('Beta');
     seconds(app, s, 6);
     expect(s.live?.name).toBe('Alpha');
-    app.audio.kind = null;                    // no music: nothing moves
+    app.music.playing = false;                // no music: nothing moves
     seconds(app, s, 100);
     expect(s.live?.name).toBe('Alpha');
   });
@@ -106,7 +106,7 @@ describe('StudioSession plan executor', () => {
     expect(s.live?.name).toBe('Alpha');       // list order
     expect(s.secondsElapsed).toBeCloseTo(0, 5);
     s.setPlan({ steps: [{ cue: 'id-Gamma', beats: 16, maxSeconds: 600 }, { cue: 'id-Beta', beats: 16, maxSeconds: 600 }], note: '', loop: true });
-    app.audio.kind = null;                    // the timer runs without music too
+    app.music.playing = false;                // the timer runs without music too
     seconds(app, s, 20.5);
     expect(s.live?.name).toBe('Gamma');       // the plan's step, after the timer's 20 s, not its beats
     seconds(app, s, 20.5);
@@ -204,7 +204,7 @@ describe('StudioSession plan executor', () => {
 describe('StudioSession pinned Live', () => {
   const { params: GLOW } = parseParams('uniform float uGlow; // @param min=0 max=3');
   const glowing = (name: string, v: number) => ({ ...cue(name), values: { uGlow: v } });
-  const projector = (app: Fake) => app.live.route({ ...programState(), scene: app.state.clock.scene }, true).projector!;
+  const projector = (app: Fake) => app.live.route({ ...programState(), scene: app.state.clock.scene }, true, 0).projector!;
 
   it('keeps Live for the projectors when the studio closes, and crossfades a take from it', () => {
     const app = fakeApp({ scenes: [{ name: 'Alpha', trails: 1 }, { name: 'Beta', trails: 1 }], params: [GLOW, GLOW] });
