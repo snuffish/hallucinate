@@ -1,73 +1,48 @@
 // A TanStack AI text adapter that runs the user's Claude subscription through the local Claude Code
 // CLI, locked down: no built-in tools (`--tools ''`: no files, no shell), none of the user's settings
 // (`--setting-sources ''`), a private working directory of its own, and ONLY this app's tools, offered to the CLI as a tiny MCP server at
-// /api/assistant/mcp. Every tool call is handed to the browser (which owns the renderer and
-// editors) as a CUSTOM stream event and answered through POST /api/assistant/tool-result.
+// /api/assistant/mcp. It translates the CLI's stream-json into TanStack's chunks; the CLI bridge
+// (cli-bridge.ts) holds its sessions and hands each tool call to the browser, which owns the renderer
+// and editors.
 //
 // TanStack's own @tanstack/ai-claude-code adapter cannot be made tool-free (verified 2026-10-13:
 // `disallowedTools` is not exhaustive and `--tools ''` is only emitted when our tools are dropped too).
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { chmodSync, lstatSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import type { IncomingMessage, ServerResponse } from 'node:http';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import { EventType, type AdapterYieldChunk, type AnyTool, type DefaultMessageMetadataByModality, type ModelMessage, type TextOptions } from '@tanstack/ai';
+import { EventType, type AdapterYieldChunk, type DefaultMessageMetadataByModality, type ModelMessage, type TextOptions } from '@tanstack/ai';
 import { BaseTextAdapter, type StructuredOutputOptions } from '@tanstack/ai/adapters';
-import { z } from 'zod';
+import type { CliBridge } from './cli-bridge';
 
 export const CLAUDE_BIN = process.env.CLAUDE_BIN || 'claude';
-const SERVER = 'hallucinate';
-const PREFIX = `mcp__${SERVER}__`;
+export const MCP_SERVER = 'hallucinate';
+const PREFIX = `mcp__${MCP_SERVER}__`;
 // Keeps these sessions apart from the user's projects. It stays the same across restarts (the CLI files
 // its sessions by working directory, so `--resume` needs that) and only this user can read it: it
 // holds the MCP configs, whose tokens let a caller run the app's tools.
-const WORKDIR = join(tmpdir(), `hallucinate-assistant-${userInfo().username}`);
-const TOOL_TIMEOUT_MS = 120_000;
+export const WORKDIR = join(tmpdir(), `hallucinate-assistant-${userInfo().username}`);
 const DEBUG = !!process.env.ASSISTANT_DEBUG;   // log the CLI arguments, MCP traffic and stderr
-const debug = (...args: unknown[]) => { if (DEBUG) console.error('[assistant]', ...args); };
+export const debug = (...args: unknown[]) => { if (DEBUG) console.error('[assistant]', ...args); };
 
-export interface ClaudeCliProviderOptions {
+// What one run tells the adapter besides chat()'s options.
+export interface CliRun {
+  model?: string | undefined;    // unset: the CLI picks its own
+  effort?: string | undefined;
   // Where the CLI reaches this server's MCP endpoint (the server's own address, never the Host header).
-  host?: string;
+  host: string;
   // The conversation already has replies (the browser keeps the history): resume its CLI session.
-  continued?: boolean;
+  continued: boolean;
 }
 
-interface PendingCall { resolve: (result: McpResult) => void; toolCallId: string; name: string }
-interface Session {
-  token: string;
-  sessionId: string;
-  started: boolean;
-  proc: ChildProcess | null;
-  push: ((chunk: AdapterYieldChunk) => void) | null;   // the stream of the message in flight
-  uses: { id: string; name: string; claimed: boolean }[];
-  pending: Map<string, PendingCall>;
-  tools: AnyTool[];
-}
-export interface McpResult { content: { type: 'text'; text: string }[] | { type: 'image'; data: string; mimeType: string }[] | ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[]; isError?: boolean }
-
-const sessions = new Map<string, Session>();   // threadId -> session
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// The browser names each conversation with a UUID; the CLI session reuses it, so a conversation finds
-// its session again after the dev server restarts.
-function sessionFor(threadId: string): Session {
-  let s = sessions.get(threadId);
-  if (!s) { s = { token: randomUUID(), sessionId: UUID.test(threadId) ? threadId : randomUUID(), started: false, proc: null, push: null, uses: [], pending: new Map(), tools: [] }; sessions.set(threadId, s); }
-  return s;
-}
-
-const toolError = (text: string): McpResult => ({ content: [{ type: 'text', text }], isError: true });
-
-function privateWorkdir(): string {
-  mkdirSync(WORKDIR, { recursive: true, mode: 0o700 });
-  const st = lstatSync(WORKDIR);
-  if (!st.isDirectory() || (process.getuid && st.uid !== process.getuid())) throw new Error(`${WORKDIR} isn't a directory of yours. Remove it and try again.`);
-  if (process.platform !== 'win32') chmodSync(WORKDIR, 0o700);
-  return WORKDIR;
+function privateWorkdir(dir: string): string {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const st = lstatSync(dir);
+  if (!st.isDirectory() || (process.getuid && st.uid !== process.getuid())) throw new Error(`${dir} isn't a directory of yours. Remove it and try again.`);
+  if (process.platform !== 'win32') chmodSync(dir, 0o700);
+  return dir;
 }
 
 export interface CliArgsOptions { mcpPath: string; tools: readonly string[]; system: string; resume: boolean; sessionId: string; model: string; effort: string | undefined }
@@ -80,7 +55,7 @@ export function cliArgs(o: CliArgsOptions): string[] {
     '--tools', '',                                       // no built-in tools: no files, no shell
     '--mcp-config', o.mcpPath, '--strict-mcp-config',
     '--allowedTools', o.tools.map((t) => PREFIX + t).join(','),
-    '--system-prompt', `${o.system}\n\n(Your tools come from the "${SERVER}" MCP server, so their names carry the prefix ${PREFIX}.)`,
+    '--system-prompt', `${o.system}\n\n(Your tools come from the "${MCP_SERVER}" MCP server, so their names carry the prefix ${PREFIX}.)`,
     '--disable-slash-commands',                          // (no --safe-mode: it silently disables MCP servers, i.e. our tools)
     ...(o.resume ? ['--resume', o.sessionId] : ['--session-id', o.sessionId]),
     ...(o.model !== 'claude-code' ? ['--model', o.model] : []),
@@ -125,31 +100,30 @@ function latestUserText(messages: ModelMessage[]): string {
   return '';
 }
 
-export class ClaudeCliAdapter extends BaseTextAdapter<string, ClaudeCliProviderOptions, readonly ['text'], DefaultMessageMetadataByModality> {
+type NoOptions = Record<string, never>;
+
+// One run on the subscription. The bridge makes it (`bridge.adapter(run)`) and keeps its session.
+export class ClaudeCliAdapter extends BaseTextAdapter<string, NoOptions, readonly ['text'], DefaultMessageMetadataByModality> {
   readonly name = 'claude-cli';
   override readonly inputModalities = ['text'] as const;
 
-  // This server's address, so the CLI can reach the MCP endpoint (set per request from its socket).
-  host = '127.0.0.1:5173';
-
-  constructor(model: string | undefined, private readonly effort: string | undefined) {
-    super({}, model ?? 'claude-code');
+  constructor(private readonly bridge: CliBridge, private readonly run: CliRun) {
+    super({}, run.model ?? 'claude-code');
   }
 
-  structuredOutput(_options: StructuredOutputOptions<ClaudeCliProviderOptions>): Promise<never> {
+  structuredOutput(_options: StructuredOutputOptions<NoOptions>): Promise<never> {
     return Promise.reject(new Error('Structured output is not supported by the Claude Code backend.'));
   }
 
-  async *chatStream(options: TextOptions<ClaudeCliProviderOptions>): AsyncIterable<AdapterYieldChunk> {
+  async *chatStream(options: TextOptions<NoOptions>): AsyncIterable<AdapterYieldChunk> {
     const model = this.model;
     const now = () => Date.now();
     const runId = options.runId ?? this.generateId();
     const threadId = options.threadId ?? this.generateId();
-    const session = sessionFor(threadId);
-    const host = options.modelOptions?.host ?? this.host;
+    const session = this.bridge.session(threadId);
     session.tools = options.tools ?? [];
     // A conversation reopened from the browser's history after a server restart: its CLI session exists on disk.
-    if (options.modelOptions?.continued && !session.started) session.started = true;
+    if (this.run.continued && !session.started) session.started = true;
 
     // The previous message's process may still be exiting after its result: give it a moment.
     if (session.proc) await new Promise<void>((resolve) => { session.proc?.once('close', () => resolve()); setTimeout(resolve, 5000); });
@@ -160,20 +134,20 @@ export class ClaudeCliAdapter extends BaseTextAdapter<string, ClaudeCliProviderO
 
     const system = (options.systemPrompts ?? []).map((p) => (typeof p === 'string' ? p : p.content)).join('\n\n');
     const text = latestUserText(options.messages);
-    const mcp = { mcpServers: { [SERVER]: { type: 'http', url: `http://${host}/api/assistant/mcp?chat=${encodeURIComponent(threadId)}&token=${session.token}` } } };
-    const workdir = privateWorkdir();
+    const mcp = { mcpServers: { [MCP_SERVER]: { type: 'http', url: this.bridge.mcpUrl(this.run.host, session) } } };
+    const workdir = privateWorkdir(this.bridge.workdir);
     // The CLI wants the MCP config as a file (inline JSON is silently ignored by recent versions).
     const mcpPath = join(workdir, `mcp-${session.token}.json`);
     writeFileSync(mcpPath, JSON.stringify(mcp), { mode: 0o600 });
-    const argsFor = (resume: boolean) => cliArgs({ mcpPath, tools: session.tools.map((t) => t.name), system, resume, sessionId: session.sessionId, model: this.model, effort: this.effort });
+    const argsFor = (resume: boolean) => cliArgs({ mcpPath, tools: session.tools.map((t) => t.name), system, resume, sessionId: session.sessionId, model: this.model, effort: this.run.effort });
 
     const chunks = new Channel<AdapterYieldChunk>();
-    session.push = (c) => chunks.push(c);
-    const push = session.push;
+    const push = (c: AdapterYieldChunk) => chunks.push(c);
+    session.attach(push);
     let finished = false;
     let textId: string | null = null, reasoningId: string | null = null;
     let context = 0;                                       // input tokens of the newest model call: the conversation's size
-    const toolArgs = new Map<string, { name: string; args: string }>();
+    const toolArgs = new Map<string, { id: string; name: string; args: string }>();   // by content block index
 
     push({ type: EventType.RUN_STARTED, runId, threadId, model, timestamp: now() });
 
@@ -200,8 +174,8 @@ export class ClaudeCliAdapter extends BaseTextAdapter<string, ClaudeCliProviderO
           endText(); endReasoning();
           const name = (ev.content_block.name ?? '').replace(PREFIX, '');
           const id = ev.content_block.id ?? randomUUID();
-          session.uses.push({ id, name, claimed: false });
-          toolArgs.set(String(ev.index), { name, args: '' });
+          session.toolUse(id, name);
+          toolArgs.set(String(ev.index), { id, name, args: '' });
           push({ type: EventType.TOOL_CALL_START, toolCallId: id, toolCallName: name, toolName: name, model, timestamp: now() });
         } else if (ev.type === 'content_block_delta' && ev.delta) {
           if (ev.delta.type === 'text_delta') {
@@ -218,19 +192,17 @@ export class ClaudeCliAdapter extends BaseTextAdapter<string, ClaudeCliProviderO
             push({ type: EventType.REASONING_MESSAGE_CONTENT, messageId: reasoningId, delta: ev.delta.thinking ?? '', model, timestamp: now() });
           } else if (ev.delta.type === 'input_json_delta') {
             const t = toolArgs.get(String(ev.index));
-            const use = session.uses.find((u) => u.name === t?.name && !u.claimed);
-            if (t && use) {
+            if (t) {
               t.args += ev.delta.partial_json ?? '';
-              push({ type: EventType.TOOL_CALL_ARGS, toolCallId: use.id, model, timestamp: now(), delta: ev.delta.partial_json ?? '', args: t.args });
+              push({ type: EventType.TOOL_CALL_ARGS, toolCallId: t.id, model, timestamp: now(), delta: ev.delta.partial_json ?? '', args: t.args });
             }
           }
         } else if (ev.type === 'content_block_stop') {
           const t = toolArgs.get(String(ev.index));
           if (t) {
-            const use = [...session.uses].reverse().find((u) => u.name === t.name);
             let input: unknown = {};
             try { input = t.args ? JSON.parse(t.args) : {}; } catch { /* streamed JSON may be incomplete; the MCP call carries the real input */ }
-            if (use) push({ type: EventType.TOOL_CALL_END, toolCallId: use.id, toolCallName: t.name, toolName: t.name, model, timestamp: now(), input });
+            push({ type: EventType.TOOL_CALL_END, toolCallId: t.id, toolCallName: t.name, toolName: t.name, model, timestamp: now(), input });
             toolArgs.delete(String(ev.index));
           } else { endText(); endReasoning(); }
         } else if (ev.type === 'message_stop') { endText(); endReasoning(); }
@@ -253,10 +225,9 @@ export class ClaudeCliAdapter extends BaseTextAdapter<string, ClaudeCliProviderO
     const launch = (resume: boolean, prompt: string, retried: boolean) => {
       const args = argsFor(resume);
       debug('spawn', CLAUDE_BIN, args.map((a) => (a.length > 200 ? `${a.slice(0, 200)}…` : a)));
-      const p = spawn(CLAUDE_BIN, args, { cwd: workdir, stdio: ['pipe', 'pipe', 'pipe'] });
+      const p = this.bridge.spawn(CLAUDE_BIN, args, { cwd: workdir });
       proc = p;
-      session.proc = p;
-      session.uses = [];
+      session.launched(p);
       p.stdin!.end(prompt);
       let stderr = '', rest = '', init = false;
       p.stderr!.on('data', (d: Buffer) => { stderr = (stderr + d.toString()).slice(-4000); debug('stderr', d.toString().trim()); });
@@ -281,13 +252,11 @@ export class ClaudeCliAdapter extends BaseTextAdapter<string, ClaudeCliProviderO
           return;
         }
         try { rmSync(mcpPath, { force: true }); } catch { /* already gone */ }
-        for (const pc of session.pending.values()) pc.resolve(toolError('The request ended before the app answered.'));
-        session.pending.clear();
+        session.end(push);
         if (!finished && code !== null) {
           const message = describeExit(stderr, code);
           push({ type: EventType.RUN_ERROR, model, timestamp: now(), message, code: 'exit', error: { message, code: 'exit' } });
         }
-        session.push = null;
         chunks.close();
       });
     };
@@ -304,74 +273,6 @@ export class ClaudeCliAdapter extends BaseTextAdapter<string, ClaudeCliProviderO
       onAbort();
     }
   }
-
-  // POST /api/assistant/new — forget a conversation.
-  static forget(threadId: string): void {
-    const s = sessions.get(threadId);
-    s?.proc?.kill('SIGTERM');
-    sessions.delete(threadId);
-  }
-
-  // POST /api/assistant/tool-result { threadId, callId, result } — the browser's answer to a tool call.
-  static answer(threadId: string, callId: string, result: McpResult): boolean {
-    const s = sessions.get(threadId);
-    const p = s?.pending.get(callId);
-    if (!s || !p) return false;
-    s.pending.delete(callId);
-    const text = result.content.map((c) => (c.type === 'text' ? c.text : '(image)')).join('\n');
-    s.push?.({ type: EventType.TOOL_CALL_RESULT, toolCallId: p.toolCallId, messageId: randomUUID(), model: 'claude-code', timestamp: Date.now(), content: text, ...(result.isError && { state: 'output-error' as const }) });
-    p.resolve(result);
-    return true;
-  }
-
-  // The MCP server Claude Code connects to: initialize, tools/list, tools/call (JSON-RPC over HTTP).
-  static async handleMcp(req: IncomingMessage, res: ServerResponse, url: URL, body: { id?: unknown; method?: string; params?: { name?: string; arguments?: unknown; protocolVersion?: string } }): Promise<void> {
-    if (req.method !== 'POST') return json(res, 405, { error: 'POST only' });
-    const threadId = url.searchParams.get('chat') ?? '';
-    const s = sessions.get(threadId);
-    if (!s || url.searchParams.get('token') !== s.token) { debug('mcp rejected', threadId, !!s); return json(res, 403, { error: 'unknown chat' }); }
-    const reply = (result: unknown) => json(res, 200, { jsonrpc: '2.0', id: body.id, result });
-    debug('mcp', body.method, body.method === 'tools/call' ? body.params?.name : '', 'tools:', s.tools.length);
-    switch (body.method) {
-      case 'initialize':
-        return reply({ protocolVersion: body.params?.protocolVersion ?? '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: SERVER, version: '2.0.0' } });
-      case 'tools/list':
-        return reply({ tools: s.tools.map((t) => ({ name: t.name, description: t.description, inputSchema: schemaOf(t) })) });
-      case 'tools/call':
-        return reply(await callInBrowser(threadId, s, body.params?.name ?? '', body.params?.arguments ?? {}));
-      case 'ping':
-        return reply({});
-      default:
-        if (body.id === undefined) { res.writeHead(202).end(); return; }
-        return json(res, 200, { jsonrpc: '2.0', id: body.id, error: { code: -32601, message: `Unknown method ${body.method}` } });
-    }
-  }
-}
-
-// Our tools are defined with zod; the CLI wants plain JSON Schema.
-function schemaOf(tool: AnyTool): unknown {
-  const schema = (tool as { inputSchema?: unknown }).inputSchema;
-  if (schema instanceof z.ZodType) return z.toJSONSchema(schema);
-  return schema ?? { type: 'object', properties: {} };
-}
-
-// Hands a tool call to the browser and waits for its answer. The tool_use id from the stream is
-// matched by name and order, so the panel can update the right chip.
-function callInBrowser(threadId: string, s: Session, name: string, input: unknown): Promise<McpResult> {
-  if (!s.push) return Promise.resolve(toolError('The app isn\'t connected.'));
-  const use = s.uses.find((u) => !u.claimed && u.name === name);
-  if (use) use.claimed = true;
-  const callId = randomUUID();
-  const toolCallId = use?.id ?? callId;
-  s.push({ type: EventType.CUSTOM, model: 'claude-code', timestamp: Date.now(), name: 'hallucinate.tool_call', value: { threadId, callId, toolCallId, name, input } });
-  return new Promise((resolve) => {
-    s.pending.set(callId, { resolve, toolCallId, name });
-    setTimeout(() => {
-      if (!s.pending.has(callId)) return;
-      s.pending.delete(callId);
-      resolve(toolError('The app didn\'t answer in time.'));
-    }, TOOL_TIMEOUT_MS);
-  });
 }
 
 // ---------- Usage and lost sessions ----------
@@ -426,9 +327,4 @@ function describeExit(stderr: string, code: number): string {
   if (/log ?in|auth|credential|subscription/i.test(stderr)) return 'Claude Code isn\'t signed in. Run `claude` once in a terminal and log in with your subscription, then try again.';
   if (/rate|limit|usage/i.test(stderr)) return `Your Claude usage limit was reached. ${stderr.trim().split('\n').pop()}`;
   return `Claude Code stopped (exit code ${code}). ${stderr.trim().split('\n').slice(-2).join(' ')}`;
-}
-
-function json(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(body));
 }

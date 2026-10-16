@@ -6,7 +6,8 @@
 
 import { execFile } from 'node:child_process';
 import { anthropicText, createAnthropicChat, type ANTHROPIC_MODELS } from '@tanstack/ai-anthropic';
-import { ClaudeCliAdapter, CLAUDE_BIN } from './claude-cli-adapter';
+import { CLAUDE_BIN } from './claude-cli-adapter';
+import type { CliBridge } from './cli-bridge';
 import { DEFAULT_MODEL, effectiveConfig, type ConfigStore, type EffectiveConfig } from './config';
 
 export type Backend = 'api' | 'claude-code' | 'none';
@@ -47,12 +48,16 @@ export function assistantConfig(config: ConfigStore, env: NodeJS.ProcessEnv = pr
 // The model a run uses: the setting, else the API's default (the CLI picks its own).
 export const apiModel = (cfg: EffectiveConfig): string => cfg.model.value ?? DEFAULT_MODEL;
 
-export function createAdapter(backend: Backend, cfg: EffectiveConfig, effort: string) {
+// What a run's request says beyond its messages: where this server is (the CLI calls back to it, at
+// the address the request came in on) and whether the conversation already has replies.
+export interface RunContext { host: string; continued: boolean }
+
+export function createAdapter(backend: Backend, cfg: EffectiveConfig, effort: string, cli: CliBridge, run: RunContext) {
   if (backend === 'api') {
     const model = apiModel(cfg) as (typeof ANTHROPIC_MODELS)[number];
     // A key from Settings is passed in; one from the environment is read by the SDK itself (incl. ANTHROPIC_AUTH_TOKEN).
     return cfg.apiKey.source === 'settings' && cfg.apiKey.value ? createAnthropicChat(model, cfg.apiKey.value) : anthropicText(model);
   }
-  if (backend === 'claude-code') return new ClaudeCliAdapter(cfg.model.value ?? undefined, effort);
+  if (backend === 'claude-code') return cli.adapter({ model: cfg.model.value ?? undefined, effort, ...run });
   return null;
 }

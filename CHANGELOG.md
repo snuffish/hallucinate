@@ -13,6 +13,8 @@
 - Deleting a conversation while it is replying deletes it for good: its transcript is no longer written back a moment
   later, and it no longer comes back as an unread badge or a peek.
 - Stop on a conversation that is waiting for a free slot sets it back to idle.
+- With the Claude subscription, a reply that uses the same tool twice shows each call's input on its own step while it
+  streams in, instead of the second one's on the first.
 
 ## Unreleased — settings (2026-10-16)
 

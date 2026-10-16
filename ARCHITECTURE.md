@@ -144,10 +144,14 @@ result gets one saying the app closed first. Notes for Claude (undo, reopened la
 user message (`notes.ts`). Before a send, screenshots older than the newest three are replaced by a short note
 (`prepareForSend`). The connection has no `joinRun` on purpose: a run is never rejoined.
 
-Subscription: the same route picks `ClaudeCliAdapter` → it spawns the CLI with an MCP config pointing back at
-`/api/assistant/mcp` → a tool call arrives as an MCP `tools/call` → the adapter emits a `hallucinate.tool_call`
-custom event on the chat stream → the browser runs the same implementation and answers via
-`POST /api/assistant/tool-result` → the adapter emits the tool result chunk and returns the MCP result. The CLI session id is the conversation's
+Subscription: the same route asks the CLI bridge (`server/cli-bridge.ts`, one `CliBridge` per server) for a
+`ClaudeCliAdapter` → it spawns the CLI with an MCP config pointing back at `/api/assistant/mcp` and turns its stream-json
+into chunks (`claude-cli-adapter.ts`) → a tool call arrives as an MCP `tools/call` → the bridge emits a `hallucinate.tool_call`
+custom event on the chat stream → the browser (`relay.ts`) runs the same implementation and answers via
+`POST /api/assistant/tool-result` → the bridge emits the tool result chunk and returns the MCP result (or an error one after
+120 s, or when the run ends first). The bridge owns the CLI sessions and its sub-routes (`/mcp`, `/tool-result`, `/new`); the
+route only mounts them. The event and the posted result are declared once, in `src/assistant/relay-wire.ts` (zod only, so
+the browser loads it too), and both ends parse them with it. The CLI session id is the conversation's
 `threadId`, and `forwardedProps.continued` makes the adapter `--resume` it after a server restart; a session the
 CLI no longer has is retried as a new one that starts from a transcript. Usage comes from the CLI's `result` event.
 

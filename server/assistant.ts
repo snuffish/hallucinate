@@ -1,24 +1,22 @@
 // In-app assistant: /api/assistant runs one TanStack AI chat() per request and streams it back as
 // server-sent events. The browser owns the tools (they act on the renderer, the editors and the
 // scene library): with an API key they are TanStack client tools; on the subscription backend the
-// CLI adapter relays each call as a stream event. The credentials stay here, on the server.
+// CLI bridge (server/cli-bridge.ts) relays each call as a stream event. The credentials stay here, on the server.
 //
 // Two run modes, chosen by `forwardedProps.mode` in the body: `chat` (the panel: every tool, up to
 // 30 turns) and `director` (a show-planning cycle: the show tools only, a few turns).
 //
 // Routes:  GET  /info            backend and model (the settings themselves: /api/settings, server/settings-route.ts)
 //          POST /                one chat run (AG-UI body from the panel's ChatClient)
-//          POST /new             forget a conversation (subscription backend; the panel deleted it)
-//          POST /tool-result     the browser's answer to a relayed tool call
-//          POST /mcp             the MCP endpoint the CLI connects to
+//          POST /mcp …           the subscription backend's own (the CLI's MCP endpoint, the browser's tool
+//                                results, forgetting a conversation): CliBridge.routes in server/cli-bridge.ts
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { chat, chatParamsFromRequestBody, maxIterations, toServerSentEventsResponse } from '@tanstack/ai';
-import { z } from 'zod';
 import { DIRECTOR_TOOLS, TOOL_DEFINITIONS } from '../src/assistant/tools';
 import { apiModel, createAdapter, NO_BACKEND, type AssistantConfig, type Backend } from './adapters';
+import { CliBridge } from './cli-bridge';
 import { DEFAULT_EFFORT } from './config';
-import { ClaudeCliAdapter, type McpResult } from './claude-cli-adapter';
 import { localAddress } from './guard';
 import { SYSTEM } from './system-prompt';
 
@@ -40,21 +38,10 @@ export const modeOf = (forwardedProps: Record<string, unknown> | undefined): Run
 // The panel says so when a conversation already has replies: the CLI backend resumes its session.
 export const continuedOf = (forwardedProps: Record<string, unknown> | undefined): boolean => forwardedProps?.continued === true;
 
-const ToolResultSchema = z.object({
-  threadId: z.string(),
-  callId: z.string(),
-  result: z.object({
-    content: z.array(z.union([
-      z.object({ type: z.literal('text'), text: z.string() }),
-      z.object({ type: z.literal('image'), data: z.string(), mimeType: z.string() }),
-    ])),
-    isError: z.boolean().optional(),
-  }),
-});
-
 // `config`: the settings (server/config.ts) and the backend they lead to, shared with /api/settings so a
 // save there takes effect at the next run. Settings changed while a run goes on apply to the next one.
-export function createAssistant(config: AssistantConfig) {
+// `cli`: the subscription backend's sessions and sub-routes, one per server.
+export function createAssistant(config: AssistantConfig, cli = new CliBridge()) {
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL((req as IncomingMessage & { originalUrl?: string }).originalUrl ?? req.url ?? '/', 'http://localhost');
     const route = url.pathname.replace(/^\/api\/assistant/, '').replace(/\/$/, '') || '/';
@@ -68,18 +55,8 @@ export function createAssistant(config: AssistantConfig) {
     } catch (err) {
       return json(res, 400, { error: `Bad request: ${(err as Error).message}` });
     }
-    if (route === '/mcp') return ClaudeCliAdapter.handleMcp(req, res, url, body as Parameters<typeof ClaudeCliAdapter.handleMcp>[3]);
-    if (route === '/new') {
-      const t = z.object({ threadId: z.string() }).safeParse(body);
-      if (t.success) ClaudeCliAdapter.forget(t.data.threadId);
-      return json(res, 200, { ok: true });
-    }
-    if (route === '/tool-result') {
-      const parsed = ToolResultSchema.safeParse(body);
-      if (!parsed.success) return json(res, 400, { error: 'Bad tool result' });
-      const ok = ClaudeCliAdapter.answer(parsed.data.threadId, parsed.data.callId, parsed.data.result as McpResult);
-      return json(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'No such tool call (it may have timed out).' });
-    }
+    const sub = cli.routes[route];
+    if (sub) { const reply = await sub(body, url); return json(res, reply.status, reply.body); }
     if (route !== '/') return json(res, 404, { error: 'Unknown endpoint' });
 
     let params: Awaited<ReturnType<typeof chatParamsFromRequestBody>>;
@@ -89,10 +66,8 @@ export function createAssistant(config: AssistantConfig) {
       return json(res, 400, { error: `Bad request: ${err instanceof Response ? await err.text() : (err as Error).message}` });
     }
     const run = runConfig(modeOf(params.forwardedProps), b, { effort: cfg.effort.value, directorEffort: cfg.directorEffort.value });
-    const adapter = createAdapter(b, cfg, run.effort);
+    const adapter = createAdapter(b, cfg, run.effort, cli, { host: localAddress(req), continued: continuedOf(params.forwardedProps) });
     if (!adapter) return json(res, 503, { error: NO_BACKEND });
-    const self = localAddress(req);
-    if (adapter instanceof ClaudeCliAdapter) adapter.host = self;
 
     // Stop in the panel closes the connection: abort the run (and the CLI process) with it.
     const abortController = new AbortController();
@@ -107,7 +82,7 @@ export function createAssistant(config: AssistantConfig) {
       agentLoopStrategy: maxIterations(run.maxTurns),
       abortController,
       ...(run.promptCache && { promptCache: run.promptCache }),
-      ...(b === 'api' ? { reasoning: run.effort as 'high' } : { modelOptions: { host: self, continued: continuedOf(params.forwardedProps) } }),
+      ...(b === 'api' && { reasoning: run.effort as 'high' }),
     });
     const response = toServerSentEventsResponse(stream, { abortController });
     res.writeHead(response.status, Object.fromEntries(response.headers));
@@ -139,7 +114,9 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+// No body: an empty response (an MCP notification's 202).
 function json(res: ServerResponse, status: number, body: unknown): void {
+  if (body === undefined) return void res.writeHead(status).end();
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
 }
