@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import { encodeJpeg } from '../engine/jpeg';
-import type { SnapshotUniforms } from '../engine/renderer';
+import { stillUniforms } from '../engine/scene-inputs';
 import { CATEGORIES, type Scene } from '../engine/scenes';
 import { HOTKEYS } from '../hotkeys/registry';
 import { useHotkeyActions } from '../hooks/useAppHotkeys';
@@ -13,7 +13,7 @@ import { inRotation, isFav, listedScenes, togglePref } from '../state/library-pr
 import { HelpButton } from './Help';
 
 // Stand-in audio for the previews, so they look like the scene mid-song rather than silent.
-const THUMB_UNIFORMS: SnapshotUniforms = { uTime: 14, uBass: 0.5, uMid: 0.5, uHigh: 0.5, uLevel: 0.6, uBeat: 0.4, uHue: 0, uBright: 0.5, uMood: 0.5 };
+const THUMB_UNIFORMS = stillUniforms();
 const SPECIAL = ['All', '★ Favourites', '⚙ Tweakable'];
 
 interface Thumb { url: string; frag: string; mediaVersion: number }

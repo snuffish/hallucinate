@@ -1,4 +1,5 @@
 import { parseParams, type ParamSpec } from './params';
+import { INPUT_DECLARATIONS, INPUT_NAMES } from './scene-inputs';
 
 export type SceneKind = 'game' | 'custom' | 'nodes';
 
@@ -22,22 +23,15 @@ export interface Scene {
 
 export interface SceneExtra { kind?: SceneKind; trails?: number }
 
-// Every scene is a fragment shader rendered over a fullscreen triangle.
-// Shared uniforms (all audio values are 0..~1.5, already scaled by "reactivity"):
-//   uTime  – audio-driven clock (runs faster when the music is louder)
-//   uBass / uMid / uHigh / uLevel – smoothed band energies
-//   uBeat  – 1.0 on a detected beat, decaying to 0
-//   uHue   – global colour rotation
-//   uBright – timbral brightness, 0 = dark/muffled .. 1 = bright/crisp (changes over seconds)
-//   uMood  – 0 = calm/slow .. 1 = energetic/fast (tempo + energy, changes over seconds)
+// Every scene is a fragment shader rendered over a fullscreen triangle, after this header. The float
+// inputs come from one table (scene-inputs.ts), each declared with what it means.
 //   uSpec  – 256x1 texture: R = log-scaled spectrum, G = waveform
 //   uMedia – the dropped image / video (uMediaSize in pixels, uHasMedia 0/1); sample it with media(p)
 
 export const COMMON = /* glsl */ `#version 300 es
 precision highp float;
 uniform vec2 uRes;
-uniform float uTime;
-uniform float uBass, uMid, uHigh, uLevel, uBeat, uHue, uBright, uMood;
+${INPUT_DECLARATIONS}
 uniform sampler2D uSpec;
 uniform sampler2D uMedia;
 uniform vec2 uMediaSize;
@@ -1464,7 +1458,7 @@ void main() {
 
 // Starting point for your own scene in the shader editor.
 export const TEMPLATE = /* glsl */ `// Your own scene. Edit me — it recompiles as you type.
-// Available: uTime uBass uMid uHigh uLevel uBeat uHue uBright uMood uRes
+// Available: ${INPUT_NAMES} uRes
 //            spec(x) wave(x) rainbow(t) neon(t) rot(a) noise(p) fbm(p) centered()
 // Lines tagged // @param get a live control in the Parameters overlay (P);
 // a // @group line gives the ones after it a heading that folds.

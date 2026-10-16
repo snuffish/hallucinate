@@ -2,6 +2,7 @@
 // Every node emits one GLSL variable per output: `<type> n<id>_<output> = <expr>;`
 
 import { z } from 'zod';
+import { AUDIO_HELP, AUDIO_OUTPUTS } from './scene-inputs';
 
 export type PortType = 'float' | 'vec2' | 'vec3';
 export interface NodeInput { name: string; type: PortType; def: number | number[] | string }
@@ -81,9 +82,9 @@ export const NODE_TYPES: Record<string, NodeType> = {
   time: { title: 'Time', cat: 'Input', help: 'Clock that runs faster when the music is loud.', inputs: [f('speed', 1)], outputs: [out('t', 'float')], emit: (a) => ({ t: `uTime * ${a.speed}` }) },
   audio: {
     title: 'Audio', cat: 'Input', inputs: [],
-    help: 'Loudness per band (0 → ~1), a pulse on each beat, tone (0 dark … 1 bright sound) and mood (0 calm … 1 energetic).',
-    outputs: ['bass', 'mid', 'high', 'level', 'beat', 'tone', 'mood'].map((n) => out(n, 'float')),
-    emit: () => ({ bass: 'uBass', mid: 'uMid', high: 'uHigh', level: 'uLevel', beat: 'uBeat', tone: 'uBright', mood: 'uMood' }),
+    help: AUDIO_HELP,
+    outputs: AUDIO_OUTPUTS.map((o) => out(o.name, 'float')),
+    emit: () => Object.fromEntries(AUDIO_OUTPUTS.map((o) => [o.name, o.uniform])),
   },
   number: { title: 'Number', cat: 'Input', inputs: [f('value', 1)], outputs: [out('out', 'float')], emit: (a) => ({ out: a.value! }) },
   spectrum: { title: 'Spectrum', cat: 'Input', help: 'Loudness at x (0 = bass … 1 = treble).', inputs: [f('x', 0.1)], outputs: [out('out', 'float')], emit: (a) => ({ out: `spec(${a.x})` }) },

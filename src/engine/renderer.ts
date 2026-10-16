@@ -12,6 +12,7 @@
 import { COMMON } from './scenes';
 import type { MediaLayer } from './media';
 import type { UniformValue } from './params';
+import { stillSpectrum, writeInputs, type SnapshotUniforms } from './scene-inputs';
 
 const VERT = /* glsl */ `#version 300 es
 out vec2 vUv;
@@ -115,10 +116,6 @@ export interface ProgramState {
   mediaRate?: number;
 }
 
-// Stand-in audio for still frames (library thumbnails, assistant screenshots).
-export interface SnapshotUniforms {
-  uTime: number; uBass: number; uMid: number; uHigh: number; uLevel: number; uBeat: number; uHue: number; uBright: number; uMood: number;
-}
 
 interface Target { tex: WebGLTexture; fbo: WebGLFramebuffer; w: number; h: number }
 interface Targets { sceneA: Target; sceneB: Target; read: Target; write: Target }
@@ -453,14 +450,7 @@ export class Renderer {
       this.thumb = null;
     }
     if (!this.thumb) this.thumb = { scene: this.createTarget(w, h), out: this.createTarget(w, h, true) };
-    if (!this.fakeSpectrum) {
-      this.fakeSpectrum = new Uint8Array(512);
-      for (let i = 0; i < 256; i++) {
-        const x = i / 255;
-        this.fakeSpectrum[i * 2] = 255 * Math.min(1, Math.max(0, 0.85 - x * 0.55 + 0.15 * Math.sin(i * 0.21)));
-        this.fakeSpectrum[i * 2 + 1] = 128 + 90 * Math.sin(x * 25) * Math.cos(x * 7);
-      }
-    }
+    this.fakeSpectrum ??= stillSpectrum();
     const t = this.thumb;
     gl.bindVertexArray(this.vao);
     gl.bindTexture(gl.TEXTURE_2D, this.specTex);
@@ -668,8 +658,7 @@ export class Renderer {
 
     const u = this.sceneUniforms;
     u.uRes = [t.sceneA.w, t.sceneA.h];
-    u.uTime = s.time; u.uBass = s.bass; u.uMid = s.mid; u.uHigh = s.high; u.uLevel = s.level; u.uBeat = s.beat; u.uHue = s.hue;
-    u.uBright = s.bright; u.uMood = s.mood;
+    writeInputs(u, s);
     u.uSpec = this.specTex;
     const media = this.mediaUniforms(s.scene, s.prevScene);
     this.drawScene(s.scene, t.sceneA, u, media, s.extra);

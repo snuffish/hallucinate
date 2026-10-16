@@ -34,7 +34,10 @@ browser                                              dev server (Vite middleware
   an output's `Motion` (its time, the time's pace, the hue's walk) into that output's frame state (reactivity, the
   synesthesia grade, trails, fringing, zoom, spin, warp). The main screen (whose motion is the clock's), the pinned
   Live slot and the studio's Preview monitor each compose their own, and `crossfade` is the one rule for how far a
-  transition is.
+  transition is. What a scene's shader can read each frame (`uTime`, the bands, `uBeat`, `uHue`, `uBright`, `uMood`)
+  is one table, `src/engine/scene-inputs.ts`: the header's declarations (`COMMON`, which the assistant's prompt
+  embeds), the renderer's per-frame values, the visual maker's Audio block, the editor's cheat sheet, the template
+  and the still-frame stand-ins are made from it, and a contract test checks each row.
 - **The projector link** (`src/engine/output-link.ts`) holds both ends: the main window's `OutputLink` and each
   projector window's `ProjectorView` (`src/output.ts` only wires it to its canvas and overlays). They talk through an
   `OutputPort`, a `BroadcastChannel` between windows and an in-memory bus in the tests, which run both ends together.

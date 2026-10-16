@@ -15,6 +15,9 @@
   closed, moving the main Reactivity or Speed slider while browsing changed what the projectors showed, and Preview
   showed a show scene with the main sliders' reactivity while Take then applied its own.
 - With *Mood from tempo* off, shaders get a neutral `uMood` too, not only the colour grade.
+- The editor's cheat sheet, the visual maker's Audio block and the assistant now give every shader input's real range:
+  the bands and `uBeat` reach 1.5 when Reactivity is turned up (they said "0 → ~1"), and `uBright` / `uMood` are not
+  scaled by Reactivity (the header said every audio value was).
 - The director reads the music's energy trend from how loud it is over seconds, so a build-up reads as rising; before,
   each band was measured against its own last few seconds and most of a build-up was evened out.
 

@@ -8,7 +8,7 @@ import { SUPERSEDED } from '../app/scene-library';
 import type { Cue, ShowSnapshot, StudioSession } from '../app/studio';
 import { blobToBase64, encodeJpeg } from '../engine/jpeg';
 import type { ParamSpec, ParamValue, ParamValues } from '../engine/params';
-import type { SnapshotUniforms } from '../engine/renderer';
+import { stillUniforms } from '../engine/scene-inputs';
 import type { Scene } from '../engine/scenes';
 import { soundNow } from '../engine/listener';
 import { LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
@@ -246,7 +246,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
   const lookAt = async (i: number, times: number[]): Promise<string[]> => {
     const out: string[] = [];
     for (const t of times) {
-      const uniforms: SnapshotUniforms = { uTime: t, uBass: 0.5, uMid: 0.5, uHigh: 0.5, uLevel: 0.6, uBeat: 0.4, uHue: app.state.look.hue + app.state.clock.huePhase, uBright: app.hearing.bright, uMood: app.hearing.mood };
+      const uniforms = stillUniforms({ uTime: t, uHue: app.state.look.hue + app.state.clock.huePhase, uBright: app.hearing.bright, uMood: app.hearing.mood });
       const img = await app.renderer.snapshotAsync(i, uniforms, 512, 288);
       out.push(await blobToBase64(await encodeJpeg(img, 0.82)));
     }

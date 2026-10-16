@@ -77,6 +77,11 @@ _Avoid_: program, output
 The show scene that would go Live at the next take, shown exactly as it will look there.
 _Avoid_: next, cue
 
+**Scene input**:
+A value every scene's shader reads each frame: the music's clock, the bands, the kick pulse, the hue, the tone and
+the mood.
+_Avoid_: shared uniform, audio uniform
+
 **Take**:
 Putting the Preview on Live, as a cut or a crossfade.
 _Avoid_: go, switch

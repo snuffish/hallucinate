@@ -2,10 +2,11 @@
 // while you type (in the background, the last working version keeps running), shows errors with
 // line numbers, and saves every successful compile.
 
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import type { EditorTarget } from '../app/editor';
 import { SUPERSEDED } from '../app/scene-library';
+import { SCENE_INPUTS } from '../engine/scene-inputs';
 import { SCENES, TEMPLATE } from '../engine/scenes';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
@@ -133,11 +134,7 @@ export function Editor() {
         <summary>Cheat sheet</summary>
         <dl>
           <dt><code>centered()</code></dt><dd>pixel position, (0,0) = centre, y from −0.5 to 0.5</dd>
-          <dt><code>uTime</code></dt><dd>clock that runs faster when the music is loud</dd>
-          <dt><code>uBass uMid uHigh uLevel</code></dt><dd>band loudness, 0 → ~1</dd>
-          <dt><code>uBeat</code></dt><dd>1 on each beat, fading to 0</dd>
-          <dt><code>uHue</code></dt><dd>colour slider + cycling</dd>
-          <dt><code>uBright uMood</code></dt><dd>tone of the sound (0 dark … 1 bright) and mood (0 calm … 1 energetic); slow-moving</dd>
+          {SCENE_INPUTS.map((i) => <Fragment key={i.uniform}><dt><code>{i.uniform}</code></dt><dd>{i.help} ({i.range})</dd></Fragment>)}
           <dt><code>spec(x) wave(x)</code></dt><dd>spectrum (0…1, bass→treble) and waveform (−1…1) at x</dd>
           <dt><code>rainbow(t) neon(t)</code></dt><dd>colour palettes, repeat every 1.0</dd>
           <dt><code>rot(a) noise(p) fbm(p) hash(p)</code></dt><dd>rotate a vec2, smooth noise, layered noise, random</dd>
