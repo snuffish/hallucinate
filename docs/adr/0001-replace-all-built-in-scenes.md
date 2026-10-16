@@ -16,4 +16,7 @@ keeping it would have meant keeping one leftover from the old set. It also broug
 
 - Cues in a saved show that pointed at a removed scene show as "missing scene" and must be re-cued by hand. Favourites,
   parameters and edits saved under old names become inert. Nothing is migrated.
+- One of your own scenes named like a new built-in is renamed "Name (mine)" when the app loads, and its parameters,
+  favourite, auto-switch exclusion and last-scene mark move with it. Show scenes in a saved show that named it are not
+  moved: they now play the built-in of that name.
 - Until the new scenes land, the app has no built-in scenes and starts on My Shader.
