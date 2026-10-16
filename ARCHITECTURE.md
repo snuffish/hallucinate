@@ -113,6 +113,10 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
    preview server and the desktop app's own server both mount that list. Anything server-side goes there, not
    into a Vite-only hook. The assistant's settings come from one `ConfigStore` (`server/config.ts`) passed to that list:
    a file in the desktop app's profile with the keychain for an API key, else `~/.config/hallucinate` without one.
+   What a route and the browser exchange is declared once, in a zod-only leaf both ends parse with:
+   `src/assistant/relay-wire.ts` for the tool round trip, `src/remote/wire.ts` for the yt-dlp bridges (whose browser
+   side is `remoteSite()` in `src/remote/client.ts`; the bridge takes its yt-dlp runner, so its tests drive that client
+   against a scripted one).
 10. **Only the app may call `/api`.** Every route is wrapped in `guarded()` (`server/guard.ts`): the Host must be
    a loopback name or an IP literal (or listed in `ALLOWED_HOSTS`), a browser request must come from the app's
    own origin, and a POST must be JSON. The CLI reaches the MCP endpoint at the server's own socket address,

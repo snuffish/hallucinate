@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — SoundCloud and YouTube (2026-10-16)
+
+### Fixed
+
+- A search no longer fails with "Unexpected answer from the local server" when one result has no duration or artwork
+  (live sets, some uploads), and the download bar no longer stalls on updates that don't know the speed or size yet.
+
 ## Unreleased — assistant undo (2026-10-16)
 
 ### Fixed

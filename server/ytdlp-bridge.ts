@@ -3,11 +3,8 @@
 // Browsers can't analyse audio from SoundCloud's player or read pixels from YouTube's (both are
 // cross-origin iframes), so tracks and videos are fetched with yt-dlp into a temp cache and served
 // from this origin. Only each site's own links are accepted, and yt-dlp is spawned without a shell.
-//
-//   GET /api/<site>/search?q=<query or link>  -> { results: [{ url, title, artist, duration, artwork }] }
-//   GET /api/<site>/fetch?url=<link>          -> { src }, or with "Accept: text/event-stream" a live stream of
-//                                                  `progress` events, then `done` { src } or `failed` { error }
-//   GET /api/<site>/file/<name>               -> the file (supports Range, so seeking works)
+// The routes and their answers are declared in src/remote/wire.ts, which the browser's client parses
+// them with. /fetch without "Accept: text/event-stream" answers once, with { src } or { error }.
 
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
@@ -15,6 +12,7 @@ import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, extname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { filePath, sitePrefix, type FetchEvent, type FetchEventName, type Progress, type RemoteTrack, type SearchResponse, type SiteName } from '../src/remote/wire';
 
 export const YTDLP = process.env.YTDLP || 'yt-dlp';
 const TYPES: Record<string, string> = {
@@ -30,22 +28,12 @@ type Env = Record<string, string>;
 type HttpError = Error & { status?: number };
 const httpError = (message: string, status: number): HttpError => Object.assign(new Error(message), { status });
 
-export interface Progress { percent: number; stage: string; bytes: number | null; total: number | null; speed: number | null; eta: number | null }
 interface Listener { progress(p: Progress): void; done(src: string): void; failed(error: string): void }
 interface Job { last: Progress | null; add(l: Listener): void; remove(l: Listener): void }
 
-// YouTube only hands out working video URLs to clients that solve its JavaScript challenge; without a
-// JS runtime yt-dlp gets intermittent "HTTP Error 403: Forbidden". Lend it the Node that runs this server
-// (needs a yt-dlp with --js-runtimes, plus its yt-dlp-ejs solver scripts).
-// Inside the desktop app execPath is the Electron binary; the app passes ELECTRON_RUN_AS_NODE=1 in `env`
-// so that binary behaves as plain Node for yt-dlp.
-let jsRuntimeArgs: Promise<string[]> | undefined;
-function jsRuntime(env?: Env): Promise<string[]> {
-  jsRuntimeArgs ??= ytdlp(['--help'], 15_000, { env })
-    .then((help) => (help.includes('--js-runtimes') ? ['--js-runtimes', `node:${process.execPath}`] : []))
-    .catch(() => []);
-  return jsRuntimeArgs;
-}
+// Runs yt-dlp with `args`; `onLine` sees every output line as it arrives. Resolves with stdout, rejects
+// with yt-dlp's error (an HttpError). The bridge's seam: spawnYtDlp in the server, a script in the tests.
+export type YtDlp = (args: string[], o: { timeoutMs: number; onLine?: (line: string) => void; signal?: AbortSignal }) => Promise<string>;
 
 interface Site { hosts: string[]; jsRuntime?: boolean; search(q: string): string; download: string[] }
 
@@ -65,32 +53,52 @@ export const SITES = {
       '--merge-output-format', 'mp4', '--match-filter', '!is_live',
     ],
   },
-} satisfies Record<string, Site>;
-
-export type SiteName = keyof typeof SITES;
+} satisfies Record<SiteName, Site>;
 
 // A cached file's name: what yt-dlp writes (`<id>.<ext>`), never `.` or `..`.
 export const safeFileName = (name: string): boolean => /^[\w-][\w.-]*$/.test(name) && !name.includes('..');
 
-// `env` is added to yt-dlp's environment (the desktop app uses it, see jsRuntime()).
-export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
-  const site: Site = SITES[name];
-  const cache = join(tmpdir(), `hallucinate-${name}`);
-  const prefix = `/api/${name}/`;
+export interface BridgeOptions {
+  env?: Env;           // added to yt-dlp's environment (the desktop app uses it, see jsRuntime())
+  run?: YtDlp;         // instead of spawning yt-dlp with `env`
+  cacheDir?: string;   // where the files go, else a folder per site in the temp directory
+}
 
-  async function search(query: string) {
+export function createBridge(name: SiteName, { env, run = spawnYtDlp(env), cacheDir }: BridgeOptions = {}) {
+  const site: Site = SITES[name];
+  const cache = cacheDir ?? join(tmpdir(), `hallucinate-${name}`);
+  const prefix = sitePrefix(name);
+
+  // YouTube only hands out working video URLs to clients that solve its JavaScript challenge; without a
+  // JS runtime yt-dlp gets intermittent "HTTP Error 403: Forbidden". Lend it the Node that runs this server
+  // (needs a yt-dlp with --js-runtimes, plus its yt-dlp-ejs solver scripts).
+  // Inside the desktop app execPath is the Electron binary; the app passes ELECTRON_RUN_AS_NODE=1 in `env`
+  // so that binary behaves as plain Node for yt-dlp.
+  let jsRuntimeArgs: Promise<string[]> | undefined;
+  function jsRuntime(): Promise<string[]> {
+    if (!site.jsRuntime) return Promise.resolve([]);
+    jsRuntimeArgs ??= run(['--help'], { timeoutMs: 15_000 })
+      .then((help) => (help.includes('--js-runtimes') ? ['--js-runtimes', `node:${process.execPath}`] : []))
+      .catch(() => []);
+    return jsRuntimeArgs;
+  }
+
+  async function search(query: string): Promise<RemoteTrack[]> {
     query = query.trim();
     if (!query) return [];
     const target = /^https?:\/\//i.test(query) ? siteUrl(query) : site.search(query);
-    const data = JSON.parse(await ytdlp([...(site.jsRuntime ? await jsRuntime(env) : []), '-J', '--flat-playlist', '--no-warnings', '--', target], 30_000, { env }));
+    const data = JSON.parse(await run([...await jsRuntime(), '-J', '--flat-playlist', '--no-warnings', '--', target], { timeoutMs: 30_000 }));
     const entries: Record<string, unknown>[] = (data.entries ?? [data]).filter(Boolean);
-    return entries.map((e) => ({
-      url: (e.webpage_url ?? e.url) as string | undefined,
-      title: (e.title as string | undefined) ?? 'Untitled',
-      artist: ((e.uploader ?? e.channel) as string | undefined) ?? '',
-      duration: (e.duration as number | undefined) ?? null,
-      artwork: pickArtwork(e.thumbnails as Thumb[] | undefined) ?? (e.thumbnail as string | undefined) ?? null,
-    })).filter((r) => r.url);
+    return entries.flatMap((e) => {
+      const url = (e.webpage_url ?? e.url) as string | undefined;
+      return url ? [{
+        url,
+        title: (e.title as string | undefined) ?? 'Untitled',
+        artist: ((e.uploader ?? e.channel) as string | undefined) ?? '',
+        duration: (e.duration as number | undefined) ?? null,
+        artwork: pickArtwork(e.thumbnails as Thumb[] | undefined) ?? (e.thumbnail as string | undefined) ?? null,
+      }] : [];
+    });
   }
 
   // Progress lines from yt-dlp ("@@P|status|bytes|total|estimate|speed|eta|fragment|fragments|format").
@@ -100,7 +108,7 @@ export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
     await mkdir(cache, { recursive: true });
     // yt-dlp skips the download when the file is already cached, and still prints its path.
     const args = [
-      ...(site.jsRuntime ? await jsRuntime(env) : []),
+      ...await jsRuntime(),
       '--no-playlist', '--no-warnings', '-q', '-N', '4', ...site.download,
       '-o', join(cache, '%(id)s.%(ext)s'),
       '--progress', '--newline', '--progress-template', `download:${PROGRESS}`,
@@ -108,12 +116,12 @@ export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
       '--print', 'after_move:@@D|%(filepath)s', '--no-simulate',
       '--', url,
     ];
-    const run = (): Promise<string | null> => {
+    const attempt = (): Promise<string | null> => {
       const progress = progressTracker(onProgress);
       let file: string | null = null;
-      return ytdlp(args, 60 * 60_000, {
+      return run(args, {
+        timeoutMs: 60 * 60_000,
         signal,
-        env,
         onLine: (line) => {
           if (line.startsWith('@@D|')) file = line.slice(4);
           else progress(line);
@@ -122,18 +130,18 @@ export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
     };
     let file: string | null;
     try {
-      file = await run();
+      file = await attempt();
     } catch (err) {
       if (!/\b403\b/.test((err as Error).message)) throw err;
       try {
-        file = await run();   // a single refused request is common; the retry usually works
+        file = await attempt();   // a single refused request is common; the retry usually works
       } catch (again) {
         throw /\b403\b/.test((again as Error).message) ? httpError(FORBIDDEN, 502) : again;
       }
     }
     if (!file) throw httpError('Nothing was downloaded (live streams aren\'t supported).', 502);
     await trimCache(cache, basename(file), CACHE_LIMIT).catch(() => {});
-    return `${prefix}file/${encodeURIComponent(basename(file))}`;
+    return filePath(name, basename(file));
   }
 
   // One download per link: a second request for the same link follows the running one. When nobody
@@ -163,7 +171,7 @@ export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
 
   function streamFetch(req: IncomingMessage, res: ServerResponse, link: string): void {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-    const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    const send = <K extends FetchEventName>(event: K, data: FetchEvent<K>) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     let j: Job;
     try {
       j = job(link);
@@ -241,7 +249,7 @@ export function createBridge(name: SiteName, { env }: { env?: Env } = {}) {
     try {
       const url = new URL((req as IncomingMessage & { originalUrl?: string }).originalUrl ?? req.url ?? '/', 'http://localhost');
       const route = url.pathname.slice(prefix.length);
-      if (route === 'search') return json(res, 200, { results: await search(url.searchParams.get('q') ?? '') });
+      if (route === 'search') return json(res, 200, { results: await search(url.searchParams.get('q') ?? '') } satisfies SearchResponse);
       if (route === 'fetch') {
         const link = url.searchParams.get('url') ?? '';
         if ((req.headers.accept ?? '').includes('text/event-stream')) return streamFetch(req, res, link);
@@ -279,9 +287,9 @@ export async function trimCache(dir: string, keep: string, limit: number): Promi
   }
 }
 
-// Runs yt-dlp; `onLine` sees every output line as it arrives. Resolves with stdout.
-function ytdlp(args: string[], timeoutMs: number, { onLine, signal, env }: { onLine?: (line: string) => void; signal?: AbortSignal; env?: Env } = {}): Promise<string> {
-  return new Promise((resolve, reject) => {
+// Runs the yt-dlp program, with `env` added to its environment.
+export const spawnYtDlp = (env?: Env): YtDlp => (args, { timeoutMs, onLine, signal }) =>
+  new Promise((resolve, reject) => {
     const proc = spawn(YTDLP, args, { stdio: ['ignore', 'pipe', 'pipe'], signal, env: env ? { ...process.env, ...env } : process.env });
     let stdout = '', stderr = '';
     const lines = (stream: NodeJS.ReadableStream, append: (d: string) => void) => {
@@ -308,7 +316,6 @@ function ytdlp(args: string[], timeoutMs: number, { onLine, signal, env }: { onL
       reject(httpError(reason.replace(/^ERROR:\s*/, ''), 502));
     });
   });
-}
 
 // Turns yt-dlp's progress lines into one overall percentage. A video + sound download fetches two
 // streams (video first, ~92 % of the bytes), then merges them.

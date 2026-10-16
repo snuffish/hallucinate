@@ -9,26 +9,16 @@ import { useApp, useUI } from '../app/AppContext';
 import type { PickerApi } from '../app/controller';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
+import { remoteSite, type Download } from '../remote/client';
+import { RemoteTrackSchema, type Progress, type RemoteTrack as Track, type SiteName } from '../remote/wire';
 import { readJSON, writeJSON, remove as removeKey } from '../state/persistence';
 import { HelpButton } from './Help';
 
 const RECENT_MAX = 25;
 
-export const TrackSchema = z.object({
-  url: z.string(),
-  title: z.string(),
-  artist: z.string().optional(),
-  duration: z.number().optional(),
-  artwork: z.string().optional(),
-});
-export type Track = z.infer<typeof TrackSchema>;
-const SearchSchema = z.object({ results: z.array(TrackSchema) });
-const ProgressSchema = z.object({ percent: z.number().default(0), stage: z.string().optional(), bytes: z.number().optional(), total: z.number().optional(), speed: z.number().optional(), eta: z.number().optional() });
-export type Progress = z.infer<typeof ProgressSchema>;
-
 export interface RemotePickerProps {
   id: 'sc' | 'yt';
-  site: 'soundcloud' | 'youtube';
+  site: SiteName;
   title: string;
   noun?: string;
   recentKey: string;
@@ -46,13 +36,13 @@ export function RemotePicker({ id, site, title, noun = 'track', recentKey, fetch
   const [results, setResults] = useState<Track[]>([]);
   const [current, setCurrent] = useState(-1);
   const [view, setView] = useState<'recent' | 'search'>('recent');
-  const [recent, setRecent] = useState<Track[]>(() => readJSON(recentKey, z.array(TrackSchema), []));
+  const [recent, setRecent] = useState<Track[]>(() => readJSON(recentKey, z.array(RemoteTrackSchema), []));
   const [status, setStatus] = useState<{ text: string; error?: boolean }>({ text: '' });
   const [progress, setProgress] = useState<{ track: Track; p: Progress } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const request = useRef(0);
   const playRequest = useRef(0);
-  const download = useRef<{ cancel: () => void } | null>(null);
+  const download = useRef<Download | null>(null);
   // The newest state for callbacks registered once (the play queue's next / previous).
   const latest = useRef({ results, current, recent });
   useEffect(() => { latest.current = { results, current, recent }; });
@@ -70,14 +60,12 @@ export function RemotePicker({ id, site, title, noun = 'track', recentKey, fetch
     setStatus({ text: 'Searching…' });
     setResults([]);
     try {
-      const body = await api(`/api/${site}/search?q=${encodeURIComponent(q)}`);
-      const parsed = SearchSchema.safeParse(body);
-      if (!parsed.success) throw new Error('Unexpected answer from the local server.');
+      const found = await remoteSite(site).search(q);
       if (n !== request.current) return;
-      setResults(parsed.data.results);
+      setResults(found);
       setCurrent(-1);
       setView('search');
-      const k = parsed.data.results.length;
+      const k = found.length;
       setStatus({ text: k ? `${k} ${noun}${k > 1 ? 's' : ''} — click one to play` : 'Nothing found' });
     } catch (err) {
       if (n === request.current) setStatus({ text: (err as Error).message, error: true });
@@ -114,7 +102,7 @@ export function RemotePicker({ id, site, title, noun = 'track', recentKey, fetch
     };
     report({ percent: 0, stage: 'starting' });
     try {
-      const dl = startDownload(site, track.url, report);
+      const dl = remoteSite(site).download(track.url, report);
       download.current = dl;
       const src = await dl.promise;
       if (n !== playRequest.current) return;
@@ -205,21 +193,6 @@ export function RemotePicker({ id, site, title, noun = 'track', recentKey, fetch
   );
 }
 
-// GET /api/<site>/fetch as an event stream: `progress` events, then `done` or `failed`.
-function startDownload(site: string, url: string, onProgress: (p: Progress) => void): { promise: Promise<string>; cancel(): void } {
-  let source: EventSource;
-  let fail: (err: Error) => void = () => {};
-  const promise = new Promise<string>((resolve, reject) => {
-    fail = reject;
-    source = new EventSource(`/api/${site}/fetch?url=${encodeURIComponent(url)}`);
-    source.addEventListener('progress', (e) => { const p = ProgressSchema.safeParse(JSON.parse((e as MessageEvent).data)); if (p.success) onProgress(p.data); });
-    source.addEventListener('done', (e) => { source.close(); const d = z.object({ src: z.string() }).safeParse(JSON.parse((e as MessageEvent).data)); if (d.success) resolve(d.data.src); else reject(new Error('Unexpected answer from the local server.')); });
-    source.addEventListener('failed', (e) => { source.close(); const d = z.object({ error: z.string() }).safeParse(JSON.parse((e as MessageEvent).data)); reject(new Error(d.success ? d.data.error : 'Download failed')); });
-    source.onerror = () => { source.close(); reject(new Error('Lost the connection to the local server. Is the dev server ("npm run dev") running?')); };
-  });
-  return { promise, cancel() { source.close(); fail(Object.assign(new Error('Cancelled'), { name: 'AbortError' })); } };
-}
-
 // "Downloading (video) 45% · 120.3 MB of 280.1 MB · 8.2 MB/s · 0:18 left"
 export function progressText(verb: string, track: Track, p: Progress): string {
   const pct = `${Math.floor(p.percent)}%`;
@@ -235,22 +208,7 @@ export function progressText(verb: string, track: Track, p: Progress): string {
 
 const mb = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(2)} GB` : `${(bytes / 1e6).toFixed(1)} MB`);
 
-async function api(path: string): Promise<unknown> {
-  let res: Response;
-  try {
-    res = await fetch(path);
-  } catch {
-    throw new Error('Could not reach the local server. Is the dev server ("npm run dev") running?');
-  }
-  const body: unknown = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const e = z.object({ error: z.string() }).safeParse(body);
-    throw new Error(e.success ? e.data.error : `Request failed (${res.status})`);
-  }
-  return body;
-}
-
-function formatDuration(seconds: number | undefined): string {
+function formatDuration(seconds: number | null | undefined): string {
   if (!seconds) return '';
   const s = Math.round(seconds);
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, '0');
