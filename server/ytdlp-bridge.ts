@@ -12,6 +12,7 @@ import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, extname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { requestUrl, sendJSON } from './http';
 import { filePath, sitePrefix, type FetchEvent, type FetchEventName, type Progress, type RemoteTrack, type SearchResponse, type SiteName } from '../src/remote/wire';
 
 const TYPES: Record<string, string> = {
@@ -195,8 +196,8 @@ export function createBridge(name: SiteName, { ytdlp = 'yt-dlp', env, run = spaw
     const j = job(link);
     const listener: Listener = {
       progress: () => {},
-      done: (src) => json(res, 200, { src }),
-      failed: (error) => json(res, 502, { error }),
+      done: (src) => sendJSON(res, 200, { src }),
+      failed: (error) => sendJSON(res, 502, { error }),
     };
     j.add(listener);
     req.on('close', () => j.remove(listener));
@@ -206,17 +207,17 @@ export function createBridge(name: SiteName, { ytdlp = 'yt-dlp', env, run = spaw
     try {
       fileName = decodeURIComponent(fileName);
     } catch {
-      return json(res, 400, { error: 'Bad file name' });
+      return sendJSON(res, 400, { error: 'Bad file name' });
     }
-    if (!safeFileName(fileName)) return json(res, 400, { error: 'Bad file name' });
+    if (!safeFileName(fileName)) return sendJSON(res, 400, { error: 'Bad file name' });
     const file = join(cache, fileName);
     let size: number;
     try {
       const s = await stat(file);
-      if (!s.isFile()) return json(res, 404, { error: 'Not in cache' });
+      if (!s.isFile()) return sendJSON(res, 404, { error: 'Not in cache' });
       size = s.size;
     } catch {
-      return json(res, 404, { error: 'Not in cache' });
+      return sendJSON(res, 404, { error: 'Not in cache' });
     }
     const headers = { 'Content-Type': TYPES[extname(fileName)] ?? 'application/octet-stream', 'Accept-Ranges': 'bytes' };
     const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range ?? '');
@@ -248,18 +249,18 @@ export function createBridge(name: SiteName, { ytdlp = 'yt-dlp', env, run = spaw
 
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
-      const url = new URL((req as IncomingMessage & { originalUrl?: string }).originalUrl ?? req.url ?? '/', 'http://localhost');
+      const url = requestUrl(req);
       const route = url.pathname.slice(prefix.length);
-      if (route === 'search') return json(res, 200, { results: await search(url.searchParams.get('q') ?? '') } satisfies SearchResponse);
+      if (route === 'search') return sendJSON(res, 200, { results: await search(url.searchParams.get('q') ?? '') } satisfies SearchResponse);
       if (route === 'fetch') {
         const link = url.searchParams.get('url') ?? '';
         if ((req.headers.accept ?? '').includes('text/event-stream')) return streamFetch(req, res, link);
         return plainFetch(req, res, link);
       }
       if (route.startsWith('file/')) return await serveFile(req, res, route.slice(5));
-      json(res, 404, { error: 'Unknown endpoint' });
+      sendJSON(res, 404, { error: 'Unknown endpoint' });
     } catch (err) {
-      json(res, (err as HttpError).status ?? 502, { error: (err as Error).message });
+      sendJSON(res, (err as HttpError).status ?? 502, { error: (err as Error).message });
     }
   };
 }
@@ -352,10 +353,4 @@ function pickArtwork(thumbs: Thumb[] = []): string | undefined {
   if (named) return named.url;
   const sized = thumbs.filter((t) => t.width).sort((a, b) => Math.abs(a.width! - 320) - Math.abs(b.width! - 320));
   return (sized[0] ?? thumbs.at(-1))?.url;
-}
-
-function json(res: ServerResponse, status: number, body: unknown): void {
-  if (res.headersSent) return;
-  res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(body));
 }

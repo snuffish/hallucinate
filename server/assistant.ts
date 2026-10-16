@@ -19,6 +19,7 @@ import { apiModel, createAdapter, NO_BACKEND, type AssistantConfig, type Backend
 import { CliBridge } from './cli-bridge';
 import { DEFAULT_EFFORT } from './config';
 import { localAddress } from './guard';
+import { readBody, requestUrl, sendJSON } from './http';
 import { SYSTEM } from './system-prompt';
 
 const MAX_BODY = 30 * 1024 * 1024;   // screenshots travel back as base64 images
@@ -44,31 +45,31 @@ export const continuedOf = (forwardedProps: Record<string, unknown> | undefined)
 // `cli`: the subscription backend's sessions and sub-routes, one per server.
 export function createAssistant(config: AssistantConfig, cli = new CliBridge()) {
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const url = new URL((req as IncomingMessage & { originalUrl?: string }).originalUrl ?? req.url ?? '/', 'http://localhost');
+    const url = requestUrl(req);
     const route = url.pathname.replace(/^\/api\/assistant/, '').replace(/\/$/, '') || '/';
     const b = await config.backend();
     const cfg = config.current();
-    if (route === '/info') return json(res, 200, { backend: b, model: b === 'api' ? apiModel(cfg) : cfg.model.value, ...(b === 'none' && { setup: NO_BACKEND }) } satisfies AssistantInfo);
-    if (req.method !== 'POST') return json(res, 405, { error: 'POST only' });
+    if (route === '/info') return sendJSON(res, 200, { backend: b, model: b === 'api' ? apiModel(cfg) : cfg.model.value, ...(b === 'none' && { setup: NO_BACKEND }) } satisfies AssistantInfo);
+    if (req.method !== 'POST') return sendJSON(res, 405, { error: 'POST only' });
     let body: unknown;
     try {
-      body = JSON.parse(await readBody(req));
+      body = JSON.parse(await readBody(req, MAX_BODY, 'conversation too large — start a new chat'));
     } catch (err) {
-      return json(res, 400, { error: `Bad request: ${(err as Error).message}` });
+      return sendJSON(res, 400, { error: `Bad request: ${(err as Error).message}` });
     }
     const sub = cli.routes[route];
-    if (sub) { const reply = await sub(body, url); return json(res, reply.status, reply.body); }
-    if (route !== '/') return json(res, 404, { error: 'Unknown endpoint' });
+    if (sub) { const reply = await sub(body, url); return sendJSON(res, reply.status, reply.body); }
+    if (route !== '/') return sendJSON(res, 404, { error: 'Unknown endpoint' });
 
     let params: Awaited<ReturnType<typeof chatParamsFromRequestBody>>;
     try {
       params = await chatParamsFromRequestBody(body);
     } catch (err) {
-      return json(res, 400, { error: `Bad request: ${err instanceof Response ? await err.text() : (err as Error).message}` });
+      return sendJSON(res, 400, { error: `Bad request: ${err instanceof Response ? await err.text() : (err as Error).message}` });
     }
     const run = runConfig(modeOf(params.forwardedProps), b, { effort: cfg.effort.value, directorEffort: cfg.directorEffort.value });
     const adapter = createAdapter(b, cfg, run.effort, cli, { host: localAddress(req), continued: continuedOf(params.forwardedProps) });
-    if (!adapter) return json(res, 503, { error: NO_BACKEND });
+    if (!adapter) return sendJSON(res, 503, { error: NO_BACKEND });
 
     // Stop in the panel closes the connection: abort the run (and the CLI process) with it.
     const abortController = new AbortController();
@@ -101,23 +102,5 @@ export function createAssistant(config: AssistantConfig, cli = new CliBridge()) 
   };
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let size = 0;
-    const chunks: Buffer[] = [];
-    req.on('data', (c: Buffer) => {
-      size += c.length;
-      if (size > MAX_BODY) { reject(new Error('conversation too large — start a new chat')); req.destroy(); return; }
-      chunks.push(c);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    req.on('error', reject);
-  });
-}
 
 // No body: an empty response (an MCP notification's 202).
-function json(res: ServerResponse, status: number, body: unknown): void {
-  if (body === undefined) return void res.writeHead(status).end();
-  res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(body));
-}
