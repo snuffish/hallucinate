@@ -6,6 +6,7 @@ import { KEYS } from '../state/persistence';
 import { Store } from '../state/store';
 import { AssistantSession, MAX_RUNNING_CLI, type Conversation } from './conversations';
 import type { Transcript, TranscriptBackend } from './history-store';
+import { codeHash } from './notes';
 import { NOT_RUN } from './transcript';
 
 // Several conversations against a scripted connection: they run side by side, share one undo stack
@@ -81,8 +82,8 @@ const until = async (cond: () => boolean, ms = 4000) => {
   }
 };
 
-function session(seen: Seen[], extra: { transcripts?: TranscriptBackend; gate?: { wait: Promise<void> } } = {}) {
-  const app = fakeApp();
+function session(seen: Seen[], extra: { transcripts?: TranscriptBackend; gate?: { wait: Promise<void> }; app?: ReturnType<typeof fakeApp> } = {}) {
+  const app = extra.app ?? fakeApp();
   const forgotten: string[] = [];
   const s = new AssistantSession(app as unknown as AppController, { connection: scripted(seen, extra.gate), transcripts: extra.transcripts ?? memoryTranscripts(), locks: null, forgetThread: (id) => forgotten.push(id) });
   s.attach();
@@ -217,6 +218,38 @@ describe('assistant conversations', () => {
     expect(seen[0]!.text).toMatch(/^\(This conversation was reopened on .*get_app_state.*\)\n\nhello again$/);
     expect(JSON.stringify(seen[0]!.messages)).toContain(NOT_RUN);
     s.dispose();
+  });
+
+  it('remembers what was on screen when a reply finished, and a reopened conversation hears whether that scene changed', async () => {
+    const transcripts = memoryTranscripts();
+    const scene = { name: 'Alpha', body: 'void main() { fragColor = vec4(1.); }' };
+    const app = Object.assign(fakeApp(), { sceneIndex: 0, currentScene: scene, editor: { target: () => ({ body: scene.body }) }, paramValues: () => ({ uGlow: 1.23456 }) });
+    const first = session([], { transcripts, app });
+    const c = first.s.active;
+    await c.load(false);
+    c.send('hello');
+    await until(() => !c.running && c.view.messages.length === 2);
+    expect(first.s.meta(c.id)!.seen).toEqual({ scene: 'Alpha', hash: codeHash(scene.body) });
+    await until(() => transcripts.data.has(c.id));
+    first.s.dispose();
+
+    const reopen = async () => {
+      const seen: Seen[] = [];
+      const again = session(seen, { transcripts, app });
+      await until(() => again.s.active.view.loaded);
+      again.s.active.send('and now?');
+      await until(() => seen.length >= 1 && !again.s.active.running);
+      const n = again.s.active.view.messages.length;
+      await until(() => transcripts.data.get(c.id)?.messages.length === n);   // kept before the next reopen reads it
+      again.s.dispose();
+      return seen[0]!.text;
+    };
+    const unchanged = await reopen();
+    expect(unchanged).toContain('On screen: "Alpha", the scene from your last reply, its code unchanged since; its parameters are {"uGlow":1.235}');
+    expect(unchanged).not.toContain('call get_app_state before');
+
+    scene.body = 'void main() { fragColor = vec4(.5); }';   // edited by hand while the chat was closed
+    expect(await reopen()).toContain('its code changed since: read it before editing');
   });
 
   it('a session disposed before a stored transcript was read leaves that transcript alone (StrictMode mounts twice)', async () => {

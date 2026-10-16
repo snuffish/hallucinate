@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { chat, convertMessagesToModelMessages, EventType, maxIterations, type AdapterYieldChunk, type DefaultMessageMetadataByModality, type TextOptions } from '@tanstack/ai';
 import { BaseTextAdapter, type StructuredOutputOptions } from '@tanstack/ai/adapters';
 import type { UIMessage } from '@tanstack/ai-client';
-import { describeNote, resumeNote, splitNotes, undoNote, withNotes } from './notes';
+import { codeHash, describeNote, resumeNote, splitNotes, undoNote, withNotes } from './notes';
 import { TOOL_DEFINITIONS } from './tools';
 import { NOT_RUN, OMITTED, prepareForSend, previewOf, sealInterrupted, titleFrom, toMarkdown } from './transcript';
 
@@ -142,5 +142,18 @@ describe('app notes on a message', () => {
     expect(describeNote(notes[1]!)).toMatch(/^Reopened later/);
     expect(splitNotes('(just parentheses)')).toEqual({ notes: [], text: '(just parentheses)' });
     expect(splitNotes(undoNote('Old form'))).toEqual({ notes: [undoNote('Old form')], text: '' });
+  });
+
+  it('a reopen note says what is on screen and whether the scene\'s code changed, on one line the panel still splits off', () => {
+    const seen = { scene: 'Tunnel (v2)', hash: codeHash('void main() {}') };
+    const same = resumeNote(new Date(0), seen, { ...seen, values: { uGlow: 1.23456, uTint: [0.1111, 1, 0] } });
+    expect(same).toContain('On screen: "Tunnel (v2)", the scene from your last reply, its code unchanged since; its parameters are {"uGlow":1.235,"uTint":[0.111,1,0]}');
+    expect(same).not.toContain('call get_app_state before');
+    expect(splitNotes(withNotes([same], 'hi'))).toEqual({ notes: [same], text: 'hi' });
+    expect(resumeNote(new Date(0), seen, { ...seen, hash: codeHash('void main() { }'), values: {} })).toContain('its code changed since: read it before editing');
+    expect(resumeNote(new Date(0), seen, { scene: 'Other', hash: seen.hash, values: {} })).toContain('a different scene than at your last reply');
+    const many = Object.fromEntries(Array.from({ length: 80 }, (_, i) => [`uParam${i}`, i / 7]));
+    expect(resumeNote(new Date(0), seen, { ...seen, values: many })).not.toContain('its parameters are');
+    expect(resumeNote(new Date(0), null, { ...seen, values: {} })).toContain('call get_app_state before changing anything');   // older chats have no record
   });
 });

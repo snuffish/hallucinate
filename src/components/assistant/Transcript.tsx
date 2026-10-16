@@ -10,7 +10,7 @@ import { splitFollowUps } from '../../assistant/follow-ups';
 import { describeNote, splitNotes } from '../../assistant/notes';
 import { ContentPartsSchema, DONE_VERBS, VERBS, type ToolName } from '../../assistant/tools';
 import { textOf } from '../../assistant/transcript';
-import { addUsage, formatTokens, NO_USAGE, type Usage } from '../../assistant/usage';
+import { addUsage, formatCost, formatTokens, newInput, NO_USAGE, type Usage } from '../../assistant/usage';
 
 type Part = UIMessage['parts'][number];
 
@@ -84,13 +84,26 @@ function ToolChip({ part, message }: { part: Extract<Part, { type: 'tool-call' }
   );
 }
 
-export function usageLabel(u: Usage): string {
-  const cached = u.prompt ? Math.round((u.cacheRead / u.prompt) * 100) : 0;
-  return `${formatTokens(u.prompt)} in · ${formatTokens(u.completion)} out${cached >= 5 ? ` · ${cached}% cached` : ''}`;
+// What a turn (or a whole chat, `chat`) cost. Not the summed input: every step of a run resends the
+// whole conversation, mostly from the prompt cache at about a tenth of the price, so that sum looks
+// huge for a one-line change. The conversation's size, the input the cache didn't serve, the output
+// (about five times the price of input) and the cost the provider reported say what it took.
+export function usageLabel(u: Usage, opts: { chat?: boolean } = {}): string {
+  return [
+    ...(u.context && !opts.chat ? [`${formatTokens(u.context)} context`] : []),
+    `${formatTokens(newInput(u))} new in`,
+    `${formatTokens(u.completion)} out`,
+    ...(u.cost > 0 ? [`≈${formatCost(u.cost)}`] : []),
+  ].join(' · ');
 }
 export function usageTitle(u: Usage, costLabel: string | null): string {
-  return [`Input: ${u.prompt.toLocaleString()} tokens (${u.cacheRead.toLocaleString()} read from the cache, ${u.cacheWrite.toLocaleString()} written to it)`,
-    `Output: ${u.completion.toLocaleString()} tokens`, ...(u.cost > 0 && costLabel ? [`${costLabel}: $${u.cost.toFixed(u.cost < 0.1 ? 3 : 2)}`] : [])].join('\n');
+  const uncached = Math.max(0, u.prompt - u.cacheRead - u.cacheWrite);
+  return [
+    ...(u.context ? [`Context: ${u.context.toLocaleString()} tokens, what each further step resends`] : []),
+    `Input over all steps: ${u.prompt.toLocaleString()} tokens: ${u.cacheRead.toLocaleString()} read from the cache (about a tenth of the price), ${u.cacheWrite.toLocaleString()} written to it, ${uncached.toLocaleString()} uncached`,
+    `Output: ${u.completion.toLocaleString()} tokens (about five times the price of input)`,
+    ...(u.cost > 0 && costLabel ? [`${costLabel}: ${formatCost(u.cost)}`] : []),
+  ].join('\n');
 }
 
 interface Props {

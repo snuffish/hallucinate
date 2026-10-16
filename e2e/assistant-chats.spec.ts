@@ -88,7 +88,7 @@ test('assistant: two conversations at once; the bubble counts unread replies and
   await send(page, 'second question');
   await expect(page.locator('#ai-log .ai-text')).toContainText('Reply to: second question');
   await expect(page.locator('#ai-log .ai-followups button')).toHaveText('Make it slower');
-  await expect(page.locator('#ai-usage')).toContainText('1.2k in · 30 out');
+  await expect(page.locator('#ai-usage')).toContainText('1.2k new in · 30 out');
   await expect(page.locator('.ai-switcher-count')).toHaveText('1');           // the first one is still working
 
   // Close the panel while the first is still working: the ring turns, then a badge and a peek.
@@ -127,7 +127,7 @@ test('assistant: a tool change, its turn usage, Undo told on the next message, t
   await send(page, 'look warmer');
   await expect(page.locator('#ai-log .ai-tool.ok')).toContainText('Adjusted the look');
   await expect(page.locator('#ai-log .ai-text')).toContainText('Shifted the hue.');
-  await expect(page.locator('#ai-log .ai-reply-usage')).toHaveText('4.2k in · 70 out · 60% cached');   // the tool call and the reply after it, one turn
+  await expect(page.locator('#ai-log .ai-reply-usage')).toHaveText('3k context · 1.7k new in · 70 out');   // the tool call and the reply after it, one turn: 500 + 1200 uncached
   await page.locator('#ai-undo').click();
   await expect(page.locator('#ai-log .ai-note.pending')).toContainText('Undid: Adjusted the look');
 

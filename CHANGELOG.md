@@ -14,6 +14,23 @@
   keychain and never sent back to the page. Environment variables still win and lock their field; `claude` and
   `yt-dlp` paths stay environment-only, and settings can only be changed on the computer the server runs on.
 
+## Unreleased — assistant token use (2026-10-16)
+
+### Changed
+
+- The assistant changes part of a scene with a new `edit_scene_code` tool (exact replacements) instead of resending the
+  whole shader, which was most of what a small tweak cost.
+- Tool results are leaner: setting parameters answers with what it applied, a code change with the new values only, and
+  the app state lists the library one line per category.
+- A reopened conversation tells Claude what is on screen and whether that scene's code changed since its last reply,
+  instead of asking it to look everything up again.
+- Token usage shows the conversation's size, the input the prompt cache didn't serve, the output and the reported cost,
+  instead of a summed input that mostly counted cheap cache reads. The long-conversation hint comes at 80k tokens.
+
+### Added
+
+- `node scripts/assistant-usage.mjs` prices a subscription conversation step by step from Claude Code's logs.
+
 ## Unreleased — performance monitor (2026-10-16)
 
 ### Added
