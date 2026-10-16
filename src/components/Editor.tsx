@@ -7,7 +7,7 @@ import { useApp, useUI } from '../app/AppContext';
 import type { EditorTarget } from '../app/editor';
 import { SUPERSEDED } from '../app/scene-library';
 import { SCENE_INPUTS } from '../engine/scene-inputs';
-import { SCENES, TEMPLATE } from '../engine/scenes';
+import { SCENES, TEMPLATE } from '../scenes';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { HelpButton } from './Help';

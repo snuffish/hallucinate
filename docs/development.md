@@ -41,7 +41,8 @@ See [ARCHITECTURE.md](../ARCHITECTURE.md) for the structure, the invariants and 
 shortcuts; [PERF.md](../PERF.md) for the performance work and measurements; [CHANGELOG.md](../CHANGELOG.md) for what
 changed in the React port. In short:
 
-- `src/engine/` – the engines (WebGL pipeline, audio analysis, scenes, `@param` parsing, visual-maker compiler, media, projector link), plain TypeScript classes.
+- `src/scenes/` – the built-in scenes (one module each, listed in key order in `index.ts`; none yet), the shared shader header and the new-scene template.
+- `src/engine/` – the engines (WebGL pipeline, audio analysis, `@param` parsing, visual-maker compiler, media, projector link), plain TypeScript classes.
 - `src/app/` – the controller that owns them and the frame loop, the editor / studio / player logic, the React shell.
 - `src/components/` – the panels, with the dockable widgets in `src/components/widgets/`; `src/hotkeys/` – the shortcut
   registry and the key badge; `src/help/` – the help topics; `src/state/` – app state, UI store, widget layout, persistence.
@@ -50,4 +51,4 @@ changed in the React port. In short:
 - `src/output.ts` / `output.html` – projector windows.
 - `desktop/` – the Electron main process and the local server it starts.
 
-Adding a scene = add a `scene(name, category, description, glsl)` line to `SCENES` in `src/engine/scenes.ts`.
+Adding a scene = a module in `src/scenes/` that builds it with `scene(name, category, description, glsl)`, listed in `SCENES` in `src/scenes/index.ts` (in key order). There are none yet ([ADR 0001](adr/0001-replace-all-built-in-scenes.md)).

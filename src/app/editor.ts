@@ -3,7 +3,7 @@
 // library's (scene-library.ts); the editor keeps "My Shader"'s code, which runs from the start whether
 // or not the editor has been opened, and the visual maker's generated code.
 
-import { TEMPLATE, type Scene } from '../engine/scenes';
+import { TEMPLATE, type Scene } from '../scenes';
 import type { AppState } from '../state/app-state';
 import { KEYS, readString, writeString } from '../state/persistence';
 import type { CompileResult, SceneLibrary } from './scene-library';

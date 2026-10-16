@@ -11,7 +11,7 @@ Press **?** in the app for the same list. Every button with a shortcut also show
 | ↑ / ↓ | volume |
 | [ / ] | tempo −5 % / +5 % |
 | M | mute |
-| ← / → , 1–9, 0 | change scene, also with the code editor open while the code itself isn't focused |
+| ← / → , 1–9, 0 | change scene (1–0: the first ten scenes, built-ins first and then yours; there are no built-ins yet), also with the code editor open while the code itself isn't focused |
 | L | scene library (inside: `/` search, Tab categories, arrows move, Enter play) |
 | I | AI assistant (inside: Alt+N new conversation, Alt+↑ / ↓ switch, Ctrl/⌘+K find one) |
 | O | studio & projector (inside: 1–9 / ← → preview, T take, Esc close) |

@@ -175,14 +175,14 @@ test('assistant: a conversation saved mid-tool reopens with that call marked not
     const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('hallucinate'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
     const store = () => db.transaction('assistant-chats', 'readwrite').objectStore('assistant-chats');
     const rec = await new Promise<{ messages: { role: string; parts: unknown[] }[] }>((res) => { const g = store().get(`chat:${id}`); g.onsuccess = () => res(g.result); });
-    rec.messages.push({ role: 'assistant', id: 'cut', parts: [{ type: 'tool-call', id: 'call-cut', name: 'write_scene_code', arguments: '{"scene":"Hyper Tunnel"}', input: { scene: 'Hyper Tunnel' }, state: 'input-complete' }] } as never);
+    rec.messages.push({ role: 'assistant', id: 'cut', parts: [{ type: 'tool-call', id: 'call-cut', name: 'write_scene_code', arguments: '{"scene":"Red Room"}', input: { scene: 'Red Room' }, state: 'input-complete' }] } as never);
     await new Promise((res) => { const p = store().put(rec, `chat:${id}`); p.onsuccess = res; });
     db.close();
   });
   await page.reload();
   await page.getByRole('button', { name: 'Play demo beat' }).click();
   await page.keyboard.press('i');
-  await expect(page.locator('#ai-log .ai-tool.error')).toContainText('Editing Hyper Tunnel');
+  await expect(page.locator('#ai-log .ai-tool.error')).toContainText('Editing Red Room');
   await expect(page.locator('#ai-log .ai-tool.running')).toHaveCount(0);       // not a chip spinning forever
   await expect(page.locator('#ai-log .ai-tool.error')).toHaveAttribute('title', /app was closed/);
 });

@@ -3,7 +3,7 @@
 // or re-ordered. React keys use `scene.id`.
 
 import { z } from 'zod';
-import { COMMON, SCENES, TEMPLATE, type Scene } from '../engine/scenes';
+import { COMMON, SCENES, TEMPLATE, type Scene } from '../scenes';
 import { parseParams } from '../engine/params';
 import { KEYS, readJSON, writeJSON } from './persistence';
 
@@ -43,9 +43,9 @@ export type CompileCheck = (frag: string, name: string) => string | null;
 // one can't stop the app) and your edits to built-in scenes. Fills `scenes` in place: it is the array
 // the renderer was created with, and it must stay that one array for the app's lifetime. The
 // built-ins are copies, so building the list twice (React's StrictMode) can't leak one run's edits
-// into the other's originals.
-export function buildSceneList(scenes: Scene[], check: CompileCheck): SceneListInit {
-  const builtins = SCENES.map((s) => ({ ...s, original: s.body }));
+// into the other's originals. With no built-ins (ADR 0001) My Shader is first, so the app starts there.
+export function buildSceneList(scenes: Scene[], check: CompileCheck, shipped: readonly Scene[] = SCENES): SceneListInit {
+  const builtins = shipped.map((s) => ({ ...s, original: s.body }));
   scenes.push(
     ...builtins,
     { id: 'custom', name: 'My Shader', kind: 'custom', cat: '', desc: '', body: TEMPLATE, frag: COMMON + TEMPLATE, params: [] },

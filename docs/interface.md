@@ -2,7 +2,7 @@
 
 [← Back to the README](../README.md)
 
-<img src="screenshots/main.jpg" alt="Hyper Tunnel playing with the panel's widgets on the left (Source, Media, Audio, Scene) and its live parameters on the right" width="100%">
+<img src="screenshots/main.jpg" alt="A scene playing with the panel's widgets on the left (Source, Media, Audio, Scene) and its live parameters on the right" width="100%">
 
 ## Widgets & layout
 

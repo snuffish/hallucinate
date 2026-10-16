@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SCENES } from '../engine/scenes';
+import { scene } from '../scenes';
 import { KEYS } from './persistence';
-import { buildSceneList, discardParked, loadUserScenes, paramKey, saveSceneEdit, saveUserScenes, sceneByName, userScene, type ParkedScenes } from './scene-list';
+import { buildSceneList, type CompileCheck, discardParked, loadUserScenes, paramKey, saveSceneEdit, saveUserScenes, sceneByName, userScene, type ParkedScenes } from './scene-list';
 
 // The scene list is the cross-window contract: indices must stay stable, so removal is a flag.
 describe('scene list', () => {
@@ -14,19 +14,40 @@ describe('scene list', () => {
   const compiles = () => null;   // every shader "compiles"
   const failing = (frag: string) => (frag.includes('nope') ? 'ERROR: 0:1: bad' : null);
   const noParked = (): ParkedScenes => ({ userScenes: [], sceneEdits: {} });
+  // Stand-in built-ins: the app ships none yet, and the list must not depend on which it ships.
+  const BUILTINS = ['Alpha', 'Beta', 'Gamma'].map((name) => scene(name, 'Beams', `${name} beams`, 'void main() { fragColor = vec4(1.); }'));
+  const build = (check: CompileCheck = compiles) => buildSceneList([], check, BUILTINS);
+  const mine = (n: number) => Array.from({ length: n }, (_, i) => ({ name: `Mine ${i + 1}`, body: 'void main() { fragColor = vec4(1.); }' }));
 
-  it('appends built-ins, the two editor slots (no game slot), then saved scenes, and keys the first ten visuals', () => {
-    store.set(KEYS.userScenes, JSON.stringify([{ name: 'Mine One', body: 'void main() { fragColor = vec4(1.); }' }]));
-    const list = buildSceneList([], compiles);
-    expect(list.scenes.length).toBe(SCENES.length + 3);
+  it('appends built-ins, the two editor slots, then saved scenes, and keys the first ten visuals', () => {
+    store.set(KEYS.userScenes, JSON.stringify(mine(8)));
+    const list = build();
+    expect(list.scenes.map((s) => s.name)).toEqual(['Alpha', 'Beta', 'Gamma', 'My Shader', 'Node Scene', ...mine(8).map((s) => s.name)]);
     expect(list.scenes[list.customIndex]!.kind).toBe('custom');
     expect(list.scenes[list.nodesIndex]!.kind).toBe('nodes');
-    expect(list.scenes.some((s) => s.kind === ('game' as string))).toBe(false);
-    expect(list).not.toHaveProperty('gameIndex');
-    expect(list.scenes.at(-1)).toMatchObject({ name: 'Mine One', user: true, cat: 'Mine' });
-    expect(list.keyedScenes).toHaveLength(10);
-    expect(list.keyedScenes.every((i) => !list.scenes[i]!.kind)).toBe(true);
+    expect(list.scenes.at(-1)).toMatchObject({ name: 'Mine 8', user: true, cat: 'Mine' });
+    expect(list.keyedScenes).toEqual([0, 1, 2, 5, 6, 7, 8, 9, 10, 11]);   // built-ins first, then yours
     expect(list.errors).toEqual([]);
+  });
+
+  // ADR 0001: no built-ins is a supported state. The app starts on index 0 when nothing is restored.
+  it('with no built-ins, starts the list with My Shader and keys your scenes', () => {
+    store.set(KEYS.userScenes, JSON.stringify(mine(2)));
+    const list = buildSceneList([], compiles, []);
+    expect(list.scenes[0]!.name).toBe('My Shader');
+    expect(list.customIndex).toBe(0);
+    expect(list.keyedScenes).toEqual([2, 3]);
+  });
+
+  it('ships no built-in scenes yet', () => {
+    expect(buildSceneList([], compiles).scenes.map((s) => s.name)).toEqual(['My Shader', 'Node Scene']);
+  });
+
+  it('ignores stored edits for built-ins that no longer exist', () => {
+    store.set(KEYS.sceneEdits, JSON.stringify({ 'Hyper Tunnel': 'void main(){}' }));
+    const list = build();
+    expect(list.errors).toEqual([]);
+    expect(list.scenes.some((s) => s.edited)).toBe(false);
   });
 
   it('reports saved scenes that no longer compile instead of failing', () => {
@@ -58,9 +79,9 @@ describe('scene list', () => {
   });
 
   it('keeps a built-in edit that failed to compile until that built-in is edited or the edit is discarded', () => {
-    const [a, b] = [SCENES[0]!.name, SCENES[1]!.name];
+    const [a, b] = ['Alpha', 'Beta'];
     store.set(KEYS.sceneEdits, JSON.stringify({ [a]: 'nope', [b]: 'nope' }));
-    const list = buildSceneList([], failing);
+    const list = build(failing);
     expect(list.parked.sceneEdits).toEqual({ [a]: 'nope', [b]: 'nope' });
     const other = list.scenes[2]!;
     other.body = 'changed';
@@ -72,7 +93,6 @@ describe('scene list', () => {
     expect(JSON.parse(store.get(KEYS.sceneEdits)!)).toMatchObject({ [a]: 'mine now', [b]: 'nope' });
     discardParked(list.parked, 'edit', b, list.scenes);
     expect(JSON.parse(store.get(KEYS.sceneEdits)!)).not.toHaveProperty(b);
-    for (const s of [other, sa]) { s.body = s.original!; saveSceneEdit(s, list.scenes, list.parked); }   // SCENES is shared module state
   });
 
   it('soft-removes user scenes so every other index keeps its meaning', () => {
@@ -86,17 +106,17 @@ describe('scene list', () => {
   });
 
   it('fills the array it is given and leaves the module\'s built-ins untouched', () => {
-    store.set(KEYS.sceneEdits, JSON.stringify({ [SCENES[0]!.name]: 'void main() { fragColor = vec4(0.); }' }));
+    store.set(KEYS.sceneEdits, JSON.stringify({ Alpha: 'void main() { fragColor = vec4(0.); }' }));
     const shared: Parameters<typeof buildSceneList>[0] = [];
-    const list = buildSceneList(shared, compiles);
+    const list = buildSceneList(shared, compiles, BUILTINS);
     expect(list.scenes).toBe(shared);
     expect(list.scenes[0]!.edited).toBe(true);
-    expect(SCENES[0]!.edited).toBeUndefined();
-    expect(buildSceneList([], compiles).scenes[0]!.original).toBe(SCENES[0]!.body);   // a second build (StrictMode) sees the real original
+    expect(BUILTINS[0]!.edited).toBeUndefined();
+    expect(build().scenes[0]!.original).toBe(BUILTINS[0]!.body);   // a second build (StrictMode) sees the real original
   });
 
   it('stores built-in edits by name and clears them when the code matches the original', () => {
-    const list = buildSceneList([], compiles);
+    const list = build();
     const s = list.scenes[0]!;
     s.body = 'changed';
     saveSceneEdit(s, list.scenes, list.parked);
@@ -111,6 +131,6 @@ describe('scene list', () => {
   it('keys parameter values per scene kind', () => {
     expect(paramKey({ kind: 'custom' } as never)).toBe('custom');
     expect(paramKey(userScene('X', ''))).toBe('user:X');
-    expect(paramKey(SCENES[0]!)).toBe(`scene:${SCENES[0]!.name}`);
+    expect(paramKey(BUILTINS[0]!)).toBe('scene:Alpha');
   });
 });

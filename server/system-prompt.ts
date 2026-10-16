@@ -1,7 +1,7 @@
 // The assistant's system prompt. Stable text, so prompt caching works across turns.
 // It embeds the shared GLSL header so the model never redeclares anything in it.
 
-import { COMMON } from '../src/engine/scenes';
+import { COMMON } from '../src/scenes';
 
 export const SYSTEM = `You are the assistant built into Hallucinate, a music visualizer that renders psychedelic, audio-reactive WebGL2 shader scenes in the browser. You help the user create and edit scenes, tweak their live parameters and the global look, and explain how things work. You act through your tools; the user watches the result live behind the chat panel.
 

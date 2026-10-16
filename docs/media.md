@@ -3,17 +3,9 @@
 [← Back to the README](../README.md)
 
 Drop any image (png, jpg, gif, webp…) or video (mp4, webm, mov…) on the page, or use *Open file* in the panel's
-Media section. Every scene can sample it; the **Media** scenes are built for it, each with live parameters:
-
-| Scene | What it does |
-| --- | --- |
-| Media Kaleidoscope | mirrors it into 0–16 segments, zoom / spin |
-| Media Liquid | flowing noise warp, colour split, optional swirl |
-| Media Glitch | datamosh-style row shifts, RGB split, corrupted blocks, scanlines; bursts on the beat |
-| Media Halftone | print-style dots (ink on paper, or colour dots) |
-| Media Ripple | water ripples from a movable drop point |
-| Media Droste | endless zoom into copies of itself, with optional spiral arms |
-| Media Neon Edges | its outlines as glowing (rainbow) neon |
+Media section. Every scene can sample it with `media(p)` (a test pattern stands in until you drop one). The built-in
+**Media** scenes that were built for it have been removed with the other built-ins
+([ADR 0001](adr/0001-replace-all-built-in-scenes.md)); new ones will come in the library's *Media* category.
 
 ## YouTube
 

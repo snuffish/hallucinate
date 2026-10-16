@@ -9,7 +9,7 @@ import type { Cue, ShowSnapshot, StudioSession } from '../app/studio';
 import { blobToBase64, encodeJpeg } from '../engine/jpeg';
 import type { ParamSpec, ParamValue, ParamValues } from '../engine/params';
 import { stillUniforms } from '../engine/scene-inputs';
-import type { Scene } from '../engine/scenes';
+import type { Scene } from '../scenes';
 import { soundNow } from '../engine/listener';
 import { LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
 import { PlanSchema } from '../state/show-plan';
