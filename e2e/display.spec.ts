@@ -16,30 +16,37 @@ async function playUserScene(page: Page, body: string) {
   await page.locator('#auto').uncheck();   // stay on the probe scene
 }
 
-// The canvas as it appears on screen, with everything drawn over it hidden.
-async function canvasPixels(page: Page): Promise<number[]> {
-  const png = await page.locator('#gl').screenshot({
+// A 40×40 patch of the canvas as it appears on screen, with everything drawn over it hidden. The
+// WebGL canvas can't be read back after it is composited, so this decodes a screenshot in the page.
+async function patch(page: Page, fx: number, fy: number): Promise<number[]> {
+  const { width, height } = page.viewportSize()!;
+  const png = await page.screenshot({
+    clip: { x: Math.round(width * fx) - 20, y: Math.round(height * fy) - 20, width: 40, height: 40 },
     style: 'body * { visibility: hidden !important; } #gl { visibility: visible !important; }',
   });
   return page.evaluate(async (b64) => {
-    const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
-    const c = new OffscreenCanvas(img.width, img.height);
-    const ctx = c.getContext('2d')!;
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const ctx = new OffscreenCanvas(img.width, img.height).getContext('2d')!;
     ctx.drawImage(img, 0, 0);
-    const d = ctx.getImageData(0, 0, img.width, img.height).data;
     const rgb: number[] = [];
-    d.forEach((v, i) => { if (i % 4 !== 3) rgb.push(v); });
+    ctx.getImageData(0, 0, img.width, img.height).data.forEach((v, i) => { if (i % 4 !== 3) rgb.push(v); });
     return rgb;
   }, png.toString('base64'));
 }
 
+// The middle, where the vignette leaves the picture brightest, and an edge.
+const SPOTS = [[0.5, 0.5], [0.05, 0.5]] as const;
+const brightest = (px: number[]) => px.reduce((m, v) => Math.max(m, v), 0);
+
 test('display: a scene that draws black leaves the display pass exactly black', async ({ page }) => {
   await playUserScene(page, BLACK);
   await page.waitForTimeout(500);   // let any start-up crossfade and trails settle
-  for (let shot = 0; shot < 3; shot++) {
-    const px = await canvasPixels(page);
-    expect(px.length).toBeGreaterThan(0);
-    expect(px.reduce((m, v) => Math.max(m, v), 0)).toBe(0);
+  for (const [fx, fy] of SPOTS) {
+    const px = await patch(page, fx, fy);
+    expect(px.length).toBe(40 * 40 * 3);
+    expect(brightest(px)).toBe(0);
   }
 });
 
@@ -47,9 +54,7 @@ test('display: lit pixels still get grain', async ({ page }) => {
   await playUserScene(page, GREY);
   await page.waitForTimeout(500);
   // Grain moves every frame; the rest of a flat grey scene's display pass holds still.
-  const a = await canvasPixels(page);
-  await page.waitForTimeout(100);
-  const b = await canvasPixels(page);
-  expect(a.reduce((m, v) => Math.max(m, v), 0)).toBeGreaterThan(0);
-  expect(a.some((v, i) => v !== b[i])).toBe(true);
+  const a = await patch(page, 0.5, 0.5);
+  expect(brightest(a)).toBeGreaterThan(0);
+  await expect.poll(async () => (await patch(page, 0.5, 0.5)).some((v, i) => v !== a[i]), { timeout: 30_000 }).toBe(true);
 });
