@@ -52,7 +52,7 @@ export interface UIState {
   nowText: string;
   activeSource: SourceButton | null;
   sceneIndex: number;
-  sceneName: string;        // "3 · Hyper Tunnel"
+  sceneName: string;        // "3 · Ring Run"
   sceneVersion: number;     // bumps when the scene list changes (add/remove/edit), for lists
   look: Look;
   meters: Meters;
