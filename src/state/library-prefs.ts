@@ -2,7 +2,7 @@
 // the rotation. Stored by scene name, as before.
 
 import { z } from 'zod';
-import type { Scene } from '../engine/scenes';
+import { CATEGORIES, type Scene } from '../scenes';
 import { KEYS, readWithDefaults, writeJSON } from './persistence';
 
 export const PrefsSchema = z.object({ favs: z.array(z.string()).default([]), off: z.array(z.string()).default([]) });
@@ -22,6 +22,13 @@ export function togglePref(prefs: LibraryPrefs, list: 'favs' | 'off', s: Scene):
 // Scenes the library lists: the visuals and your saved scenes (not the editor slots).
 export const listedScenes = (scenes: readonly Scene[]) =>
   scenes.map((s, i) => ({ s, i })).filter(({ s }) => !s.removed && !s.kind);
+
+// The library's filter tabs. A category tab shows only when it has scenes; Mine only when you have saved one.
+export const SPECIAL_TABS: readonly string[] = ['All', '★ Favourites', '⚙ Tweakable'];
+export function libraryTabs(scenes: readonly Scene[]): string[] {
+  const cats = new Set(listedScenes(scenes).map(({ s }) => (s.user ? 'Mine' : s.cat)));
+  return [...SPECIAL_TABS, ...CATEGORIES.filter((c) => cats.has(c)), ...(cats.has('Mine') ? ['Mine'] : [])];
+}
 
 // Indices auto-switch may pick from. Favourites count twice, so they come up more often.
 export function rotation(scenes: readonly Scene[], prefs: LibraryPrefs): number[] {

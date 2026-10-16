@@ -9,7 +9,7 @@
 // through immutable storage + texSubImage2D, once per decoded video frame. Snapshots read back
 // asynchronously through a pixel buffer and a fence, so thumbnails don't stall the GPU.
 
-import { COMMON } from './scenes';
+import { COMMON } from '../scenes';
 import type { MediaLayer } from './media';
 import type { UniformValue } from './params';
 import { stillSpectrum, writeInputs, type SnapshotUniforms } from './scene-inputs';

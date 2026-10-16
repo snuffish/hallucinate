@@ -203,7 +203,7 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 
 ## Adding things
 
-- **A scene:** add a `scene(name, category, description, glsl)` line to `SCENES` in `src/engine/scenes.ts`.
+- **A scene:** add a module to `src/scenes/` that builds it with `scene(name, category, description, glsl)`, and list it in `SCENES` in `src/scenes/index.ts` (key order). The shared shader header (`header.ts`) and the new-scene template (`template.ts`) live there too.
   Tag uniforms or constants with `// @param` for live controls.
 - **A visual-maker block:** add an entry to `NODE_TYPES` in `src/engine/nodes.ts` (and a helper to `LIBS` if it
   needs GLSL). The examples test compiles every example graph.

@@ -10,7 +10,7 @@ import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState } from '../engine/renderer';
-import type { Scene } from '../engine/scenes';
+import type { Scene } from '../scenes';
 import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
 import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
@@ -661,8 +661,12 @@ export class AppController {
     this.mediaChanged();
     if (this.mediaSound && this.media.kind === 'video') await this.linkMediaSound();
     else if (this.state.activeSource === 'media') this.player.pause();
-    if (!this.renderer.usesMedia(this.state.clock.scene)) this.setScene(this.state.scenes.findIndex((s) => s.cat === 'Media'));
-    this.toast(`${this.media.kind === 'video' ? 'Video' : 'Image'} loaded — the Media scenes distort it (library → Media). In code, sample it with media(p).`, 5000);
+    const mediaScene = this.state.scenes.findIndex((s) => s.cat === 'Media' && !s.removed);
+    if (!this.renderer.usesMedia(this.state.clock.scene)) this.setScene(mediaScene);
+    const what = this.media.kind === 'video' ? 'Video' : 'Image';
+    this.toast(mediaScene >= 0
+      ? `${what} loaded — the Media scenes distort it (library → Media). In code, sample it with media(p).`
+      : `${what} loaded. In a scene's code, sample it with media(p).`, 5000);
   }
 
   clearMedia(): void {

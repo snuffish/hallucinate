@@ -1,9 +1,10 @@
-import { expect, test } from './fixtures';
+import { expect, seedScenes, solidScene, test } from './fixtures';
 
 const lookValues = (page: import('@playwright/test').Page) =>
   page.locator('#w-look input[type="range"]').evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));
 
 test('randomize: rolls the look without changing scene unless the random-scene box is ticked; Shift+R goes back', async ({ page }) => {
+  await seedScenes(page, [solidScene('Red Room', '1., 0., 0.'), solidScene('Blue Room', '0., 0., 1.')]);   // for the random scene to pick
   await page.goto('/');
   await page.getByRole('button', { name: 'Play demo beat' }).click();
   await expect(page.locator('#now')).toContainText('Demo beat');

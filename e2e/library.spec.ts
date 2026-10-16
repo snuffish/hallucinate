@@ -1,6 +1,9 @@
-import { expect, test } from './fixtures';
+import { expect, seedScenes, solidScene, test } from './fixtures';
+
+const SCENES = [solidScene('Red Room', '1., 0., 0.'), solidScene('Night Nest', '0., 0., .6'), solidScene('Green Field', '0., 1., 0.')];
 
 test('library: L opens it, / focuses search, arrows move through hits, Enter plays', async ({ page }) => {
+  await seedScenes(page, SCENES);
   await page.goto('/');
   await page.getByRole('button', { name: 'Play demo beat' }).click();
   await expect(page.locator('#now')).toContainText('Demo beat');
@@ -18,6 +21,8 @@ test('library: L opens it, / focuses search, arrows move through hits, Enter pla
   await expect(page.locator('#lib-filters button.active')).toHaveText('★ Favourites');
   await page.keyboard.press('Shift+Tab');
   await expect(page.locator('#lib-filters button.active')).toHaveText('All');
+  // No built-in scenes yet: only the special tabs and Mine.
+  await expect(page.locator('#lib-filters button')).toHaveText(['All', '★ Favourites', '⚙ Tweakable', 'Mine']);
   await page.keyboard.press('/');
   await page.keyboard.type('nest');
   await expect(page.locator('#lib-grid .lib-card')).toHaveCount(1);
@@ -26,7 +31,7 @@ test('library: L opens it, / focuses search, arrows move through hits, Enter pla
   await expect(page.locator('#lib-grid .lib-card.focused')).toHaveCount(1);
   await page.keyboard.press('Enter');
   await expect(page.locator('#library')).toBeHidden();
-  await expect(page.locator('#scene-name')).toContainText('Star Nest');
+  await expect(page.locator('#scene-name')).toContainText('Night Nest');
 });
 
 test('every panel opens with its key, shows key badges, and closes with Escape', async ({ page }) => {
@@ -63,18 +68,20 @@ test('every panel opens with its key, shows key badges, and closes with Escape',
 });
 
 test('the scene on screen comes back after a reload', async ({ page }) => {
+  await seedScenes(page, SCENES);
   await page.goto('/');
+  await expect(page.locator('#scene-name')).toContainText('My Shader');   // nothing to restore yet
   await page.getByRole('button', { name: 'Play demo beat' }).click();
   await page.keyboard.press('l');
   await page.keyboard.press('/');
   await page.keyboard.type('nest');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
-  await expect(page.locator('#scene-name')).toContainText('Star Nest');
+  await expect(page.locator('#scene-name')).toContainText('Night Nest');
   await page.locator('#auto').uncheck();   // so auto-switch doesn't move on before the reload
 
   await page.reload();
-  await expect(page.locator('#scene-name')).toContainText('Star Nest');   // before any source starts
+  await expect(page.locator('#scene-name')).toContainText('Night Nest');   // before any source starts
   await page.getByRole('button', { name: 'Play demo beat' }).click();
-  await expect(page.locator('#scene-name')).toContainText('Star Nest');
+  await expect(page.locator('#scene-name')).toContainText('Night Nest');
 });

@@ -3,7 +3,7 @@ import type { Hearing } from '../engine/listener';
 import { parseParams, type ParamValues } from '../engine/params';
 import { programState } from '../engine/look';
 import type { SceneUniforms } from '../engine/renderer';
-import type { Scene } from '../engine/scenes';
+import type { Scene } from '../scenes';
 import { defaultClock, defaultLook } from '../state/app-state';
 import { Store } from '../state/store';
 import { initialUIState } from '../state/ui-state';

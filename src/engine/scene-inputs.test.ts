@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { programState } from './look';
 import { NODE_TYPES } from './nodes';
 import { SCENE_INPUTS, stillUniforms, writeInputs } from './scene-inputs';
-import { COMMON, TEMPLATE } from './scenes';
+import { COMMON, TEMPLATE } from '../scenes';
 
 describe('the scene inputs', () => {
   it('declares every input in the shader header, with what it means', () => {

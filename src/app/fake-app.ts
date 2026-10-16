@@ -5,7 +5,7 @@
 import type { Hearing } from '../engine/listener';
 import type { MediaLayer } from '../engine/media';
 import { ParamStore, type ParamSpec } from '../engine/params';
-import type { Scene } from '../engine/scenes';
+import type { Scene } from '../scenes';
 import { defaultClock, defaultLook, LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
 import { DEFAULT_PREFS } from '../state/prefs';
 import { Store } from '../state/store';

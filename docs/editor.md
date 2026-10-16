@@ -15,13 +15,14 @@ running), and saves automatically in the browser. While it's open the editor fol
   *Revert to original* brings the original back.
 - **Your library scenes** save straight back to the library. **My Shader** is your scratch scene.
 - **Visual-maker scenes** are generated from the graph, so they open read-only; *Edit a copy* puts the code in My Shader.
-- *Start from…* replaces the code with a blank template or any built-in scene's original; *Save to library* saves the
+- *Start from…* replaces the code with a blank template or any built-in scene's original (there are no built-in
+  scenes yet, so only the blank template for now); *Save to library* saves the
   code as a new scene. The *Cheat sheet* lists the audio uniforms and helpers. In the library, *Edit code* plays a scene
   and opens it here.
 
 ## 🎛 Live parameters — press P
 
-<img src="screenshots/params-groups.jpg" alt="Aurora Veil with its parameters in folding groups: Curtains and Colour open, Scenery folded" width="100%">
+<img src="screenshots/params-groups.jpg" alt="A scene with its parameters in folding groups, some open and some folded" width="100%">
 
 Expose values and constants as controls in the Parameters widget, and tweak them while the scene runs (no
 recompiling). In the code editor, tag a top-level `uniform` or `const` with `// @param`:

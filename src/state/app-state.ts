@@ -1,7 +1,7 @@
 // The app's mutable state, shared by the engines (read every frame, no React) and the React tree
 // (through store.ts, which publishes immutable snapshots at UI rate). Nothing here allocates per frame.
 
-import type { Scene } from '../engine/scenes';
+import type { Scene } from '../scenes';
 
 export const BEATS_PER_SCENE = 32;
 export const MAX_SECONDS_PER_SCENE = 45;

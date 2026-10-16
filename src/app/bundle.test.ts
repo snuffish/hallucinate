@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EXAMPLES } from '../engine/nodes';
-import { SCENES } from '../engine/scenes';
+import { scene } from '../scenes';
 import { resetLayout } from '../state/layout';
 import { KEY_CLASS, KEYS } from '../state/persistence';
 import { BUNDLE_VERSION, MAX_BUNDLE_BYTES, SECTIONS, applyWrites, buildBundle, parseBundle } from './bundle';
 
+// A stand-in built-in: the app ships none yet (ADR 0001).
+const BUILTIN = scene('Alpha', 'Beams', 'Stand-in', 'void main() { fragColor = vec4(1.); }');
 const SHOW = { cues: [{ id: 'c1', name: 'Opener', scene: 'Mine', values: {}, look: {} }], mode: 'cut', seconds: 2, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120 };
 
 describe('settings bundle', () => {
@@ -23,7 +25,7 @@ describe('settings bundle', () => {
 
   const seed = () => {
     store.set(KEYS.userScenes, JSON.stringify([{ name: 'Mine', body: 'void main(){}' }, { name: 'Broken here', body: 'nope' }]));
-    store.set(KEYS.sceneEdits, JSON.stringify({ [SCENES[0]!.name]: 'edited' }));
+    store.set(KEYS.sceneEdits, JSON.stringify({ [BUILTIN.name]: 'edited' }));
     store.set(KEYS.customShader, 'void main() { /* mine */ }');
     store.set(KEYS.nodeGraph, JSON.stringify(EXAMPLES[0]!.graph));
     store.set(KEYS.params, JSON.stringify({ 'user:Mine': { uGlow: { v: 2, def: 1 } } }));
@@ -90,13 +92,18 @@ describe('settings bundle', () => {
     ['an empty export', file({}), 'nothing to import'],
     ['a broken section', file({ userScenes: [{ name: 'X' }] }), 'The "userScenes" section is broken (0.body:'],
     ['a broken layout', file({ layout: { widgets: {} } }), 'The "layout" section is broken'],
-    ['a built-in name', file({ userScenes: [{ name: SCENES[0]!.name, body: '' }] }), 'same name as a built-in'],
     ['an editor slot name', file({ userScenes: [{ name: 'My Shader', body: '' }] }), 'same name as a built-in'],
     ['duplicate names', file({ userScenes: [{ name: 'A', body: '' }, { name: 'A', body: '' }] }), 'two scenes called "A"'],
   ])('rejects %s', (_, text, message) => {
     const parsed = parseBundle(text);
     expect(parsed.ok).toBe(false);
     if (!parsed.ok) expect(parsed.error).toContain(message);
+  });
+
+  it('rejects a scene with the name of a built-in scene', () => {
+    const parsed = parseBundle(file({ userScenes: [{ name: 'Alpha', body: '' }] }), [BUILTIN]);
+    expect(parsed).toMatchObject({ ok: false, error: expect.stringContaining('same name as a built-in') });
+    expect(parseBundle(file({ userScenes: [{ name: 'Alpha', body: '' }] }), [])).toMatchObject({ ok: true });
   });
 
   it('rejects a file over the size limit', () => {

@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Psychedelic, audio-reactive visuals for your music, rendered in real time with WebGL2 shaders.</b><br>
-  40 scenes that follow the beat · a live GLSL editor · a node-based visual maker · an OBS-style studio with projector output ·<br>
+  scenes that follow the beat · a live GLSL editor · a node-based visual maker · an OBS-style studio with projector output ·<br>
   an AI assistant that writes and fixes scenes for you, inside the app.
 </p>
 
@@ -40,34 +40,23 @@ Needs Node 22.12 or newer. SoundCloud and YouTube also need [yt-dlp](https://git
 and the AI assistant needs a Claude subscription or an Anthropic API key ([setup](docs/assistant.md#setup)).
 Press **?** in the app for help and every shortcut.
 
-## ✨ At a glance
+## ✨ Scenes: a new set is on the way
 
-<table>
-  <tr>
-    <td align="center"><img src="docs/screenshots/hyper-tunnel.jpg" alt="Hyper Tunnel" width="100%"><br><sub><b>Hyper Tunnel</b> · endless twisting tiled tunnel</sub></td>
-    <td align="center"><img src="docs/screenshots/neon-loop.jpg" alt="Neon Loop" width="100%"><br><sub><b>Neon Loop</b> · repeated space folding with neon glow</sub></td>
-    <td align="center"><img src="docs/screenshots/liquid-blobs.jpg" alt="Liquid Blobs" width="100%"><br><sub><b>Liquid Blobs</b> · metaballs that melt with the bass</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/screenshots/star-nest.jpg" alt="Star Nest" width="100%"><br><sub><b>Star Nest</b> · volumetric flight through a Kali fractal</sub></td>
-    <td align="center"><img src="docs/screenshots/mandala-bloom.jpg" alt="Mandala Bloom" width="100%"><br><sub><b>Mandala Bloom</b> · petals and rings that bloom with the mids</sub></td>
-    <td align="center"><img src="docs/screenshots/voronoi-glass.jpg" alt="Voronoi Glass" width="100%"><br><sub><b>Voronoi Glass</b> · stained-glass cells that flash on the beat</sub></td>
-  </tr>
-</table>
-
-<sub>Stills from a software-rendered headless browser (`scripts/screenshots.mjs`); on a GPU the scenes run at full frame rate with motion trails.</sub>
+There are **no built-in scenes yet**. The old ones were removed to make way for a new set built for one style, a laser
+show ([ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md)). Until the first one ships, the app starts on
+**My Shader**: write your own scenes in the code editor or the visual maker, or ask the assistant for one.
 
 ## 🎛 Features
 
-<img src="docs/screenshots/main.jpg" alt="Hyper Tunnel playing with the panel's widgets on the left (Source, Media, Audio, Scene) and its live parameters on the right" width="100%">
+<img src="docs/screenshots/main.jpg" alt="A scene playing with the panel's widgets on the left (Source, Media, Audio, Scene) and its live parameters on the right" width="100%">
 
 | | Feature | |
 | --- | --- | --- |
 | 🎧 | **[Audio](docs/audio.md)** | Play a file, SoundCloud, the mic, a browser tab or the built-in demo beat. A full player with tempo, and *synesthesia* that colours the visuals by how the music sounds. |
-| 🎬 | **[Scenes](docs/scenes.md)** · L | 40 scenes in seven categories that crossfade on the beat, and a searchable library with favourites. |
+| 🎬 | **[Scenes](docs/scenes.md)** · L | No built-in scenes yet (a new set is coming in Beams, Geometry, Fields and Media). Your scenes crossfade on the beat, in a searchable library with favourites. |
 | 🧑‍💻 | **[Code editor](docs/editor.md)** · E | Edit any scene's GLSL live, with errors shown as you type. Tag a value with `// @param` and it becomes a slider (P). |
 | 🧩 | **[Visual maker](docs/visual-maker.md)** · N | Build scenes by wiring blocks together, then send the result to code. |
-| 🖼️ | **[Media](docs/media.md)** | Drop an image or video, or pick one from YouTube, and warp it with the Media scenes. |
+| 🖼️ | **[Media](docs/media.md)** | Drop an image or video, or pick one from YouTube, and sample it in any scene with `media(p)`. |
 | 📺 | **[Studio & projector](docs/studio.md)** · O | An OBS-style Preview / Live studio with projector windows, fades, an autopilot that counts beats, and an AI Director that plans the set. |
 | ✦ | **[AI assistant](docs/assistant.md)** · I | Claude writes and fixes scenes, sets parameters and runs the studio for you, across several conversations. |
 | 🪟 | **[Interface](docs/interface.md)** | Dockable, resizable widgets with a remembered layout, and help on every panel. |

@@ -57,7 +57,7 @@ export const HELP_TOPICS = {
     id: 'library',
     title: 'Scene library',
     body: [
-      'Every scene with a live preview. Click a preview to play it, or filter by category and search.',
+      'Every scene with a live preview. Click a preview to play it, or filter by category and search. There are no built-in scenes yet: the library lists your own (Mine) until new ones ship.',
       '★ makes a scene come up twice as often in auto-switch; the checkbox takes it out of the rotation. "Edit code" opens it in the code editor.',
     ],
     hotkeys: ['librarySearch', 'libraryTabNext', 'libraryRight', 'libraryDown', 'libraryPick', 'closeOverlay'],
@@ -149,7 +149,7 @@ export const HELP_TOPICS = {
     id: 'youtube',
     title: 'YouTube',
     body: [
-      'Search, or paste a video, playlist or Shorts link. The video becomes the picture the Media scenes distort.',
+      'Search, or paste a video, playlist or Shorts link. The video becomes the picture Media scenes and your own shaders (media(p)) work with.',
       'Tick "Use the video\'s sound as the music" to make it the audio source too. The first load of a long video takes a moment.',
       ...NEEDS_SERVER,
     ],

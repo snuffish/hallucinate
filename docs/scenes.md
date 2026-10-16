@@ -4,21 +4,13 @@
 
 ## Scenes
 
-40 visual scenes in seven categories (Fractal · Tunnel & 3D · Geometric · Organic · Spectrum · Space · Media). Every
-scene has [live parameters](editor.md#-live-parameters--press-p) suited to it — speeds, counts, sizes, colours and
-on/off layers (press P); their defaults are the scene's original look:
-Kaleido Fractal · Hyper Tunnel · Mandala Bloom · Liquid Plasma · Gyroid Cave · Wave Orbits · Julia Morph · Voronoi Glass · Hex Pulse ·
-Aurora Veil · Radial EQ · Oscilloscope · Truchet Weave · Moiré Bloom · Hyperspace · Menger Halls · Flower of Life ·
-Quasicrystal · Tumbling Blocks · Polygon Tunnel · Op Art Lens · Tesseract · Spirograph ·
-Lissajous Knot · Mirror Kaleidoscope · Retro Plasma · Starfield · Sunburst · Lava Lamp · the seven
-[Media scenes](media.md), plus four written from techniques made famous on Shadertoy (own implementations, not copied code):
+**There are no built-in scenes yet.** The old ones were removed to make way for a new set built for one style: a laser
+show (see [ADR 0001](adr/0001-replace-all-built-in-scenes.md)). Until the first new scene ships, the app starts on
+**My Shader**, and you can play the [Node Scene](visual-maker.md) and your own saved scenes (*Mine*). Built-in scenes will
+come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only once it has scenes.
 
-| Scene | Technique | Inspired by |
-| --- | --- | --- |
-| Neon Loop | repeated `fract()` folding + inverse-distance neon glow | kishimisu, *An introduction to Shader Art Coding* |
-| Star Nest | volumetric march through a tiled 3D Kali fractal | Kali, *Star Nest* |
-| Neon Jacks | glow accumulation while raymarching repeated shapes | *Phantom Star* / *Octagrams* style |
-| Liquid Blobs | smooth-min metaballs; bass melts them, spectrum sizes them | *Audio Reactive Liquid Blobs* |
+A show you saved that uses a removed scene keeps that show scene, marked *missing scene* in the [Studio](studio.md):
+taking it only shows a message, and the autopilot and the director skip it.
 
 With *Auto-switch* on (A), scenes crossfade every 32 detected beats (or 45 s), picking from the scenes in rotation.
 
@@ -37,4 +29,4 @@ Every scene as a card with a rendered preview. Filter by category or search, the
 
 Keyboard, with the library open: `/` jumps to the search box (`Esc` leaves it, a second `Esc` closes the library),
 `Tab` / `Shift+Tab` cycle the categories, `←` `↑` `↓` `→` move through the hits (also while typing), `Enter` plays the
-highlighted scene, `1`–`9` and `0` play the first ten scenes as everywhere else.
+highlighted scene, `1`–`9` and `0` play the first ten scenes (built-ins first, then yours) as everywhere else.
