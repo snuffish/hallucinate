@@ -27,7 +27,7 @@ float outline(float a, float i) {
 
 void main() {
   vec2 p = centered();
-  float px = 1. / uRes.y;
+  float px = onePixel();
   float a = atan(p.y, p.x);
   float r = length(p);
 

@@ -23,7 +23,7 @@ float height(float x, float y, float push) {
 
 void main() {
   vec2 p = centered();
-  float px = 1. / uRes.y;
+  float px = onePixel();
   float halfW = .5 * uRes.x / uRes.y;
   float fade = smoothstep(halfW - .02, halfW - .14, abs(p.x));   // lines end before the side edges
   if (fade <= 0.) { fragColor = vec4(0., 0., 0., 1.); return; }

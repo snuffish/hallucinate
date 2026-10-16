@@ -39,8 +39,14 @@ float fbm(vec2 p) {
   return v;
 }
 vec2 centered() { return (gl_FragCoord.xy - .5 * uRes) / uRes.y; }
+// One pixel in centered() units: sizes given in pixels keep their size on any screen.
+float onePixel() { return 1. / uRes.y; }
+// The tick's flash: 1 on the tick, fading to 0 by the next one.
+float tickFlash() { return (1. - uTick) * (1. - uTick); }
+// The ticks so far, easing into each new one over the first 30% of it: steps in time without jumping.
+float easedTicks() { return uTicks + smoothstep(0., .3, uTick); }
 // A thin luminous line at distance d from it: a hard core w wide plus a short halo that never lights
-// the whole frame. Give w in pixels, as WIDTH / uRes.y, so lines keep their width at any size.
+// the whole frame. Give w in pixels, as WIDTH * onePixel(), so lines keep their width at any size.
 float beam(float d, float w) { d = abs(d); return 1. - smoothstep(w * .35, w, d) + .45 * exp(-d / (w * 3.)); }
 float luma(vec3 c) { return dot(c, vec3(.299, .587, .114)); }
 // Undo the display's tonemapping, so a picture keeps its true colours on screen.

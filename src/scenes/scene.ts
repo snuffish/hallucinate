@@ -26,6 +26,9 @@ export interface SceneExtra { kind?: SceneKind; trails?: number }
 // The library's category tabs, in order. A tab shows only when it has scenes.
 export const CATEGORIES: readonly string[] = ['Beams', 'Geometry', 'Fields', 'Media'];
 
+// The id of one of your saved scenes (also its `paramKey`, so stored values and the last-scene mark use it).
+export const userSceneId = (name: string): string => `user:${name}`;
+
 // A built-in scene from its shader body. cat/desc are shown in the scene library.
 export function scene(name: string, cat: string, desc: string, body: string, extra: SceneExtra = {}): Scene {
   const { code, params } = parseParams(body);

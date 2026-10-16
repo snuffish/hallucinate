@@ -6,8 +6,9 @@
 
 The built-in scenes are a **laser show**: thin luminous lines, beams and points on pure black (see
 [ADR 0001](adr/0001-replace-all-built-in-scenes.md)). Every one reacts to the kicks, the ticks of the tempo and the
-bands, takes its colour from the hue slider and colour cycling, and keeps the background pure black. A kick never
-brightens more than a quarter of the frame. There are eight; the number keys play them in this order:
+bands, takes its colour from the hue slider and colour cycling, and keeps the background pure black. They are
+strobe-safe: no change from one frame to the next makes more than a quarter of the frame over twice as bright more than
+3 times a second, at any tempo. There are eight; the number keys play them in this order:
 
 | Key | Scene | Category | What it does |
 | --- | --- | --- | --- |

@@ -23,7 +23,7 @@ const float GONE = .62;      // ... and are gone by this one, before they light 
 
 void main() {
   vec2 p = centered();
-  float px = 1. / uRes.y;
+  float px = onePixel();
   float r = max(length(p), 1e-4);
   float a = atan(p.y, p.x);
   float s = uTicks + uTick;

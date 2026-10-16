@@ -15,7 +15,7 @@ const float KICK = 1.6;      // @param min=0 max=3 label="Kick wave"
 
 void main() {
   vec2 p = centered();
-  float px = 1. / uRes.y;
+  float px = onePixel();
   p *= rot(sin(uTime * .11) * .04);          // a slow roll, as if the room breathes
 
   const float HORIZON = -.18, FOCAL = 1.;

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { scene } from '../scenes';
 import { KEYS } from './persistence';
-import { buildSceneList, type CompileCheck, discardParked, loadUserScenes, paramKey, saveSceneEdit, saveUserScenes, sceneByName, takeRenameReport, userScene, type ParkedScenes } from './scene-list';
+import { buildSceneList, type CompileCheck, discardParked, isBuiltin, loadUserScenes, paramKey, saveSceneEdit, saveUserScenes, sceneByName, stepScene, userScene, type ParkedScenes } from './scene-list';
+import { takeRenameReport } from './scene-renames';
 
 // The scene list is the cross-window contract: indices must stay stable, so removal is a flag.
 describe('scene list', () => {
@@ -39,9 +40,22 @@ describe('scene list', () => {
     expect(list.keyedScenes).toEqual([2, 3]);
   });
 
-  it('plays Beam Fan on key 1, the first of the shipped laser-show set', () => {
-    const list = buildSceneList([], compiles);
-    expect(list.scenes[list.keyedScenes[0]!]).toMatchObject({ name: 'Beam Fan', cat: 'Beams' });
+  it('plays the first built-in on key 1, in the order the set ships', () => {
+    const list = build();
+    expect(list.keyedScenes.slice(0, 3).map((i) => list.scenes[i]!.name)).toEqual(['Alpha', 'Beta', 'Gamma']);
+  });
+
+  // ← / → walk the list in key order, wrap at both ends and skip deleted scenes.
+  it('steps through the scenes in key order, wrapping and skipping removed ones', () => {
+    store.set(KEYS.userScenes, JSON.stringify(mine(2)));
+    const { scenes } = build();
+    const names = (from: number, dir: number, n: number) =>
+      Array.from({ length: n }, () => scenes[(from = stepScene(scenes, from, dir))]!.name);
+    expect(names(0, 1, 3)).toEqual(['Beta', 'Gamma', 'My Shader']);
+    expect(names(0, -1, 2)).toEqual(['Mine 2', 'Mine 1']);
+    scenes[1]!.removed = true;
+    expect(names(0, 1, 1)).toEqual(['Gamma']);
+    expect(names(2, -1, 1)).toEqual(['Alpha']);
   });
 
   it('ignores stored edits for built-ins that no longer exist', () => {
@@ -53,7 +67,7 @@ describe('scene list', () => {
 
   it('reports saved scenes that no longer compile instead of failing', () => {
     store.set(KEYS.userScenes, JSON.stringify([{ name: 'Broken', body: 'nope' }]));
-    const list = buildSceneList([], failing);
+    const list = build(failing);
     expect(list.errors).toEqual(['Broken']);
     expect(list.scenes.some((s) => s.name === 'Broken')).toBe(false);
     expect(list.parked.userScenes).toEqual([{ name: 'Broken', body: 'nope' }]);
@@ -62,7 +76,7 @@ describe('scene list', () => {
   // An import from another GPU or app version must not lose scenes the first time anything is saved.
   it('keeps a scene that failed to compile stored when another scene is saved', () => {
     store.set(KEYS.userScenes, JSON.stringify([{ name: 'Broken', body: 'nope' }, { name: 'Fine', body: 'void main(){}' }]));
-    const list = buildSceneList([], failing);
+    const list = build(failing);
     list.scenes.push(userScene('New', 'void main(){}'));
     saveUserScenes(list.scenes, list.parked);
     expect(loadUserScenes().map((s) => s.name)).toEqual(['Fine', 'New', 'Broken']);
@@ -70,7 +84,7 @@ describe('scene list', () => {
 
   it('un-parks a scene saved again under its name, and deletes one on request', () => {
     store.set(KEYS.userScenes, JSON.stringify([{ name: 'Broken', body: 'nope' }, { name: 'Other', body: 'nope too' }]));
-    const list = buildSceneList([], failing);
+    const list = build(failing);
     list.scenes.push(userScene('Broken', 'void main(){}'));   // fixed in the editor, saved under the same name
     saveUserScenes(list.scenes, list.parked);
     expect(list.parked.userScenes.map((p) => p.name)).toEqual(['Other']);
@@ -183,6 +197,12 @@ describe('scene list', () => {
       expect(list.renamed).toEqual([{ from: 'Beta', to: 'Beta (mine 2)' }, { from: 'Gamma', to: 'Gamma (mine 3)' }]);
       expect(loadUserScenes().map((s) => s.name)).toEqual(['Beta (mine)', 'Beta (mine 2)', 'Gamma (mine)', 'Gamma (mine 2)', 'Gamma (mine 3)']);
     });
+  });
+
+  it('tells the built-ins from your scenes and the editor slots', () => {
+    store.set(KEYS.userScenes, JSON.stringify(mine(1)));
+    const { scenes } = build();
+    expect(scenes.filter(isBuiltin).map((s) => s.name)).toEqual(['Alpha', 'Beta', 'Gamma']);
   });
 
   it('keys parameter values per scene kind', () => {

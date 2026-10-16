@@ -14,12 +14,12 @@ const float STROBE = .8;     // @param min=0 max=1 label="Kick strobe"
 
 void main() {
   vec2 p = centered();
-  float px = 1. / uRes.y;
+  float px = onePixel();
   float r = length(p);
   float a = atan(p.x, p.y);                  // 0 = straight up
 
   float gap = TAU / RAYS;
-  float step = uTicks + smoothstep(0., .3, uTick);              // one ray further on each tick, eased
+  float step = easedTicks();              // one ray further on each tick, eased
   float turn = uTime * SPIN + step * gap;
   float nearest = floor((a - turn) / gap + .5);
   float strobe = uBeat * STROBE;

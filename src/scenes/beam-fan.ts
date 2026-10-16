@@ -13,7 +13,7 @@ const float STROBE = .8;     // @param min=0 max=1 label="Kick strobe"
 
 void main() {
   vec2 p = centered();
-  float px = 1. / uRes.y;
+  float px = onePixel();
 
   vec2 q = p - vec2(0., -.52);               // the source sits just below the bottom edge
   float r = length(q);
@@ -35,7 +35,7 @@ void main() {
     float d = r * sin(da);
     float f = i / max(BEAMS - 1., 1.);
     float level = .35 + 1.3 * spec(.04 + .5 * f);                     // calm but lit when quiet
-    level += (i == chase ? 1.6 * (1. - uTick) * (1. - uTick) : 0.);  // the tick chase
+    level += (i == chase ? 1.6 * tickFlash() : 0.);  // the tick chase
     level += 2. * strobe;
     vec3 c = mix(rainbow(uHue + (f - .5) * .08), vec3(1.), .55 * strobe);
     col += c * beam(d, WIDTH * px) * level * mix(1., .45, clamp(r, 0., 1.));
