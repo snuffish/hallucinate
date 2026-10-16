@@ -10,6 +10,7 @@ import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState } from '../engine/renderer';
+import { silentSpectrum, stillUniforms } from '../engine/scene-inputs';
 import type { Scene } from '../scenes';
 import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
 import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
@@ -115,8 +116,14 @@ export class AppController {
     report: () => (this.profiler.on ? this.perfReport() : null),
     fillTest: () => this.runFillTest(),
     reset: () => this.profiler.reset(),
-    scenes: () => this.state.scenes.flatMap((s, index) => (s.removed ? [] : [{ index, name: s.name }])),
+    scenes: () => this.state.scenes.flatMap((s, index) => (s.removed ? [] : [{ index, name: s.name, cat: s.cat, params: s.params.length, builtin: s.original !== undefined }])),
     setScene: (index) => this.setScene(index),
+    still: async (index, { inputs = {}, silent = false } = {}) => {
+      const s = this.state.scenes[index];
+      const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
+      if (error) return { error, image: null };
+      return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, silent ? silentSpectrum() : undefined) };
+    },
   };
   // Another tab imported settings: this one's state is stale, so it must not write, and reloads.
   // Another tab changed a preference: take it over, so this tab's next write doesn't undo it.

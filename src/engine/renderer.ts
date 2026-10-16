@@ -446,7 +446,7 @@ export class Renderer {
 
   // ---------- Snapshots ----------
 
-  private renderThumb(index: number, uniforms: SnapshotUniforms, w: number, h: number): Target {
+  private renderThumb(index: number, uniforms: SnapshotUniforms, w: number, h: number, spectrum?: Uint8Array): Target {
     const gl = this.gl;
     if (this.thumb && (this.thumb.out.w !== w || this.thumb.out.h !== h)) {   // previews and assistant frames differ in size
       for (const t of [this.thumb.scene, this.thumb.out]) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
@@ -457,7 +457,7 @@ export class Renderer {
     const t = this.thumb;
     gl.bindVertexArray(this.vao);
     gl.bindTexture(gl.TEXTURE_2D, this.specTex);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 1, gl.RG, gl.UNSIGNED_BYTE, this.fakeSpectrum);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 1, gl.RG, gl.UNSIGNED_BYTE, spectrum ?? this.fakeSpectrum);
     const prog = this.program(index, true);
     if (prog) {
       this.use(prog, uniforms as unknown as SceneUniforms, this.mediaUniforms(index, -1), { uRes: [w, h], uSpec: this.specTex }, this.sceneParams[index]);
@@ -484,12 +484,13 @@ export class Renderer {
   }
 
   // Same picture, but the GPU is never stalled: the pixels come back through a pixel buffer once
-  // a fence says the frame is done. Calls are queued so they share one set of targets.
-  snapshotAsync(index: number, uniforms: SnapshotUniforms, w = 320, h = 180): Promise<ImageData> {
+  // a fence says the frame is done. Calls are queued so they share one set of targets. `spectrum`
+  // (256 × RG bytes) replaces the stand-in one, e.g. with silence.
+  snapshotAsync(index: number, uniforms: SnapshotUniforms, w = 320, h = 180, spectrum?: Uint8Array): Promise<ImageData> {
     const run = async (): Promise<ImageData> => {
       const gl = this.gl;
       if (this.disposed || this.lost) throw new Error('Renderer unavailable');
-      const out = this.renderThumb(index, uniforms, w, h);
+      const out = this.renderThumb(index, uniforms, w, h, spectrum);
       const bytes = w * h * 4;
       this.pbo ??= gl.createBuffer();
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);

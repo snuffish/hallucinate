@@ -14,7 +14,7 @@ describe('scene list', () => {
   const compiles = () => null;   // every shader "compiles"
   const failing = (frag: string) => (frag.includes('nope') ? 'ERROR: 0:1: bad' : null);
   const noParked = (): ParkedScenes => ({ userScenes: [], sceneEdits: {} });
-  // Stand-in built-ins: the app ships none yet, and the list must not depend on which it ships.
+  // Stand-in built-ins: the list must not depend on which ones the app ships.
   const BUILTINS = ['Alpha', 'Beta', 'Gamma'].map((name) => scene(name, 'Beams', `${name} beams`, 'void main() { fragColor = vec4(1.); }'));
   const build = (check: CompileCheck = compiles) => buildSceneList([], check, BUILTINS);
   const mine = (n: number) => Array.from({ length: n }, (_, i) => ({ name: `Mine ${i + 1}`, body: 'void main() { fragColor = vec4(1.); }' }));
@@ -39,8 +39,9 @@ describe('scene list', () => {
     expect(list.keyedScenes).toEqual([2, 3]);
   });
 
-  it('ships no built-in scenes yet', () => {
-    expect(buildSceneList([], compiles).scenes.map((s) => s.name)).toEqual(['My Shader', 'Node Scene']);
+  it('plays Beam Fan on key 1, the first of the shipped laser-show set', () => {
+    const list = buildSceneList([], compiles);
+    expect(list.scenes[list.keyedScenes[0]!]).toMatchObject({ name: 'Beam Fan', cat: 'Beams' });
   });
 
   it('ignores stored edits for built-ins that no longer exist', () => {

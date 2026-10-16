@@ -57,7 +57,7 @@ export const HELP_TOPICS = {
     id: 'library',
     title: 'Scene library',
     body: [
-      'Every scene with a live preview. Click a preview to play it, or filter by category and search. There are no built-in scenes yet: the library lists your own (Mine) until new ones ship.',
+      'Every scene with a live preview. Click a preview to play it, or filter by category and search. The built-ins are a laser show in Beams, Geometry, Fields and Media; your own are under Mine.',
       '★ makes a scene come up twice as often in auto-switch; the checkbox takes it out of the rotation. "Edit code" opens it in the code editor.',
     ],
     hotkeys: ['librarySearch', 'libraryTabNext', 'libraryRight', 'libraryDown', 'libraryPick', 'closeOverlay'],

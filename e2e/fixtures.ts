@@ -23,7 +23,7 @@ export const test = base.extend({
   },
 });
 
-// The app ships no built-in scenes yet (ADR 0001), so specs that need scenes save their own first.
+// Specs that need particular scenes save their own first, so they don't depend on the built-ins.
 export interface SavedScene { name: string; body: string }
 export const solidScene = (name: string, rgb: string): SavedScene => ({ name, body: `void main() { fragColor = vec4(${rgb}, 1.); }` });
 

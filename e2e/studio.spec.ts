@@ -1,6 +1,5 @@
 import { expect, seedScenes, solidScene, test } from './fixtures';
 
-// Your scenes come after My Shader (0) and Node Scene (1) in the list.
 const SCENES = [solidScene('Red Room', '1., 0., 0.'), solidScene('Green Room', '0., 1., 0.'), solidScene('Blue Room', '0., 0., 1.')];
 
 // A fake projector: says hello like output.html does and reports the scene index of the next frame.
@@ -24,13 +23,13 @@ test('studio: Live stays pinned to the taken scene while the screen previews oth
   await page.keyboard.press('t');                           // Take: Red Room is Live and on screen
   await expect(page.locator('#st-live-name')).toHaveText('Red Room');
   await expect(page.locator('#scene-name')).toContainText('Red Room');
-  expect(await projectorSees(page)).toBe(2);                // Red Room is scene index 2
+  const red = await projectorSees(page);                    // Red Room's scene index
 
   await page.keyboard.press('Escape');                      // close the studio: Live is pinned
   await expect(page.locator('#live-pin')).toContainText('Red Room');
   await page.keyboard.press('ArrowRight');                  // browse on screen
   await expect(page.locator('#scene-name')).toContainText('Green Room');
-  expect(await projectorSees(page)).toBe(2);                // the projector still shows Red Room
+  expect(await projectorSees(page)).toBe(red);              // the projector still shows Red Room
 
   await page.keyboard.press('o');                           // reopening puts Live back on screen
   await expect(page.locator('#scene-name')).toContainText('Red Room');
