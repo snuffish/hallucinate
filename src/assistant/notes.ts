@@ -8,8 +8,30 @@ export const UNDO_PREFIX = '(The user pressed Undo and reverted your change: ';
 export const RESUME_PREFIX = '(This conversation was reopened on ';
 
 export const undoNote = (label: string) => `${UNDO_PREFIX}${label}.)`;
-export const resumeNote = (date: Date) =>
-  `${RESUME_PREFIX}${date.toLocaleString()}. The app may have changed since and your earlier changes can no longer be undone from the panel: call get_app_state before changing anything.)`;
+
+// What was on screen when a conversation's last reply finished (kept in its history entry), and what
+// is on screen now. The reopen note compares the two, so Claude doesn't re-read a scene it already
+// has: those re-reads were most of what a reopened conversation cost.
+export interface Screen { scene: string; hash: string }
+export interface ScreenNow extends Screen { values: Record<string, unknown> }
+
+const MAX_VALUES = 600;   // characters; a scene with many parameters gets pointed at get_app_state instead
+
+export function resumeNote(date: Date, seen?: Screen | null, now?: ScreenNow | null): string {
+  const head = `${RESUME_PREFIX}${date.toLocaleString()}. Your earlier changes can no longer be undone from the panel`;
+  if (!seen || !now) return `${head}, and the app may have changed since: call get_app_state before changing anything.)`;
+  const what = now.scene !== seen.scene ? 'a different scene than at your last reply' : now.hash === seen.hash ? 'the scene from your last reply, its code unchanged since' : 'the scene from your last reply, but its code changed since: read it before editing';
+  const values = JSON.stringify(now.values, (_k, v: unknown) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v));
+  const params = values.length <= MAX_VALUES ? `; its parameters are ${values}` : '';
+  return `${head}. On screen: ${JSON.stringify(now.scene)}, ${what}${params}. Call get_app_state only if you need more.)`;
+}
+
+// A cheap fingerprint of a scene's code (FNV-1a), enough to tell "unchanged" from "changed".
+export function codeHash(code: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < code.length; i++) h = Math.imul(h ^ code.charCodeAt(i), 0x01000193);
+  return `${code.length.toString(36)}-${(h >>> 0).toString(36)}`;
+}
 
 const NOTE_LINE = /^\((?:The user pressed Undo and reverted your change: |This conversation was reopened on )[^\n]*\)$/;
 

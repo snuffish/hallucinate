@@ -2,15 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HISTORY_CAP, loadTranscript, parseIndex, prune, transcriptWriter, type ChatMeta, type Transcript, type TranscriptBackend } from './history-store';
 import { createLock, serialized } from './lock';
 import { NOT_RUN } from './transcript';
-import { addUsage, contextOf, formatTokens, NO_USAGE, usageOf } from './usage';
+import { addUsage, contextOf, formatCost, formatTokens, newInput, NO_USAGE, usageOf } from './usage';
 
 describe('usage', () => {
   it('reads TanStack usage off RUN_FINISHED, with the cache split and the cost', () => {
     const u = usageOf({ type: 'RUN_FINISHED', usage: { promptTokens: 1000, completionTokens: 50, totalTokens: 1050, promptTokensDetails: { cachedTokens: 700, cacheWriteTokens: 200 }, cost: 0.02 } });
-    expect(u).toEqual({ prompt: 1000, completion: 50, cacheRead: 700, cacheWrite: 200, cost: 0.02 });
+    expect(u).toEqual({ prompt: 1000, completion: 50, cacheRead: 700, cacheWrite: 200, cost: 0.02, context: 1000 });
     expect(usageOf({ type: 'TEXT_MESSAGE_CONTENT', usage: { promptTokens: 5 } })).toBeNull();
     expect(usageOf({ type: 'RUN_FINISHED' })).toBeNull();
-    expect(usageOf({ type: 'RUN_FINISHED', usage: [{ promptTokens: 10, completionTokens: 1 }, { promptTokens: 20, completionTokens: 2 }] })).toMatchObject({ prompt: 30, completion: 3 });
+    expect(usageOf({ type: 'RUN_FINISHED', usage: [{ promptTokens: 10, completionTokens: 1 }, { promptTokens: 20, completionTokens: 2 }] })).toMatchObject({ prompt: 30, completion: 3, context: 20 });
+    // The CLI sums every call of a run and names the newest call's input apart.
+    expect(usageOf({ type: 'RUN_FINISHED', usage: { promptTokens: 100_292, providerUsageDetails: { contextTokens: 50_958 } } })).toMatchObject({ prompt: 100_292, context: 50_958 });
   });
 
   it('sizes the conversation by the newest call (the CLI reports it; otherwise the run is one call)', () => {
@@ -20,7 +22,12 @@ describe('usage', () => {
   });
 
   it('adds up and formats', () => {
-    expect(addUsage(NO_USAGE, { prompt: 1, completion: 2, cacheRead: 3, cacheWrite: 4, cost: 0.5 })).toEqual({ prompt: 1, completion: 2, cacheRead: 3, cacheWrite: 4, cost: 0.5 });
+    expect(addUsage(NO_USAGE, { prompt: 1, completion: 2, cacheRead: 3, cacheWrite: 4, cost: 0.5, context: 1 })).toEqual({ prompt: 1, completion: 2, cacheRead: 3, cacheWrite: 4, cost: 0.5, context: 1 });
+    const later = { ...NO_USAGE, prompt: 9000, cacheRead: 8500, context: 5000 }, earlier = { ...NO_USAGE, prompt: 3000, context: 3000 };
+    expect(addUsage(later, earlier).context).toBe(5000);   // the larger (later) context, in either order
+    expect(addUsage(earlier, later).context).toBe(5000);
+    expect(newInput(later)).toBe(500);
+    expect([0.0412, 1.2].map(formatCost)).toEqual(['$0.041', '$1.20']);
     expect([950, 1234, 48_210, 1_250_000].map(formatTokens)).toEqual(['950', '1.2k', '48k', '1.3M']);
     expect(formatTokens(2000)).toBe('2k');
   });

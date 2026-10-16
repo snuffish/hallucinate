@@ -22,7 +22,7 @@ export type ContentParts = z.infer<typeof ContentPartsSchema>;
 
 export const getAppState = toolDefinition({
   name: 'get_app_state',
-  description: 'Get what is on screen now: the playing scene (name, kind, live parameters and their values), the look sliders, the audio source, BPM and mood, whether media is loaded, and the list of every scene (name, category, kind, number of parameters, whether the user edited it). Call this when you need to know the current situation or the exact scene names.',
+  description: 'Get what is on screen now: the playing scene (name, kind, live parameters with their ranges and values), the look sliders, the audio source, BPM and mood, whether media is loaded, and every scene name by category (a mark after a name: * edited by the user, (mine), (visual maker), (game); unmarked ones are built-in). Call this when you need to know the current situation or the exact scene names.',
   inputSchema: z.object({}),
   outputSchema: record,
 });
@@ -44,6 +44,19 @@ export const writeSceneCode = toolDefinition({
   outputSchema: record,
 });
 
+export const editSceneCode = toolDefinition({
+  name: 'edit_scene_code',
+  description: 'Change part of an existing scene\'s code by exact text replacement, and show it. Prefer this over write_scene_code for any change smaller than a rewrite: it costs a fraction of resending the whole scene. Each edit replaces `find`, which must occur exactly once in the code (include enough surrounding text to make it unique), with `replace`; the edits apply in order, each to the result of the one before. Then the code compiles like write_scene_code: on success it runs live and is saved, with the same undo; if an edit doesn\'t match or the result doesn\'t compile, nothing changes and the problem is returned. Scenes made in the visual maker are read-only here.',
+  inputSchema: z.object({
+    scene: sceneName.optional(),
+    edits: z.array(z.object({
+      find: z.string().min(1).describe('Exact text from the current code, whitespace included.'),
+      replace: z.string().describe('What replaces it (empty deletes it).'),
+    })).min(1).describe('Replacements, applied in order.'),
+  }),
+  outputSchema: record,
+});
+
 export const createScene = toolDefinition({
   name: 'create_scene',
   description: 'Create a new scene in the user\'s library (category "Mine") and play it. Use this for new ideas instead of overwriting an existing scene. Returns compile errors with line numbers if the code does not compile (nothing is created then).',
@@ -56,7 +69,7 @@ export const createScene = toolDefinition({
 
 export const setParameters = toolDefinition({
   name: 'set_parameters',
-  description: 'Set live parameters (the scene\'s @param controls) of the scene on screen. Keys are parameter names, labels, or "Group/Label" when a label repeats across groups. Numbers for sliders, true/false for checkboxes, "#rrggbb" for colours, arrays of numbers for vec2/vec3/vec4. Returns the values now in effect.',
+  description: 'Set live parameters (the scene\'s @param controls) of the scene on screen. Keys are parameter names, labels, or "Group/Label" when a label repeats across groups. Numbers for sliders, true/false for checkboxes, "#rrggbb" for colours, arrays of numbers for vec2/vec3/vec4. Returns the values it applied and any keys it couldn\'t.',
   inputSchema: z.object({ values: z.record(z.string(), z.unknown()).describe('Map of parameter name (or label, or "Group/Label") to value.') }),
   outputSchema: record,
 });
@@ -168,7 +181,7 @@ export const takeShowScene = toolDefinition({
 });
 
 export const TOOL_DEFINITIONS = [
-  getAppState, readSceneCode, writeSceneCode, createScene, setParameters, setLook, switchScene, lookAtScene,
+  getAppState, readSceneCode, writeSceneCode, editSceneCode, createScene, setParameters, setLook, switchScene, lookAtScene,
   getShow, addShowScene, updateShowScene, reorderShow, removeShowScene, setTransition, setAutopilot, setAutopilotPlan, takeShowScene,
 ] as const;
 // What the director gets in its cycles: read the show, write the plan, tweak a show scene's look. It
@@ -183,6 +196,7 @@ export const DONE_VERBS: Record<ToolName, (input: Record<string, unknown>) => st
   get_app_state: () => 'Looked around',
   read_scene_code: (i) => `Read ${(i.scene as string | undefined) ?? 'the scene'}`,
   write_scene_code: (i) => `Edited ${(i.scene as string | undefined) ?? 'the scene'}`,
+  edit_scene_code: (i) => { const n = Array.isArray(i.edits) ? i.edits.length : 0; return `Edited ${(i.scene as string | undefined) ?? 'the scene'}${n ? ` (${n} change${n === 1 ? '' : 's'})` : ''}`; },
   create_scene: (i) => `Created "${(i.name as string | undefined) ?? 'a scene'}"`,
   set_parameters: (i) => { const n = Object.keys((i.values as object | undefined) ?? {}).length; return `Set ${n || ''} parameter${n === 1 ? '' : 's'}`.replace('  ', ' '); },
   set_look: () => 'Adjusted the look',
@@ -204,6 +218,7 @@ export const VERBS: Record<ToolName, (input: Record<string, unknown>) => string>
   get_app_state: () => 'Looking around',
   read_scene_code: (i) => `Reading ${(i.scene as string | undefined) ?? 'the scene'}`,
   write_scene_code: (i) => `Editing ${(i.scene as string | undefined) ?? 'the scene'}`,
+  edit_scene_code: (i) => `Editing ${(i.scene as string | undefined) ?? 'the scene'}`,
   create_scene: (i) => `Creating "${(i.name as string | undefined) ?? 'a scene'}"`,
   set_parameters: () => 'Setting parameters',
   set_look: () => 'Adjusting the look',

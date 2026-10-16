@@ -16,14 +16,14 @@ import { clientTools } from './client-tools';
 import { createToolRunner, UndoConflict, type ToolRunner } from './executor';
 import { HISTORY_CAP, indexedDBTranscripts, loadTranscript, prune, readIndex, transcriptWriter, writeIndex, type ChatMeta, type TranscriptBackend, type TranscriptWriter } from './history-store';
 import { createLock, serialized, type Lock } from './lock';
-import { resumeNote, undoNote, withNotes } from './notes';
+import { codeHash, resumeNote, undoNote, withNotes, type ScreenNow } from './notes';
 import { relayToolCalls } from './relay';
 import { previewOf, prepareForSend, sealInterrupted, titleFrom } from './transcript';
 import { UndoStack } from './undo';
 import { addUsage, contextOf, NO_USAGE, usageOf, type Usage } from './usage';
 
 export const MAX_RUNNING_CLI = 3;     // subscription backend: one `claude -p` per running conversation
-export const LONG_CHAT_TOKENS = 150_000;
+export const LONG_CHAT_TOKENS = 80_000;   // context size: every step of every message resends it
 const SETTLE_MS = 400;                // browser-run tools continue a run after its stream ends: wait this long for quiet
 
 export type ChatStatus = 'idle' | 'running' | 'waiting';
@@ -129,7 +129,7 @@ export class Conversation {
       return;
     }
     const [next, ...rest] = v.outbox;
-    const notes = [...v.notes, ...(this.restored ? [resumeNote(new Date(this.session.now()))] : [])];
+    const notes = [...v.notes, ...(this.restored ? [resumeNote(new Date(this.session.now()), this.session.meta(this.id)?.seen, this.session.screen())] : [])];
     this.restored = false;
     this.store.set({ outbox: rest, notes: [], status: 'running', error: null, runStartedAt: this.session.now(), runTools: 0 });
     this.session.started(this, next!.text);
@@ -421,7 +421,8 @@ export class AssistantSession {
     const ui = this.app.ui.get();
     const seen = ui.assistantOpen && this.view.activeId === c.id && !(typeof document !== 'undefined' && document.hidden);
     const error = !!c.view.error;
-    this.updateMeta(c.id, { count: c.view.messages.length }, true);
+    const screen = this.screen();
+    this.updateMeta(c.id, { count: c.view.messages.length, ...(screen && { seen: { scene: screen.scene, hash: screen.hash } }) }, true);
     this.setLive(c.id, { status: 'idle', unread: !seen, error });
     if (!ui.assistantOpen) {
       const meta = this.meta(c.id);
@@ -429,6 +430,16 @@ export class AssistantSession {
     }
     for (const other of this.chats.values()) if (other !== c) other.pump();   // a slot is free
     this.publish();
+  }
+
+  // The scene on screen, its code's fingerprint and its parameter values (null where the app can't say, e.g. in tests).
+  screen(): ScreenNow | null {
+    try {
+      const i = this.app.sceneIndex;
+      return { scene: this.app.currentScene.name, hash: codeHash(this.app.editor.target(i).body), values: this.app.paramValues(i) };
+    } catch {
+      return null;
+    }
   }
 
   changed(c: Conversation): void {

@@ -7,7 +7,8 @@
 A chat bubble at the bottom, next to the panel (✦, or I), opens a panel where Claude creates and edits scenes for you,
 right in the app, while everything else stays where it is. It:
 
-- reads a scene's code, writes or fixes it (and sees its own compile errors), and creates new scenes in your library;
+- reads a scene's code, edits it in place or rewrites it (and sees its own compile errors), and creates new scenes in
+  your library;
 - sets live parameters and the look sliders, switches scenes, and looks at a rendered frame to check its work;
 - runs the [studio](studio.md): it adds, changes, reorders and removes show scenes, sets the transition and the
   autopilot, writes a plan for the autopilot and takes show scenes live ("build a show from the Space scenes and plan an
@@ -27,9 +28,10 @@ next, as buttons under the reply, like the examples on an empty chat.
 - **Notifications.** Close the panel while Claude works: the bubble's ring turns, then a badge counts the
   conversations with a reply waiting and a card next to the bubble peeks at it (click it to open that conversation).
   With the tab in the background, the window title shows the count.
-- **Token usage** under each reply (in, out, how much came from the prompt cache) and for the whole conversation;
-  long conversations get a hint to start a new one. On a subscription the tooltip also shows the CLI's API-equivalent
-  cost (not billed).
+- **Token usage** under each reply and for the whole conversation: how big the conversation is (context), the input the
+  prompt cache didn't serve (new in), the output, and the cost as reported (on a subscription, the CLI's
+  API-equivalent figure, not billed). The tooltip has every part. Long conversations get a hint to start a new one.
+  See [What a reply costs](#what-a-reply-costs).
 - **Reasoning.** 💭 shows Claude's reasoning (rendered, with a word count and Copy) or folds it away; the setting is
   remembered.
 - **Type while it works**: your message waits (dimmed, × to drop it) and goes out when the reply is done. **Retry**
@@ -51,7 +53,7 @@ npm run dev
 ```
 
 On the subscription backend Claude Code runs with **no built-in tools, none of your settings and a throw-away working
-directory**: it can only use this app's tools (eight for scenes, nine for the studio).
+directory**: it can only use this app's tools (nine for scenes, nine for the studio).
 
 ## Environment variables
 
@@ -66,3 +68,20 @@ directory**: it can only use this app's tools (eight for scenes, nine for the st
 The director's cycles get only the show tools (read the show, write the plan, tweak a show scene's look); on the
 subscription backend each cycle is one short `claude` run and its session is dropped afterwards. On the API backend the
 system prompt and tool list are cached between runs.
+
+## What a reply costs
+
+Every step of a reply (each tool call, then the answer) sends the whole conversation to Claude again, so a change as
+small as one parameter is two steps that each read the conversation so far. Most of that comes from the prompt cache,
+which costs about a tenth of normal input; what costs is what the reply adds: new input (written to the cache) and
+output (about five times the price of input). That's why the panel shows the conversation's size, the new input and the
+output rather than a summed "in", and why the assistant edits scenes in place rather than resending them whole, and
+gets a short note of what is on screen when you reopen a conversation instead of looking everything up again.
+
+To see a subscription conversation's cost step by step, from Claude Code's own logs:
+
+```sh
+node scripts/assistant-usage.mjs            # the newest conversation
+node scripts/assistant-usage.mjs --list     # all of them
+```
+

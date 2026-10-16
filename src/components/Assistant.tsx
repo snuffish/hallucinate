@@ -357,7 +357,7 @@ export function Assistant() {
       )}
       <p id="ai-status" className="ai-status">
         <span>{status}</span>
-        {usage && totalTokens(usage) > 0 && <span id="ai-usage" title={usageTitle(usage, costLabel)}>This chat: {usageLabel(usage)}</span>}
+        {usage && totalTokens(usage) > 0 && <span id="ai-usage" title={usageTitle(usage, costLabel)}>This chat: {usageLabel(usage, { chat: true })}</span>}
       </p>
       <div className="ai-composer">
         <textarea id="ai-input" ref={composer} rows={2} value={view.draft} disabled={view.readOnly}
