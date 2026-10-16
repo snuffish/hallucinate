@@ -4,6 +4,7 @@
 
 import type { Scene } from './scene';
 import { BEAM_FAN } from './beam-fan';
+import { LIGHT_SHEET } from './light-sheet';
 import { RING_RUN } from './ring-run';
 import { SPECTRUM_RAYS } from './spectrum-rays';
 import { CONTOUR_LINES } from './contour-lines';
@@ -14,6 +15,7 @@ export { CATEGORIES, scene, type Scene, type SceneExtra, type SceneKind } from '
 
 export const SCENES: readonly Scene[] = [
   BEAM_FAN,      // 1
+  LIGHT_SHEET,   // 2
   RING_RUN,      // 3
   SPECTRUM_RAYS, // 5
   CONTOUR_LINES, // 6
