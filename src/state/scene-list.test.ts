@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { scene } from '../scenes';
 import { KEYS } from './persistence';
-import { buildSceneList, type CompileCheck, discardParked, loadUserScenes, paramKey, saveSceneEdit, saveUserScenes, sceneByName, userScene, type ParkedScenes } from './scene-list';
+import { buildSceneList, type CompileCheck, discardParked, loadUserScenes, paramKey, saveSceneEdit, saveUserScenes, sceneByName, takeRenameReport, userScene, type ParkedScenes } from './scene-list';
 
 // The scene list is the cross-window contract: indices must stay stable, so removal is a flag.
 describe('scene list', () => {
@@ -127,6 +127,62 @@ describe('scene list', () => {
     saveSceneEdit(s, list.scenes, list.parked);
     expect(s.edited).toBe(false);
     expect(JSON.parse(store.get(KEYS.sceneEdits)!)).toEqual({});
+  });
+
+  // A user scene saved before a built-in of the same name shipped: both stay reachable (#26).
+  describe('name clash on load', () => {
+    const body = 'void main() { fragColor = vec4(1.); }';
+    const save = (...names: string[]) => store.set(KEYS.userScenes, JSON.stringify(names.map((name) => ({ name, body }))));
+
+    it('renames a user scene named like a built-in to "Name (mine)" and persists it', () => {
+      save('Alpha', 'Other');
+      const list = build();
+      expect(list.scenes.filter((s) => s.user).map((s) => s.name)).toEqual(['Alpha (mine)', 'Other']);
+      expect(list.scenes.find((s) => s.name === 'Alpha (mine)')).toMatchObject({ id: 'user:Alpha (mine)', user: true });
+      expect(list.renamed).toEqual([{ from: 'Alpha', to: 'Alpha (mine)' }]);
+      expect(loadUserScenes().map((s) => s.name)).toEqual(['Alpha (mine)', 'Other']);
+      expect(build().renamed).toEqual([]);   // it doesn't rename again
+    });
+
+    it('moves its parameters, favourite, auto-switch exclusion and last-scene mark to the new name', () => {
+      save('Alpha', 'Other');
+      const glow = { GLOW: { v: 0.8, def: 0.5 } };
+      store.set(KEYS.params, JSON.stringify({ 'user:Alpha': glow, 'user:Other': glow, 'scene:Beta': glow }));
+      store.set(KEYS.library, JSON.stringify({ favs: ['Alpha', 'Other'], off: ['Beta', 'Alpha'] }));
+      store.set(KEYS.lastScene, 'user:Alpha');
+      build();
+      expect(JSON.parse(store.get(KEYS.params)!)).toEqual({ 'user:Alpha (mine)': glow, 'user:Other': glow, 'scene:Beta': glow });
+      expect(JSON.parse(store.get(KEYS.library)!)).toEqual({ favs: ['Alpha (mine)', 'Other'], off: ['Beta', 'Alpha (mine)'] });
+      expect(store.get(KEYS.lastScene)).toBe('user:Alpha (mine)');
+    });
+
+    it('leaves saved settings alone when nothing clashes', () => {
+      save('Other');
+      store.set(KEYS.library, JSON.stringify({ favs: ['Alpha'], off: [] }));   // the built-in's own favourite
+      store.set(KEYS.lastScene, 'scene:Alpha');
+      build();
+      expect(JSON.parse(store.get(KEYS.library)!)).toEqual({ favs: ['Alpha'], off: [] });
+      expect(store.get(KEYS.lastScene)).toBe('scene:Alpha');
+      expect(store.has(KEYS.params)).toBe(false);
+    });
+
+    // Shown once, even when the list is built twice (StrictMode) and only the first build renames.
+    it('says in one toast what every rename on that load was, and nothing when no name clashed', () => {
+      save('Alpha', 'Beta', 'Other');
+      build();
+      build();
+      expect(takeRenameReport()).toBe('Renamed your scene(s) that share a built-in\'s name: Alpha → Alpha (mine), Beta → Beta (mine)');
+      expect(takeRenameReport()).toBeNull();
+      build();
+      expect(takeRenameReport()).toBeNull();
+    });
+
+    it('numbers the new name when "Name (mine)" is taken too', () => {
+      save('Beta (mine)', 'Beta', 'Gamma (mine)', 'Gamma (mine 2)', 'Gamma');
+      const list = build();
+      expect(list.renamed).toEqual([{ from: 'Beta', to: 'Beta (mine 2)' }, { from: 'Gamma', to: 'Gamma (mine 3)' }]);
+      expect(loadUserScenes().map((s) => s.name)).toEqual(['Beta (mine)', 'Beta (mine 2)', 'Gamma (mine)', 'Gamma (mine 2)', 'Gamma (mine 3)']);
+    });
   });
 
   it('keys parameter values per scene kind', () => {
