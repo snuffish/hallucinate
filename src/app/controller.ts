@@ -262,12 +262,12 @@ export class AppController {
   }
 
   // The assistant floats in its own bubble and can stay open next to any overlay. `chatId` opens it on
-  // that conversation (the bubble's peek card was clicked).
+  // that conversation (the bubble's peek card was clicked). The session clears the peek once it's open.
   toggleAssistant(open = !this.ui.get().assistantOpen, chatId?: string): void {
-    if (chatId) this.ui.set({ assistantFocus: chatId, assistantPeek: null });
+    if (chatId) this.ui.set({ assistantFocus: chatId });
     if (this.ui.get().assistantOpen === open) return;
     if (!open && document.activeElement instanceof HTMLElement && document.activeElement.closest('#ai')) document.activeElement.blur();
-    this.ui.set({ assistantOpen: open, help: null, ...(open && { assistantPeek: null }) });
+    this.ui.set({ assistantOpen: open, help: null });
     this.wake();
   }
 

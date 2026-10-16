@@ -2,7 +2,9 @@
 // run at once, each on its own Chat (chat.ts), and they keep running while the panel shows
 // another one or is closed. The session keeps the history index, decides which conversation may
 // start a run (the subscription backend runs a `claude` process per run), and publishes what the
-// bubble needs (running, unread, the peek card) to the UI store.
+// bubble needs (running, unread, the peek card) to the UI store. It is the only writer of the peek:
+// a reply with the panel closed shows it; opening the panel, reading that conversation or dismissing
+// the card (its timer, its ×) clears it.
 //
 // Shared between conversations: one tool lock (their tools act on one app) and one undo stack (an
 // undo closure restores a snapshot, so only the newest change can be undone safely).
@@ -252,7 +254,7 @@ export class AssistantSession {
     off.push(this.app.ui.subscribe(() => {
       const ui = this.app.ui.get();
       if (ui.assistantFocus) { this.app.ui.set({ assistantFocus: null }); this.select(ui.assistantFocus); }
-      if (ui.assistantOpen) { this.markRead(this.view.activeId); if (ui.assistantPeek) this.app.ui.set({ assistantPeek: null }); }
+      if (ui.assistantOpen) { this.markRead(this.view.activeId); this.dismissPeek(); }
     }));
     void this.open(this.view.activeId);
     const detach = () => { for (const f of off.splice(0)) f(); };
@@ -432,7 +434,8 @@ export class AssistantSession {
     if (this.app.ui.get().assistantPeek?.chatId === id) this.app.ui.set({ assistantPeek: null });
   }
 
-  dismissPeek(): void { this.app.ui.set({ assistantPeek: null }); }
+  // The card goes; the reply stays unread.
+  dismissPeek(): void { if (this.app.ui.get().assistantPeek) this.app.ui.set({ assistantPeek: null }); }
 
   dispose(): void {
     for (const c of this.chats.values()) c.dispose();

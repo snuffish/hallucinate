@@ -61,6 +61,7 @@ function unplaceChat(sizedH: number | null): void {
 // The card beside the bubble when a reply lands with the panel closed. Click opens that conversation.
 function Peek({ bubble }: { bubble: HTMLElement | null }) {
   const app = useApp();
+  const session = useSessions().assistant;
   const peek = useUI((ui) => ui.assistantPeek);
   const card = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState(false);
@@ -75,9 +76,9 @@ function Peek({ bubble }: { bubble: HTMLElement | null }) {
   }, [peek, bubble]);
   useEffect(() => {
     if (!peek || hover) return;
-    const t = setTimeout(() => app.ui.set({ assistantPeek: null }), 6000);
+    const t = setTimeout(() => session.dismissPeek(), 6000);
     return () => clearTimeout(t);
-  }, [app, peek, hover]);
+  }, [session, peek, hover]);
   if (!peek) return null;
   return (
     <div id="ai-peek" ref={card} className={`ai-peek${peek.error ? ' error' : ''}`} role="status" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
@@ -85,7 +86,7 @@ function Peek({ bubble }: { bubble: HTMLElement | null }) {
         <strong>{peek.title}</strong>
         <span>{peek.text}</span>
       </button>
-      <button type="button" className="icon" aria-label="Dismiss" title="Dismiss" onClick={() => app.ui.set({ assistantPeek: null })}>×</button>
+      <button type="button" className="icon" aria-label="Dismiss" title="Dismiss" onClick={() => session.dismissPeek()}>×</button>
     </div>
   );
 }

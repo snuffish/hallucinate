@@ -83,6 +83,34 @@ function session(seen: Seen[], extra: { transcripts?: TranscriptBackend; gate?: 
 }
 
 describe('assistant conversations', () => {
+  it('a peek can be dismissed, the reply staying unread, and clicking one opens its conversation, read', async () => {
+    const { app, s } = session([]);
+    const a = s.active;
+    await a.load();
+    a.send('first');
+    await until(() => !a.running && a.view.messages.length === 2);
+    expect(app.ui.get().assistantPeek).toMatchObject({ chatId: a.id });
+    s.dismissPeek();
+    expect(app.ui.get().assistantPeek).toBeNull();
+    expect(s.view.live[a.id]!.unread).toBe(true);
+
+    s.newChat();
+    await until(() => s.active !== a);
+    const b = s.active;
+    await b.load();
+    b.send('second');
+    await until(() => !b.running && b.view.messages.length === 2);
+    expect(app.ui.get().assistantPeek).toMatchObject({ chatId: b.id });
+    // A click on a's line in the list does what a peek click does (toggleAssistant): focus it, then open.
+    app.ui.set({ assistantFocus: a.id });
+    app.ui.set({ assistantOpen: true });
+    await until(() => s.view.activeId === a.id);
+    expect(s.view.live[a.id]!.unread).toBe(false);
+    expect(app.ui.get().assistantPeek).toBeNull();
+    expect(app.ui.get().assistantUnread).toBe(1);   // b's reply is still unread
+    s.dispose();
+  });
+
   it('runs two conversations at once; each counts its tokens; replies with the panel closed are unread and peek', async () => {
     const seen: Seen[] = [];
     const gate = { release: () => {}, wait: Promise.resolve() };
