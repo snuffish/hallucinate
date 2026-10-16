@@ -39,7 +39,7 @@ float segment(vec2 p, vec2 a, vec2 b) {
 
 void main() {
   vec2 p = centered();
-  float px = 1. / uRes.y;
+  float px = onePixel();
   int s = int(mod(floor(uTicks / 4.), 4.));
   int n = count(s);
   float L = edgeLen(s);
@@ -47,7 +47,7 @@ void main() {
   float t = uTime * SPIN;
   float ca = cos(t), sa = sin(t), cb = cos(t * .63 + .8), sb = sin(t * .63 + .8);
   mat3 m = mat3(ca, 0., -sa, 0., 1., 0., sa, 0., ca) * mat3(1., 0., 0., 0., cb, sb, 0., -sb, cb);
-  float size = SIZE * (.85 + .3 * min(uBass, 1.2)) * (1. + .12 * (1. - uTick) * (1. - uTick) * step(mod(uTicks, 4.), .5));
+  float size = SIZE * (.85 + .3 * min(uBass, 1.2)) * (1. + .12 * tickFlash() * step(mod(uTicks, 4.), .5));
 
   vec3 col = vec3(0.);
   if (length(p) > size / (1. - DEPTH) + 40. * px) { fragColor = vec4(col, 1.); return; }
@@ -83,7 +83,7 @@ void main() {
   // The tick spark: a hot point on one vertex that fades through the tick.
   for (int i = 0; i < 12; i++) {
     if (i >= n) break;
-    float hot = float(i) == spark ? 1.8 * (1. - uTick) * (1. - uTick) : 0.;
+    float hot = float(i) == spark ? 1.8 * tickFlash() : 0.;
     col += rainbow(uHue + .05) * beam(length(p - v2[i]), 2.5 * w) * (.35 + hot);
   }
   fragColor = vec4(col, 1.);

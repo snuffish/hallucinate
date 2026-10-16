@@ -15,7 +15,7 @@ const float KICK = .8;       // @param min=0 max=1 label="Kick flash"
 
 void main() {
   vec2 p = centered();
-  float px = 1. / uRes.y;
+  float px = onePixel();
 
   // An island: a broad hill, roughened by drifting noise, that falls below sea level (0) before the edges.
   float hill = 1. - 1.75 * length(p * vec2(.8, 1.25));
@@ -23,7 +23,7 @@ void main() {
   float h = (hill + ROUGH * (fbm(w) - .5)) * (.75 + LIFT * .5 * min(uBass, 1.5));
 
   // The contours climb a quarter of a level on each tick: quickly at its start, then they rest.
-  float climb = (uTicks + smoothstep(0., .3, uTick)) * .25;
+  float climb = (easedTicks()) * .25;
   float t = h * LEVELS - climb;
   float k = floor(t + .5);                                 // the nearest contour
   float grad = max(length(vec2(dFdx(t), dFdy(t))), 1e-4);  // contours per pixel

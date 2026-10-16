@@ -138,7 +138,9 @@ export function Editor() {
           <dt><code>spec(x) wave(x)</code></dt><dd>spectrum (0…1, bass→treble) and waveform (−1…1) at x</dd>
           <dt><code>rainbow(t) neon(t)</code></dt><dd>colour palettes, repeat every 1.0</dd>
           <dt><code>rot(a) noise(p) fbm(p) hash(p)</code></dt><dd>rotate a vec2, smooth noise, layered noise, random</dd>
-          <dt><code>beam(d, w)</code></dt><dd>a thin laser line at distance d: a hard core w wide and a short halo; give w in pixels, as <code>2. / uRes.y</code></dd>
+          <dt><code>beam(d, w)</code></dt><dd>a thin laser line at distance d: a hard core w wide and a short halo; give w in pixels, as <code>2. * onePixel()</code></dd>
+          <dt><code>onePixel()</code></dt><dd>the size of one pixel in <code>centered()</code> units</dd>
+          <dt><code>tickFlash() easedTicks()</code></dt><dd>1 on each tick, fading to 0 by the next; <code>uTicks</code> easing into each new tick, to step things in time without a jump</dd>
           <dt><code>fragColor</code></dt><dd>write your final colour here</dd>
           <dt><code>media(p) luma(c) untone(c)</code></dt><dd>the dropped image / video at p (fills the screen, mirrored beyond its edges); the brightness of a colour; wrap your final colour in <code>untone()</code> to show a picture in its true colours</dd>
           <dt><code>// @param</code></dt><dd>put after a top-level <code>uniform</code> or <code>const</code> to get a live control in the Parameters overlay:<br />
