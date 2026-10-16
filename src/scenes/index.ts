@@ -10,6 +10,7 @@ import { WIRE_SOLID } from './wire-solid';
 import { SPECTRUM_RAYS } from './spectrum-rays';
 import { CONTOUR_LINES } from './contour-lines';
 import { POINT_STORM } from './point-storm';
+import { SCAN_TRACE } from './scan-trace';
 
 export { COMMON } from './header';
 export { TEMPLATE } from './template';
@@ -23,4 +24,5 @@ export const SCENES: readonly Scene[] = [
   SPECTRUM_RAYS, // 5
   CONTOUR_LINES, // 6
   POINT_STORM,   // 7
+  SCAN_TRACE,    // 8
 ];
