@@ -14,6 +14,7 @@ brightens more than a quarter of the frame. The set is still growing; the number
 | 1 | **Beam Fan** | Beams | A fan of thin beams rising from the bottom edge. It sweeps, opens with the bass, strobes on kicks and chases one beam along on each tick. |
 | 2 | **Light Sheet** | Beams | A laser ceiling: scan lines receding to a horizon, rippling with the spectrum (near lines = bass, far = treble). A bright front runs out to the horizon on each tick, a kick sends a wave from the near lines to the far ones, and haze glows around the lines. |
 | 3 | **Ring Run** | Geometry | Thin polygon rings flying towards you. A new ring is born on each tick, the rings glow with the spectrum and flare on kicks; the polygon and ring speed are parameters. |
+| 4 | **Wire Solid** | Geometry | A wireframe polyhedron of beams turning in perspective. It becomes the next solid every 4 ticks, swells with the bass, a spark steps from vertex to vertex on each tick, and its front edges flare on kicks. |
 | 5 | **Spectrum Rays** | Beams | A star of beams from the centre, one per frequency (bass at the top, treble at the bottom), each as long as its band is loud. It turns slowly, steps one ray on each tick and strobes a third of its rays on kicks. |
 | 6 | **Contour Lines** | Fields | Glowing contour lines over a slowly drifting island of terrain. The bass lifts the land, the lines climb a step on each tick, and a kick lights every third one. |
 
