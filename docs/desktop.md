@@ -25,6 +25,9 @@ tab keeps them as run artifacts.
   Dock or a menu. The app's own settings are read from your shell profile too: `CLAUDE_BIN` and `YTDLP` point at a
   specific binary, `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN`) selects the API backend, and the `ASSISTANT_*`
   settings apply. Nothing else is taken from the shell, and a value the app was started with wins.
+- **Settings → Assistant** sets the connection, model and effort without touching your shell profile, and keeps an API
+  key encrypted with the system keychain (macOS Keychain, Windows DPAPI, the Linux secret service). A shell variable
+  still wins and locks that field. On Linux without a keyring the key field is off; use `ANTHROPIC_API_KEY`.
 - **Your data** (scenes, shows, settings, assistant conversations) lives in the app's own profile, separate from the
   browser's and from `npm run desktop`'s. Move a setup between them with *☰ → Export scenes & settings* and *Import…*
   (see [Back up & move your setup](backup.md)); assistant conversations don't move that way, but each one can be

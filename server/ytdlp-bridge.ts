@@ -16,7 +16,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, extname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const YTDLP = process.env.YTDLP || 'yt-dlp';
+export const YTDLP = process.env.YTDLP || 'yt-dlp';
 const TYPES: Record<string, string> = {
   '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.opus': 'audio/ogg', '.ogg': 'audio/ogg',
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska',

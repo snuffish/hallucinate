@@ -316,6 +316,9 @@ export class AppController {
     this.wake();   // the idle delay may have changed
   }
 
+  // Settings → Assistant saved: the assistant's panel asks the server for the backend and model again.
+  assistantConfigChanged(): void { this.ui.set({ assistantConfig: this.ui.get().assistantConfig + 1 }); }
+
   // The "Press ? for help" toast shows again at the next sound source.
   resetHelpHint(): void { remove(KEYS.helpHint); }
 

@@ -2,15 +2,15 @@
 // data. A preference is a default, never a second control for something live: the Look widget keeps
 // Resolution, the transport keeps volume and tempo.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { z } from 'zod';
+import { useRef, useState, type ReactNode } from 'react';
 import { useApp, usePrefs, useUI } from '../app/AppContext';
-import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
+import { STATIC_DEMO } from '../app/static-demo';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { LOOK_RANGES } from '../state/app-state';
 import { APPLIES, IDLE_SECONDS, PIXEL_RATIOS, setShowThinking, useShowThinking, type PrefKey } from '../state/prefs';
 import { HelpButton } from './Help';
+import { AssistantSettings } from './SettingsAssistant';
 
 const SECTIONS = { display: 'Display', audio: 'Audio', interface: 'Interface', assistant: 'Assistant', data: 'Data' } as const;
 type SectionId = keyof typeof SECTIONS;
@@ -44,7 +44,7 @@ export function Settings() {
           {section === 'display' && <DisplaySection />}
           {section === 'audio' && <AudioSection />}
           {section === 'interface' && <InterfaceSection />}
-          {section === 'assistant' && open && <AssistantSection />}
+          {section === 'assistant' && open && <AssistantSettings />}
           {section === 'data' && <DataSection />}
         </div>
       </div>
@@ -151,31 +151,6 @@ function InterfaceSection() {
   );
 }
 
-const InfoSchema = z.object({ backend: z.enum(['api', 'claude-code', 'none']), model: z.string().nullable().optional(), setup: z.string().optional() });
-const BACKENDS = { 'api': 'Anthropic API key', 'claude-code': 'Your Claude subscription (Claude Code)', 'none': 'Not set up' } as const;
-
-function AssistantSection() {
-  const [info, setInfo] = useState<z.infer<typeof InfoSchema> | null>(null);
-  useEffect(() => {
-    if (STATIC_DEMO) return;
-    fetch('/api/assistant/info').then((r) => r.json()).then((j) => { const p = InfoSchema.safeParse(j); if (p.success) setInfo(p.data); }).catch(() => {});
-  }, []);
-  if (STATIC_DEMO) return <><h3>Assistant</h3><p className="settings-note">{STATIC_DEMO_NOTE}</p></>;
-  return (
-    <>
-      <h3>Assistant</h3>
-      {!info ? <p className="settings-note">Asking the server…</p> : (
-        <dl className="settings-facts">
-          <dt>Backend</dt><dd id="settings-backend">{BACKENDS[info.backend]}</dd>
-          {info.model && <><dt>Model</dt><dd>{info.model}</dd></>}
-        </dl>
-      )}
-      {info?.setup && <p className="settings-note error">{info.setup}</p>}
-      <p className="settings-note">The model, effort and backend are set with environment variables (<code>ASSISTANT_MODEL</code>, <code>ASSISTANT_EFFORT</code>, <code>ANTHROPIC_API_KEY</code>); see docs/assistant.md.</p>
-    </>
-  );
-}
-
 function DataSection() {
   const app = useApp();
   const file = useRef<HTMLInputElement>(null);
@@ -197,7 +172,7 @@ function DataSection() {
           app.toast('Recently played cleared', 2000);
         }}>Clear recently played</button>
         <button id="pref-reset" onClick={() => {
-          if (!confirm('Reset every setting on this page to its default? Your scenes, show and layout stay as they are.')) return;
+          if (!confirm('Reset the Display, Audio and Interface settings to their defaults? Your scenes, show, layout and the Assistant settings stay as they are.')) return;
           app.resetPrefs();
           app.toast('Settings reset to defaults', 2000);
         }}>Reset settings to defaults</button>

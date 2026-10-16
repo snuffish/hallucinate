@@ -2,7 +2,7 @@
 // Run with `npm run test:e2e:desktop`, which builds dist/ and dist-desktop/ first.
 
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -36,6 +36,23 @@ test('desktop: serves the app and the API from its own fixed origin', async () =
   const info = await page.evaluate(() => fetch('/api/assistant/info').then((r) => r.json()));
   expect(info).toMatchObject({ backend: 'api' });
   expect(await page.title()).toBe('Hallucinate');
+});
+
+// No API key is saved here: that would add an entry to the real system keychain.
+test('desktop: Settings → Assistant saves into the app\'s profile; the environment still wins', async () => {
+  const settings = (body?: object) => page.evaluate((b) => fetch('/api/settings', b
+    ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }
+    : undefined).then(async (r) => ({ status: r.status, json: await r.json() })), body);
+  const before = await settings();
+  expect(before.status).toBe(200);
+  expect(before.json.backend).toMatchObject({ value: 'api', source: 'env', locked: true });   // ASSISTANT_BACKEND above
+  expect(typeof before.json.apiKey.editable).toBe('boolean');   // whether this OS has a keychain to encrypt with
+
+  expect((await settings({ backend: 'claude-code' })).status).toBe(409);
+  const saved = await settings({ effort: 'low' });
+  expect(saved.status).toBe(200);
+  expect(saved.json.effort).toMatchObject({ value: 'low', source: 'settings' });
+  expect(JSON.parse(readFileSync(join(profile, 'config.json'), 'utf8'))).toEqual({ v: 1, effort: 'low' });
 });
 
 test('desktop: plays the demo beat without a click-to-start and lists displays', async () => {

@@ -235,6 +235,7 @@ export function Assistant() {
   const undo = useStore(session.undo.store, (u) => u);
   const [info, setInfo] = useState<Info | null>(STATIC_DEMO ? { backend: 'none', setup: STATIC_DEMO_NOTE } : null);
   const [listOpen, setListOpen] = useState(false);
+  const configVersion = useUI((ui) => ui.assistantConfig);
   const [searchTick, setSearchTick] = useState(0);
   const showThinking = useShowThinking();
   const [now, setNow] = useState(() => Date.now());
@@ -244,7 +245,7 @@ export function Assistant() {
   useEffect(() => {
     if (STATIC_DEMO) return;
     fetch('/api/assistant/info').then((r) => r.json()).then((j) => { const p = InfoSchema.safeParse(j); if (p.success) { setInfo(p.data); session.setBackend(p.data.backend); } }).catch(() => {});
-  }, [session]);
+  }, [session, configVersion]);
 
   // Stick to the bottom while new text arrives, unless the user scrolled up to read.
   const pinned = useRef(true);

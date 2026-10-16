@@ -103,6 +103,83 @@ test.describe('on a 2× screen', () => {
   });
 });
 
+// The server's side (precedence, the keychain, locking) is unit-tested in server/settings-route.test.ts;
+// here it is stubbed, so a test never writes the developer's real ~/.config/hallucinate.
+function settingsServer(page: Page, initial: Record<string, unknown> = {}) {
+  const f = (value: unknown, source = 'default') => ({ value, source, locked: source === 'env' });
+  const state = {
+    backend: f('auto'), model: f(null), effort: f('low', 'env'), directorEffort: f('low'),
+    apiKey: { set: false, source: 'default', locked: false, editable: true, unreadable: false },
+    detected: 'claude-code', canWrite: true,
+    options: { efforts: ['low', 'medium', 'high', 'xhigh', 'max'], apiModels: ['claude-opus-5-5', 'claude-haiku-5-5'], defaultModel: 'claude-opus-5-5' },
+    env: { backend: 'ASSISTANT_BACKEND', model: 'ASSISTANT_MODEL', effort: 'ASSISTANT_EFFORT', directorEffort: 'ASSISTANT_DIRECTOR_EFFORT', apiKey: 'ANTHROPIC_API_KEY' },
+    paths: { claudeBin: 'claude', ytdlp: 'yt-dlp' },
+    ...initial,
+  };
+  const posts: Record<string, unknown>[] = [];
+  let infoRequests = 0;
+  void page.route('**/api/assistant/info', (route) => { infoRequests++; return route.fulfill({ json: { backend: state.detected, model: null } }); });
+  void page.route('**/api/settings', async (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: state });
+    const patch = route.request().postDataJSON() as Record<string, unknown>;
+    posts.push(patch);
+    if ('model' in patch && patch.model === 'gpt-5') return route.fulfill({ status: 400, json: { error: '"gpt-5" isn\'t a model the Anthropic API offers.' } });
+    if ('backend' in patch) { state.backend = f(patch.backend ?? 'auto', patch.backend ? 'settings' : 'default'); state.detected = patch.backend === 'api' ? 'api' : 'claude-code'; }
+    if ('model' in patch) state.model = f(patch.model, patch.model ? 'settings' : 'default');
+    if ('apiKey' in patch) state.apiKey = { ...state.apiKey, set: patch.apiKey !== null, source: patch.apiKey ? 'settings' : 'default' };
+    return route.fulfill({ json: state });
+  });
+  return { posts, infoRequests: () => infoRequests };
+}
+
+test('assistant: change the connection and model; the environment locks what it sets', async ({ page }) => {
+  const server = settingsServer(page);
+  await openApp(page);
+  await page.keyboard.press(',');
+  await page.locator('#settings-tab-assistant').click();
+  await expect(page.locator('#settings-detected')).toContainText('your Claude subscription');
+  await expect(page.locator('#ai-effort')).toBeDisabled();
+  await expect(page.locator('#settings-pane')).toContainText('Set by ASSISTANT_EFFORT');
+
+  const before = server.infoRequests();
+  await page.locator('#ai-backend').selectOption('api');
+  await expect(page.locator('#settings-detected')).toContainText('the Anthropic API');
+  expect(server.posts.at(-1)).toEqual({ backend: 'api' });
+  await expect.poll(server.infoRequests).toBeGreaterThan(before);   // the assistant's panel asks again
+
+  await page.locator('#ai-model').fill('gpt-5');
+  await page.locator('#ai-model').press('Enter');
+  await expect(page.getByRole('alert')).toContainText('isn\'t a model the Anthropic API offers');
+  await page.locator('#ai-model').fill('claude-haiku-5-5');
+  await page.locator('#ai-model').press('Enter');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect(server.posts.at(-1)).toEqual({ model: 'claude-haiku-5-5' });
+});
+
+test('assistant: an API key is sent once, then only shown as saved', async ({ page }) => {
+  const server = settingsServer(page);
+  await openApp(page);
+  await page.keyboard.press(',');
+  await page.locator('#settings-tab-assistant').click();
+  await page.locator('#ai-key').fill('sk-ant-api03-test-key-0123456789');
+  await page.locator('#ai-key').press('Enter');
+  await expect(page.locator('#ai-key-status')).toHaveText('Saved, encrypted on this computer.');
+  await expect(page.locator('#ai-key')).toHaveCount(0);
+  expect(server.posts.at(-1)).toEqual({ apiKey: 'sk-ant-api03-test-key-0123456789' });
+  await page.locator('#ai-key-remove').click();
+  await expect(page.locator('#ai-key')).toBeVisible();
+  expect(server.posts.at(-1)).toEqual({ apiKey: null });
+});
+
+test('assistant: a server without a keychain points to the environment instead', async ({ page }) => {
+  settingsServer(page, { apiKey: { set: false, source: 'default', locked: false, editable: false, unreadable: false } });
+  await openApp(page);
+  await page.keyboard.press(',');
+  await page.locator('#settings-tab-assistant').click();
+  await expect(page.locator('#ai-key-status')).toContainText('ANTHROPIC_API_KEY');
+  await expect(page.locator('#ai-key')).toHaveCount(0);
+});
+
 test('start resolution seeds the Look slider at the next start', async ({ page }) => {
   await openApp(page);
   await page.keyboard.press(',');

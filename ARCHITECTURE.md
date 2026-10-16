@@ -103,7 +103,8 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
    TanStack's own Claude Code adapter is not used.
 9. **The server handlers are host-agnostic.** `server/routes.ts` lists the `/api` handlers once; the Vite dev /
    preview server and the desktop app's own server both mount that list. Anything server-side goes there, not
-   into a Vite-only hook.
+   into a Vite-only hook. The assistant's settings come from one `ConfigStore` (`server/config.ts`) passed to that list:
+   a file in the desktop app's profile with the keychain for an API key, else `~/.config/hallucinate` without one.
 10. **Only the app may call `/api`.** Every route is wrapped in `guarded()` (`server/guard.ts`): the Host must be
    a loopback name or an IP literal (or listed in `ALLOWED_HOSTS`), a browser request must come from the app's
    own origin, and a POST must be JSON. The CLI reaches the MCP endpoint at the server's own socket address,
@@ -160,6 +161,11 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
   controller's `applyPrefs`, and give it a control in `src/components/Settings.tsx`. A preference is a default that seeds
   live state, never a second control for it. One that reaches every renderer (`all-renderers`) also goes into
   `outputPrefs`, so projector windows get it; the prefs test fails otherwise. Preferences are not exported.
+- **A server setting** (how the server reaches Claude): add it to `StoredConfigSchema` and `effectiveConfig` in
+  `server/config.ts` (the environment wins, then Settings, then the default), accept it in the patch schema of
+  `server/settings-route.ts` and give it a control in `src/components/SettingsAssistant.tsx`. Never make a program path
+  settable over HTTP: the server runs it, and `/api` admits non-browser clients. Writes are allowed from a loopback host
+  only (`isLoopbackHost`).
 
 ## Checks
 

@@ -4,10 +4,11 @@
 
 Open Settings with **⚙** in the Hallucinate widget, **☰ → Settings…**, or the **,** key. Esc closes it.
 
-Settings hold how *this computer* renders, listens and shows the controls. They are defaults, not live controls: the
-Look widget keeps the Resolution slider and the player keeps volume and tempo. They are kept in this browser (or in the
-[desktop app](desktop.md)'s own profile) and are **left out of Export**: a setup moved to a projector laptop shouldn't
-bring the GPU and microphone settings of the computer it came from.
+Settings hold how *this computer* renders, listens and shows the controls, and how the assistant reaches Claude. They
+are defaults, not live controls: the Look widget keeps the Resolution slider and the player keeps volume and tempo.
+Display, Audio and Interface are kept in this browser (or in the [desktop app](desktop.md)'s own profile), Assistant
+on the local server. None of them are in Export: a setup moved to a projector laptop shouldn't bring the GPU and
+microphone settings of the computer it came from.
 
 ## Display
 
@@ -40,13 +41,24 @@ hint.
 
 ## Assistant
 
-Shows which way Hallucinate reaches Claude and with which model. See [AI assistant](assistant.md#setup) for setting it up.
+These live on the local server, not in the browser, and apply to the next reply without a restart.
+
+| Setting | What it does |
+| --- | --- |
+| Connection | Automatic (an API key if there is one, else Claude Code), the Anthropic API, or your Claude subscription through Claude Code. |
+| Model | Empty for the default (`claude-opus-5-5` on the API, Claude Code's own otherwise). The API takes Anthropic's model ids; Claude Code also takes aliases like `opus`. |
+| Effort, Director effort | `low` … `max`. Lower is faster and uses fewer tokens. The Director's follows Effort unless set. |
+| API key | Desktop app only: encrypted with your system's keychain and never shown again. With `npm run dev`, export `ANTHROPIC_API_KEY`. |
+
+An environment variable the server was started with (`ASSISTANT_MODEL`, `ANTHROPIC_API_KEY`, …) wins, and Settings shows
+that field as locked. The `claude` and `yt-dlp` programs are shown but can only be set with `CLAUDE_BIN` and `YTDLP`.
+Assistant settings can only be changed on the computer Hallucinate runs on. See [AI assistant](assistant.md#setup).
 
 ## Data
 
 *Export scenes & settings* and *Import…* are the same as in the ☰ menu ([Back up & move your setup](backup.md)).
 *Clear recently played* forgets the SoundCloud and YouTube pickers' recent lists. *Reset settings to defaults* resets
-everything on this page; your scenes, show and layout stay as they are.
+Display, Audio and Interface; your scenes, show, layout and the Assistant settings stay as they are.
 
 ## Several tabs
 

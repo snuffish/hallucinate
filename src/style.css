@@ -637,6 +637,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 .settings-pane select option { background: #1a1326; }
 .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.settings-inline input { flex: 1; min-width: 180px; }
+.settings-pane code { font-size: 11.5px; }
 .settings-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
 .settings-facts dt { color: var(--muted); }
 .settings-facts dd { margin: 0; }

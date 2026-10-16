@@ -7,8 +7,9 @@
 // HALLUCINATE_DEV_URL (set by `npm run desktop`) loads the Vite dev server instead, which hosts the API itself.
 // HALLUCINATE_USER_DATA and HALLUCINATE_PORT give the desktop e2e test its own profile and port.
 
-import { app, BrowserWindow, desktopCapturer, dialog, session, shell, systemPreferences, type WebContents } from 'electron';
+import { app, BrowserWindow, desktopCapturer, dialog, safeStorage, session, shell, systemPreferences, type WebContents } from 'electron';
 import { join } from 'node:path';
+import { fileConfigStore, type Secrets } from '../server/config';
 import { fixEnv } from './env';
 import { PREFERRED_PORT, startServer, type AppServer } from './server';
 
@@ -46,7 +47,8 @@ async function start(): Promise<void> {
   } else {
     await fixEnv();   // so `claude`, `yt-dlp` and the shell's API key are found when the app was started from the Dock / a menu
     // yt-dlp borrows this process as its JavaScript runtime (node:<execPath>); make the Electron binary act as Node.
-    server = await startServer({ dist: join(ROOT, 'dist'), preferredPort: PORT, env: { ELECTRON_RUN_AS_NODE: '1' } });
+    const config = fileConfigStore(join(app.getPath('userData'), 'config.json'), keychain());
+    server = await startServer({ dist: join(ROOT, 'dist'), preferredPort: PORT, env: { ELECTRON_RUN_AS_NODE: '1' }, config });
     appUrl = `http://127.0.0.1:${server.port}`;
   }
   setUpSession();
@@ -58,6 +60,18 @@ async function start(): Promise<void> {
       detail: 'Your scenes, shows and settings belong to the usual port and are not visible now; nothing is lost. Close whatever uses that port and restart Hallucinate to get them back.',
     });
   }
+}
+
+// The assistant's settings (Settings → Assistant) keep an API key encrypted with the OS keychain. Linux
+// without a keyring has none (Electron's `basic_text` fallback uses a fixed password, so it doesn't
+// count): the key field is then off and ANTHROPIC_API_KEY in the shell still works.
+function keychain(): Secrets | null {
+  if (!safeStorage.isEncryptionAvailable()) return null;
+  if (process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text') return null;
+  return {
+    encrypt: (plain) => safeStorage.encryptString(plain).toString('base64'),
+    decrypt: (stored) => safeStorage.decryptString(Buffer.from(stored, 'base64')),
+  };
 }
 
 function sameOrigin(url: string): boolean {

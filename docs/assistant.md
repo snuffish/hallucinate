@@ -50,18 +50,31 @@ export ANTHROPIC_API_KEY=sk-ant-…
 npm run dev
 ```
 
+In the [desktop app](desktop.md) you can also paste the key into **Settings → Assistant** instead: it is encrypted
+with your system's keychain, kept in the app's profile and never shown again.
+
 On the subscription backend Claude Code runs with **no built-in tools, none of your settings and a throw-away working
 directory**: it can only use this app's tools (eight for scenes, nine for the studio).
 
-## Environment variables
+## Settings and environment variables
 
-| Variable | What it does |
-| --- | --- |
-| `ASSISTANT_MODEL` | the model (default `claude-opus-5-5` on the API; the CLI's default otherwise) |
-| `ASSISTANT_EFFORT` | `low` … `max`, default `high`; lower is faster and cheaper |
-| `ASSISTANT_DIRECTOR_EFFORT` | the effort of the studio director's cycles; same as `ASSISTANT_EFFORT` unless set |
-| `ASSISTANT_BACKEND` | `api` or `claude-code` to force one backend |
-| `ASSISTANT_DEBUG` | `1` logs the CLI arguments and tool traffic |
+**Settings → Assistant** (⚙ or `,`) sets the connection, the model and the efforts, and shows which way Hallucinate
+reaches Claude right now. A change applies to the next reply, without a restart. The same can be set with environment
+variables; one the server was started with wins, and Settings shows that field as locked.
+
+| Variable | Settings | What it does |
+| --- | --- | --- |
+| `ASSISTANT_MODEL` | Model | the model (default `claude-opus-5-5` on the API; the CLI's default otherwise, which also takes aliases like `opus`) |
+| `ASSISTANT_EFFORT` | Effort | `low`, `medium`, `high`, `xhigh` or `max`, default `high`; lower is faster and cheaper |
+| `ASSISTANT_DIRECTOR_EFFORT` | Director effort | the effort of the studio director's cycles; same as the effort unless set |
+| `ASSISTANT_BACKEND` | Connection | `api` or `claude-code` to force one backend |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` | API key (desktop app) | selects the API backend |
+| `CLAUDE_BIN`, `YTDLP` | shown only | the `claude` and `yt-dlp` programs to run; never settable from the page, since the server runs them |
+| `ASSISTANT_DEBUG` | | `1` logs the CLI arguments and tool traffic |
+
+Settings saved from the page live in `~/.config/hallucinate/config.json` (`%APPDATA%\hallucinate` on Windows) for
+`npm run dev`, and in the app's profile for the desktop app. They can only be changed from the computer the server runs
+on: with `HOST=0.0.0.0`, a device on the network sees them but can't change them.
 
 The director's cycles get only the show tools (read the show, write the plan, tweak a show scene's look); on the
 subscription backend each cycle is one short `claude` run and its session is dropped afterwards. On the API backend the
