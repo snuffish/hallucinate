@@ -160,12 +160,11 @@ export const HELP_TOPICS = {
 export type HelpTopicId = keyof typeof HELP_TOPICS;
 
 // The sheet's group order.
-export const SHEET_GROUPS: HotkeyDef['group'][] = ['Playback', 'Scenes', 'Look', 'Panels', 'Studio', 'Game'];
+export const SHEET_GROUPS: HotkeyDef['group'][] = ['Playback', 'Scenes', 'Look', 'Panels', 'Studio'];
 
 // Where a shortcut works, for keys that only apply in one place.
 const WHEN_NOTES: Partial<Record<HotkeyWhen, string>> = {
   library: 'in the library',
-  game: 'in Beat Racer',
   studio: 'in the studio',
   nodesOpen: 'in the visual maker',
   paramsVisible: 'while parameters show',

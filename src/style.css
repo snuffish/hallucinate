@@ -282,31 +282,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .crash-actions button { flex: 1; }
 
 
-/* Beat Racer HUD */
-.hud {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  text-align: right;
-  pointer-events: none;
-  text-shadow: 0 0 12px rgba(255, 79, 216, 0.8);
-}
-.hud-score { font-size: 44px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-#hud-combo { color: #ffd84f; min-height: 1.4em; }
-#hud-lives { font-size: 20px; color: #ff4f7b; }
-#hud-best { color: var(--muted); font-size: 12px; }
-.hud-over {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-content: center;
-  text-align: center;
-  font-size: clamp(36px, 8vw, 72px);
-  font-weight: 800;
-}
-.hud-over[hidden] { display: none; }
-.hud-over small { display: block; font-size: 16px; font-weight: 400; color: var(--muted); }
-
 /* Performance overlay (Shift+P). Inset by the docks like the other overlays; only its button takes clicks. */
 .perf {
   z-index: var(--z-perf);

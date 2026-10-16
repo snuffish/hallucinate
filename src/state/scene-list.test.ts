@@ -15,13 +15,14 @@ describe('scene list', () => {
   const failing = (frag: string) => (frag.includes('nope') ? 'ERROR: 0:1: bad' : null);
   const noParked = (): ParkedScenes => ({ userScenes: [], sceneEdits: {} });
 
-  it('appends built-ins, the two editor slots, then saved scenes, and keys the first ten visuals', () => {
+  it('appends built-ins, the two editor slots (no game slot), then saved scenes, and keys the first ten visuals', () => {
     store.set(KEYS.userScenes, JSON.stringify([{ name: 'Mine One', body: 'void main() { fragColor = vec4(1.); }' }]));
     const list = buildSceneList([], compiles);
     expect(list.scenes.length).toBe(SCENES.length + 3);
     expect(list.scenes[list.customIndex]!.kind).toBe('custom');
     expect(list.scenes[list.nodesIndex]!.kind).toBe('nodes');
-    expect(list.scenes[list.gameIndex]!.kind).toBe('game');
+    expect(list.scenes.some((s) => s.kind === ('game' as string))).toBe(false);
+    expect(list).not.toHaveProperty('gameIndex');
     expect(list.scenes.at(-1)).toMatchObject({ name: 'Mine One', user: true, cat: 'Mine' });
     expect(list.keyedScenes).toHaveLength(10);
     expect(list.keyedScenes.every((i) => !list.scenes[i]!.kind)).toBe(true);

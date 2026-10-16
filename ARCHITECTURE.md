@@ -13,7 +13,7 @@ browser                                              dev server (Vite middleware
 │ UI store  ◄───────────────┤               │        │   adapters: Anthropic API | Claude │
 │   ▲ publishes             ▼               │  SSE   │   CLI (subscription, locked down)  │
 │ AppController ── frame loop ── engines    │◄──────►│   MCP endpoint for the CLI          │
-│   (renderer, audio, media, game, params)  │        └───────────────────────────────────┘
+│   (renderer, audio, media, params)        │        └───────────────────────────────────┘
 │   shared Scene[] (stable indices)         │
 └──────────────┬────────────────────────────┘
                │ BroadcastChannel (scenes, per-frame state, media)
@@ -23,7 +23,7 @@ browser                                              dev server (Vite middleware
 ```
 
 - **Engines** (`src/engine/`) are plain classes with no DOM access beyond the canvas, media elements and
-  `localStorage`: `Renderer`, `AudioEngine`, `Listener`, `MediaLayer`, `BeatRacer`, the `@param` parser and store,
+  `localStorage`: `Renderer`, `AudioEngine`, `Listener`, `MediaLayer`, the `@param` parser and store,
   the visual-maker compiler, the projector link. Each one that holds a resource (GL objects, audio nodes, media,
   listeners) has `dispose()`. `AudioEngine` is the Web Audio graph only (sources, volume, recording, the demo
   beat); its `read()` hands the analyser's bins to the **Listener** (`src/engine/listener.ts`, the controller's
@@ -161,8 +161,8 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
 ## Data flow per frame
 
 `AudioEngine.read` → the bins → `Listener.hear` (on real time, so the tempo reads right at any frame rate) → the
-`Hearing`: bands, kick and tick, BPM, tone, mood → `AppController.onBeats`: a kick jumps the hue, drops Beat Racer's
-walls and counts towards auto-switch, a tick is the studio's and the director's beat (both before the frame is
+`Hearing`: bands, kick and tick, BPM, tone, mood → `AppController.onBeats`: a kick jumps the hue and counts towards
+auto-switch, a tick is the studio's and the director's beat (both before the frame is
 composed) → `composeFrame` fills one reused `ProgramState` for the main screen (on the clock's motion) →
 `LiveSlot.route` composes Live (on its own motion) and decides what the screen and the
 projectors draw → `Renderer.render` (scene pass → feedback pass → display pass) → `OutputLink.sendFrame` when a

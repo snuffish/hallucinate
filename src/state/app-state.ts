@@ -65,7 +65,6 @@ export type SourceButton = 'file' | 'mic' | 'soundcloud' | 'display' | 'demo' | 
 
 export interface AppState {
   scenes: readonly Scene[]; // the shared list; stable indices, soft-deleted entries stay (append with appendScene)
-  gameIndex: number;
   customIndex: number;
   nodesIndex: number;
   keyedScenes: number[];

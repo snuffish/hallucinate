@@ -41,7 +41,7 @@ const lookKeys = ['hue', 'cycle', 'trails', 'speed', 'reactivity', 'aberration',
 export const TOOLS = [
   tool({
     name: 'get_app_state',
-    description: 'Get what is on screen now: the playing scene (name, kind, live parameters with their ranges and values), the look sliders, the audio source, BPM and mood, whether media is loaded, and every scene name by category (a mark after a name: * edited by the user, (mine), (visual maker), (game); unmarked ones are built-in). Call this when you need to know the current situation or the exact scene names.',
+    description: 'Get what is on screen now: the playing scene (name, kind, live parameters with their ranges and values), the look sliders, the audio source, BPM and mood, whether media is loaded, and every scene name by category (a mark after a name: * edited by the user, (mine), (visual maker); unmarked ones are built-in). Call this when you need to know the current situation or the exact scene names.',
     inputSchema: z.object({}),
     outputSchema: record,
     running: () => 'Looking around',

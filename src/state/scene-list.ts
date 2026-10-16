@@ -29,7 +29,6 @@ export function userScene(name: string, body: string): Scene {
 
 export interface SceneListInit {
   scenes: Scene[];
-  gameIndex: number;
   customIndex: number;
   nodesIndex: number;
   keyedScenes: number[];   // keys 1–0
@@ -68,7 +67,6 @@ export function buildSceneList(scenes: Scene[], check: CompileCheck): SceneListI
   }
   return {
     scenes,
-    gameIndex: scenes.findIndex((s) => s.kind === 'game'),
     customIndex: scenes.findIndex((s) => s.kind === 'custom'),
     nodesIndex: scenes.findIndex((s) => s.kind === 'nodes'),
     keyedScenes: scenes.map((s, i) => (s.kind ? -1 : i)).filter((i) => i >= 0).slice(0, 10),

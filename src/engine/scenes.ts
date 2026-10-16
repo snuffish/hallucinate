@@ -1,7 +1,7 @@
 import { parseParams, type ParamSpec } from './params';
 import { INPUT_DECLARATIONS, INPUT_NAMES } from './scene-inputs';
 
-export type SceneKind = 'game' | 'custom' | 'nodes';
+export type SceneKind = 'custom' | 'nodes';
 
 // One entry of the shared scene list. Scenes are addressed by their INDEX in that list everywhere
 // (renderer, projector protocol, number keys), so entries are soft-removed with `removed`, never spliced.
@@ -1390,72 +1390,6 @@ void main() {
 }
 `;
 
-// Beat Racer: game state lives in src/game.js and arrives through these uniforms.
-const GAME = /* glsl */ `
-uniform vec4 uObs[12];   // x lane position, z distance, type (0 wall, 1 orb), alive
-uniform vec3 uGame;      // player x, distance travelled, crash flash
-const float HOR = .12;   // horizon height on screen
-const float CAMH = .6;   // camera height
-const float PZ = 2.;     // player depth
-
-float sdBox(vec2 p, vec2 b) { vec2 q = abs(p) - b; return length(max(q, 0.)) + min(max(q.x, q.y), 0.); }
-
-void main() {
-  vec2 p = centered();
-  p.x += sin(uTime * 60.) * uGame.z * .015;   // screen shake on crash
-  p *= rot(-uGame.x * .04);
-  vec3 col;
-  float sy = p.y - HOR;
-
-  if (sy > 0.) {
-    col = mix(vec3(.25, .02, .35), vec3(.02, 0., .08), clamp(sy * 2.2, 0., 1.));
-    vec2 sp = p - vec2(0., HOR + .2);
-    float sr = .2 + uBass * .03;
-    float stripes = clamp(step(0., sin(sp.y * 90. - uTime * 2.)) + step(.02, sp.y), 0., 1.);
-    col += mix(vec3(1., .2, .6), vec3(1., .85, .2), clamp(sp.y / sr * .5 + .5, 0., 1.)) * smoothstep(sr, sr - .006, length(sp)) * stripes;
-    col += vec3(1., .3, .7) * .01 / (abs(length(sp) - sr) + .02) * (.5 + uBeat);
-    float m = spec(fract(abs(p.x) * .7)) * .22 + .015;    // mountains = spectrum
-    col = mix(col, vec3(.05, 0., .1), smoothstep(.003, 0., sy - m));
-    col += rainbow(abs(p.x) * .5 + uHue) * smoothstep(.006, 0., abs(sy - m)) * .8;
-  } else {
-    float z = CAMH / -sy;
-    float wx = p.x * z;
-    vec2 g = vec2(wx + .5, z + uGame.y);
-    vec2 gg = abs(fract(g - .5) - .5) / max(fwidth(g), 1e-4);
-    float line = 1. - clamp(min(gg.x, gg.y), 0., 1.);
-    float fog = exp(-z * .05);
-    col = vec3(.03, 0., .06) + rainbow(z * .02 + uHue + .6) * line * (.5 + uBass) * fog;
-    col += vec3(1., .3, .9) * smoothstep(.08, 0., abs(abs(wx) - 1.5)) * fog * 1.5;   // road edges
-  }
-
-  for (int i = 0; i < 12; i++) {                  // sorted far -> near on the CPU
-    vec4 o = uObs[i];
-    if (o.w < .5 || o.y < .4) continue;
-    float s = 1. / o.y;
-    float base = HOR - CAMH * s;
-    float fog = exp(-o.y * .04);
-    if (o.z < .5) {
-      float d = sdBox(p - vec2(o.x * s, base + .25 * s), vec2(.4, .25) * s);
-      if (d < 0.) col = mix(col, vec3(.12, 0., .06) + vec3(.4, 0., .1) * uBeat, fog);
-      col += vec3(1., .15, .3) * smoothstep(.006, 0., abs(d)) * 1.5 * fog;
-      col += vec3(1., .1, .3) * .004 / (abs(d) + .01) * fog;
-    } else {
-      float d = length(p - vec2(o.x * s, base + .3 * s)) - .14 * s * (1. + uBeat * .3);
-      col += rainbow(uTime * .5 + float(i) * .1) * (smoothstep(.01, 0., d) * .8 + .006 / (abs(d) + .01)) * fog;
-    }
-  }
-
-  vec2 d = p - vec2(uGame.x / PZ, HOR - CAMH / PZ + .03);
-  float ship = max(abs(d.x) * 1.6 + d.y, -d.y - .04) - .06;
-  if (ship < 0.) col = vec3(.02, .05, .1);
-  col += vec3(.2, 1., 1.) * smoothstep(.006, 0., abs(ship)) * 1.5;
-  col += vec3(.3, .8, 1.) * .003 / (abs(ship) + .01);
-  col += vec3(.2, .6, 1.) * .012 / (length(d + vec2(0., .06)) + .02) * (.5 + uBass * 1.5);   // engine glow
-  col += vec3(1., .1, .2) * uGame.z * .7;
-  fragColor = vec4(col, 1.);
-}
-`;
-
 // Starting point for your own scene in the shader editor.
 export const TEMPLATE = /* glsl */ `// Your own scene. Edit me — it recompiles as you type.
 // Available: ${INPUT_NAMES} uRes
@@ -1536,5 +1470,4 @@ export const SCENES: Scene[] = [
   scene('Media Ripple', 'Media', 'Water ripples spreading over your picture', MEDIA_RIPPLE, { trails: 0.3 }),
   scene('Media Droste', 'Media', 'Endless zoom into copies of your picture', MEDIA_DROSTE, { trails: 0.3 }),
   scene('Media Neon Edges', 'Media', 'The outlines of your picture as glowing neon', MEDIA_EDGES, { trails: 0.5 }),
-  scene('Beat Racer', 'Game', 'Dodge walls that drop on the beat', GAME, { kind: 'game', trails: 0.55 }),
 ];

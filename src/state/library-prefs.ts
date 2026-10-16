@@ -19,13 +19,13 @@ export function togglePref(prefs: LibraryPrefs, list: 'favs' | 'off', s: Scene):
   return { ...prefs, [list]: names.includes(s.name) ? names.filter((n) => n !== s.name) : [...names, s.name] };
 }
 
-// Scenes the library lists: the visuals, the game and your saved scenes (not the editor slots).
+// Scenes the library lists: the visuals and your saved scenes (not the editor slots).
 export const listedScenes = (scenes: readonly Scene[]) =>
-  scenes.map((s, i) => ({ s, i })).filter(({ s }) => !s.removed && (!s.kind || s.kind === 'game'));
+  scenes.map((s, i) => ({ s, i })).filter(({ s }) => !s.removed && !s.kind);
 
 // Indices auto-switch may pick from. Favourites count twice, so they come up more often.
 export function rotation(scenes: readonly Scene[], prefs: LibraryPrefs): number[] {
-  const visual = listedScenes(scenes).filter(({ s }) => !s.kind);
+  const visual = listedScenes(scenes);
   const on = visual.filter(({ s }) => inRotation(prefs, s));
   return (on.length ? on : visual).flatMap(({ s, i }) => (isFav(prefs, s) ? [i, i] : [i]));
 }
