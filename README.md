@@ -56,7 +56,7 @@ your own scenes in the code editor or the visual maker, or ask the assistant for
 | 🎬 | **[Scenes](docs/scenes.md)** · L | A laser-show set, growing (Beams, Geometry, Fields and Media). Your scenes crossfade on the beat, in a searchable library with favourites. |
 | 🧑‍💻 | **[Code editor](docs/editor.md)** · E | Edit any scene's GLSL live, with errors shown as you type. Tag a value with `// @param` and it becomes a slider (P). |
 | 🧩 | **[Visual maker](docs/visual-maker.md)** · N | Build scenes by wiring blocks together, then send the result to code. |
-| 🖼️ | **[Media](docs/media.md)** | Drop an image or video, or pick one from YouTube, and sample it in any scene with `media(p)`. |
+| 🖼️ | **[Media](docs/media.md)** | Drop an image or video, or pick one from YouTube: Scan Trace redraws it as laser scan lines, and any scene can sample it with `media(p)`. |
 | 📺 | **[Studio & projector](docs/studio.md)** · O | An OBS-style Preview / Live studio with projector windows, fades, an autopilot that counts beats, and an AI Director that plans the set. |
 | ✦ | **[AI assistant](docs/assistant.md)** · I | Claude writes and fixes scenes, sets parameters and runs the studio for you, across several conversations. |
 | 🪟 | **[Interface](docs/interface.md)** | Dockable, resizable widgets with a remembered layout, and help on every panel. |

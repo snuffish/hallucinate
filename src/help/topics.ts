@@ -149,7 +149,7 @@ export const HELP_TOPICS = {
     id: 'youtube',
     title: 'YouTube',
     body: [
-      'Search, or paste a video, playlist or Shorts link. The video becomes the picture Media scenes and your own shaders (media(p)) work with.',
+      'Search, or paste a video, playlist or Shorts link. The video becomes the picture Scan Trace draws and your own shaders sample with media(p).',
       'Tick "Use the video\'s sound as the music" to make it the audio source too. The first load of a long video takes a moment.',
       ...NEEDS_SERVER,
     ],

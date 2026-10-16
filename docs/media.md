@@ -3,9 +3,10 @@
 [← Back to the README](../README.md)
 
 Drop any image (png, jpg, gif, webp…) or video (mp4, webm, mov…) on the page, or use *Open file* in the panel's
-Media section. Every scene can sample it with `media(p)` (a test pattern stands in until you drop one). The built-in
-**Media** scenes that were built for it have been removed with the other built-ins
-([ADR 0001](adr/0001-replace-all-built-in-scenes.md)); new ones will come in the library's *Media* category.
+Media section. The built-in [**Scan Trace**](scenes.md) (library → *Media*) is made for it: it redraws your picture
+as laser scan lines, each pushed up by the brightness beneath it, and the app switches to it when you load media
+while a scene that doesn't use media is playing. Every scene can also sample it with `media(p)` (a test pattern
+stands in until you drop one).
 
 ## YouTube
 

@@ -672,7 +672,7 @@ export class AppController {
     if (!this.renderer.usesMedia(this.state.clock.scene)) this.setScene(mediaScene);
     const what = this.media.kind === 'video' ? 'Video' : 'Image';
     this.toast(mediaScene >= 0
-      ? `${what} loaded — the Media scenes distort it (library → Media). In code, sample it with media(p).`
+      ? `${what} loaded — ${this.state.scenes[mediaScene]!.name} draws it (library → Media). In code, sample it with media(p).`
       : `${what} loaded. In a scene's code, sample it with media(p).`, 5000);
   }
 
