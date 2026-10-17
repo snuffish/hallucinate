@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SCENE_INPUTS } from './scene-inputs';
 import { EFFECTS, addEffect, cleanStack, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
 
 describe('cleaning up a stored effect stack', () => {
@@ -99,5 +100,30 @@ describe('the catalogue', () => {
 
   it("runs an effect at its strongest at the top of every setting's range", () => {
     expect(strongest('mirror')).toEqual([{ id: 'mirror', on: true, settings: { axis: 2 } }]);   // both axes
+  });
+});
+
+describe('the Wave', () => {
+  it('has an amount and a wavelength, each a slider', () => {
+    expect(addEffect([], 'wave')).toEqual([{ id: 'wave', on: true, settings: { amount: 0.4, wavelength: 0.4 } }]);
+    const wave = EFFECTS.find((e) => e.id === 'wave')!;
+    expect(wave.settings.map((s) => [s.key, 'options' in s])).toEqual([['amount', false], ['wavelength', false]]);
+  });
+
+  it('is strongest at its largest amount and its longest wavelength', () => {
+    expect(strongest('wave')).toEqual([{ id: 'wave', on: true, settings: { amount: 1, wavelength: 1 } }]);
+  });
+
+  it('keeps a stored Wave within its ranges', () => {
+    expect(cleanStack([{ id: 'wave', on: true, settings: { amount: 5, wavelength: 0 } }])[0]!.settings).toEqual({ amount: 1, wavelength: 0.1 });
+  });
+
+  // Its kick ripple reads the scene inputs the scene reads: no input of its own.
+  it('moves with the kick through the existing scene inputs', () => {
+    const wave = EFFECTS.find((e) => e.id === 'wave')!;
+    const known = new Set<string>([...SCENE_INPUTS.map((i) => i.uniform), ...wave.settings.map((s) => s.uniform), 'uRes']);
+    const read = new Set(wave.glsl.match(/\bu[A-Z]\w*/g));
+    expect([...read].filter((u) => !known.has(u))).toEqual([]);
+    expect(read).toContain('uBeat');
   });
 });
