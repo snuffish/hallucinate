@@ -1,4 +1,4 @@
-import { EDGE_CLEAR, EDGE_FADE } from '../src/engine/effects';
+import { EDGE_CLEAR, EDGE_FADE, effectDef, passesOf } from '../src/engine/effects';
 import { expect, seedScenes, test, type Page } from './fixtures';
 
 // How far the main screen's picture is from symmetric, left to right and top to bottom: the share of
@@ -107,6 +107,31 @@ test('effects: a switched-on effect costs one pass, and none switched on costs n
   await addMenu(page).selectOption('mirror');
   await expect.poll(() => passes(page), { timeout: 15_000 }).toBe(plain + 1);
   await page.locator('#fx-mirror-on').uncheck();
+  await expect.poll(() => passes(page), { timeout: 15_000 }).toBe(plain);
+});
+
+// Glow's sliders come from its catalogue row, and its blur's passes run only while it is on.
+test('effects: a Glow has strength and radius sliders from its ranges, and costs its blur only while on', async ({ page }) => {
+  await countDraws(page);
+  await start(page);
+  await expect.poll(() => passes(page), { timeout: 15_000 }).toBeGreaterThan(0);
+  const plain = await passes(page);
+  await addMenu(page).selectOption('glow');
+  await expect(row(page, 'glow')).toBeVisible();
+  const glow = effectDef('glow')!;
+  for (const s of glow.settings) {
+    const slider = page.locator(`#fx-glow-${s.key}`);
+    await expect(slider).toHaveAttribute('type', 'range');
+    await expect(slider).toHaveAttribute('min', String(s.min));
+    await expect(slider).toHaveAttribute('max', String(s.max));
+    await expect(slider).toHaveAttribute('step', String(s.step));
+    await expect(slider).toHaveValue(String(s.default));
+  }
+  await page.locator('#fx-glow-radius').fill('20');
+  await expect(page.locator('#fx-glow-radius')).toHaveValue('20');
+
+  await expect.poll(() => passes(page), { timeout: 15_000 }).toBe(plain + 1 + passesOf(glow).length);
+  await page.locator('#fx-glow-on').uncheck();
   await expect.poll(() => passes(page), { timeout: 15_000 }).toBe(plain);
 });
 
