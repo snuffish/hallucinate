@@ -63,4 +63,8 @@ The editor's *Cheat sheet* has the full list. A few worth knowing:
   nothing plays.
 - `uBright`, `uMood` – the [synesthesia](audio.md#-synesthesia-sound--light-mapping) tone and mood, 0 to 1 and not
   scaled by Reactivity.
+- `laser(t)`, `rainbow(t)`, `neon(t)` – colour palettes that repeat every 1.0; add `uHue` so the Colour slider and
+  Colour cycling move them. `laser` is the laser palette: pure, fully saturated colours on a continuous wheel (red →
+  yellow → green → cyan → blue → magenta → red), which the built-in scenes and the new-scene template use. `rainbow` is
+  the softer one.
 - `media(p)`, `untone(col)` – sample the dropped image or video; see [Media](media.md#in-code-and-the-visual-maker).

@@ -15,4 +15,6 @@ numbers straight into unconnected inputs. The result renders live behind the gra
 - The **Slider** and **Colour picker** blocks become [live parameters](editor.md#-live-parameters--press-p).
 - The **Audio** block has *tone* and *mood* outputs ([synesthesia](audio.md#-synesthesia-sound--light-mapping)); the
   **Media** block samples the dropped image or video (see the *Media warp* example).
+- The **Palette** block starts on the *laser* preset (pure, fully saturated colours, like the built-in scenes);
+  *rainbow*, *neon* and the others stay available, and graphs that use them keep them.
 - Graphs save automatically. `Delete` or `Backspace` removes the selected block.
