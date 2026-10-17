@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, seedScenes, test, type Page } from './fixtures';
 import type { ListedScene, ProfilerApi } from '../src/engine/profiler';
 import { EDGE_BAND, EDGE_CLEAR, EDGE_FADE, EFFECTS, strongest, type EffectStack } from '../src/engine/effects';
 import type { FrameLook } from '../src/engine/look';
@@ -30,6 +30,8 @@ const TICK_END = { uBeat: 0, uTick: 0.99, uTicks: 6 };
 const TICK_START = { uBeat: 0, uTick: 0, uTicks: 7 };
 
 const MIRROR_SCENE = 'Light Sheet';   // a scene that isn't symmetric left to right on its own
+// Thin lines that hold still whatever the music does, for watching an effect's own movement.
+const STILL_GRID = { name: 'Still grid', body: 'void main() { vec2 g = abs(fract(centered() * 8.) - .5); fragColor = vec4(vec3(smoothstep(.03, .0, min(g.x, g.y))), 1.); }' };
 
 const LOOKS: { name: string; look: FrameLook }[] = [
   { name: 'default Look', look: defaultLook() },
@@ -187,6 +189,49 @@ for (const effect of EFFECTS) {
     expect(changed).toBeGreaterThan(0.001);
   });
 }
+
+// A Wave's ripple starts at the centre on a kick. Watched on a grid that ignores the music, so whatever
+// a kick changes the Wave changed: near the centre it moves the lines, further out, where the ripple
+// hasn't reached yet, next to nothing changes. It reads the kick the scene reads (uBeat), scaled by
+// Reactivity: at Reactivity 0 a kick moves nothing.
+test('a kick sends a Wave ripple out from the centre', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await seedScenes(page, [STILL_GRID]);
+  await openProfiler(page);
+  const moved = await page.evaluate(async ({ look, sceneName, effects, CALM, KICK }) => {
+    const p = (window as Hook).__profiler!;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    // The share of pixels inside a disc around the centre and outside a wider one that the kick changes
+    // by more than a quarter of full brightness: a line moved, not its edge sliding a fraction of a
+    // pixel as the bend drifts on by a frame.
+    const kickChanges = async (look: FrameLook, effects: EffectStack) => {
+      const [a, b] = (await p.stillChange(index, { from: CALM, to: KICK, look, effects })).images!;
+      const { width: w, height: h } = a!;
+      const disc = 0.2 * Math.min(w, h), beyond = 0.45 * Math.min(w, h);
+      const n = { centre: 0, out: 0 }, all = { centre: 0, out: 0 };
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const r = Math.hypot(x - w / 2, y - h / 2);
+        const where = r < disc ? 'centre' : r > beyond ? 'out' : null;
+        if (!where) continue;
+        const i = (y * w + x) * 4;
+        all[where]++;
+        if (Math.max(Math.abs(a!.data[i]! - b!.data[i]!), Math.abs(a!.data[i + 1]! - b!.data[i + 1]!), Math.abs(a!.data[i + 2]! - b!.data[i + 2]!)) > 64) n[where]++;
+      }
+      return { centre: n.centre / all.centre, out: n.out / all.out };
+    };
+    return {
+      plain: await kickChanges(look, []),
+      wave: await kickChanges(look, effects),
+      still: await kickChanges({ ...look, reactivity: 0 }, effects),
+    };
+  }, { look: defaultLook(), sceneName: STILL_GRID.name, effects: [{ id: 'wave', on: true, settings: { amount: 1, wavelength: 0.4 } }] as EffectStack, CALM, KICK });
+  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+  console.log(`a kick changes ${pct(moved.plain.centre)} of the centre without a Wave; with one ${pct(moved.wave.centre)} of the centre and ${pct(moved.wave.out)} further out; at Reactivity 0 ${pct(moved.still.centre)}`);
+  expect(moved.plain.centre, 'the grid ignores the kick').toBeLessThan(0.001);
+  expect(moved.wave.centre, 'a kick ripples the centre').toBeGreaterThan(0.05);
+  expect(moved.wave.out, 'the ripple starts at the centre').toBeLessThan(moved.wave.centre / 2);
+  expect(moved.still.centre, 'at Reactivity 0 the kick adds nothing to the bend').toBeLessThan(moved.wave.centre / 2);
+});
 
 // A left↔right Mirror makes the picture symmetric across its middle, away from the edges, where the
 // scene's own picture shows through.
