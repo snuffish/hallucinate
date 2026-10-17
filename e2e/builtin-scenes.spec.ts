@@ -140,30 +140,25 @@ for (const effect of EFFECTS) for (const { name: sceneName } of SCENES) {
 }
 
 // Every effect stacked, each at its strongest: whatever runs before it, each effect fades back to the
-// scene's own picture across the border, so the edges stay the scene's. One test for every scene and
-// only the silent still: the kick and the tick are each effect's own, checked alone above. (In this
-// stack the Kaleidoscope's disc leaves the corners black too, so the edges hold with a margin.)
+// scene's own picture across the border, so the edges stay the scene's. Only the silent still, a third of
+// what a test above renders: the kick and the tick are each effect's own, checked alone above. A test
+// per scene all the same, so they share the workers: one test rendering all eight ran past four minutes
+// on a loaded machine. (In this stack the Kaleidoscope's disc leaves the corners black too, so the edges
+// hold with a margin.)
 const ALL_STRONGEST: EffectStack = EFFECTS.flatMap((e) => strongest(e.id));
-test('every scene with all the effects stacked at their strongest, at the strongest Look: black edges in silence', async ({ page }) => {
-  test.setTimeout(4 * 60_000);
-  const scenes = await openProfiler(page);
-  const edges = await page.evaluate(async ({ scenes, look, effects, band, SILENCE, source }) => {
-    const p = (window as Hook).__profiler!;
-    const edgeBlack = (0, eval)(source) as EdgeBlack;
-    const out: { name: string; error: string | null; edgeBlack: number }[] = [];
-    for (const { name, index } of scenes) {
-      const { image, error } = await p.still(index, { inputs: SILENCE, silent: true, look, effects });
-      out.push({ name, error, edgeBlack: image ? edgeBlack(image, band) : 0 });
-    }
-    return out;
-  }, { scenes: scenes.map(({ name, index }) => ({ name, index })), look: STRONGEST_LOOK, effects: ALL_STRONGEST, band: EDGE_BAND, SILENCE, source: EDGE_BLACK });
-  expect(edges.map((e) => e.name), 'every built-in scene').toEqual(SCENES.map((s) => s.name));
-  for (const { name, error, edgeBlack } of edges) {
-    console.log(`${name} with every effect stacked: ${(edgeBlack * 100).toFixed(1)}% of the edge is black in silence`);
-    expect.soft(error, `${name} renders`).toBeNull();
-    expect.soft(edgeBlack, `${name}: the edges are pure black in silence`).toBeGreaterThanOrEqual(0.75);
-  }
-});
+for (const { name: sceneName } of SCENES) {
+  test(`${sceneName} with all the effects stacked at their strongest, at the strongest Look: black edges in silence`, async ({ page }) => {
+    test.setTimeout(4 * 60_000);
+    const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
+    const { error, edgeBlack } = await page.evaluate(async ({ index, look, effects, band, SILENCE, source }) => {
+      const { image, error } = await (window as Hook).__profiler!.still(index, { inputs: SILENCE, silent: true, look, effects });
+      return { error, edgeBlack: image ? ((0, eval)(source) as EdgeBlack)(image, band) : 0 };
+    }, { index: scene.index, look: STRONGEST_LOOK, effects: ALL_STRONGEST, band: EDGE_BAND, SILENCE, source: EDGE_BLACK });
+    console.log(`${sceneName} with every effect stacked: ${(edgeBlack * 100).toFixed(1)}% of the edge is black in silence`);
+    expect(error, `${sceneName} renders`).toBeNull();
+    expect(edgeBlack, `${sceneName}: the edges are pure black in silence`).toBeGreaterThanOrEqual(0.75);
+  });
+}
 
 // The rules above only mean something if the Look reaches the picture: trails leave an afterglow and
 // fringing splits the colours in the frame still() returns.
