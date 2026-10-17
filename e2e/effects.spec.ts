@@ -72,13 +72,23 @@ async function start(page: Page) {
 }
 
 test('effects: the widget docks under the Look and adds, switches, sets and removes a Mirror on the main screen', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  // Light Sheet (not symmetric on its own) on screen from the start, without trails: switching to it
+  // would crossfade from the first scene, and an afterglow would keep the picture from before each
+  // change for a few frames. Under software WebGL on a loaded machine a frame can take seconds, so either
+  // could outlast a symmetry check; this way each change shows whole on the next frame.
+  await seedScenes(page, [], { 'hallucinate.lastScene': 'scene:Light Sheet' });
   await start(page);
+  await page.locator('#trails').fill('0');
   const left = await page.locator('.dock-zone.left > [data-widget]').evaluateAll((els) => els.map((e) => e.getAttribute('data-widget')));
   expect(left.indexOf('effects')).toBe(left.indexOf('look') + 1);
 
-  await press(page, '2');
-  await expect(page.locator('#scene-name')).toContainText('Light Sheet');   // not symmetric on its own
-  await mirrored(page, { lr: false, tb: false });
+  await expect(page.locator('#scene-name')).toContainText('Light Sheet');
+  // Read once, without a poll: nothing changes until the Mirror is added, and the first frames, which
+  // wait for the scenes to compile, can take longer than a poll waits.
+  const plain = await asymmetry(page);
+  expect(plain.lr, 'Light Sheet is not symmetric left to right').toBeGreaterThan(SYMMETRIC);
+  expect(plain.tb, '…nor top to bottom').toBeGreaterThan(SYMMETRIC);
 
   await expect(addMenu(page).locator('option', { hasText: 'Mirror' })).toHaveCount(1);
   await addMenu(page).selectOption('mirror');
