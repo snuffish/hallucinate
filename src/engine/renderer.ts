@@ -506,6 +506,26 @@ export class Renderer {
     ]);
   }
 
+  // How long the GPU takes to draw `frames` through the whole pipeline at w×h, in ms per frame: into the
+  // burst's targets, waiting for the GPU before and after (a one-pixel read can only return once every
+  // draw before it is done). Queued with the snapshots, which share those targets. Blocks the main
+  // thread while it waits: for the profiler only.
+  timeFramesAsync(frames: readonly ProgramState[], w: number, h: number): Promise<number> {
+    const run = async (): Promise<number> => {
+      if (this.disposed || this.lost) throw new Error('Renderer unavailable');
+      const gl = this.gl;
+      const pixel = new Uint8Array(4);
+      const wait = (out: Target) => { gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); };
+      wait(this.renderBurst(frames.slice(0, 1), w, h));   // targets made and programs compiled before the clock starts
+      const start = performance.now();
+      wait(this.renderBurst(frames, w, h));
+      return (performance.now() - start) / frames.length;
+    };
+    const next = this.snapshotQueue.then(run, run);
+    this.snapshotQueue = next.catch(() => {});
+    return next;
+  }
+
   private renderBurst(frames: readonly ProgramState[], w: number, h: number, fromBlack = true): Target {
     const gl = this.gl;
     if (this.burst && (this.burst.out.w !== w || this.burst.out.h !== h)) this.deleteBurst();

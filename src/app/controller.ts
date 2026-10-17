@@ -138,6 +138,20 @@ export class AppController {
       const frames = composeStill(index, stillUniforms(from), look, s!.trails ?? 1, stillSpectrum(), stillUniforms(to), effects);
       return { error: null, images: await this.renderer.stillPairAsync(frames, 1280, 720) };
     },
+    effectsCost: async (effects, { size = this.renderer.size, frames = 30, rounds = 5 } = {}) => {
+      const scale = this.renderer.scale;
+      const [w, h] = size.map((x) => Math.max(1, Math.round(x * scale))) as [number, number];
+      // The frame on screen now, held still, without a crossfade.
+      const burst = (stack: FX.EffectStack) => Array.from({ length: frames }, (): ProgramState => ({ ...this.program, prevScene: -1, mix: 1, effects: stack, prevEffects: FX.NO_EFFECTS }));
+      const none: number[] = [], shaped: number[] = [];
+      for (let i = 0; i < rounds; i++) {   // in turns, so a slower moment weighs on both alike
+        none.push(await this.renderer.timeFramesAsync(burst(FX.NO_EFFECTS), w, h));
+        shaped.push(await this.renderer.timeFramesAsync(burst(effects), w, h));
+      }
+      const median = (xs: number[]) => xs.sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
+      const cost = { none: median(none), with: median(shaped) };
+      return { ...cost, extra: cost.with - cost.none, size: [w, h], scale, frames, rounds };
+    },
   };
   // Another tab imported settings: this one's state is stale, so it must not write, and reloads.
   // Another tab changed a preference: take it over, so this tab's next write doesn't undo it.

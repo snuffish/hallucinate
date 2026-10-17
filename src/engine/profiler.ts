@@ -394,7 +394,16 @@ export interface ProfilerApi {
   // more frame with `to`'s. The images either side of it (the strobe rule compares them), or why the
   // scene doesn't compile. Half the frames of two stills.
   stillChange(index: number, sound: { from: Partial<SnapshotUniforms>; to: Partial<SnapshotUniforms>; look: FrameLook; effects?: EffectStack }): Promise<{ error: string | null; images: [ImageData, ImageData] | null }>;
+  // What `effects` cost per frame on this screen: the scene on screen through the whole pipeline at the
+  // size the screen renders at (`size`, default the canvas, × the Resolution setting), timed with no
+  // effects and with them, in turns, waiting for the GPU each time. Effects run on every output and
+  // projector, so this is their cost on each. Blocks the main thread for a moment.
+  effectsCost(effects: EffectStack, options?: { size?: [number, number]; frames?: number; rounds?: number }): Promise<EffectsCost>;
 }
+
+// Milliseconds per frame (the median of the rounds) without effects and with them, and the difference,
+// at `size` render pixels (the canvas × `scale`, the Resolution setting).
+export interface EffectsCost { none: number; with: number; extra: number; size: [number, number]; scale: number; frames: number; rounds: number }
 
 // A scene as scripts see it: its category, how many parameters it has, and whether it ships with the app.
 export interface ListedScene { index: number; name: string; cat: string; params: number; builtin: boolean }

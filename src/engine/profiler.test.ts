@@ -279,7 +279,7 @@ describe('diagnose', () => {
 });
 
 describe('window.__profiler', () => {
-  const api = (): ProfilerApi => ({ report: () => null, fillTest: async () => null, reset: () => {}, scenes: () => [], setScene: () => {}, still: async () => ({ error: null, image: null }), stillChange: async () => ({ error: null, images: null }) });
+  const api = (): ProfilerApi => ({ report: () => null, fillTest: async () => null, reset: () => {}, scenes: () => [], setScene: () => {}, still: async () => ({ error: null, image: null }), stillChange: async () => ({ error: null, images: null }), effectsCost: async () => ({ none: 0, with: 0, extra: 0, size: [0, 0], scale: 1, frames: 0, rounds: 0 }) });
 
   it('is removed only by the controller that installed it (StrictMode makes two)', () => {
     const target: { __profiler?: ProfilerApi } = {};
