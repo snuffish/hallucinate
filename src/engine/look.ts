@@ -6,6 +6,7 @@
 
 import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
+import type { SnapshotUniforms } from './scene-inputs';
 
 // The sliders a frame is composed with: a show scene stores the numbers it keeps (LOOK_KEYS), the rest
 // (synesthesia) is the app's.
@@ -68,7 +69,29 @@ function grade(p: ProgramState, look: Readonly<FrameLook>): void {
   g.saturation = 1 + A * (mood - 0.5) * 0.8;
 }
 
-export const smoothstep = (x: number): number => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+// A still frame with a Look applied, as the audience would see it: a short burst of frames with the same
+// sound, so the afterglow builds up as it does on screen. The burst ends at the inputs' time; the hue
+// starts at theirs and walks as Colour cycling says. A kick (uBeat 1) lands on the last frame, as the
+// moment it happens. The renderer draws the frames in order and keeps the last.
+const BURST_FRAMES = 20;   // a third of a second: long enough for the strongest Look's afterglow to settle
+const BURST_DT = 1 / 60;
+
+export function composeStill(scene: number, inputs: Readonly<SnapshotUniforms>, look: Readonly<FrameLook>, sceneTrails: number, spectrum: Uint8Array): ProgramState[] {
+  const sound = (kick: boolean): Hearing => ({
+    bass: inputs.uBass, mid: inputs.uMid, high: inputs.uHigh, level: inputs.uLevel, beat: inputs.uBeat, kick, tick: false,
+    tickPhase: inputs.uTick, ticks: inputs.uTicks, bpm: null, bright: inputs.uBright, centroid: 0, energy: inputs.uLevel, mood: inputs.uMood,
+  });
+  const play = (motion: Motion): ProgramState[] => Array.from({ length: BURST_FRAMES }, (_, i) => {
+    const p = { ...programState(spectrum), scene, prevScene: -1, mix: 1 };
+    composeFrame(p, motion, sound(i === BURST_FRAMES - 1 && inputs.uBeat >= 1), look, sceneTrails, BURST_DT);
+    return p;
+  });
+  const start = (): Motion => ({ time: 0, timeRate: look.speed, huePhase: inputs.uHue });
+  const elapsed = play(start()).at(-1)!.time;   // the clock's pace eases with the sound: measure it, then start early by that much
+  return play({ ...start(), time: inputs.uTime - elapsed });
+}
+
+export const smoothstep =(x: number): number => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 
 // A crossfade from `prevScene`, `fade` seconds long from `transitionStart`.
 export interface Transition { prevScene: number; transitionStart: number; fade: number }
