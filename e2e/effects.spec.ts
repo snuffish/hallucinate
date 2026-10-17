@@ -30,6 +30,21 @@ async function asymmetry(page: Page): Promise<{ lr: number; tb: number }> {
   }), EDGE_CLEAR + EDGE_FADE);
 }
 
+// How many passes the main screen draws in one frame: WebGL draw calls between two animation frames
+// (the app draws in its own animation frame, which runs before ours). Needs countDraws() first.
+async function passes(page: Page): Promise<number> {
+  return page.evaluate(() => new Promise<number>((resolve) => {
+    const w = window as unknown as { __draws: number };
+    requestAnimationFrame(() => { w.__draws = 0; requestAnimationFrame(() => resolve(w.__draws)); });
+  }));
+}
+const countDraws = (page: Page) => page.addInitScript(() => {
+  const w = window as unknown as { __draws: number };
+  w.__draws = 0;
+  const draw = WebGL2RenderingContext.prototype.drawArrays;
+  WebGL2RenderingContext.prototype.drawArrays = function (...args) { w.__draws++; return draw.apply(this, args); };
+});
+
 const SYMMETRIC = 0.0005;   // a few stray pixels at most
 const mirrored = (page: Page, axes: { lr: boolean; tb: boolean }) => expect.poll(async () => {
   const a = await asymmetry(page);
@@ -83,6 +98,18 @@ test('effects: the widget docks under the Look and adds, switches, sets and remo
   await mirrored(page, { lr: false, tb: false });
 });
 
+// No crossfade runs here (that draws the outgoing picture too): the first scene, auto-switch off.
+test('effects: a switched-on effect costs one pass, and none switched on costs nothing', async ({ page }) => {
+  await countDraws(page);
+  await start(page);
+  await expect.poll(() => passes(page), { timeout: 15_000 }).toBeGreaterThan(0);   // the app draws
+  const plain = await passes(page);
+  await addMenu(page).selectOption('mirror');
+  await expect.poll(() => passes(page), { timeout: 15_000 }).toBe(plain + 1);
+  await page.locator('#fx-mirror-on').uncheck();
+  await expect.poll(() => passes(page), { timeout: 15_000 }).toBe(plain);
+});
+
 test('effects: the main screen keeps them through a scene change, Randomize, Drift and a reload', async ({ page }) => {
   await start(page);
   await addMenu(page).selectOption('mirror');
@@ -129,7 +156,7 @@ test('effects: library previews show scenes without effects', async ({ page }) =
   await page.locator('#fx-mirror-axis').selectOption({ label: 'Both' });
   await press(page, 'l');
   const preview = page.locator('.lib-card', { hasText: 'Light Sheet' }).locator('img');
-  await expect(preview).toHaveAttribute('src', /^blob:/);
+  await expect(preview).toHaveAttribute('src', /^blob:/, { timeout: 30_000 });   // previews render two at a time
   const asym = await preview.evaluate((img: HTMLImageElement, inner) => {
     const { naturalWidth: w, naturalHeight: h } = img;
     const c = document.createElement('canvas');
