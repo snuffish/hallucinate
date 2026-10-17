@@ -77,6 +77,32 @@ eight new scenes have not been ranked yet:
 A gain close to ×4 (a quarter of the pixels) means the scene's cost is almost all per-pixel shader work. The other 31
 scenes held 60 fps.
 
+## What effects cost
+
+An effect runs on every output that draws its show scene: the main screen, the studio's Preview and every projector.
+`__profiler.effectsCost(stack, { size? })` (with `?perf` or Shift+P) times it: the scene on screen through the whole
+pipeline at the size the screen renders at (`size`, default the canvas, × the Resolution setting), with no effects and
+with the stack, in turns, waiting for the GPU each time (a one-pixel read). It reports the median milliseconds per
+frame of each and the difference. `perf/measure.mjs` reports it for Glow at its defaults and at its strongest, on the
+canvas and at 1920×1080; `e2e/perf.spec.ts` checks it reports.
+
+**Glow** (2026-10-17, default Resolution 1). Its blur is two passes at half size (a Gaussian across, then down, a tap
+every 2 pixels of a 720-high picture, out to 2.5 sigma), then its picture step at full size, so it adds three passes.
+On an M2 (ANGLE → Metal, Chromium headless with `channel: 'chromium'`, which uses the GPU), the same on every built-in
+scene within 0.05 ms:
+
+| Render size | No effects (cheapest – heaviest scene) | Glow at its defaults (0.8, radius 10) | Glow at its strongest (1.5, radius 24) |
+| --- | --- | --- | --- |
+| 1280×720 | 0.6 – 2.8 ms | +0.6 ms | +0.8 ms |
+| 1920×1080 | 1.2 – 6.1 ms | +1.2 ms | +1.7 ms |
+| 3840×2160 | 4.5 – 23.9 ms | +4.2 ms | +6.3 ms |
+
+The cost scales with the pixels and barely with the scene. At 4K the strongest Glow alone takes over a third of a
+60 Hz frame, so a 4K projector with a Glow wants Resolution below 1 (at 0.5 it renders 1920×1080: +1.7 ms). Under
+SwiftShader (headless Chromium's software WebGL, as `e2e/perf.spec.ts` and `node perf/measure.mjs` without `--gpu`
+run) the same Glow at 1280×720 adds 33 ms (defaults) and 61 ms (strongest) to 94 ms on Point Storm: software
+rendering pays for every blur tap on the CPU, so those numbers say nothing about a GPU.
+
 ## Before → after
 
 | Scenario | Metric | Before (vanilla JS) | After (React port) |

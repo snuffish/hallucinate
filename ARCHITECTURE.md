@@ -165,8 +165,8 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
 auto-switch, a tick is the studio's and the director's beat (both before the frame is
 composed) → `composeFrame` fills one reused `ProgramState` for the main screen (on the clock's motion) →
 `LiveSlot.route` composes Live (on its own motion) and decides what the screen and the
-projectors draw → `Renderer.render` (scene pass → effects, one pass per switched-on effect of each picture's stack, none when
-none is on → feedback pass → display pass) → `OutputLink.sendFrame` when a
+projectors draw → `Renderer.render` (scene pass → effects, one pass per switched-on effect of each picture's stack plus that effect's
+own `passes` (Glow's blur), none when none is on → feedback pass → display pass) → `OutputLink.sendFrame` when a
 projector is connected → `hooks.onFrame` (studio preview and master
 fader) → every second frame: publish meters to the UI store. `FrameProfiler` (Shift+P, `?perf`) laps between these stages;
 while it is off each lap is one flag check.
@@ -209,7 +209,9 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 - **An effect:** add a row to `EFFECTS` in `src/engine/effects.ts`: its id and label, its settings (range, step,
   default; a choice lists its `options`), how it moves with the music, and its picture step, GLSL defining
   `vec3 effect(vec2 uv)` that reads the picture with `pick(uv)`, its settings by their `uniform` names and the scene
-  inputs (so Reactivity scales its movement). The widget, the clean-up of stored stacks, the renderer (each picture
+  inputs (so Reactivity scales its movement). An effect that needs more than one pass (Glow's blur) lists `passes`:
+  each renders at a share of the picture (`scale`) and defines `vec3 pass(vec2 uv)` reading its input with `pick`;
+  the picture step reads the last one with `passed(uv)`. The renderer keeps two targets per pass size. The widget, the clean-up of stored stacks, the renderer (each picture
   step compiled once, wrapped with the edge fade) and `e2e/builtin-scenes.spec.ts` (alone at its strongest on every
   scene at the strongest Look, edges measured across `EDGE_BAND`) all pick it up from there.
 - **A visual-maker block:** add an entry to `NODE_TYPES` in `src/engine/nodes.ts` (and a helper to `LIBS` if it

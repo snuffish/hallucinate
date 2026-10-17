@@ -7,6 +7,11 @@
 - An **Effects** widget, docked under the Look: add a **Mirror** to the main screen (left↔right, top↕bottom or both),
   switch it on and off and remove it. It stays through scene changes and reloads, and projectors showing the main
   screen show it too. See [ADR 0003](docs/adr/0003-effects-belong-to-the-show-scene.md).
+- A **Glow** effect: a soft bloom around the lines with a strength and a radius. It swells with the bass and gives
+  way to each kick, so a kick never doubles the picture. Its blur runs at half size in two passes: about +1.2 ms a
+  frame at 1080p on an M2 at its defaults (PERF.md).
+- `__profiler.effectsCost(stack)` times what effects cost per frame at the screen's resolution, against none, and
+  `perf/measure.mjs` reports it for Glow.
 
 ### Changed
 
