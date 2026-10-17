@@ -85,8 +85,8 @@ pipeline at the size the screen renders at (`size`, default the canvas, × the R
 with the stack, in turns, waiting for the GPU each time (a one-pixel read). It reports the median milliseconds per
 frame of each and the difference. `perf/measure.mjs` reports it for Glow and for all four effects stacked, each at its
 defaults and at its strongest, on the canvas and at 1920×1080; `e2e/perf.spec.ts` checks it reports for a Glow and for
-all four stacked (the stack on a 640×360 picture at the default Resolution, 10 frames × 3 rounds, to stay within
-seconds under software WebGL).
+all four stacked (a 480×270 picture at the default Resolution, 4 frames × 3 rounds, to stay within seconds
+under software WebGL).
 
 **Glow** (2026-10-17, default Resolution 1). Its blur is two passes at half size (a Gaussian across, then down, a tap
 every 2 pixels of a 720-high picture, out to 2.5 sigma), then its picture step at full size, so it adds three passes.
@@ -119,8 +119,8 @@ and a show scene with everything on stays well inside a 60 Hz frame up to 1080p.
 throttles under a sustained GPU load, and in the same run the Glow alone read +13 ms (the table above has +6.3 ms),
 all four at their defaults +15 ms and at their strongest +42 ms while "no effects" crept from 5.7 to 7.1 ms. A run
 of `effectsCost` calls on one page without rests drifted the same way at every size, "no effects" included,
-several-fold within minutes, so compare numbers from a rested run only. Under SwiftShader (`e2e/perf.spec.ts`), the four at their strongest add about 80 ms a
-frame to 31 ms at 640×360.
+several-fold within minutes, so compare numbers from a rested run only. Under SwiftShader the four at their strongest add
+about 80 ms a frame to 31 ms at 640×360.
 
 ## Before → after
 
