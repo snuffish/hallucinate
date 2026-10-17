@@ -60,7 +60,7 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- e2e/builtin-scenes.spec.ts
+      - run: npx playwright test e2e/builtin-scenes.spec.ts --project chromium
         env:
           CI: '1'
       - uses: actions/upload-artifact@v4
