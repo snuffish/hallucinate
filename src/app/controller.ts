@@ -4,13 +4,13 @@
 
 import { AudioEngine } from '../engine/audio';
 import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
-import { composeFrame, crossfade, programState } from '../engine/look';
+import { composeFrame, composeStill, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
 import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState } from '../engine/renderer';
-import { silentSpectrum, stillUniforms } from '../engine/scene-inputs';
+import { silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
 import type { Scene } from '../scenes';
 import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
 import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
@@ -120,11 +120,14 @@ export class AppController {
     reset: () => this.profiler.reset(),
     scenes: () => this.state.scenes.flatMap((s, index) => (s.removed ? [] : [{ index, name: s.name, cat: s.cat, params: s.params.length, builtin: isBuiltin(s) }])),
     setScene: (index) => this.setScene(index),
-    still: async (index, { inputs = {}, silent = false } = {}) => {
+    still: async (index, { inputs = {}, silent = false, look } = {}) => {
       const s = this.state.scenes[index];
       const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
       if (error) return { error, image: null };
-      return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, silent ? silentSpectrum() : undefined) };
+      const spectrum = silent ? silentSpectrum() : undefined;
+      if (!look) return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, spectrum) };
+      const frames = composeStill(index, stillUniforms(inputs), look, s!.trails ?? 1, spectrum ?? stillSpectrum());
+      return { error: null, image: await this.renderer.stillAsync(frames, 1280, 720) };
     },
   };
   // Another tab imported settings: this one's state is stale, so it must not write, and reloads.

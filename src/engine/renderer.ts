@@ -143,6 +143,7 @@ export class Renderer {
   private maxPixelRatio = 2;   // Settings → Display (src/state/prefs.ts)
   private readonly observer: ResizeObserver | null;
   private thumb: { scene: Target; out: Target } | null = null;
+  private burst: { targets: Targets; out: Target } | null = null;   // still frames with a Look (stillAsync)
   private fakeSpectrum: Uint8Array | null = null;
   private pbo: WebGLBuffer | null = null;
   private pboSize = 0;
@@ -209,6 +210,7 @@ export class Renderer {
     this.inUse.length = 0;
     this.targets = null;
     this.thumb = null;
+    this.burst = null;
     this.pbo = null;
     this.pboSize = 0;
     this.size = [0, 0];
@@ -461,14 +463,51 @@ export class Renderer {
     return new ImageData(flipRows(px, w, h), w, h);
   }
 
-  // Same picture, but the GPU is never stalled: the pixels come back through a pixel buffer once
-  // a fence says the frame is done. Calls are queued so they share one set of targets. `spectrum`
-  // (256 × RG bytes) replaces the stand-in one, e.g. with silence.
+  // Same picture, but the GPU is never stalled (see readbackAsync). `spectrum` (256 × RG bytes)
+  // replaces the stand-in one, e.g. with silence.
   snapshotAsync(index: number, uniforms: SnapshotUniforms, w = 320, h = 180, spectrum?: Uint8Array): Promise<ImageData> {
+    return this.readbackAsync(() => this.renderThumb(index, uniforms, w, h, spectrum), w, h);
+  }
+
+  // A still frame through the whole pipeline (scene, trails, fringing, grade): draws `frames` in order
+  // into targets of its own, starting from black, and returns the last. composeStill() (look.ts) makes them.
+  stillAsync(frames: readonly ProgramState[], w = 320, h = 180): Promise<ImageData> {
+    return this.readbackAsync(() => this.renderBurst(frames, w, h), w, h);
+  }
+
+  private renderBurst(frames: readonly ProgramState[], w: number, h: number): Target {
+    const gl = this.gl;
+    if (this.burst && (this.burst.out.w !== w || this.burst.out.h !== h)) this.deleteBurst();
+    this.burst ??= {
+      targets: { sceneA: this.createTarget(w, h), sceneB: this.createTarget(w, h), read: this.createTarget(w, h), write: this.createTarget(w, h) },
+      out: this.createTarget(w, h, true),
+    };
+    const { targets, out } = this.burst;
+    for (const t of [targets.read, targets.write]) {   // no afterglow from the last burst
+      gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    for (const s of frames) {
+      this.program(s.scene, true);   // compiled now, or the burst would draw black while it compiles
+      this.pipeline(s, targets, out);
+    }
+    return out;
+  }
+
+  private deleteBurst(): void {
+    if (!this.burst) return;
+    for (const t of [...Object.values(this.burst.targets), this.burst.out]) { this.gl.deleteTexture(t.tex); this.gl.deleteFramebuffer(t.fbo); }
+    this.burst = null;
+  }
+
+  // Reads back what `render()` drew without stalling the GPU: the pixels come through a pixel buffer
+  // once a fence says the frame is done. Calls are queued, so they share one set of targets.
+  private readbackAsync(render: () => Target, w: number, h: number): Promise<ImageData> {
     const run = async (): Promise<ImageData> => {
       const gl = this.gl;
       if (this.disposed || this.lost) throw new Error('Renderer unavailable');
-      const out = this.renderThumb(index, uniforms, w, h, spectrum);
+      const out = render();
       const bytes = w * h * 4;
       this.pbo ??= gl.createBuffer();
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
@@ -630,9 +669,13 @@ export class Renderer {
   }
 
   private renderFrame(s: ProgramState): void {
-    const gl = this.gl;
     this.resize();
-    const t = this.targets!;
+    this.pipeline(s, this.targets!, null);
+  }
+
+  // One frame from the scene(s) to `out` (null: the canvas), keeping the trails in `t`.
+  private pipeline(s: ProgramState, t: Targets, out: Target | null): void {
+    const gl = this.gl;
     gl.bindVertexArray(this.vao);
 
     gl.bindTexture(gl.TEXTURE_2D, this.specTex);
@@ -659,7 +702,7 @@ export class Renderer {
     d.uTex = t.read.tex; d.uAberr = s.aberration; d.uTime = s.time;
     d.uExposure = g.exposure; d.uContrast = g.contrast; d.uSat = g.saturation; d.uTint = g.tint; d.uMaster = s.master ?? 1;
     this.use(this.displayProgram, d);
-    this.draw(null);
+    this.draw(out);
   }
 
   dispose(): void {
@@ -679,6 +722,7 @@ export class Renderer {
     gl.deleteShader(this.vert);
     if (this.targets) for (const t of Object.values(this.targets)) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
     if (this.thumb) for (const t of [this.thumb.scene, this.thumb.out]) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
+    this.deleteBurst();
     gl.deleteTexture(this.mediaTex);
     gl.deleteTexture(this.specTex);
     if (this.pbo) gl.deleteBuffer(this.pbo);
