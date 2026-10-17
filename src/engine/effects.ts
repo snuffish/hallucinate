@@ -72,6 +72,35 @@ vec3 effect(vec2 uv) {
   if (q.x < 0. || q.x > 1. || q.y < 0. || q.y > 1.) return vec3(0.);   // past the picture: dark, never a smeared edge
   return pick(q);
 }`,
+    },
+    {
+    id: 'wave',
+    label: 'Wave',
+    help: 'Ripples and bends the picture: Amount sets how far it bends, Wavelength how far apart the ripples are.',
+    music: 'A ripple runs outward from the centre on each kick.',
+    settings: [
+      { key: 'amount', label: 'Amount', uniform: 'uAmount', min: 0, max: 1, step: 0.01, default: 0.4 },
+      { key: 'wavelength', label: 'Wavelength', uniform: 'uWavelength', min: 0.1, max: 1, step: 0.01, default: 0.4 },
+    ],
+    // Distances are shares of the short side. The bend is a share of the wavelength, so at any setting it
+    // stays a bend and never folds the picture over onto itself: the most it moves the picture is at the
+    // top of both ranges, where the safety spec checks it.
+    glsl: /* glsl */ `
+vec3 effect(vec2 uv) {
+  float side = min(uRes.x, uRes.y);
+  vec2 p = (uv - .5) * uRes / side;   // from the centre
+  float k = TAU / uWavelength;
+  float reach = .08 * uAmount * uWavelength;
+  // The bend: two slow waves across each other, carried along by the music's clock.
+  vec2 bend = vec2(sin(p.y * k + uTime * 1.3), sin(p.x * k * .8 - uTime * 1.1));
+  // The kick ripple: a ring that starts at the centre on a kick and runs outward as the kick fades
+  // (uBeat falls from 1 to 0 within half a second), pushing the picture to and fro along its radius.
+  float r = length(p);
+  float front = (1. - uBeat) * 1.1;
+  float ring = uBeat * exp(-pow((r - front) / (.35 * uWavelength), 2.));
+  vec2 ripple = (r > 1e-4 ? p / r : vec2(0.)) * sin((r - front) * k) * ring;
+  return pick(uv + (bend + ripple) * reach * side / uRes);
+}`,
   },
 ] as const satisfies readonly EffectDef[];
 

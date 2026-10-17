@@ -9,6 +9,8 @@
   screen show it too. See [ADR 0003](docs/adr/0003-effects-belong-to-the-show-scene.md).
 - A **Kaleidoscope** effect: the picture folded into 3 to 12 segments around the centre, turning at a spin speed. The
   bass pushes the turn ahead and each kick jumps it on, scaled by the Look's Reactivity.
+- A **Wave** effect: the picture ripples and bends, with an amount and a wavelength, and each kick sends a ripple
+  outward from the centre, scaled by Reactivity.
 
 ### Changed
 

@@ -1,4 +1,4 @@
-import { EDGE_CLEAR, EDGE_FADE, effectDef } from '../src/engine/effects';
+import { EDGE_CLEAR, EDGE_FADE, EFFECTS, effectDef } from '../src/engine/effects';
 import { expect, seedScenes, test, type Page } from './fixtures';
 
 // How far the main screen's picture is from symmetric, left to right and top to bottom: the share of
@@ -193,4 +193,26 @@ test('effects: library previews show scenes without effects', async ({ page }) =
     return lr / all;
   }, EDGE_CLEAR + EDGE_FADE);
   expect(asym, "Light Sheet's preview isn't mirrored").toBeGreaterThan(0.01);
+});
+
+// Each catalogue effect's settings become the widget's controls: the Wave's amount and wavelength
+// sliders, with its ranges and defaults.
+test('effects: a Wave gets amount and wavelength sliders from its catalogue ranges', async ({ page }) => {
+  await start(page);
+  await addMenu(page).selectOption('wave');
+  await expect(row(page, 'wave')).toBeVisible();
+  await expect(addMenu(page).locator('option', { hasText: 'Wave' })).toHaveCount(0);
+  const wave = EFFECTS.find((e) => e.id === 'wave')!;
+  for (const s of wave.settings) {
+    const slider = page.locator(`#fx-wave-${s.key}`);
+    await expect(slider).toHaveAttribute('type', 'range');
+    await expect(slider).toHaveAttribute('min', String(s.min));
+    await expect(slider).toHaveAttribute('max', String(s.max));
+    await expect(slider).toHaveAttribute('step', String(s.step));
+    await expect(slider).toHaveValue(String(s.default));
+  }
+  await expect(row(page, 'wave')).toContainText('Amount');
+  await expect(row(page, 'wave')).toContainText('Wavelength');
+  await page.locator('#fx-wave-amount').fill('1');
+  await expect(page.locator('#fx-wave-amount')).toHaveValue('1');
 });
