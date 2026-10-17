@@ -1,7 +1,25 @@
+import { RANDOM_RANGES } from '../src/state/look-drift';
 import { expect, seedScenes, solidScene, test } from './fixtures';
 
 const lookValues = (page: import('@playwright/test').Page) =>
   page.locator('#w-look input[type="range"]').evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));
+
+// The Look sliders Randomize and Drift move, by id, each with the range it may land in.
+const rolledValues = (page: import('@playwright/test').Page) =>
+  page.evaluate((ids) => Object.fromEntries(ids.map((id) => [id, Number((document.getElementById(id) as HTMLInputElement).value)])), Object.keys(RANDOM_RANGES));
+const expectInRanges = (values: Record<string, number>) => {
+  for (const [key, [min, max]] of Object.entries(RANDOM_RANGES)) {
+    expect(values[key], key).toBeGreaterThanOrEqual(min);
+    expect(values[key], key).toBeLessThanOrEqual(max);
+  }
+};
+
+test('a fresh start opens with the laser look: Reactivity to Fringing, then Drift', async ({ page }) => {
+  await page.goto('/');
+  const labels = await page.locator('#w-look label').evaluateAll((els) => els.map((e) => [...e.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim())?.textContent?.trim()));
+  expect(labels.filter((l) => l !== 'Resolution')).toEqual(['Reactivity', 'Speed', 'Trails', 'Colour', 'Colour cycling', 'Synesthesia', 'Fringing', 'Drift']);
+  expect(await rolledValues(page)).toEqual({ reactivity: 1, speed: 1, trails: 0.35, hue: 0, cycle: 0.2, synesthesia: 0.3, aberration: 0 });
+});
 
 test('randomize: rolls the look without changing scene unless the random-scene box is ticked; Shift+R goes back', async ({ page }) => {
   await seedScenes(page, [solidScene('Red Room', '1., 0., 0.'), solidScene('Blue Room', '0., 0., 1.')]);   // for the random scene to pick
@@ -19,6 +37,12 @@ test('randomize: rolls the look without changing scene unless the random-scene b
   await page.locator('#randomize').focus();
   await page.keyboard.press('Enter');
   await expect.poll(() => lookValues(page)).not.toEqual(before);
+  expectInRanges(await rolledValues(page));
+  for (let roll = 0; roll < 10; roll++) {   // every roll lands in laser-friendly territory
+    await page.keyboard.press('Enter');
+    expectInRanges(await rolledValues(page));
+  }
+  for (let roll = 0; roll < 10; roll++) await page.keyboard.press('Shift+R');   // back to the first roll
   await expect(page.locator('#scene-name')).toHaveText(scene ?? '');
   await expect(page.locator('#resolution')).toHaveValue(resolution);   // a performance setting, left alone
 
@@ -50,6 +74,7 @@ test('drift: the look sliders glide on their own while it is on, and stop when i
   await page.locator('#driftSpeed').fill('4');
   const start = await lookValues(page);
   await expect.poll(() => lookValues(page), { timeout: 10_000 }).not.toEqual(start);
+  expectInRanges(await rolledValues(page));
   await expect(page.locator('#resolution')).toHaveValue(resolution);
 
   await page.locator('#drift').uncheck();

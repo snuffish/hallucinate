@@ -1,10 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { defaultLook } from './app-state';
-import { LookDrift, RANDOM_RANGES, type DriftKey } from './look-drift';
+import { LookDrift, RANDOM_RANGES, STRONGEST_LOOK, type DriftKey } from './look-drift';
 
 // A repeatable "random" sequence.
 const seeded = (seed = 1) => () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 const keys = Object.keys(RANDOM_RANGES) as DriftKey[];
+
+describe('laser defaults and ranges', () => {
+  it('opens with the laser look', () => {
+    expect(defaultLook()).toMatchObject({ reactivity: 1, speed: 1, trails: 0.35, hue: 0, cycle: 0.2, synesthesia: 0.3, aberration: 0 });
+  });
+
+  it('lets Randomize and Drift pick only from laser-friendly ranges', () => {
+    expect(RANDOM_RANGES).toEqual({
+      reactivity: [0.6, 1.4], speed: [0.5, 1.6], trails: [0, 0.6], hue: [0, 1],
+      cycle: [0, 1], synesthesia: [0, 0.6], aberration: [0, 0.006],
+    });
+  });
+
+  it('names the strongest Look: the top of every range', () => {
+    expect(STRONGEST_LOOK).toEqual({ reactivity: 1.4, speed: 1.6, trails: 0.6, hue: 1, cycle: 1, synesthesia: 0.6, aberration: 0.006 });
+  });
+});
 
 describe('LookDrift', () => {
   it('glides every slider smoothly, inside its range once it gets there, and leaves the rest alone', () => {
