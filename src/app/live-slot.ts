@@ -10,6 +10,7 @@
 // screen's whenever its show scene changes. Created by the controller; publishes `liveName` and
 // `screenMode`. Nothing per frame allocates.
 
+import { NO_EFFECTS, type EffectStack } from '../engine/effects';
 import { toUniform, type ParamSpec, type ParamValues } from '../engine/params';
 import type { Hearing } from '../engine/listener';
 import { composeFrame, copyMotion, crossfade, programState, type FrameLook, type Motion, type Transition } from '../engine/look';
@@ -18,8 +19,9 @@ import { LOOK_KEYS, type AppState } from '../state/app-state';
 import type { Store } from '../state/store';
 import type { ScreenMode, UIState } from '../state/ui-state';
 
-// A show scene on an output: a scene, its parameter values and its look sliders.
-export interface Shot { scene: number; values: ParamValues; look: Readonly<Record<string, number>> }
+// A show scene on an output: a scene, its parameter values, its look sliders and its effects (none when
+// it has no `effects`).
+export interface Shot { scene: number; values: ParamValues; look: Readonly<Record<string, number>>; effects?: EffectStack }
 
 // What one renderer draws this frame. `params` stands in for the stored @param values of the scenes it
 // lists (Renderer.render's second argument).
@@ -69,7 +71,7 @@ export class LiveSlot {
     const from = this.pin && this.pin.shot.scene !== shot.scene ? this.pin.shot : null;
     if (!this.pin) copyMotion(this.liveMotion, this.deps.state.clock);   // Live goes on from the screen
     this.pin = {
-      shot: { scene: shot.scene, values: shot.values, look },
+      shot: { scene: shot.scene, values: shot.values, look, effects: shot.effects },
       from,
       prevScene: from?.scene ?? -1,
       transitionStart: this.deps.state.clock.clock,
@@ -118,6 +120,7 @@ export class LiveSlot {
     if (!shot) {
       const p = this.fill(f, base);
       p.scene = -1; p.prevScene = -1; p.mix = 1; p.master = 0;
+      p.effects = p.prevEffects = NO_EFFECTS;
       return f;
     }
     this.compose(f, base, shot, null, 1, this.previewMotion, dt);
@@ -132,7 +135,8 @@ export class LiveSlot {
     return this.compose(this.live, base, pin.shot, pin.from, mix, this.liveMotion, dt);
   }
 
-  // `base` (the master, the media, the spectrum) into `f`'s program, which keeps its own grade.
+  // `base` (the master, the media, the spectrum) into `f`'s program, which keeps its own grade. It copies
+  // the main screen's effects too: every caller sets its own.
   private fill(f: Frame, base: ProgramState): ProgramState {
     const grade = f.program.grade;
     const p = Object.assign(f.program, base);
@@ -153,6 +157,7 @@ export class LiveSlot {
   private compose(f: FullFrame, base: ProgramState, shot: Shot, from: Shot | null, mix: number, motion: Motion, dt: number): FullFrame {
     const p = this.fill(f, base);
     p.scene = shot.scene; p.prevScene = from?.scene ?? -1; p.mix = mix;
+    p.effects = shot.effects ?? NO_EFFECTS; p.prevEffects = from?.effects ?? NO_EFFECTS;   // each picture keeps its own
     composeFrame(p, motion, this.deps.hearing, this.frameLook(shot.look), this.deps.state.scenes[shot.scene]?.trails ?? 1, dt);
     const params = f.params;
     for (const k in params) delete params[k];

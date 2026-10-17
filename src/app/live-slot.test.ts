@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { EffectStack } from '../engine/effects';
 import type { Hearing } from '../engine/listener';
 import { parseParams, type ParamValues } from '../engine/params';
 import { programState } from '../engine/look';
@@ -27,6 +28,8 @@ function slot() {
   return { live, state, ui, toasts, base, at, hearing };
 }
 const glow = (v: number): ParamValues => ({ uGlow: v });
+const MIRRORED: EffectStack = [{ id: 'mirror', on: true, settings: { axis: 0 } }];
+const FLIPPED: EffectStack = [{ id: 'mirror', on: true, settings: { axis: 1 } }];
 
 describe('LiveSlot', () => {
   it('with nothing pinned, the screen and the projectors show the main program', () => {
@@ -169,6 +172,28 @@ describe('LiveSlot', () => {
     expect(p.grade).not.toBe(base.grade);
     expect(p.grade.tint[0]).toBeGreaterThan(1);       // bright sound warms Live
     expect(base.grade.tint).toEqual(tint);
+  });
+
+  it("carries the main screen's effects on both pictures to the screen and the projectors", () => {
+    const { live, base } = slot();
+    base.effects = base.prevEffects = MIRRORED;
+    const out = live.route(base, true, 0);
+    expect(out.screen.program).toMatchObject({ effects: MIRRORED, prevEffects: MIRRORED });
+    expect(out.projector!.program).toMatchObject({ effects: MIRRORED, prevEffects: MIRRORED });
+  });
+
+  it("draws Live and Preview with their own show scene's effects, never the main screen's", () => {
+    const { live, base, at } = slot();
+    base.effects = base.prevEffects = MIRRORED;
+    live.take({ scene: 1, values: glow(2), look: {} }, 'Beta');
+    expect(live.route(base, true, 0).projector!.program).toMatchObject({ effects: [], prevEffects: [] });
+    at(10);
+    live.take({ scene: 2, values: glow(1), look: {}, effects: FLIPPED }, 'Gamma flipped', 2);
+    at(11);
+    expect(live.route(base, true, 0).projector!.program).toMatchObject({ scene: 2, prevScene: 1, effects: FLIPPED, prevEffects: [] });
+    expect(live.preview(base, { scene: 0, values: glow(1), look: {} }, 0).program).toMatchObject({ effects: [], prevEffects: [] });
+    expect(live.preview(base, { scene: 0, values: glow(1), look: {}, effects: FLIPPED }, 0).program).toMatchObject({ effects: FLIPPED });
+    expect(live.preview(base, null, 0).program).toMatchObject({ effects: [], prevEffects: [] });
   });
 
   it('reuses its frames and uniforms from frame to frame', () => {
