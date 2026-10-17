@@ -65,23 +65,19 @@ await sample('point-storm', 8000);
 
 // What effects cost per frame at the default resolution, against none: the app's profiler times the
 // pipeline on the scene on screen (Point Storm) at the canvas's size and at 1920×1080 (a projector's
-// load), with and without each stack. Settings as the catalogue has them (src/engine/effects.ts).
-const EFFECT_STACKS = {
-  'glow-default': [{ id: 'glow', on: true, settings: { strength: 0.8, radius: 10 } }],
-  'glow-strongest': [{ id: 'glow', on: true, settings: { strength: 1.5, radius: 24 } }],
-  'all-four-default': [
-    { id: 'mirror', on: true, settings: { axis: 0 } },
-    { id: 'kaleidoscope', on: true, settings: { segments: 6, spin: 0.3 } },
-    { id: 'glow', on: true, settings: { strength: 0.8, radius: 10 } },
-    { id: 'wave', on: true, settings: { amount: 0.4, wavelength: 0.4 } },
-  ],
-  'all-four-strongest': [
-    { id: 'mirror', on: true, settings: { axis: 2 } },
-    { id: 'kaleidoscope', on: true, settings: { segments: 12, spin: 1 } },
-    { id: 'glow', on: true, settings: { strength: 1.5, radius: 24 } },
-    { id: 'wave', on: true, settings: { amount: 1, wavelength: 1 } },
-  ],
-};
+// load), with and without each stack. The stacks are built in the page from the catalogue the dev server
+// serves (src/engine/effects.ts): Glow and every effect, at their defaults and at their strongest.
+const EFFECT_STACKS = await page.evaluate(async () => {
+  const { EFFECTS, addEffect, strongest } = await import('/src/engine/effects.ts');
+  const defaults = (ids) => ids.reduce((stack, id) => addEffect(stack, id), []);
+  const all = EFFECTS.map((e) => e.id);
+  return {
+    'glow-default': defaults(['glow']),
+    'glow-strongest': strongest('glow'),
+    'all-four-default': defaults(all),
+    'all-four-strongest': all.flatMap((id) => strongest(id)),
+  };
+});
 if (!gpu) await page.keyboard.press('Shift+P');   // installs window.__profiler
 results['effects-cost'] = {};
 for (const [name, effects] of Object.entries(EFFECT_STACKS)) for (const size of [undefined, [1920, 1080]]) {
