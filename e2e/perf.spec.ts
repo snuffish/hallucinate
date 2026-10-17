@@ -65,8 +65,9 @@ test('perf: the profiler reports what a Glow costs per frame at the default reso
 // Every effect stacked, each at its strongest: what a show scene that uses them all costs per frame,
 // against none, at the default resolution. A smaller picture than the canvas (at the same resolution
 // scale) and fewer frames keep it to seconds under software WebGL, where a full-size Glow alone takes
-// a minute.
+// a minute (and still 40 s beside the other specs' workers, hence the longer timeout).
 test('perf: the profiler reports what all the effects stacked cost per frame at the default resolution, against none', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
   await start(page, '/?perf');
   const all = EFFECTS.flatMap((e) => strongest(e.id));
   const cost = await page.evaluate((effects) => (window as unknown as { __profiler: ProfilerApi }).__profiler.effectsCost(effects, { size: [640, 360], frames: 10, rounds: 3 }), all);
