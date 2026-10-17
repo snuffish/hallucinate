@@ -101,7 +101,7 @@ export const TOOLS = [
   }),
   tool({
     name: 'set_look',
-    description: 'Adjust the global look sliders that apply to every scene. hue 0-1 (colour shift), cycle 0-2 (colour cycling speed), trails 0-0.97 (afterglow: how long a line keeps glowing where it was drawn, fading in place; 0 = none), speed 0-2.5 (animation speed), reactivity 0-2 (how strongly visuals follow the music), aberration 0-0.04 (fringing: how far each line splits into red, green and blue copies; 0 = none), synesthesia 0-1 (how much the sound\'s tone tints the colours).',
+    description: 'Adjust the global look sliders that apply to every scene. hue 0-1 (colour shift), cycle 0-2 (colour cycling speed), trails 0-0.97 (afterglow: how long a line keeps glowing where it was drawn, fading in place; 0 = none), speed 0-2.5 (animation speed), reactivity 0-2 (how strongly visuals follow the music), aberration 0-0.04 (fringing: how far each line splits into red, green and blue copies; 0 = none), synesthesia 0-1 (how much the music tints the colours: the sound\'s tone warms or cools them and the music\'s mood is always part of it; 0 = off).',
     inputSchema: z.object(Object.fromEntries(lookKeys.map((k) => [k, z.number().optional()])) as Record<(typeof lookKeys)[number], z.ZodOptional<z.ZodNumber>>),
     outputSchema: record,
     running: () => 'Adjusting the look',

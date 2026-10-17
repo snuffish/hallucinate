@@ -203,7 +203,7 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 
 ## Adding things
 
-- **A scene:** add a module to `src/scenes/` that builds it with `scene(name, category, description, glsl)`, and list it in `SCENES` in `src/scenes/index.ts` (key order). The shared shader header (`header.ts`) and the new-scene template (`template.ts`) live there too. A scene reads only scene inputs and the header's helpers (lines with `beam(d, w)`); a helper two scenes need goes into the header. `e2e/builtin-scenes.spec.ts` picks every listed scene up and checks it against the laser-show checklist.
+- **A scene:** add a module to `src/scenes/` that builds it with `scene(name, category, description, glsl)`, and list it in `SCENES` in `src/scenes/index.ts` (key order). The shared shader header (`header.ts`) and the new-scene template (`template.ts`) live there too. A scene reads only scene inputs and the header's helpers (lines with `beam(d, w)`); a helper two scenes need goes into the header. `e2e/builtin-scenes.spec.ts` picks every listed scene up and checks it against the laser-show checklist, the safety rules with the Look applied: at the default Look and at the strongest (`STRONGEST_LOOK`), through `still(index, { look })`.
   Tag uniforms or constants with `// @param` for live controls.
 - **A visual-maker block:** add an entry to `NODE_TYPES` in `src/engine/nodes.ts` (and a helper to `LIBS` if it
   needs GLSL). The examples test compiles every example graph.
