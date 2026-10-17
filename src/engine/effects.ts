@@ -288,9 +288,9 @@ const glslFloat = (x: number): string => (Number.isInteger(x) ? `${x}.` : String
 
 // An effect's picture step as a whole fragment shader. It reads the picture so far (uTex), the scene's own
 // picture (uScene), the result of its own passes if it has any (uPassed), the scene inputs (the same
-// uniforms, so the Look's Reactivity reaches its movement), the effects' turn (uTurn) and its settings, and blends back to the scene's
-// own picture towards the edges (the edge fade). Each effect of a stack fades the same way, so however many
-// run, the border shows the scene alone.
+// uniforms, so the Look's Reactivity reaches its movement), the effects' turn (uTurn) and its settings,
+// and blends back to the scene's own picture towards the edges (the edge fade). Each effect of a stack
+// fades the same way, so however many run, the border shows the scene alone.
 export function effectShader(def: EffectDef): string {
   return /* glsl */ `${header(def)}
 uniform sampler2D uScene, uPassed;
