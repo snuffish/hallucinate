@@ -38,7 +38,9 @@ async function openProfiler(page: Page): Promise<ListedScene[]> {
   return (await page.evaluate(() => (window as Hook).__profiler!.scenes())).filter((s) => s.builtin);
 }
 
-test('every built-in scene is listed, compiles, has a tab and 3–8 parameters', async ({ page }) => {
+// Whether each one compiles is checked by its scene × Look tests below: a still renders it. Rendering
+// all eight here too took over a minute under software WebGL.
+test('every built-in scene is listed, has a tab and 3–8 parameters', async ({ page }) => {
   const builtins = await openProfiler(page);
   expect(builtins.map((s) => s.name), 'the app lists the scenes this spec checks').toEqual(SCENES.map((s) => s.name));
 
@@ -47,8 +49,6 @@ test('every built-in scene is listed, compiles, has a tab and 3–8 parameters',
   await page.keyboard.press('Escape');
 
   for (const scene of builtins) {
-    const { error } = await page.evaluate((index) => (window as Hook).__profiler!.still(index), scene.index);
-    expect.soft(error, `${scene.name} compiles`).toBeNull();
     expect.soft(tabs, `${scene.name}'s category has a tab`).toContain(scene.cat);
     expect.soft(scene.params, `${scene.name} has at least 3 parameters`).toBeGreaterThanOrEqual(3);
     expect.soft(scene.params, `${scene.name} has at most 8 parameters`).toBeLessThanOrEqual(8);
