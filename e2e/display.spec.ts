@@ -77,12 +77,12 @@ test('display: lines stay one pixel thin at the default Resolution, and soften a
   await playUserScene(page, STRIPES);
   await page.locator('#trails').fill('0');       // a still picture: no afterglow…
   await page.locator('#aberration').fill('0');   // …and no colour split
-  await page.waitForTimeout(500);
-  const sharp = stripeContrast(await patch(page, 0.5, 0.5));
-  expect(sharp).toBeGreaterThan(100);
+  const contrast = async () => stripeContrast(await patch(page, 0.5, 0.5));
+  await expect.poll(contrast, { timeout: 30_000 }).toBeGreaterThan(100);   // once the start-up crossfade has settled
+  const sharp = await contrast();
 
   await page.keyboard.press(',');
   await page.locator('#pref-resolution').fill('0.5');   // Settings → Display & performance
   await page.keyboard.press('Escape');
-  await expect.poll(async () => stripeContrast(await patch(page, 0.5, 0.5))).toBeLessThan(sharp / 2);
+  await expect.poll(contrast, { timeout: 30_000 }).toBeLessThan(sharp / 2);
 });
