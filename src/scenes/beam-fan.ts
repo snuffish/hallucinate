@@ -37,10 +37,10 @@ void main() {
     float level = .35 + 1.3 * spec(.04 + .5 * f);                     // calm but lit when quiet
     level += (i == chase ? 1.6 * tickFlash() : 0.);  // the tick chase
     level += 2. * strobe;
-    vec3 c = mix(rainbow(uHue + (f - .5) * .08), vec3(1.), .55 * strobe);
+    vec3 c = mix(laser(uHue + (f - .5) * .08), vec3(1.), .55 * strobe);
     col += c * beam(d, WIDTH * px) * level * mix(1., .45, clamp(r, 0., 1.));
   }
-  col += rainbow(uHue) * beam(r, 5. * px) * (1. + strobe);            // hot spot at the source
+  col += laser(uHue) * beam(r, 5. * px) * (1. + strobe);            // hot spot at the source
   fragColor = vec4(col, 1.);
 }
 `;

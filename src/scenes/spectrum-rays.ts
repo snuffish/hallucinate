@@ -37,10 +37,10 @@ void main() {
     float d = along > len ? length(vec2(along - len, across)) : abs(across);
     float kicked = mod(i + uTicks, 3.) < .5 ? strobe : 0.;      // a staggered third of the rays
     float level = (.35 + 1.2 * loud + 2. * kicked) * mix(.35, 1., clamp(along / max(len, .01), 0., 1.));
-    vec3 c = mix(rainbow(uHue + (f - .5) * .12), vec3(1.), .5 * kicked);
+    vec3 c = mix(laser(uHue + (f - .5) * .12), vec3(1.), .5 * kicked);
     col += c * (beam(d, WIDTH * px) * level + beam(length(vec2(along - len, across)), 2. * WIDTH * px) * (.6 + kicked));
   }
-  col += rainbow(uHue) * beam(r, 4. * px) * (1. + strobe);         // hot spot at the centre
+  col += laser(uHue) * beam(r, 4. * px) * (1. + strobe);         // hot spot at the centre
   fragColor = vec4(col, 1.);
 }
 `;
