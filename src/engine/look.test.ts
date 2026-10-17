@@ -21,6 +21,12 @@ describe('composeFrame', () => {
     expect(p.zoom).toBeCloseTo(1.006 + 1.5 * 0.025);
   });
 
+  it('never flashes a kick brighter than 1, whatever the reactivity', () => {
+    expect(frame(sound({ beat: 1 }), { ...defaultLook(), reactivity: 2 }).beat).toBe(1);
+    expect(frame(sound({ beat: 0.6 }), { ...defaultLook(), reactivity: 2 }).beat).toBe(1);
+    expect(frame(sound({ beat: 0.4 }), { ...defaultLook(), reactivity: 2 }).beat).toBeCloseTo(0.8);
+  });
+
   it('passes the tick phase and count to the shaders as heard, whatever the reactivity', () => {
     const p = frame(sound({ tickPhase: 0.25, ticks: 37 }), { ...defaultLook(), reactivity: 2 });
     expect(p.tickPhase).toBe(0.25);
@@ -51,12 +57,29 @@ describe('composeFrame', () => {
     expect(off.mood).toBe(0.5);
   });
 
-  it('runs the clock faster with louder music and jumps the hue on a kick', () => {
+  it('runs the clock faster with louder music', () => {
     const quiet = still(), loud = still();
     for (let i = 0; i < 120; i++) { frame(sound({ level: 0 }), defaultLook(), quiet); frame(sound({ level: 1 }), defaultLook(), loud); }
     expect(loud.time).toBeGreaterThan(quiet.time * 1.5);
-    const m = still();
-    frame(sound({ kick: true }), { ...defaultLook(), cycle: 0, reactivity: 1 }, m, 0);
-    expect(m.huePhase).toBeCloseTo(0.03);
+  });
+
+  it('at Colour cycling 0 holds the hue across kicks, at any reactivity', () => {
+    for (const reactivity of [0, 1, 2]) {
+      const m = still();
+      for (let i = 0; i < 60; i++) frame(sound({ kick: i % 10 === 0, beat: 1 }), { ...defaultLook(), cycle: 0, reactivity }, m);
+      expect(m.huePhase).toBe(0);
+    }
+  });
+
+  it('jumps the hue on a kick further the higher Colour cycling is', () => {
+    const jump = (cycle: number) => { const m = still(); frame(sound({ kick: true }), { ...defaultLook(), cycle }, m, 0); return m.huePhase; };
+    expect(jump(0.5)).toBeGreaterThan(0);
+    expect(jump(1)).toBeGreaterThan(jump(0.5));
+    expect(jump(2)).toBeGreaterThan(jump(1));
+  });
+
+  it('jumps the hue on a kick no further at higher reactivity', () => {
+    const jump = (reactivity: number) => { const m = still(); frame(sound({ kick: true }), { ...defaultLook(), cycle: 1, reactivity }, m, 0); return m.huePhase; };
+    expect(jump(2)).toBe(jump(1));
   });
 });
