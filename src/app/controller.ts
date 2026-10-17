@@ -92,6 +92,7 @@ export class AppController {
   mediaSound = readFlag(KEYS.mediaSound);
   // Device preferences (Settings overlay, src/state/prefs.ts).
   readonly prefs = new Store<Prefs>(loadPrefs());
+  private resolution = 0;   // the Resolution setting the renderer was last set to
   // Where each frame's time goes (Shift+P, or ?perf / ?perf=trace in the URL). Off: one flag check per stage.
   readonly profiler = new FrameProfiler();
 
@@ -156,12 +157,11 @@ export class AppController {
     this.paramStore = new ParamStore();
     this.state = {
       scenes: list.scenes, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
-      look: { ...defaultLook(), resolution: this.prefs.get().startResolution }, clock: defaultClock(), activeSource: null,
+      look: defaultLook(), clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
     this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound });
     this.renderer.setMedia(this.media);
-    this.renderer.setScale(this.state.look.resolution);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
     this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what));
     this.live = new LiveSlot({ state: this.state, hearing: this.listener.hearing, specs: (i) => this.library.specs(i), stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
@@ -312,9 +312,14 @@ export class AppController {
   }
 
   // Pushes the preferences to whatever uses them: this renderer, the projectors, the studio's Preview
-  // monitor (its hook), the audio analysis, the badges and the idle timer. Start resolution is read once, at startup.
+  // monitor (its hook), the audio analysis, the badges and the idle timer. Resolution reaches the
+  // projectors with each frame.
   private applyPrefs(): void {
     const p = this.prefs.get();
+    if (p.resolution !== this.resolution) {
+      this.profiler.cancelFill();   // a GPU test measures one resolution
+      this.renderer.setScale((this.resolution = p.resolution));   // a rescale restarts the trails: only on a change
+    }
     applyRendererPrefs(this.renderer, outputPrefs(p));
     this.output.sendPrefs(outputPrefs(p));
     this.hooks.onPrefs?.(p);
@@ -558,10 +563,6 @@ export class AppController {
     const r = LOOK_RANGES[key];
     const v = Math.min(r.max, Math.max(r.min, value));
     this.state.look[key] = v;
-    if (key === 'resolution') {
-      this.profiler.cancelFill();   // a GPU test measures one resolution
-      this.renderer.setScale(v);
-    }
     this.ui.set({ look: { ...this.state.look } });
   }
 
@@ -820,7 +821,7 @@ export class AppController {
   // the trails restart), then back. Resolves with null if it was cut short.
   runFillTest(): Promise<FillResult | null> {
     if (!this.profiler.on) this.setPerf(true);
-    const done = this.profiler.startFill((s) => this.renderer.setScale(s), () => this.state.look.resolution, this.state.clock.scene);
+    const done = this.profiler.startFill((s) => this.renderer.setScale(s), () => this.prefs.get().resolution, this.state.clock.scene);
     this.ui.set({ perf: this.perfReport() });
     return done;
   }
@@ -829,7 +830,7 @@ export class AppController {
     return this.profiler.report({
       size: this.renderer.size,
       scale: this.renderer.scale,
-      resolution: this.state.look.resolution,
+      resolution: this.prefs.get().resolution,
       scene: this.state.clock.scene,
       projectors: this.ui.get().outputs.length,
       preview: this.ui.get().overlay === 'studio',
@@ -886,7 +887,7 @@ export class AppController {
     const out = this.live.route(p, this.output.connected, dt);
     this.renderer.render(out.screen.program, out.screen.params);
     this.profiler.lap(Stage.render);
-    if (out.projector) this.output.sendFrame(out.projector.program, out.projector.params, look.resolution);
+    if (out.projector) this.output.sendFrame(out.projector.program, out.projector.params, this.prefs.get().resolution);
     this.profiler.lap(Stage.output);
     this.hooks.onFrame?.(dt, p);
     this.profiler.lap(Stage.studio);

@@ -5,6 +5,18 @@ import { fakeApp, type FakeApp } from './fake-app';
 import { StudioSession } from './studio';
 import { KEYS, flushAll } from '../state/persistence';
 import type { Plan } from '../state/show-plan';
+import { DEFAULT_PREFS } from '../state/prefs';
+
+// The Preview monitor's renderer needs a GPU: a stand-in records the scale it is asked to render at.
+const previewScales: number[] = [];
+vi.mock('../engine/renderer', async (original) => ({
+  ...await original<typeof import('../engine/renderer')>(),
+  Renderer: class {
+    setMedia(): void {}
+    setMaxPixelRatio(): void {}
+    setScale(s: number): void { previewScales.push(s); }
+  },
+}));
 
 // The app in memory (fake-app.ts): the preview renderer is never created because setOpen() is not called.
 const app3 = () => fakeApp({ scenes: [{ name: 'Alpha', cat: 'Fractal', trails: 1 }, { name: 'Beta', cat: 'Tunnel & 3D', trails: 1 }, { name: 'Gamma', cat: 'Organic', trails: 1 }] });
@@ -229,5 +241,20 @@ describe('StudioSession pinned Live', () => {
     expect(app.ui.get().liveName).toBeNull();
     expect(app.state.clock.scene).toBe(1);
     expect(app.library.values(1)).toEqual({ uGlow: 1 });
+  });
+});
+
+describe('StudioSession Preview monitor', () => {
+  it('renders at the Resolution setting, and follows it when it changes', () => {
+    const app = fakeApp();
+    let prefs = { ...DEFAULT_PREFS, resolution: 0.8 };
+    Object.assign(app, { prefs: { get: () => prefs } });
+    const s = session(app);
+    s.setOpen(true, {} as HTMLCanvasElement);
+    expect(previewScales.at(-1)).toBe(0.8);   // what Live renders at, not a monitor-sized fraction of it
+
+    prefs = { ...prefs, resolution: 0.5 };
+    app.hooks.onPrefs!(prefs);
+    expect(previewScales.at(-1)).toBe(0.5);
   });
 });

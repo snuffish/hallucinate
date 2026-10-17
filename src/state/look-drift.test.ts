@@ -24,7 +24,6 @@ describe('LookDrift', () => {
       expect(look[k]).toBeLessThanOrEqual(RANDOM_RANGES[k][1]);
       expect(look[k]).not.toBe(defaultLook()[k]);
     }
-    expect(look.resolution).toBe(defaultLook().resolution);
     expect(look.mood).toBe(true);
   });
 

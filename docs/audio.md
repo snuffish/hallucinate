@@ -44,8 +44,9 @@ warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm col
 
 ## 🎨 The Look widget
 
-Look sliders: reactivity, speed, trails (feedback), colour, colour cycling, chromatic aberration, synesthesia, Drift
-speed and render resolution (lower it if frames drop).
+Look sliders: reactivity, speed, trails (feedback), colour, colour cycling, chromatic aberration, synesthesia and Drift
+speed. Resolution isn't part of the Look: it is in [Settings → Display & performance](settings.md#display--performance)
+(lower it if frames drop).
 
 - **Drift** – the Look sliders glide to new random values on their own, each at its own pace, so the look keeps
   changing smoothly; *Drift speed* sets how fast. A slider you move by hand drifts on from there.
