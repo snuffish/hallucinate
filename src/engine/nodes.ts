@@ -8,7 +8,7 @@ export type PortType = 'float' | 'vec2' | 'vec3';
 export interface NodeInput { name: string; type: PortType; def: number | number[] | string }
 export interface NodeOutput { name: string; type: PortType }
 export type NodeParamDef =
-  | { name: string; kind: 'select'; options: string[]; def: string }
+  | { name: string; kind: 'select'; options: string[]; def: string; saved?: string }   // saved: what a saved graph that names none, or an unknown one, gets
   | { name: string; kind: 'text' | 'color'; def: string }
   | { name: string; kind: 'number'; def: number };
 export type NodeParams = Record<string, string | number>;
@@ -30,7 +30,7 @@ const f = (name: string, def: number): NodeInput => ({ name, type: 'float', def 
 const v2 = (name: string): NodeInput => ({ name, type: 'vec2', def: 'uv' });
 const v3 = (name: string, def: number[] = [0, 0, 0]): NodeInput => ({ name, type: 'vec3', def });
 const out = (name: string, type: PortType): NodeOutput => ({ name, type });
-const select = (name: string, options: string[], def: string = options[0]!): NodeParamDef => ({ name, kind: 'select', options, def });
+const select = (name: string, options: string[], def: string = options[0]!, saved?: string): NodeParamDef => ({ name, kind: 'select', options, def, saved });
 const field = (name: string, kind: 'text' | 'color', def: string): NodeParamDef => ({ name, kind, def });
 const numberField = (name: string, def: number): NodeParamDef => ({ name, kind: 'number', def });
 const label = (text: string | number | undefined) => String(text ?? '').replace(/["\n]/g, '').trim() || 'Value';
@@ -47,6 +47,9 @@ const PALETTES: Record<string, Unary> = {
   ice: (t) => `pal(${t} + uHue, vec3(.4, .6, .8), vec3(.3), vec3(1.), vec3(.5, .55, .6))`,
   acid: (t) => `pal(${t} + uHue, vec3(.5), vec3(.5), vec3(2., 1., 0.), vec3(.5, .2, .25))`,
 };
+// A new Palette block starts on laser; one saved before laser existed, or naming a palette that is gone,
+// keeps the rainbow it always fell back to.
+const SAVED_PALETTE = 'rainbow';
 const MATH: Record<string, Binary> = {
   add: (a, b) => `${a} + ${b}`,
   subtract: (a, b) => `${a} - ${b}`,
@@ -75,7 +78,7 @@ const BLENDS: Record<string, Binary> = {
   difference: (a, b) => `abs(${a} - ${b})`,
   lighten: (a, b) => `max(${a}, ${b})`,
 };
-const pick = <T>(table: Record<string, T>, key: string | number | undefined): T => table[String(key)] ?? Object.values(table)[0]!;
+const pick = <T>(table: Record<string, T>, key: string | number | undefined, fallback: string = Object.keys(table)[0]!): T => table[String(key)] ?? table[fallback]!;
 
 export const NODE_TYPES: Record<string, NodeType> = {
   // ----- Input
@@ -146,7 +149,7 @@ export const NODE_TYPES: Record<string, NodeType> = {
   threshold: { title: 'Smooth step', cat: 'Math', help: 'Soft 0 → 1 as x goes from "from" to "to".', inputs: [f('x', 0), f('from', 0), f('to', 1)], outputs: [out('out', 'float')], emit: (a) => ({ out: `smoothstep(${a.from}, ${a.to}, ${a.x})` }) },
 
   // ----- Color
-  palette: { title: 'Palette', cat: 'Color', params: [select('preset', Object.keys(PALETTES))], help: 'Turns a number into a colour (repeats every 1.0).', inputs: [f('t', 0)], outputs: [out('color', 'vec3')], emit: (a, p) => ({ color: pick(PALETTES, p.preset)(a.t!) }) },
+  palette: { title: 'Palette', cat: 'Color', params: [select('preset', Object.keys(PALETTES), 'laser', SAVED_PALETTE)], help: 'Turns a number into a colour (repeats every 1.0).', inputs: [f('t', 0)], outputs: [out('color', 'vec3')], emit: (a, p) => ({ color: pick(PALETTES, p.preset, SAVED_PALETTE)(a.t!) }) },
   colorPicker: {
     title: 'Colour picker', cat: 'Color',
     help: 'A colour you can change live from the Parameters overlay while the scene runs.',
@@ -231,9 +234,14 @@ export type GraphNode = z.infer<typeof GraphNodeSchema>;
 export type GraphLink = z.infer<typeof GraphLinkSchema>;
 export type Graph = z.infer<typeof GraphSchema>;
 
+// What a new block of this type starts with.
 export function defaultParams(type: string): NodeParams {
   return Object.fromEntries((NODE_TYPES[type]?.params ?? []).map((p) => [p.name, p.def]));
 }
+
+// What a saved block gets for a parameter it doesn't name: the new-block default, unless that changed since.
+const savedDefaults = (type: string): NodeParams =>
+  Object.fromEntries((NODE_TYPES[type]?.params ?? []).map((p) => [p.name, (p.kind === 'select' && p.saved) || p.def]));
 
 // Mismatched types are converted instead of refused, so any wire "just works".
 const CONVERT: Record<string, Unary> = {
@@ -296,7 +304,7 @@ export function compileGraph(graph: Graph): string {
         args[input.name] = wrap(literal(input, node.values[input.name]));
       }
     }
-    const params = { ...defaultParams(node.type), ...node.params };
+    const params = { ...savedDefaults(node.type), ...node.params };
     const exprs = def.emit(args, params, node.id);
     if (def.uniform) uniforms.push(def.uniform(node.id, params));
     for (const o of def.outputs) lines.push(`  ${o.type} n${node.id}_${o.name} = ${exprs[o.name]};`);

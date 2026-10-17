@@ -52,6 +52,25 @@ describe('compileGraph', () => {
     expect(rainbow).not.toContain('laser(');
   });
 
+  it('a saved Palette block that names no palette, or one that no longer exists, stays on rainbow', () => {
+    const paletteGraph = (params: Record<string, string>) => ({
+      nodes: [
+        { id: 1, type: 'uv', x: 0, y: 0, values: {}, params: {} },
+        { id: 2, type: 'palette', x: 0, y: 0, values: {}, params },
+        { id: 3, type: 'output', x: 0, y: 0, values: {}, params: {} },
+      ],
+      links: [
+        { from: 1, out: 'p', to: 2, in: 't' },
+        { from: 2, out: 'color', to: 3, in: 'color' },
+      ],
+    });
+    for (const params of [{}, { preset: 'sunset' }] as Record<string, string>[]) {
+      const code = compileGraph(paletteGraph(params));
+      expect(code, JSON.stringify(params)).toContain('rainbow(');
+      expect(code, JSON.stringify(params)).not.toContain('laser(');
+    }
+  });
+
   it('rejects loops and graphs without an output', () => {
     expect(() => compileGraph({ nodes: [{ id: 1, type: 'uv', x: 0, y: 0, values: {}, params: {} }], links: [] })).toThrow(/Output/);
     const loop = {
