@@ -7,6 +7,8 @@
 - An **Effects** widget, docked under the Look: add a **Mirror** to the main screen (left↔right, top↕bottom or both),
   switch it on and off and remove it. It stays through scene changes and reloads, and projectors showing the main
   screen show it too. See [ADR 0003](docs/adr/0003-effects-belong-to-the-show-scene.md).
+- A **Wave** effect: the picture ripples and bends, with an amount and a wavelength, and each kick sends a ripple
+  outward from the centre, scaled by Reactivity.
 
 ### Changed
 
