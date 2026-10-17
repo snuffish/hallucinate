@@ -36,6 +36,6 @@ test('My Shader follows the ticks: uTick sweeps through each beat and uTicks cou
   await expect.poll(async () => {
     const [r, , b] = await centreColour(page);
     reds.push(r); blues.push(b);
-    return Math.min(...reds) < 80 && Math.max(...reds) > 150 && Math.min(...blues) < 40 && Math.max(...blues) > 200;
+    return Math.min(...reds) < 80 && Math.max(...reds) > 150 && Math.min(...blues) < 40 && Math.max(...blues) > 160;   // a full channel tonemaps to ~185, with no saturation boost
   }, { timeout: 120_000, intervals: [100] }).toBe(true);
 });

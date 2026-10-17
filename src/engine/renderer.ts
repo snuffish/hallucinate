@@ -75,7 +75,7 @@ void main() {
   col = 1. - exp(-col * 1.3);
   col = pow(col, vec3(uContrast));            // >1 crisper darks, <1 hazy and soft
   float l = dot(col, vec3(.299, .587, .114));
-  col = mix(vec3(l), col, 1.15 * uSat);
+  col = mix(vec3(l), col, uSat);
   col *= 1. - dot(c, c) * .6;
   // Grain fades out below a low brightness, so black stays exactly black on a projector.
   float lit = smoothstep(0., .05, max(col.r, max(col.g, col.b)));
