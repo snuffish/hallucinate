@@ -81,7 +81,7 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
       if (!scenes[snap.scene] || scenes[snap.scene]!.removed) return;
       for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) setLook(k, snap.look[k]!);
       library.replaceValues(snap.scene, snap.values);
-      state.effects = snap.effects;
+      if (snap.effects !== state.effects) { state.effects = snap.effects; ui.set({ effects: snap.effects }); }   // as the controller's setEffects
       show(snap.scene, fade);
     },
   };

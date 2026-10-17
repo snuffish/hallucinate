@@ -283,8 +283,10 @@ describe('StudioSession effects', () => {
     s.setOpen(true, null);
     s.take(s.cues[0]!);
     expect(app.state.effects).toEqual(MIRRORED);
+    expect(app.ui.get().effects, 'the Effects widget shows them').toEqual(MIRRORED);
     s.take(s.cues[1]!);
     expect(app.state.effects).toEqual([]);   // a show scene without effects clears them
+    expect(app.ui.get().effects).toEqual([]);
   });
 
   it('Preview shows the picked show scene with its effects', () => {
