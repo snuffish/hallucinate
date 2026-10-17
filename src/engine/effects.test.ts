@@ -107,4 +107,12 @@ describe('the catalogue', () => {
   it("runs an effect at its strongest at the top of every setting's range", () => {
     expect(strongest('mirror')).toEqual([{ id: 'mirror', on: true, settings: { axis: 2 } }]);   // both axes
   });
+
+  it('folds a Kaleidoscope into 3 to 12 whole segments, strongest at 12 and its fastest spin', () => {
+    const k = EFFECTS.find((e) => e.id === 'kaleidoscope')!;
+    expect(k.settings.map((s) => [s.key, s.min, s.max, s.step])).toEqual([['segments', 3, 12, 1], ['spin', 0, 1, 0.01]]);
+    expect(cleanStack([{ id: 'kaleidoscope', settings: { segments: 7.6, spin: 4 } }])[0]!.settings).toEqual({ segments: 8, spin: 1 });
+    expect(cleanStack([{ id: 'kaleidoscope', settings: { segments: 1 } }])[0]!.settings.segments).toBe(3);
+    expect(strongest('kaleidoscope')).toEqual([{ id: 'kaleidoscope', on: true, settings: { segments: 12, spin: 1 } }]);
+  });
 });
