@@ -7,6 +7,11 @@
 - An **Effects** widget, docked under the Look: add a **Mirror** to the main screen (left↔right, top↕bottom or both),
   switch it on and off and remove it. It stays through scene changes and reloads, and projectors showing the main
   screen show it too. See [ADR 0003](docs/adr/0003-effects-belong-to-the-show-scene.md).
+- Show scenes keep their effects: *What's on Live now* and *Update from Live* store the screen's, a take with the
+  studio open brings them back to the screen, and Preview, Live and every projector show them. Through a fade each
+  picture keeps its own effects; a cut switches them with the scene. Shows saved before effects load with none, a
+  damaged effect is dropped without losing the show, and an exported show carries its effects while still opening
+  (without them) in an older copy. Show scenes the director and the assistant write have none.
 
 ### Changed
 

@@ -29,6 +29,9 @@ auto-switch or the library), come back after a reload, and show on any projector
 and Drift leave them alone, and library previews show scenes without them. Near the edges every effect fades back to
 the scene's own picture, so the border stays as dark as the scene keeps it.
 
+A show scene keeps its effects too ([Studio](studio.md)): *What's on Live now* and ⤓ *Update from Live* store the
+screen's effects in it, and taking it with the studio open puts its effects on the screen in place of yours.
+
 **⚙** (or **,**) opens [Settings](settings.md): how this computer renders and listens, how soon the controls hide, and
 whether buttons show their key badges.
 

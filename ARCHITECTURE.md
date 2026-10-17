@@ -50,7 +50,8 @@ browser                                              dev server (Vite middleware
   sharing, the microphone went away). It is the only writer of `activeSource`, and the one place that says whether
   the music is `playing` (a paused or finished file is still the source, but not playing).
 - **The Live slot** (`src/app/live-slot.ts`, the controller's `live`): closing the studio with a show scene Live pins
-  it there. Projectors keep it, and crossfade from it on the next take with each show scene's own values, while the
+  it there. Projectors keep it, and crossfade from it on the next take with each show scene's own values and
+  effects (a take of the same scene switches both at once: one scene draws with one set of values), while the
   screen is free to browse (or shows Live too, from the Screen widget). `route()` decides each frame what the main
   canvas and the projectors draw; the studio's Preview monitor is composed by the same code (`preview()`), and the
   slot publishes `liveName` and `screenMode`. Live and Preview compose with their show scene's own look (reactivity,
@@ -72,8 +73,9 @@ browser                                              dev server (Vite middleware
   The panels only subscribe and render; the shortcuts and the tools reach the same objects. The sessions see
   the app through `AppPort` (`src/app/app-port.ts`), the part of the controller they use; the tests use one
   in-memory fake of it (`src/app/fake-app.ts`), so neither can drift from what the sessions need. A scene goes
-  on screen as a whole through `applyScene` / `captureScene` (scene, parameter values, look), the way the studio
-  takes it. A scene's code, its `@params` and their stored values belong to the scene library
+  on screen as a whole through `applyScene` / `captureScene` (scene, parameter values, look, effects), the way the
+  studio takes it. On the main screen both pictures of a crossfade draw with the screen's effects, except that a
+  show scene put there by `applyScene` leaves the outgoing picture the stack it had until the fade ends. A scene's code, its `@params` and their stored values belong to the scene library
   (`src/app/scene-library.ts`, the controller's `library`): compiling into a scene, adding one of yours (one rule for
   "Save to library" and the assistant's `create_scene`), removing it and setting values all go through it, and it
   tells the controller what changed, which keeps the renderer, the projector and the Parameters panel current. It
