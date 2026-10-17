@@ -6,8 +6,8 @@
 
 <p align="center">
   <b>Psychedelic, audio-reactive visuals for your music, rendered in real time with WebGL2 shaders.</b><br>
-  40 scenes that follow the beat · a live GLSL editor · a node-based visual maker · an OBS-style studio with projector output ·<br>
-  a beat-driven game · an AI assistant that writes and fixes scenes for you, inside the app.
+  scenes that follow the beat · a live GLSL editor · a node-based visual maker · an OBS-style studio with projector output ·<br>
+  an AI assistant that writes and fixes scenes for you, inside the app.
 </p>
 
 <p align="center">
@@ -40,34 +40,43 @@ Needs Node 22.12 or newer. SoundCloud and YouTube also need [yt-dlp](https://git
 and the AI assistant needs a Claude subscription or an Anthropic API key ([setup](docs/assistant.md#setup)).
 Press **?** in the app for help and every shortcut.
 
-## ✨ At a glance
+## ✨ Scenes: a laser show
+
+The eight built-in scenes are a set built for one style, a laser show: thin luminous lines, beams and points on pure
+black ([ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md)). They come in four categories: **Beams** (Beam Fan,
+Light Sheet, Spectrum Rays), **Geometry** (Ring Run, Wire Solid, Point Storm), **Fields** (Contour Lines) and
+**Media** (Scan Trace, which redraws your video or camera). Each reacts to the kicks, the ticks of the tempo and the
+bands, and the number keys 1–8 play them in this order. Write your own scenes in the code editor or the visual
+maker, or ask the assistant for one.
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/hyper-tunnel.jpg" alt="Hyper Tunnel" width="100%"><br><sub><b>Hyper Tunnel</b> · endless twisting tiled tunnel</sub></td>
-    <td align="center"><img src="docs/screenshots/neon-loop.jpg" alt="Neon Loop" width="100%"><br><sub><b>Neon Loop</b> · repeated space folding with neon glow</sub></td>
-    <td align="center"><img src="docs/screenshots/liquid-blobs.jpg" alt="Liquid Blobs" width="100%"><br><sub><b>Liquid Blobs</b> · metaballs that melt with the bass</sub></td>
+    <td align="center"><img src="docs/screenshots/beam-fan.jpg" alt="Beam Fan" width="100%"><br><sub><b>Beam Fan</b> · Beams · a fan of beams from the floor</sub></td>
+    <td align="center"><img src="docs/screenshots/light-sheet.jpg" alt="Light Sheet" width="100%"><br><sub><b>Light Sheet</b> · Beams · a laser ceiling rippling with the spectrum</sub></td>
+    <td align="center"><img src="docs/screenshots/ring-run.jpg" alt="Ring Run" width="100%"><br><sub><b>Ring Run</b> · Geometry · polygon rings flying towards you</sub></td>
+    <td align="center"><img src="docs/screenshots/wire-solid.jpg" alt="Wire Solid" width="100%"><br><sub><b>Wire Solid</b> · Geometry · a turning wireframe polyhedron</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/star-nest.jpg" alt="Star Nest" width="100%"><br><sub><b>Star Nest</b> · volumetric flight through a Kali fractal</sub></td>
-    <td align="center"><img src="docs/screenshots/mandala-bloom.jpg" alt="Mandala Bloom" width="100%"><br><sub><b>Mandala Bloom</b> · petals and rings that bloom with the mids</sub></td>
-    <td align="center"><img src="docs/screenshots/voronoi-glass.jpg" alt="Voronoi Glass" width="100%"><br><sub><b>Voronoi Glass</b> · stained-glass cells that flash on the beat</sub></td>
+    <td align="center"><img src="docs/screenshots/spectrum-rays.jpg" alt="Spectrum Rays" width="100%"><br><sub><b>Spectrum Rays</b> · Beams · one ray per frequency</sub></td>
+    <td align="center"><img src="docs/screenshots/contour-lines.jpg" alt="Contour Lines" width="100%"><br><sub><b>Contour Lines</b> · Fields · contour lines over drifting terrain</sub></td>
+    <td align="center"><img src="docs/screenshots/point-storm.jpg" alt="Point Storm" width="100%"><br><sub><b>Point Storm</b> · Geometry · laser dots thrown by the kicks</sub></td>
+    <td align="center"><img src="docs/screenshots/scan-trace.jpg" alt="Scan Trace" width="100%"><br><sub><b>Scan Trace</b> · Media · your video as laser scan lines</sub></td>
   </tr>
 </table>
 
-<sub>Stills from a software-rendered headless browser (`scripts/screenshots.mjs`); on a GPU the scenes run at full frame rate with motion trails.</sub>
+<sub>Stills from a software-rendered headless browser (`scripts/screenshots.mjs`); on a GPU the scenes run at full frame rate.</sub>
 
 ## 🎛 Features
 
-<img src="docs/screenshots/main.jpg" alt="Hyper Tunnel playing with the panel's widgets on the left (Source, Media, Audio, Scene) and its live parameters on the right" width="100%">
+<img src="docs/screenshots/main.jpg" alt="Beam Fan playing with the panel's widgets on the left (Source, Media, Audio, Scene) and its live parameters on the right" width="100%">
 
 | | Feature | |
 | --- | --- | --- |
 | 🎧 | **[Audio](docs/audio.md)** | Play a file, SoundCloud, the mic, a browser tab or the built-in demo beat. A full player with tempo, and *synesthesia* that colours the visuals by how the music sounds. |
-| 🎬 | **[Scenes](docs/scenes.md)** · L | 40 scenes in seven categories that crossfade on the beat, a searchable library with favourites, and **Beat Racer** (G), a game driven by your music. |
+| 🎬 | **[Scenes](docs/scenes.md)** · L | Eight laser-show scenes in four categories (Beams, Geometry, Fields and Media). Your scenes crossfade on the beat, in a searchable library with favourites. |
 | 🧑‍💻 | **[Code editor](docs/editor.md)** · E | Edit any scene's GLSL live, with errors shown as you type. Tag a value with `// @param` and it becomes a slider (P). |
 | 🧩 | **[Visual maker](docs/visual-maker.md)** · N | Build scenes by wiring blocks together, then send the result to code. |
-| 🖼️ | **[Media](docs/media.md)** | Drop an image or video, or pick one from YouTube, and warp it with the Media scenes. |
+| 🖼️ | **[Media](docs/media.md)** | Drop an image or video, or pick one from YouTube: Scan Trace redraws it as laser scan lines, and any scene can sample it with `media(p)`. |
 | 📺 | **[Studio & projector](docs/studio.md)** · O | An OBS-style Preview / Live studio with projector windows, fades, an autopilot that counts beats, and an AI Director that plans the set. |
 | ✦ | **[AI assistant](docs/assistant.md)** · I | Claude writes and fixes scenes, sets parameters and runs the studio for you, across several conversations. |
 | 🪟 | **[Interface](docs/interface.md)** | Dockable, resizable widgets with a remembered layout, and help on every panel. |

@@ -1,24 +1,31 @@
-# 🎬 Scenes, the library & Beat Racer
+# 🎬 Scenes & the library
 
 [← Back to the README](../README.md)
 
 ## Scenes
 
-40 visual scenes in seven categories (Fractal · Tunnel & 3D · Geometric · Organic · Spectrum · Space · Media). Every
-scene has [live parameters](editor.md#-live-parameters--press-p) suited to it — speeds, counts, sizes, colours and
-on/off layers (press P); their defaults are the scene's original look:
-Kaleido Fractal · Hyper Tunnel · Mandala Bloom · Liquid Plasma · Gyroid Cave · Wave Orbits · Julia Morph · Voronoi Glass · Hex Pulse ·
-Aurora Veil · Radial EQ · Oscilloscope · Truchet Weave · Moiré Bloom · Hyperspace · Menger Halls · Flower of Life ·
-Quasicrystal · Tumbling Blocks · Polygon Tunnel · Op Art Lens · Tesseract · Spirograph ·
-Lissajous Knot · Mirror Kaleidoscope · Retro Plasma · Starfield · Sunburst · Lava Lamp · the seven
-[Media scenes](media.md), plus four written from techniques made famous on Shadertoy (own implementations, not copied code):
+The built-in scenes are a **laser show**: thin luminous lines, beams and points on pure black (see
+[ADR 0001](adr/0001-replace-all-built-in-scenes.md)). Every one reacts to the kicks, the ticks of the tempo and the
+bands, takes its colour from the hue slider and colour cycling, and keeps the background pure black. They are
+strobe-safe: no change from one frame to the next makes more than a quarter of the frame over twice as bright more than
+3 times a second, at any tempo. There are eight; the number keys play them in this order:
 
-| Scene | Technique | Inspired by |
-| --- | --- | --- |
-| Neon Loop | repeated `fract()` folding + inverse-distance neon glow | kishimisu, *An introduction to Shader Art Coding* |
-| Star Nest | volumetric march through a tiled 3D Kali fractal | Kali, *Star Nest* |
-| Neon Jacks | glow accumulation while raymarching repeated shapes | *Phantom Star* / *Octagrams* style |
-| Liquid Blobs | smooth-min metaballs; bass melts them, spectrum sizes them | *Audio Reactive Liquid Blobs* |
+| Key | Scene | Category | What it does |
+| --- | --- | --- | --- |
+| 1 | **Beam Fan** | Beams | A fan of thin beams rising from the bottom edge. It sweeps, opens with the bass, strobes on kicks and chases one beam along on each tick. |
+| 2 | **Light Sheet** | Beams | A laser ceiling: scan lines receding to a horizon, rippling with the spectrum (near lines = bass, far = treble). A bright front runs out to the horizon on each tick, a kick sends a wave from the near lines to the far ones, and haze glows around the lines. |
+| 3 | **Ring Run** | Geometry | Thin polygon rings flying towards you. A new ring is born on each tick, the rings glow with the spectrum and flare on kicks; the polygon and ring speed are parameters. |
+| 4 | **Wire Solid** | Geometry | A wireframe polyhedron of beams turning in perspective. It becomes the next solid every 4 ticks, swells with the bass, a spark steps from vertex to vertex on each tick, and its front edges flare on kicks. |
+| 5 | **Spectrum Rays** | Beams | A star of beams from the centre, one per frequency (bass at the top, treble at the bottom), each as long as its band is loud. It turns slowly, steps one ray on each tick and strobes a third of its rays on kicks. |
+| 6 | **Contour Lines** | Fields | Glowing contour lines over a slowly drifting island of terrain. The bass lifts the land, the lines climb a step on each tick, and a kick lights every third one. |
+| 7 | **Point Storm** | Geometry | Hundreds of laser dots on three nested rings holding a polygon or star. A kick throws them outwards, they loosen between ticks and pull into a new shape on each tick; the bass, mids and treble each light a ring. |
+| 8 | **Scan Trace** | Media | Your video or camera redrawn as horizontal laser scan lines, each pushed up by the brightness beneath it. A scan beam runs down the lines on each tick and kicks flash every third line; with nothing loaded the lines lie flat. |
+
+They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only while it has
+scenes. You can also play the [Node Scene](visual-maker.md), **My Shader** and your own saved scenes (*Mine*).
+
+A show you saved that uses a removed scene keeps that show scene, marked *missing scene* in the [Studio](studio.md):
+taking it only shows a message, and the autopilot and the director skip it.
 
 With *Auto-switch* on (A), scenes crossfade every 32 detected beats (or 45 s), picking from the scenes in rotation.
 
@@ -37,12 +44,4 @@ Every scene as a card with a rendered preview. Filter by category or search, the
 
 Keyboard, with the library open: `/` jumps to the search box (`Esc` leaves it, a second `Esc` closes the library),
 `Tab` / `Shift+Tab` cycle the categories, `←` `↑` `↓` `→` move through the hits (also while typing), `Enter` plays the
-highlighted scene, `1`–`9` and `0` play the first ten scenes as everywhere else.
-
-## 🏁 Beat Racer (game) — press G
-
-<img src="screenshots/beat-racer.jpg" alt="Beat Racer: a synthwave road, walls dropping on the beat, the live spectrum as mountains" width="100%">
-
-A synthwave racer driven by your music: walls drop on every detected beat, the mountains are the live spectrum.
-Steer with ← / →, dodge walls (+1 × multiplier), grab orbs (+10 × multiplier). The multiplier grows every 8 in a row;
-3 lives; Enter restarts. Best score is remembered.
+highlighted scene, `1`–`9` and `0` play the first ten scenes (built-ins first, then yours) as everywhere else.

@@ -24,7 +24,7 @@ What the music sounds like right now: its bands, kicks, ticks, tempo, tone, ener
 _Avoid_: features, audio state
 
 **Kick**:
-A clear bass hit heard in the music. Kicks jump the hue, drop Beat Racer's walls and count towards auto-switch.
+A clear bass hit heard in the music. Kicks jump the hue, as far as colour cycling allows, and count towards auto-switch.
 _Avoid_: beat, onset
 
 **Tick**:
@@ -51,6 +51,11 @@ _Avoid_: vibe
 
 ## The picture
 
+**Scene**:
+A picture that moves with the music, with its own parameters and a category. Built-in scenes ship with the app;
+your own are saved from the editor. Any scene may also show your video, camera or images.
+_Avoid_: visual, effect, shader, preset
+
 **Look**:
 The sliders that shape how a scene reacts and colours: reactivity, speed, trails, hue, colour cycling, fringing,
 synesthesia.
@@ -60,10 +65,27 @@ _Avoid_: style, settings
 How strongly the picture follows the music's bands and kicks. The tone and the mood are not scaled by it.
 _Avoid_: sensitivity, gain
 
+**Trails**:
+How long a line keeps glowing where it was drawn after the scene has moved on, like an afterglow.
+_Avoid_: feedback, motion trails
+
+**Fringing**:
+How far each line splits into red, green and blue copies towards the edges of the picture.
+_Avoid_: aberration, chromatic aberration
+
 **Synesthesia**:
 How strongly the tone and the mood grade the picture: dark sound dim, cool and lingering, bright sound light, warm
 and crisp, energetic music saturated.
 _Avoid_: colour grade (that is what it does)
+
+**Drift**:
+The Look sliders wandering to random values on their own, each at its own pace, within the Randomize ranges.
+_Avoid_: auto-look, wander
+
+**Laser palette**:
+The wheel of pure, fully saturated colours that the built-in scenes colour their lines from. Your own scenes can use
+it, or the softer rainbow.
+_Avoid_: rainbow (that is the softer one)
 
 **Show scene**:
 A scene with its parameter values and the look it keeps, as the studio plays it.

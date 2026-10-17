@@ -112,7 +112,6 @@ export function SceneBody({ onOpenLibrary }: { onOpenLibrary: () => void }) {
       {liveName && <div id="live-pin" className="live-pin" title="The projector shows the Live show scene. The Screen widget switches this screen between your preview and Live; the studio (O) puts Live back on screen too.">● LIVE · {liveName} <span>· {screenMode === 'live' ? 'on screen' : 'screen is a preview'}</span></div>}
       <div className="scene-buttons">
         <button id="open-library" onClick={onOpenLibrary}>Scene library<Kbd hotkey={HOTKEYS.library} /></button>
-        <button id="play-game" onClick={() => app.setScene(app.state.gameIndex)}>Beat Racer<Kbd hotkey={HOTKEYS.game} /></button>
       </div>
       <label className="toggle"><input type="checkbox" id="auto" checked={auto} onChange={(e) => app.setLookFlag('auto', e.target.checked)} /> Auto-switch on the beat <Kbd hotkey={HOTKEYS.auto} /></label>
     </>
@@ -149,7 +148,7 @@ const SLIDERS: { key: LookKey; label: string; hint?: string }[] = [
   { key: 'trails', label: 'Trails' },
   { key: 'hue', label: 'Colour' },
   { key: 'cycle', label: 'Colour cycling' },
-  { key: 'synesthesia', label: 'Synesthesia', hint: 'dark sound → dim & cool · bright sound → light & warm' },
+  { key: 'synesthesia', label: 'Synesthesia', hint: 'dark sound → dim & cool · bright sound → light & warm · energetic mood → vivid & warm' },
 ];
 
 export function LookBody() {
@@ -162,9 +161,7 @@ export function LookBody() {
   return (
     <>
       {SLIDERS.map((s) => <label key={s.key}>{s.label} {s.hint && <small>{s.hint}</small>}{slider(s.key)}</label>)}
-      <label className="toggle"><input type="checkbox" id="mood" checked={look.mood} onChange={(e) => app.setLookFlag('mood', e.target.checked)} /> Mood from tempo <small>fast → vivid & warm · slow → muted & cool</small></label>
-      <label>Aberration {slider('aberration')}</label>
-      <label>Resolution {slider('resolution')}</label>
+      <label>Fringing {slider('aberration')}</label>
       <label className="toggle"><input type="checkbox" id="drift" checked={look.drift} onChange={(e) => app.setLookFlag('drift', e.target.checked)} /> Drift <small>sliders glide to random values, each at its own pace</small></label>
       {look.drift && <label>Drift speed {slider('driftSpeed')}</label>}
     </>

@@ -6,6 +6,9 @@
 // duration, so per-pass numbers would point at the wrong shader (PERF.md). Instead `FillTest` renders
 // at half scale for a moment and compares frame rates. Plain TypeScript, no DOM: unit-tested.
 
+import type { FrameLook } from './look';
+import type { SnapshotUniforms } from './scene-inputs';
+
 export const STAGES = ['audio', 'logic', 'render', 'output', 'studio', 'ui', 'react'] as const;
 export type StageName = (typeof STAGES)[number];
 // Laps take an index, so the frame loop never looks a stage up by name.
@@ -13,7 +16,7 @@ export const Stage = { audio: 0, logic: 1, render: 2, output: 3, studio: 4, ui: 
 
 export const STAGE_LABELS: Record<StageName, string> = {
   audio: 'Audio analysis',
-  logic: 'Clock, look & game',
+  logic: 'Clock & look',
   render: 'Draw calls',
   output: 'Projector link',
   studio: 'Studio & Preview',
@@ -376,9 +379,23 @@ export interface ProfilerApi {
   report(): PerfReport | null;
   fillTest(): Promise<FillResult | null>;
   reset(): void;
-  scenes(): { index: number; name: string }[];
+  scenes(): ListedScene[];
   setScene(index: number): void;
+  // One still frame of a scene (1280×720: lines drawn in pixels look as they do on a screen) with the
+  // inputs you give on top of the stand-in ones; `silent` swaps the stand-in spectrum for silence.
+  // Without `look`: the scene and the display pass, no trails, a neutral grade. With one: a short burst
+  // of frames through the whole pipeline (trails, fringing, grade) with that Look, ending on the
+  // returned one, as the audience would see it. The built-in conformance spec uses it to hear silence
+  // and kicks on cue. An image, or why the scene doesn't compile.
+  still(index: number, sound?: { inputs?: Partial<SnapshotUniforms>; silent?: boolean; look?: FrameLook }): Promise<{ error: string | null; image: ImageData | null }>;
+  // One frame's change with a Look applied: a burst with `from`'s inputs as still() draws it, then one
+  // more frame with `to`'s. The images either side of it (the strobe rule compares them), or why the
+  // scene doesn't compile. Half the frames of two stills.
+  stillChange(index: number, sound: { from: Partial<SnapshotUniforms>; to: Partial<SnapshotUniforms>; look: FrameLook }): Promise<{ error: string | null; images: [ImageData, ImageData] | null }>;
 }
+
+// A scene as scripts see it: its category, how many parameters it has, and whether it ships with the app.
+export interface ListedScene { index: number; name: string; cat: string; params: number; builtin: boolean }
 
 type GlobalTarget = { __profiler?: ProfilerApi };
 

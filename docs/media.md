@@ -3,17 +3,10 @@
 [← Back to the README](../README.md)
 
 Drop any image (png, jpg, gif, webp…) or video (mp4, webm, mov…) on the page, or use *Open file* in the panel's
-Media section. Every scene can sample it; the **Media** scenes are built for it, each with live parameters:
-
-| Scene | What it does |
-| --- | --- |
-| Media Kaleidoscope | mirrors it into 0–16 segments, zoom / spin |
-| Media Liquid | flowing noise warp, colour split, optional swirl |
-| Media Glitch | datamosh-style row shifts, RGB split, corrupted blocks, scanlines; bursts on the beat |
-| Media Halftone | print-style dots (ink on paper, or colour dots) |
-| Media Ripple | water ripples from a movable drop point |
-| Media Droste | endless zoom into copies of itself, with optional spiral arms |
-| Media Neon Edges | its outlines as glowing (rainbow) neon |
+Media section. The built-in [**Scan Trace**](scenes.md) (library → *Media*) is made for it: it redraws your picture
+as laser scan lines, each pushed up by the brightness beneath it, and the app switches to it when you load media
+while a scene that doesn't use media is playing. Every scene can also sample it with `media(p)` (a test pattern
+stands in until you drop one).
 
 ## YouTube
 

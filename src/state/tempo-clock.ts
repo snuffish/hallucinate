@@ -4,6 +4,7 @@
 //   clock.setBpm(124)            from the BPM estimate, whenever it changes
 //   clock.onDetectedBeat(now)    a real kick: counts as a tick (unless one just happened) and resets the phase
 //   clock.advance(now)           once per frame: how many ticks fell due since last time
+//   clock.phase(now)             how far through the current tick: 0 on the tick, rising towards 1
 
 export class TempoClock {
   private interval = 0;     // seconds per beat; 0 = no tempo yet
@@ -34,6 +35,12 @@ export class TempoClock {
     if (ticked) this.last = now;
     this.next = now + this.interval;
     return ticked;
+  }
+
+  // How far `now` is through the current tick, 0..1 (0 with no tempo yet).
+  phase(now: number): number {
+    if (!this.interval) return 0;
+    return Math.min(1, Math.max(0, (now - this.last) / this.interval));
   }
 
   // Ticks that fell due by `now`. After a long stall (tab hidden) it catches up by at most one.

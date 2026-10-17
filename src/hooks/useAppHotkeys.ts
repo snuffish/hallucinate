@@ -1,21 +1,19 @@
 // Registers the shortcuts from the registry with TanStack Hotkeys. Every binding has one owner: the
 // app (App.tsx) or a panel (the library, the visual maker, the assistant), which registers it with its
 // action through useHotkeyActions. The actions are a map typed by binding, so a binding without one
-// doesn't compile. Overlays and the game take some keys over, the visual maker takes them all;
+// doesn't compile. Overlays take some keys over, the visual maker takes them all;
 // `isEnabled` in the registry decides which is live, for every registration.
 
 import { useHotkeys, type UseHotkeyDefinition } from '@tanstack/react-hotkeys';
-import { useApp, useUI } from '../app/AppContext';
+import { useUI } from '../app/AppContext';
 import { CUE_DIGITS, CUE_DIGITS_WHEN, HOTKEYS, isEnabled, SCENE_DIGITS, SCENE_DIGITS_WHEN, type HotkeyActions, type HotkeyContext, type HotkeyDef, type HotkeyIdOf, type HotkeyOwner } from '../hotkeys/registry';
 
 function useHotkeyContext(): HotkeyContext {
-  const app = useApp();
   const overlay = useUI((ui) => ui.overlay);
   const assistantOpen = useUI((ui) => ui.assistantOpen);
   const helpOpen = useUI((ui) => ui.help !== null);
   const paramsVisible = useUI((ui) => ui.paramsVisible);
-  const sceneIndex = useUI((ui) => ui.sceneIndex);
-  return { overlay, inGame: sceneIndex === app.state.gameIndex, assistantOpen, helpOpen, paramsVisible };
+  return { overlay, assistantOpen, helpOpen, paramsVisible };
 }
 
 // After a shortcut, hand the keyboard back from any focused control (the old handler blurred too).
@@ -28,7 +26,7 @@ const binding = (def: HotkeyDef, fn: () => void, context: HotkeyContext): UseHot
   options: { enabled: isEnabled(def.when, context), preventDefault: true, ...(def.inInputs && { ignoreInputs: false }), meta: { name: def.label, group: def.group } },
 });
 
-// Several actions share a key (← is scene / steer / cue / library hit) and exactly one is enabled at a
+// Several actions share a key (← is scene / cue / library hit) and exactly one is enabled at a
 // time, so only the enabled ones are registered. Conflicts are allowed: when a panel takes a key over
 // (opening the library takes ←), its registration runs before the app's (a child's effects run first),
 // so both are registered until the app's effect drops its own, within the same commit. The registry

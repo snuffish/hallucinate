@@ -5,16 +5,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import { encodeJpeg } from '../engine/jpeg';
 import { stillUniforms } from '../engine/scene-inputs';
-import { CATEGORIES, type Scene } from '../engine/scenes';
+import type { Scene } from '../scenes';
 import { HOTKEYS } from '../hotkeys/registry';
 import { useHotkeyActions } from '../hooks/useAppHotkeys';
 import { Kbd } from '../hotkeys/Kbd';
-import { inRotation, isFav, listedScenes, togglePref } from '../state/library-prefs';
+import { SPECIAL_TABS, inRotation, isFav, libraryTabs, listedScenes, togglePref } from '../state/library-prefs';
 import { HelpButton } from './Help';
 
 // Stand-in audio for the previews, so they look like the scene mid-song rather than silent.
 const THUMB_UNIFORMS = stillUniforms();
-const SPECIAL = ['All', '★ Favourites', '⚙ Tweakable'];
 
 interface Thumb { url: string; frag: string; mediaVersion: number }
 
@@ -34,14 +33,13 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
   const prefs = app.libraryPrefs;
 
   const all = useMemo(() => listedScenes(app.state.scenes), [app, version]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const hasMine = all.some(({ s }) => s.user);
-  const tabs = ['All', '★ Favourites', '⚙ Tweakable', ...CATEGORIES, 'Game', ...(hasMine ? ['Mine'] : [])];
+  const tabs = useMemo(() => libraryTabs(app.state.scenes), [app, version]);   // eslint-disable-line react-hooks/exhaustive-deps
   const activeFilter = tabs.includes(filter) ? filter : 'All';
   const q = query.trim().toLowerCase();
   const shown = all.filter(({ s }) => {
     if (activeFilter === '★ Favourites' && !isFav(prefs, s)) return false;
     if (activeFilter === '⚙ Tweakable' && !s.params?.length) return false;
-    if (!SPECIAL.includes(activeFilter) && s.cat !== activeFilter) return false;
+    if (!SPECIAL_TABS.includes(activeFilter) && s.cat !== activeFilter) return false;
     return !q || `${s.name} ${s.cat} ${s.desc}`.toLowerCase().includes(q);
   });
   const rotating = all.filter(({ s }) => !s.kind && inRotation(prefs, s)).length;

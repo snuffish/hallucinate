@@ -3,7 +3,7 @@ import type { Hearing } from '../engine/listener';
 import { parseParams, type ParamValues } from '../engine/params';
 import { programState } from '../engine/look';
 import type { SceneUniforms } from '../engine/renderer';
-import type { Scene } from '../engine/scenes';
+import type { Scene } from '../scenes';
 import { defaultClock, defaultLook } from '../state/app-state';
 import { Store } from '../state/store';
 import { initialUIState } from '../state/ui-state';
@@ -19,7 +19,7 @@ function slot() {
   const stored: SceneUniforms[] = [{ uGlow: 0.1 }, { uGlow: 0.2 }, { uGlow: 0.3 }];
   const ui = new Store(initialUIState(look));
   const toasts: string[] = [];
-  const hearing: Hearing = { bass: 0.8, mid: 0.4, high: 0.2, level: 0.6, beat: 0, kick: false, tick: false, bpm: 120, bright: 0.5, centroid: 2500, energy: 0.5, mood: 0.5 };
+  const hearing: Hearing = { bass: 0.8, mid: 0.4, high: 0.2, level: 0.6, beat: 0, kick: false, tick: false, tickPhase: 0, ticks: 0, bpm: 120, bright: 0.5, centroid: 2500, energy: 0.5, mood: 0.5 };
   const live = new LiveSlot({ state, hearing, specs: () => GLOW, stored, ui, toast: (t) => { toasts.push(t); } });
   // The main program this frame: scene 0, crossfading from nothing.
   const base = { ...programState(), scene: 0, master: 0.8 };

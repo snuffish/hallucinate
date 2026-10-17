@@ -7,7 +7,7 @@ import { z, type ZodType } from 'zod';
 import { version as appVersion } from '../../package.json';
 import { GraphSchema } from '../engine/nodes';
 import { ParamDataSchema } from '../engine/params';
-import { SCENES } from '../engine/scenes';
+import { SCENES, type Scene } from '../scenes';
 import { StoredLayoutSchema, parseLayout } from '../state/layout';
 import { PrefsSchema } from '../state/library-prefs';
 import { KEYS, commitRaw, flagText, readFlag, readString } from '../state/persistence';
@@ -83,9 +83,9 @@ const issueText = (error: z.ZodError) => {
 };
 
 // Every name the app already uses: a saved scene can't share one (it would never be found by name).
-const RESERVED = new Set([...SCENES.map((s) => s.name), 'My Shader', 'Node Scene']);
+const reservedNames = (builtins: readonly Scene[]) => new Set([...builtins.map((s) => s.name), 'My Shader', 'Node Scene']);
 
-export function parseBundle(text: string): { ok: true; bundle: ParsedBundle } | { ok: false; error: string } {
+export function parseBundle(text: string, builtins: readonly Scene[] = SCENES): { ok: true; bundle: ParsedBundle } | { ok: false; error: string } {
   if (text.length > MAX_BUNDLE_BYTES) return { ok: false, error: 'This file is too big to be a Hallucinate export.' };
   let json: unknown;
   try { json = JSON.parse(text); } catch { return { ok: false, error: 'This file isn\'t valid JSON.' }; }
@@ -105,8 +105,9 @@ export function parseBundle(text: string): { ok: true; bundle: ParsedBundle } | 
 
   const scenes = (values.userScenes ?? []) as z.infer<typeof UserScenesSchema>;
   const seen = new Set<string>();
+  const reserved = reservedNames(builtins);
   for (const { name } of scenes) {
-    if (RESERVED.has(name)) return { ok: false, error: `Your scene "${name}" has the same name as a built-in scene. Rename it in the file to import it.` };
+    if (reserved.has(name)) return { ok: false, error: `Your scene "${name}" has the same name as a built-in scene. Rename it in the file to import it.` };
     if (seen.has(name)) return { ok: false, error: `There are two scenes called "${name}" in the file.` };
     seen.add(name);
   }

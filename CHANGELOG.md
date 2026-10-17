@@ -1,6 +1,39 @@
 # Changelog
 
+## Unreleased — the Look serves the laser set (2026-10-17)
+
+The Look widget now works with the laser set instead of against it. See
+[ADR 0002](docs/adr/0002-the-look-serves-the-laser-set.md).
+
+### Changed
+
+- The default Look shows crisp lines on black: light trails (0.35), slow colour cycling (0.2), no fringing and a
+  light Synesthesia (0.3). Dragging the sliders by hand still reaches their full ranges.
+- Trails are now an afterglow: a line fades where it was drawn. The tunnel zoom and the hidden spin are gone, and the
+  afterglow keeps the line's colour. A saved show scene with long trails now plays a long afterglow instead of a
+  tunnel; it is not migrated.
+- *Aberration* is renamed *Fringing* and defaults to 0.
+- Colour cycling at 0 holds the colour still, even on kicks; kicks jump the colour more as cycling goes up.
+- Synesthesia at 0 is off (it no longer boosts saturation), and it always includes the music's mood: the *Mood from
+  tempo* checkbox is gone.
+- Reactivity no longer makes kick flashes brighter.
+- Resolution moved from the Look widget to Settings → *Display & performance*. It applies at once, defaults to 100%,
+  and the studio's Preview renders at it too. The old *Start resolution* setting is not carried over.
+- Randomize and Drift pick from narrower, laser-friendly ranges (trails 0–0.6, fringing 0–0.006, synesthesia 0–0.6,
+  reactivity 0.6–1.4, speed 0.5–1.6), and Randomize no longer flips mood or spin.
+- The built-in scenes and the new-scene template use a new `laser` palette of pure, fully saturated colours, and a
+  new Palette block in the visual maker starts on it. `rainbow` keeps its colours for your own scenes, and saved graphs that name it (or no
+  palette) keep it.
+- The safety rules (black edges, strobe) now check every built-in scene with the Look applied, at the default Look and
+  at the strongest one Randomize or Drift can reach.
+
 ## Unreleased — the music and the visuals (2026-10-16)
+
+### Removed
+
+- Beat Racer, the game: its scene, the *Game* tab in the library, the toolbar button, the score overlay and the
+  assistant's knowledge of it. The G key is now free (it does nothing). See
+  [ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md).
 
 ### Fixed
 

@@ -89,11 +89,11 @@ test('a parked scene survives saving another scene, and saving under its name re
 
 test('import: an invalid file changes nothing and says why', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => localStorage.setItem('hallucinate.library', JSON.stringify({ favs: ['Star Nest'], off: [] })));
+  await page.evaluate(() => localStorage.setItem('hallucinate.library', JSON.stringify({ favs: ['Night Nest'], off: [] })));
   await openApp(page);
   await page.locator('#settings-file').setInputFiles(bundle({ library: { favs: 'all of them' } }));
   await expect(page.locator('#toast')).toContainText('The "library" section is broken');
-  expect(await page.evaluate(() => localStorage.getItem('hallucinate.library'))).toBe(JSON.stringify({ favs: ['Star Nest'], off: [] }));
+  expect(await page.evaluate(() => localStorage.getItem('hallucinate.library'))).toBe(JSON.stringify({ favs: ['Night Nest'], off: [] }));
 });
 
 test('import: another open tab reloads instead of writing its old state back', async ({ page, context }) => {
@@ -103,7 +103,7 @@ test('import: another open tab reloads instead of writing its old state back', a
   page.on('dialog', (d) => void d.accept());
   const otherReloaded = other.waitForEvent('load');
   const reloaded = page.waitForEvent('load');
-  await page.locator('#settings-file').setInputFiles(bundle({ library: { favs: ['Star Nest'], off: [] } }));
+  await page.locator('#settings-file').setInputFiles(bundle({ library: { favs: ['Night Nest'], off: [] } }));
   await Promise.all([otherReloaded, reloaded]);
-  expect(await other.evaluate(() => localStorage.getItem('hallucinate.library'))).toBe(JSON.stringify({ favs: ['Star Nest'], off: [] }));
+  expect(await other.evaluate(() => localStorage.getItem('hallucinate.library'))).toBe(JSON.stringify({ favs: ['Night Nest'], off: [] }));
 });

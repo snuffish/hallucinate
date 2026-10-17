@@ -13,7 +13,7 @@ browser                                              dev server (Vite middleware
 │ UI store  ◄───────────────┤               │        │   adapters: Anthropic API | Claude │
 │   ▲ publishes             ▼               │  SSE   │   CLI (subscription, locked down)  │
 │ AppController ── frame loop ── engines    │◄──────►│   MCP endpoint for the CLI          │
-│   (renderer, audio, media, game, params)  │        └───────────────────────────────────┘
+│   (renderer, audio, media, params)        │        └───────────────────────────────────┘
 │   shared Scene[] (stable indices)         │
 └──────────────┬────────────────────────────┘
                │ BroadcastChannel (scenes, per-frame state, media)
@@ -23,7 +23,7 @@ browser                                              dev server (Vite middleware
 ```
 
 - **Engines** (`src/engine/`) are plain classes with no DOM access beyond the canvas, media elements and
-  `localStorage`: `Renderer`, `AudioEngine`, `Listener`, `MediaLayer`, `BeatRacer`, the `@param` parser and store,
+  `localStorage`: `Renderer`, `AudioEngine`, `Listener`, `MediaLayer`, the `@param` parser and store,
   the visual-maker compiler, the projector link. Each one that holds a resource (GL objects, audio nodes, media,
   listeners) has `dispose()`. `AudioEngine` is the Web Audio graph only (sources, volume, recording, the demo
   beat); its `read()` hands the analyser's bins to the **Listener** (`src/engine/listener.ts`, the controller's
@@ -32,9 +32,9 @@ browser                                              dev server (Vite middleware
   frame, read by everything else (the sessions as `app.hearing`), and is tested with synthetic bins.
   `src/engine/look.ts` holds every rule from the sound to the picture: `composeFrame` turns a `Hearing`, a look and
   an output's `Motion` (its time, the time's pace, the hue's walk) into that output's frame state (reactivity, the
-  synesthesia grade, trails, fringing, zoom, spin, warp). The main screen (whose motion is the clock's), the pinned
+  synesthesia grade, the trails' afterglow, fringing). The main screen (whose motion is the clock's), the pinned
   Live slot and the studio's Preview monitor each compose their own, and `crossfade` is the one rule for how far a
-  transition is. What a scene's shader can read each frame (`uTime`, the bands, `uBeat`, `uHue`, `uBright`, `uMood`)
+  transition is. What a scene's shader can read each frame (`uTime`, the bands, `uBeat`, the tick's `uTick` / `uTicks`, `uHue`, `uBright`, `uMood`)
   is one table, `src/engine/scene-inputs.ts`: the header's declarations (`COMMON`, which the assistant's prompt
   embeds), the renderer's per-frame values, the visual maker's Audio block, the editor's cheat sheet, the template
   and the still-frame stand-ins are made from it, and a contract test checks each row.
@@ -161,8 +161,8 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
 ## Data flow per frame
 
 `AudioEngine.read` → the bins → `Listener.hear` (on real time, so the tempo reads right at any frame rate) → the
-`Hearing`: bands, kick and tick, BPM, tone, mood → `AppController.onBeats`: a kick jumps the hue, drops Beat Racer's
-walls and counts towards auto-switch, a tick is the studio's and the director's beat (both before the frame is
+`Hearing`: bands, kick and tick, BPM, tone, mood → `AppController.onBeats`: a kick jumps the hue and counts towards
+auto-switch, a tick is the studio's and the director's beat (both before the frame is
 composed) → `composeFrame` fills one reused `ProgramState` for the main screen (on the clock's motion) →
 `LiveSlot.route` composes Live (on its own motion) and decides what the screen and the
 projectors draw → `Renderer.render` (scene pass → feedback pass → display pass) → `OutputLink.sendFrame` when a
@@ -203,7 +203,7 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 
 ## Adding things
 
-- **A scene:** add a `scene(name, category, description, glsl)` line to `SCENES` in `src/engine/scenes.ts`.
+- **A scene:** add a module to `src/scenes/` that builds it with `scene(name, category, description, glsl)`, and list it in `SCENES` in `src/scenes/index.ts` (key order). The shared shader header (`header.ts`) and the new-scene template (`template.ts`) live there too. A scene reads only scene inputs and the header's helpers (lines with `beam(d, w)`); a helper two scenes need goes into the header. `e2e/builtin-scenes.spec.ts` picks every listed scene up and checks it against the laser-show checklist, the safety rules with the Look applied: at the default Look and at the strongest (`STRONGEST_LOOK`), through `still(index, { look })`.
   Tag uniforms or constants with `// @param` for live controls.
 - **A visual-maker block:** add an entry to `NODE_TYPES` in `src/engine/nodes.ts` (and a helper to `LIBS` if it
   needs GLSL). The examples test compiles every example graph.

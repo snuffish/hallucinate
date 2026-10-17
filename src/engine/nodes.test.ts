@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EXAMPLES, GraphSchema, NODE_TYPES, compileGraph, emptyGraph } from './nodes';
+import { EXAMPLES, GraphSchema, NODE_TYPES, compileGraph, defaultParams, emptyGraph } from './nodes';
 import { parseParams } from './params';
 
 describe('compileGraph', () => {
@@ -31,6 +31,44 @@ describe('compileGraph', () => {
     const code = compileGraph(graph);
     expect(code.match(/vec2 nk_kaleido\(/g)).toHaveLength(1);
     expect(code).toContain('vec3(n3_p, 0.)');
+  });
+
+  it('a new Palette block starts on the laser palette, and a graph that names rainbow keeps it', () => {
+    const paletteGraph = (params: Record<string, string>) => ({
+      nodes: [
+        { id: 1, type: 'uv', x: 0, y: 0, values: {}, params: {} },
+        { id: 2, type: 'palette', x: 0, y: 0, values: {}, params },
+        { id: 3, type: 'output', x: 0, y: 0, values: {}, params: {} },
+      ],
+      links: [
+        { from: 1, out: 'p', to: 2, in: 't' },
+        { from: 2, out: 'color', to: 3, in: 'color' },
+      ],
+    });
+    expect(defaultParams('palette')).toEqual({ preset: 'laser' });
+    expect(compileGraph(paletteGraph(defaultParams('palette') as Record<string, string>))).toContain('laser(');
+    const rainbow = compileGraph(paletteGraph({ preset: 'rainbow' }));
+    expect(rainbow).toContain('rainbow(');
+    expect(rainbow).not.toContain('laser(');
+  });
+
+  it('a saved Palette block that names no palette, or one that no longer exists, stays on rainbow', () => {
+    const paletteGraph = (params: Record<string, string>) => ({
+      nodes: [
+        { id: 1, type: 'uv', x: 0, y: 0, values: {}, params: {} },
+        { id: 2, type: 'palette', x: 0, y: 0, values: {}, params },
+        { id: 3, type: 'output', x: 0, y: 0, values: {}, params: {} },
+      ],
+      links: [
+        { from: 1, out: 'p', to: 2, in: 't' },
+        { from: 2, out: 'color', to: 3, in: 'color' },
+      ],
+    });
+    for (const params of [{}, { preset: 'sunset' }] as Record<string, string>[]) {
+      const code = compileGraph(paletteGraph(params));
+      expect(code, JSON.stringify(params)).toContain('rainbow(');
+      expect(code, JSON.stringify(params)).not.toContain('laser(');
+    }
   });
 
   it('rejects loops and graphs without an output', () => {

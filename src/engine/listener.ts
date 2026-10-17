@@ -37,6 +37,8 @@ export interface Hearing {
   beat: number;      // 1 on a kick, fading out within ~0.5 s
   kick: boolean;     // a kick (a clear bass hit) in this frame
   tick: boolean;     // a tick of the tempo clock in this frame: steady, through breakdowns, only while playing
+  tickPhase: number; // 0..1 how far through the current tick, 0 on each tick; holds still while not playing
+  ticks: number;     // the ticks so far
   bpm: number | null;   // held once known, until the next source
   bright: number;    // the tone: 0 dark, muffled … 1 bright, crisp (log of the spectral centroid)
   centroid: number;  // Hz, smoothed like the tone
@@ -49,7 +51,7 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const ease = (dt: number, seconds: number) => 1 - Math.exp(-dt / seconds);
 
 export class Listener {
-  readonly hearing: Hearing = { bass: 0, mid: 0, high: 0, level: 0, beat: 0, kick: false, tick: false, bpm: null, bright: 0.5, centroid: 0, energy: 0, mood: 0.5 };
+  readonly hearing: Hearing = { bass: 0, mid: 0, high: 0, level: 0, beat: 0, kick: false, tick: false, tickPhase: 0, ticks: 0, bpm: null, bright: 0.5, centroid: 0, energy: 0, mood: 0.5 };
   readonly spectrum = new Uint8Array(512);   // 256 texels * (log-frequency spectrum, waveform)
 
   private readonly tempo = new TempoClock();
@@ -74,6 +76,8 @@ export class Listener {
     }
     const ticked = h.kick && playing && this.tempo.onDetectedBeat(now);
     h.tick = playing && (this.tempo.advance(now) > 0 || ticked);
+    if (playing) h.tickPhase = this.tempo.phase(now);
+    if (h.tick) h.ticks++;
     h.energy = clamp01((this.avg.level - 0.15) / 0.4);
     const tempo = h.bpm ? clamp01((h.bpm - CALM_BPM) / (ENERGETIC_BPM - CALM_BPM)) : 0.5;
     h.mood += ((playing ? tempo * 0.65 + h.energy * 0.35 : 0.5) - h.mood) * ease(dt, MOOD_SECONDS);

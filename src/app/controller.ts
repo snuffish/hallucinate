@@ -3,22 +3,23 @@
 // AppContext. Panels that need deeper hooks (editor, studio, assistant) register them here.
 
 import { AudioEngine } from '../engine/audio';
-import { BeatRacer } from '../engine/game';
 import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
-import { composeFrame, crossfade, programState } from '../engine/look';
+import { composeFrame, composeStill, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
 import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState } from '../engine/renderer';
-import type { Scene } from '../engine/scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
-import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
+import { silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
+import type { Scene } from '../scenes';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type LookKey, type SourceButton } from '../state/app-state';
+import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
-import { buildSceneList, paramKey } from '../state/scene-list';
+import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
+import { takeRenameReport } from '../state/scene-renames';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { applyWrites, buildBundle, parseBundle } from './bundle';
@@ -68,7 +69,6 @@ export interface PickerApi {
 export class AppController {
   readonly audio = new AudioEngine();
   readonly media = new MediaLayer();
-  readonly game = new BeatRacer();
   readonly renderer: Renderer;
   readonly output: OutputLink;
   // The pinned Live slot (studio closed after a take): what projectors and the screen show, see live-slot.ts.
@@ -87,7 +87,7 @@ export class AppController {
   readonly listener = new Listener();
   readonly editor: EditorCore;
   readonly pickers: Partial<Record<'sc' | 'yt', PickerApi>> = {};
-  libraryPrefs: LibraryPrefs = loadLibraryPrefs();
+  libraryPrefs: LibraryPrefs;   // read after the scene list is built: a rename on load moves entries in it
   readonly hooks: ControllerHooks = {};
   mediaSound = readFlag(KEYS.mediaSound);
   // Device preferences (Settings overlay, src/state/prefs.ts).
@@ -105,20 +105,36 @@ export class AppController {
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly drift = new LookDrift();
   private driftFrames = 0;
-  private readonly beforeRandom: { look: Partial<Look>; scene: number }[] = [];   // Shift+R steps back through these
+  private readonly beforeRandom: { look: Record<DriftKey, number>; scene: number }[] = [];   // Shift+R steps back through these
   private toastKey = 0;
   private readonly downloads = new Map<'sc' | 'yt', DownloadView>();
   private disposed = false;
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly program: ProgramState;
-  private readonly paramStore = new ParamStore();
+  private readonly paramStore: ParamStore;   // likewise
   private readonly profilerApi: ProfilerApi = {
     report: () => (this.profiler.on ? this.perfReport() : null),
     fillTest: () => this.runFillTest(),
     reset: () => this.profiler.reset(),
-    scenes: () => this.state.scenes.flatMap((s, index) => (s.removed || index === this.state.gameIndex ? [] : [{ index, name: s.name }])),
+    scenes: () => this.state.scenes.flatMap((s, index) => (s.removed ? [] : [{ index, name: s.name, cat: s.cat, params: s.params.length, builtin: isBuiltin(s) }])),
     setScene: (index) => this.setScene(index),
+    still: async (index, { inputs = {}, silent = false, look } = {}) => {
+      const s = this.state.scenes[index];
+      const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
+      if (error) return { error, image: null };
+      const spectrum = silent ? silentSpectrum() : undefined;
+      if (!look) return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, spectrum) };
+      const frames = composeStill(index, stillUniforms(inputs), look, s!.trails ?? 1, spectrum ?? stillSpectrum());
+      return { error: null, image: await this.renderer.stillAsync(frames, 1280, 720) };
+    },
+    stillChange: async (index, { from, to, look }) => {
+      const s = this.state.scenes[index];
+      const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
+      if (error) return { error, images: null };
+      const frames = composeStill(index, stillUniforms(from), look, s!.trails ?? 1, stillSpectrum(), stillUniforms(to));
+      return { error: null, images: await this.renderer.stillPairAsync(frames, 1280, 720) };
+    },
   };
   // Another tab imported settings: this one's state is stale, so it must not write, and reloads.
   // Another tab changed a preference: take it over, so this tab's next write doesn't undo it.
@@ -146,14 +162,15 @@ export class AppController {
     const scenes: Scene[] = [];   // the one shared list: the renderer holds it, buildSceneList fills it
     this.renderer = new Renderer(canvas, scenes);
     const list = buildSceneList(scenes, (frag, name) => this.renderer.check(frag, name));
+    this.libraryPrefs = loadLibraryPrefs();
+    this.paramStore = new ParamStore();
     this.state = {
-      scenes: list.scenes, gameIndex: list.gameIndex, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
-      look: { ...defaultLook(), resolution: this.prefs.get().startResolution }, clock: defaultClock(), activeSource: null,
+      scenes: list.scenes, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
+      look: defaultLook(), clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
     this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound });
     this.renderer.setMedia(this.media);
-    this.renderer.setScale(this.state.look.resolution);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
     this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what));
     this.live = new LiveSlot({ state: this.state, hearing: this.listener.hearing, specs: (i) => this.library.specs(i), stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
@@ -196,16 +213,17 @@ export class AppController {
     setTimeout(() => { if (!this.disposed) this.startupNotice(); }, 500);
   }
 
-  // What happened at startup: an import that just finished (its report is shown once) and saved
-  // scenes that don't compile here. Read late, so a controller disposed right away (StrictMode)
-  // doesn't swallow the report.
+  // What happened at startup, in one toast: an import that just finished (its report is shown once),
+  // your scenes renamed because a built-in has their name, and saved scenes that don't compile here.
+  // Read late, so a controller disposed right away (StrictMode) doesn't swallow a report.
   private startupNotice(): void {
     const imported = readString(KEYS.importReport);
     if (imported !== null) remove(KEYS.importReport);
     const errors = this.ui.get().startupErrors;
     const broken = errors.length ? `Couldn't compile your saved scene(s): ${errors.join(', ')} — kept in the library under "Doesn't compile here"` : '';
-    if (imported !== null) this.toast(`Imported ${imported}.${broken ? ` ${broken}.` : ''}`, broken ? 9000 : 5000);
-    else if (broken) this.toast(broken, 6000);
+    const notes = [takeRenameReport(), broken].filter(Boolean).map((n) => `${n}.`).join(' ');
+    if (imported !== null) this.toast(`Imported ${imported}.${notes ? ` ${notes}` : ''}`, notes ? 9000 : 5000);
+    else if (notes) this.toast(notes, 6000);
   }
 
   dispose(): void {
@@ -303,9 +321,12 @@ export class AppController {
   }
 
   // Pushes the preferences to whatever uses them: this renderer, the projectors, the studio's Preview
-  // monitor (its hook), the audio analysis, the badges and the idle timer. Start resolution is read once, at startup.
+  // monitor (its hook), the audio analysis, the badges and the idle timer. Resolution reaches the
+  // projectors with each frame.
   private applyPrefs(): void {
     const p = this.prefs.get();
+    if (p.resolution !== this.renderer.scale) this.profiler.cancelFill();   // a GPU test measures one resolution: any other ends it
+    this.renderer.setScale(p.resolution);
     applyRendererPrefs(this.renderer, outputPrefs(p));
     this.output.sendPrefs(outputPrefs(p));
     this.hooks.onPrefs?.(p);
@@ -393,7 +414,6 @@ export class AppController {
   keyFor(i: number): string {
     const s = this.state.scenes[i];
     if (!s) return '';
-    if (s.kind === 'game') return 'G';
     if (s.kind === 'custom') return 'E';
     if (s.kind === 'nodes') return 'N';
     const n = this.state.keyedScenes.indexOf(i);
@@ -405,17 +425,14 @@ export class AppController {
   private publishScene(): void {
     const i = this.state.clock.scene;
     const key = this.keyFor(i);
-    this.ui.set({ sceneIndex: i, sceneName: `${key ? `${key} · ` : ''}${this.state.scenes[i]?.name ?? ''}`, hud: i === this.state.gameIndex ? this.game.hud() : null });
+    this.ui.set({ sceneIndex: i, sceneName: `${key ? `${key} · ` : ''}${this.state.scenes[i]?.name ?? ''}` });
   }
 
   bumpScenes(): void { this.ui.set({ sceneVersion: this.ui.get().sceneVersion + 1 }); }
 
   // ← / → step through every scene, skipping deleted ones.
   stepScene(dir: number): void {
-    const scenes = this.state.scenes;
-    let i = this.state.clock.scene;
-    do i = (i + dir + scenes.length) % scenes.length; while (scenes[i]!.removed);
-    this.setScene(i);
+    this.setScene(stepScene(this.state.scenes, this.state.clock.scene, dir));
   }
 
   // `fade` is the crossfade time (0 = cut). Changing scene this way (not as a show scene, see
@@ -434,10 +451,9 @@ export class AppController {
       this.toast('GPU test stopped: the scene changed. Turn auto-switch off (A) to test one scene.', 4500);
     }
     c.fade = fade;
-    if (i === this.state.gameIndex) { this.game.reset(); this.toast('Beat Racer: walls drop on the beat. ← → to steer, Enter to restart', 4500); }
     c.prevScene = c.scene;
     c.scene = i;
-    if (i !== this.state.gameIndex) writeString(KEYS.lastScene, paramKey(scene));
+    writeString(KEYS.lastScene, paramKey(scene));
     c.transitionStart = c.clock;
     c.sceneStart = c.clock;
     c.beatsInScene = 0;
@@ -446,11 +462,11 @@ export class AppController {
   }
 
   // The scene that was on screen when the page closed (by name, not index: the list can change in
-  // between), or the first one. Never the game, which needs a fresh start.
+  // between), or the first one.
   private lastScene(): number {
     const key = readString(KEYS.lastScene);
     const i = key ? this.state.scenes.findIndex((s) => !s.removed && paramKey(s) === key) : -1;
-    return i >= 0 && i !== this.state.gameIndex ? i : 0;
+    return i >= 0 ? i : 0;
   }
 
   nextRandomScene(): void {
@@ -458,7 +474,7 @@ export class AppController {
     if (choices.length) this.setScene(choices[Math.floor(Math.random() * choices.length)]!);
   }
 
-  // Auto-switch only cycles the visual scenes; it never leaves the game or your own shader.
+  // Auto-switch only cycles the visual scenes; it never leaves your own shader.
   // It also holds still while you're editing the scene's code.
   private autoSwitching(): boolean {
     return this.state.look.auto && !this.hooks.autopilot?.() && this.overlay !== 'editor' && !this.currentScene.kind;
@@ -554,14 +570,10 @@ export class AppController {
     const r = LOOK_RANGES[key];
     const v = Math.min(r.max, Math.max(r.min, value));
     this.state.look[key] = v;
-    if (key === 'resolution') {
-      this.profiler.cancelFill();   // a GPU test measures one resolution
-      this.renderer.setScale(v);
-    }
     this.ui.set({ look: { ...this.state.look } });
   }
 
-  setLookFlag(key: 'mood' | 'auto' | 'randomScene' | 'drift', value: boolean): void {
+  setLookFlag(key: 'auto' | 'randomScene' | 'drift', value: boolean): void {
     if (key === 'drift' && value) this.drift.reset();   // start from the sliders as they are
     this.state.look[key] = value;
     this.ui.set({ look: { ...this.state.look } });
@@ -573,15 +585,13 @@ export class AppController {
     return this.state.look.auto;
   }
 
-  // Rolls the Look widget's values (not Resolution: that's a performance setting), within ranges that
-  // stay watchable. The scene only changes when "Also pick a random scene" is on.
+  // Rolls the Look widget's values, within ranges that stay watchable. The scene only changes when
+  // "Also pick a random scene" is on.
   randomize(): void {
-    const { reactivity, speed, trails, hue, cycle, synesthesia, aberration, mood, spin } = this.state.look;
-    this.beforeRandom.push({ look: { reactivity, speed, trails, hue, cycle, synesthesia, aberration, mood, spin }, scene: this.state.clock.scene });
+    const look = this.state.look;
+    this.beforeRandom.push({ look: Object.fromEntries(DRIFT_KEYS.map((k) => [k, look[k]])) as Record<DriftKey, number>, scene: this.state.clock.scene });
     if (this.beforeRandom.length > RANDOM_HISTORY) this.beforeRandom.shift();
-    for (const [key, [min, max]] of Object.entries(RANDOM_RANGES)) this.setLook(key as DriftKey, min + Math.random() * (max - min));
-    this.setLookFlag('mood', Math.random() < 0.5);
-    this.state.look.spin = Math.random() < 0.5 ? -1 : 1;
+    for (const key of DRIFT_KEYS) { const [min, max] = RANDOM_RANGES[key]; this.setLook(key, min + Math.random() * (max - min)); }
     if (this.state.look.randomScene) this.nextRandomScene();
   }
 
@@ -590,9 +600,7 @@ export class AppController {
   randomizeBack(): void {
     const prev = this.beforeRandom.pop();
     if (!prev) { this.toast('No earlier random look to go back to', 1500); return; }
-    for (const key of ['reactivity', 'speed', 'trails', 'hue', 'cycle', 'synesthesia', 'aberration'] as const) this.setLook(key, prev.look[key]!);
-    this.setLookFlag('mood', prev.look.mood!);
-    this.state.look.spin = prev.look.spin!;
+    for (const key of DRIFT_KEYS) this.setLook(key, prev.look[key]);
     if (prev.scene !== this.state.clock.scene) this.setScene(prev.scene);
     const left = this.beforeRandom.length;
     this.toast(`Back to the previous look${left ? ` (${left} more)` : ''}`, 1500);
@@ -665,8 +673,12 @@ export class AppController {
     this.mediaChanged();
     if (this.mediaSound && this.media.kind === 'video') await this.linkMediaSound();
     else if (this.state.activeSource === 'media') this.player.pause();
-    if (!this.renderer.usesMedia(this.state.clock.scene)) this.setScene(this.state.scenes.findIndex((s) => s.cat === 'Media'));
-    this.toast(`${this.media.kind === 'video' ? 'Video' : 'Image'} loaded — the Media scenes distort it (library → Media). In code, sample it with media(p).`, 5000);
+    const mediaScene = this.state.scenes.findIndex((s) => s.cat === 'Media' && !s.removed);
+    if (!this.renderer.usesMedia(this.state.clock.scene)) this.setScene(mediaScene);
+    const what = this.media.kind === 'video' ? 'Video' : 'Image';
+    this.toast(mediaScene >= 0
+      ? `${what} loaded — ${this.state.scenes[mediaScene]!.name} draws it (library → Media). In code, sample it with media(p).`
+      : `${what} loaded. In a scene's code, sample it with media(p).`, 5000);
   }
 
   clearMedia(): void {
@@ -725,13 +737,12 @@ export class AppController {
   // ---------- Beats ----------
 
   // What a kick and a tick do, in this order, once the frame's sound is heard and before the frame is
-  // composed: a kick drops the game's walls and counts towards auto-switch (kicks, not ticks: a breakdown
+  // composed: a kick counts towards auto-switch (kicks, not ticks: a breakdown
   // holds the scene; each output's hue jumps in composeFrame); a tick is the studio's and the director's beat.
   private onBeats(h: Readonly<Hearing>): void {
     const c = this.state.clock;
     if (h.kick) {
       c.beatsInScene++;
-      if (c.scene === this.state.gameIndex) this.game.onBeat();
       if (this.autoSwitching() && c.beatsInScene >= BEATS_PER_SCENE) this.nextRandomScene();
     }
     if (h.tick) this.hooks.onTempoBeat?.();
@@ -813,7 +824,7 @@ export class AppController {
   // the trails restart), then back. Resolves with null if it was cut short.
   runFillTest(): Promise<FillResult | null> {
     if (!this.profiler.on) this.setPerf(true);
-    const done = this.profiler.startFill((s) => this.renderer.setScale(s), () => this.state.look.resolution, this.state.clock.scene);
+    const done = this.profiler.startFill((s) => this.renderer.setScale(s), () => this.prefs.get().resolution, this.state.clock.scene);
     this.ui.set({ perf: this.perfReport() });
     return done;
   }
@@ -822,7 +833,7 @@ export class AppController {
     return this.profiler.report({
       size: this.renderer.size,
       scale: this.renderer.scale,
-      resolution: this.state.look.resolution,
+      resolution: this.prefs.get().resolution,
       scene: this.state.clock.scene,
       projectors: this.ui.get().outputs.length,
       preview: this.ui.get().overlay === 'studio',
@@ -871,10 +882,7 @@ export class AppController {
     if (this.autoSwitching() && this.music.playing && c.clock - c.sceneStart > MAX_SECONDS_PER_SCENE) this.nextRandomScene();
     const p = this.program;
     composeFrame(p, c, f, look, this.currentScene.trails ?? 1, dt);   // the main screen's motion is the clock's
-    const inGame = c.scene === this.state.gameIndex;
-    if (inGame) this.game.update(dt, p.level);
     p.scene = c.scene; p.prevScene = c.prevScene; p.mix = crossfade(c, c.clock);
-    p.extra = inGame ? this.game.uniforms() : p.extra;
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
     this.profiler.lap(Stage.logic);
@@ -882,20 +890,19 @@ export class AppController {
     const out = this.live.route(p, this.output.connected, dt);
     this.renderer.render(out.screen.program, out.screen.params);
     this.profiler.lap(Stage.render);
-    if (out.projector) this.output.sendFrame(out.projector.program, out.projector.params, look.resolution);
+    if (out.projector) this.output.sendFrame(out.projector.program, out.projector.params, this.prefs.get().resolution);
     this.profiler.lap(Stage.output);
     this.hooks.onFrame?.(dt, p);
     this.profiler.lap(Stage.studio);
 
     if (++this.meterTick % 2 === 0) {
       const tone = toneWord(f.bright);
-      const moodLabel: MoodLabel = !look.mood || !this.music.playing ? '' : `mood: ${moodWord(f.mood)}`;
+      const moodLabel: MoodLabel = !this.music.playing ? '' : `mood: ${moodWord(f.mood)}`;
       this.ui.set({
         meters: { bass: f.bass, mid: f.mid, high: f.high, bright: f.bright, beat: f.beat },
         bpm: f.bpm,
         moodLabel,
         toneTitle: `Timbral brightness: ${tone} (spectral centroid ≈ ${(f.centroid / 1000).toFixed(1)} kHz)`,
-        ...(inGame && { hud: this.game.hud() }),
       });
     }
     this.profiler.lap(Stage.ui);

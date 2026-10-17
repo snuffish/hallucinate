@@ -2,17 +2,17 @@
 // studio's Preview monitor each compose their frame here, with their own look and their own motion, so
 // Preview shows exactly what Take puts on Live, and Live keeps a show scene's look while the main sliders
 // move. Every rule from the sound to the picture lives here: reactivity, the clock's pace, the hue's walk,
-// the synesthesia grade, trails, fringing, zoom, spin and warp.
+// the synesthesia grade, the trails' afterglow and fringing.
 
 import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
+import { stillHearing, type SnapshotUniforms } from './scene-inputs';
 
 // The sliders a frame is composed with: a show scene stores the numbers it keeps (LOOK_KEYS), the rest
-// (synesthesia, mood, spin) are the app's.
+// (synesthesia) is the app's.
 export interface FrameLook {
-  reactivity: number; speed: number; cycle: number; spin: number;
+  reactivity: number; speed: number; cycle: number;
   hue: number; trails: number; aberration: number; synesthesia: number;
-  mood: boolean;   // "Mood from tempo": off, the mood reads neutral to the grade and the shaders
 }
 
 // Where an output's picture is in its own time: the clock the shaders see, how fast it runs (it eases
@@ -32,35 +32,34 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
   const mid = Math.min(1.5, h.mid * R);
   const high = Math.min(1.5, h.high * R);
   const level = Math.min(1.5, h.level * R);
-  const beat = Math.min(1.5, h.beat * R);
+  const beat = Math.min(1, h.beat * R);   // the kick flash: never brighter than the strobe rule was checked at
 
   // Ease the clock's pace instead of jumping it on every beat, so motion stays fluid.
   const targetRate = look.speed * (0.55 + level * 0.9 + beat * 0.35);
   motion.timeRate += (targetRate - motion.timeRate) * (1 - Math.exp(-dt * 3));
   motion.time += dt * motion.timeRate;
-  motion.huePhase += dt * look.cycle * 0.06 + (h.kick ? 0.03 * R : 0);
+  // Colour cycling sets both the hue's walk and how far a kick jumps it, so at 0 the colour holds.
+  motion.huePhase += look.cycle * (dt * 0.06 + (h.kick ? 0.05 : 0));
 
   p.time = motion.time;
   p.bass = bass; p.mid = mid; p.high = high; p.level = level; p.beat = beat;
+  p.tickPhase = h.tickPhase; p.ticks = h.ticks;
   p.bright = h.bright;
-  p.mood = look.mood ? h.mood : 0.5;
+  p.mood = h.mood;
   grade(p, look);
-  // Dark sound lingers (longer trails), bright sound is crisp (shorter trails, more fringing).
+  // Trails are an afterglow: the previous frame fades in place by this much. Dark sound lingers (longer
+  // trails), bright sound is crisp (shorter trails, more fringing).
   const s = look.synesthesia;
   p.hue = look.hue + motion.huePhase;
   p.feedback = Math.min(0.97, look.trails * sceneTrails * (1 + s * (0.5 - p.bright) * 0.12));
   p.aberration = look.aberration * (1 + p.beat * 1.5) * (1 + s * (p.bright - 0.5) * 1.2);
-  p.zoom = 1.006 + bass * 0.025;
-  p.rotation = look.spin * (0.003 * Math.sin(motion.time * 0.1) + mid * 0.01);
-  p.hueDrift = 0.01 + high * 0.03;
-  p.warp = bass;
 }
 
 // Crossmodal correspondences: dark/muffled sound reads as dim, cool and soft; bright/crisp sound
 // as light, warm and sharp. Fast, energetic music reads as saturated and warm; slow as muted and cool.
 function grade(p: ProgramState, look: Readonly<FrameLook>): void {
   const A = look.synesthesia, bright = p.bright, mood = p.mood;
-  const warmth = look.mood ? bright * 0.6 + mood * 0.4 : bright;
+  const warmth = bright * 0.6 + mood * 0.4;
   const g = p.grade, tint = g.tint;
   for (let i = 0; i < 3; i++) tint[i] = COOL[i]! + (WARM[i]! - COOL[i]!) * warmth;
   const luma = tint[0]! * 0.299 + tint[1]! * 0.587 + tint[2]! * 0.114;   // tint shifts colour, not brightness
@@ -68,6 +67,28 @@ function grade(p: ProgramState, look: Readonly<FrameLook>): void {
   g.exposure = 1 + A * (bright - 0.5) * 0.9;
   g.contrast = 1 + A * (bright - 0.5) * 0.3;
   g.saturation = 1 + A * (mood - 0.5) * 0.8;
+}
+
+// A still frame with a Look applied, as the audience would see it: a short burst of frames with the same
+// sound, so the afterglow builds up as it does on screen. The burst ends at the inputs' time; the hue
+// starts at theirs and walks as Colour cycling says. A kick (uBeat 1) lands on the last frame, as the
+// moment it happens. With `then`, one more frame follows with those inputs: the change from the burst's
+// last frame to it is one frame's change on screen (the strobe rule's). The renderer draws the frames in
+// order and keeps the last.
+export const BURST_FRAMES = 20;   // a third of a second: long enough for the strongest Look's afterglow to settle
+const BURST_DT = 1 / 60;
+
+export function composeStill(scene: number, inputs: Readonly<SnapshotUniforms>, look: Readonly<FrameLook>, sceneTrails: number, spectrum: Uint8Array, then?: Readonly<SnapshotUniforms>): ProgramState[] {
+  const sounds = Array.from({ length: BURST_FRAMES }, (_, i) => stillHearing(inputs, !then && i === BURST_FRAMES - 1 && inputs.uBeat >= 1));
+  if (then) sounds.push(stillHearing(then, then.uBeat >= 1));
+  const play = (motion: Motion): ProgramState[] => sounds.map((h) => {
+    const p = { ...programState(spectrum), scene, prevScene: -1, mix: 1 };
+    composeFrame(p, motion, h, look, sceneTrails, BURST_DT);
+    return p;
+  });
+  const start = (): Motion => ({ time: 0, timeRate: look.speed, huePhase: inputs.uHue });
+  const elapsed = play(start()).at(-1)!.time;   // the clock's pace eases with the sound: measure it, then start early by that much
+  return play({ ...start(), time: (then ?? inputs).uTime - elapsed });
 }
 
 export const smoothstep = (x: number): number => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
@@ -86,9 +107,9 @@ export function crossfade(t: Transition, now: number): number {
 // A new, neutral frame state. Each pipeline keeps one and refills it every frame.
 export function programState(spectrum: Uint8Array = new Uint8Array(512)): ProgramState {
   return {
-    scene: -1, prevScene: -1, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, hue: 0,
-    spectrum, extra: {}, bright: 0.5, mood: 0.5,
+    scene: -1, prevScene: -1, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, tickPhase: 0, ticks: 0, hue: 0,
+    spectrum, bright: 0.5, mood: 0.5,
     grade: { exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] },
-    feedback: 0.86, zoom: 1, rotation: 0, hueDrift: 0, warp: 0, aberration: 0, master: 1,
+    feedback: 0.86, aberration: 0, master: 1,
   };
 }

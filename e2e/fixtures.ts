@@ -22,3 +22,18 @@ export const test = base.extend({
     await use(page);
   },
 });
+
+// Specs that need particular scenes save their own first, so they don't depend on the built-ins.
+export interface SavedScene { name: string; body: string }
+export const solidScene = (name: string, rgb: string): SavedScene => ({ name, body: `void main() { fragColor = vec4(${rgb}, 1.); }` });
+
+// Stores `scenes` as your saved scenes (and any other keys) before the app first loads, once per
+// test: a reload keeps whatever the app wrote since.
+export async function seedScenes(page: import('@playwright/test').Page, scenes: SavedScene[], storage: Record<string, string> = {}) {
+  await page.addInitScript(({ scenes, storage }) => {
+    if (sessionStorage.getItem('seeded-scenes')) return;
+    localStorage.setItem('hallucinate.userScenes', JSON.stringify(scenes));
+    for (const [k, v] of Object.entries(storage)) localStorage.setItem(k, v);
+    sessionStorage.setItem('seeded-scenes', '1');
+  }, { scenes, storage });
+}

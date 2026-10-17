@@ -27,6 +27,7 @@ npm run lint        # ESLint (TypeScript + React hooks rules)
 npm run typecheck   # tsc for the app and the server
 npm test            # Vitest unit tests (parameters, node compiler, scene list, hotkeys, persistence, assistant plumbing)
 npm run test:e2e    # Playwright: boot, scenes, every panel, library keys, widgets & layout, help, params, randomize, backup, studio, assistant chats
+E2E_SKIP_SCENES=1 npm run test:e2e   # the same without the built-in scenes' pixel checks (CI runs those in a job of their own, e2e-scenes)
 npm run test:e2e:desktop   # builds the desktop app and drives it (needs a GPU, so not in CI; lint, typecheck, unit and e2e are)
 ASSISTANT_E2E=1 npx playwright test e2e/assistant.spec.ts   # one real assistant round-trip (uses your Claude backend)
 node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json   # performance probe, with the dev server running
@@ -41,7 +42,8 @@ See [ARCHITECTURE.md](../ARCHITECTURE.md) for the structure, the invariants and 
 shortcuts; [PERF.md](../PERF.md) for the performance work and measurements; [CHANGELOG.md](../CHANGELOG.md) for what
 changed in the React port. In short:
 
-- `src/engine/` – the engines (WebGL pipeline, audio analysis, scenes, `@param` parsing, visual-maker compiler, media, game, projector link), plain TypeScript classes.
+- `src/scenes/` – the built-in scenes (one module each, listed in key order in `index.ts`), the shared shader header and the new-scene template.
+- `src/engine/` – the engines (WebGL pipeline, audio analysis, `@param` parsing, visual-maker compiler, media, projector link), plain TypeScript classes.
 - `src/app/` – the controller that owns them and the frame loop, the editor / studio / player logic, the React shell.
 - `src/components/` – the panels, with the dockable widgets in `src/components/widgets/`; `src/hotkeys/` – the shortcut
   registry and the key badge; `src/help/` – the help topics; `src/state/` – app state, UI store, widget layout, persistence.
@@ -50,4 +52,4 @@ changed in the React port. In short:
 - `src/output.ts` / `output.html` – projector windows.
 - `desktop/` – the Electron main process and the local server it starts.
 
-Adding a scene = add a `scene(name, category, description, glsl)` line to `SCENES` in `src/engine/scenes.ts`.
+Adding a scene = a module in `src/scenes/` that builds it with `scene(name, category, description, glsl)`, listed in `SCENES` in `src/scenes/index.ts` (in key order). It uses only the scene inputs and the shared header's helpers (draw its lines with `beam(d, w)`, size them with `onePixel()`, time them with `tickFlash()` and `easedTicks()`); a helper two scenes need goes into `src/scenes/header.ts`. `e2e/builtin-scenes.spec.ts` checks every listed built-in against the laser-show checklist ([ADR 0001](adr/0001-replace-all-built-in-scenes.md)): it compiles, its category has a tab, it has 3–8 parameters, at least three quarters of its edges are pure black in silence, and neither a kick nor the step from one tick to the next makes a quarter of the frame or more over twice as bright. The two safety rules (black edges, strobe) are checked with the Look applied, as the audience sees it ([ADR 0002](adr/0002-the-look-serves-the-laser-set.md)): once at the default Look and once at the strongest one Randomize or Drift can reach (`STRONGEST_LOOK` in `src/state/look-drift.ts`), each frame rendered through `window.__profiler.still(index, { look })`.

@@ -26,7 +26,7 @@ export const HELP_TOPICS = {
       'Export scenes & settings (☰ menu) saves your scenes, edits to built-ins, My Shader, the visual maker graph, parameter values, the Studio show, favourites, player settings and layout to one file. Import… (or drop the file on the page) replaces them and reloads; your current setup is downloaded first as a backup.',
       'The controls fade away while the music plays and you leave the mouse alone; move it to bring them back.',
       'Every button with a shortcut shows its key. Hold a modifier to see which badges light up.',
-      'Randomize (R) rolls the Look sliders (not Resolution), mood from tempo and the spin direction. Tick "Randomize also picks a random scene" to change the scene too. Shift+R goes back to the look before each roll.',
+      'Randomize (R) rolls the Look sliders to new values within laser-friendly ranges. Tick "Randomize also picks a random scene" to change the scene too. Shift+R goes back to the look before each roll.',
     ],
     hotkeys: ['help', 'hidePanel', 'resetLayout', 'fullscreen', 'randomize', 'randomizeBack', 'record'],
   },
@@ -46,10 +46,10 @@ export const HELP_TOPICS = {
     id: 'look',
     title: 'The look',
     body: [
-      'These sliders apply to every scene: how strongly it reacts, how fast it moves, how long its trails are, and its colour.',
-      'Synesthesia grades the picture by the sound: dark sound goes dim and cool, bright sound light and warm. Mood from tempo makes fast music more vivid.',
-      'Drift lets the sliders glide to new random values on their own, each at its own pace, for a look that keeps slowly changing; Drift speed sets how fast. Move a slider yourself and it drifts on from there.',
-      'Lower the resolution if the frame rate drops.',
+      'These sliders apply to every scene: how strongly it reacts, how fast it moves, how long the afterglow of its trails lasts, its colour, and Fringing, how far each line splits into red, green and blue.',
+      'Synesthesia grades the picture by the sound: dark sound goes dim and cool, bright sound light and warm, and an energetic mood more vivid. At 0 it is off.',
+      'Drift lets the sliders glide to new random values (within the same laser-friendly ranges as Randomize) on their own, each at its own pace, for a look that keeps slowly changing; Drift speed sets how fast. Move a slider yourself and it drifts on from there.',
+      'If the frame rate drops, lower Resolution in Settings → Display & performance.',
     ],
     hotkeys: ['randomize', 'randomizeBack', 'auto'],
   },
@@ -57,7 +57,7 @@ export const HELP_TOPICS = {
     id: 'library',
     title: 'Scene library',
     body: [
-      'Every scene with a live preview. Click a preview to play it, or filter by category and search.',
+      'Every scene with a live preview. Click a preview to play it, or filter by category and search. The built-ins are a laser show in Beams, Geometry, Fields and Media; your own are under Mine.',
       '★ makes a scene come up twice as often in auto-switch; the checkbox takes it out of the rotation. "Edit code" opens it in the code editor.',
     ],
     hotkeys: ['librarySearch', 'libraryTabNext', 'libraryRight', 'libraryDown', 'libraryPick', 'closeOverlay'],
@@ -127,7 +127,7 @@ export const HELP_TOPICS = {
     id: 'settings',
     title: 'Settings',
     body: [
-      'Display: where Resolution starts each time Hallucinate opens, and the pixel density everything renders at (the main screen, the studio monitor and projectors). Lower both if the frame rate drops.',
+      'Display & performance: the Resolution and pixel density everything renders at (the main screen, the studio\'s Preview and projectors). They apply at once: lower them if the frame rate drops.',
       'Audio: how much the analysis smooths the sound, and the browser\'s microphone processing, off by default because it ducks and gates music.',
       'Interface: when the controls hide, the key badges on buttons and the assistant\'s reasoning.',
       ...(STATIC_DEMO ? [] : ['Assistant: which way Hallucinate reaches Claude, the model and effort, and (in the desktop app) an API key, kept encrypted. A variable set in the environment wins and locks its field.']),
@@ -149,7 +149,7 @@ export const HELP_TOPICS = {
     id: 'youtube',
     title: 'YouTube',
     body: [
-      'Search, or paste a video, playlist or Shorts link. The video becomes the picture the Media scenes distort.',
+      'Search, or paste a video, playlist or Shorts link. The video becomes the picture Scan Trace draws and your own shaders sample with media(p).',
       'Tick "Use the video\'s sound as the music" to make it the audio source too. The first load of a long video takes a moment.',
       ...NEEDS_SERVER,
     ],
@@ -160,12 +160,11 @@ export const HELP_TOPICS = {
 export type HelpTopicId = keyof typeof HELP_TOPICS;
 
 // The sheet's group order.
-export const SHEET_GROUPS: HotkeyDef['group'][] = ['Playback', 'Scenes', 'Look', 'Panels', 'Studio', 'Game'];
+export const SHEET_GROUPS: HotkeyDef['group'][] = ['Playback', 'Scenes', 'Look', 'Panels', 'Studio'];
 
 // Where a shortcut works, for keys that only apply in one place.
 const WHEN_NOTES: Partial<Record<HotkeyWhen, string>> = {
   library: 'in the library',
-  game: 'in Beat Racer',
   studio: 'in the studio',
   nodesOpen: 'in the visual maker',
   paramsVisible: 'while parameters show',

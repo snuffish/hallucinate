@@ -26,17 +26,18 @@ export const KEYS = {
   // Migrated into `layout` (src/state/layout.ts) on first load, then removed.
   paramsCollapsed: 'hallucinate.paramsCollapsed',
   paramsPos: 'hallucinate.paramsPos',
-  best: 'hallucinate.best',
   helpHint: 'hallucinate.helpHint',
   // Settings import (src/app/bundle.ts): other tabs reload when this changes; the report is shown
   // once after the reload.
   importedAt: 'hallucinate.importedAt',
   importReport: 'hallucinate.importReport',
+  // Your scenes renamed on load because a built-in has their name (src/state/scene-list.ts), shown once.
+  renameReport: 'hallucinate.renameReport',
 } as const;
 
 // What each stored key holds, which decides whether Export / Import (src/app/bundle.ts) carries it:
 // `setup` is what you built and configured, and travels; `device` describes this computer; `history`
-// is what you did (recently played, high score, hints, conversations); `migration` is read once and
+// is what you did (recently played, hints, conversations); `migration` is read once and
 // removed; `import` belongs to the import itself. A key without a class doesn't compile, and the
 // bundle test checks that the export holds exactly the setup keys.
 export type KeyClass = 'setup' | 'device' | 'history' | 'migration' | 'import';
@@ -44,7 +45,7 @@ export const KEY_CLASS: Record<keyof typeof KEYS, KeyClass> = {
   sceneEdits: 'setup', userScenes: 'setup', library: 'setup', params: 'setup', customShader: 'setup', nodeGraph: 'setup',
   show: 'setup', player: 'setup', mediaSound: 'setup', layout: 'setup',
   prefs: 'device', assistantThinking: 'device',
-  scRecent: 'history', ytRecent: 'history', lastScene: 'history', assistantChats: 'history', paramGroups: 'history', best: 'history', helpHint: 'history',
+  scRecent: 'history', ytRecent: 'history', lastScene: 'history', renameReport: 'history', assistantChats: 'history', paramGroups: 'history', helpHint: 'history',
   paramsCollapsed: 'migration', paramsPos: 'migration',
   importedAt: 'import', importReport: 'import',
 };

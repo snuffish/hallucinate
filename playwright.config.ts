@@ -24,7 +24,9 @@ export default defineConfig({
     timeout: 60_000,
   },
   projects: [
-    { name: 'chromium', use: { browserName: 'chromium' }, testIgnore: 'desktop.spec.ts' },
+    // CI runs the built-in scenes' pixel checks in a job of their own (E2E_SKIP_SCENES here): they keep
+    // a CPU busy rendering for minutes, and the timing specs beside them would starve.
+    { name: 'chromium', use: { browserName: 'chromium' }, testIgnore: ['desktop.spec.ts', ...(process.env.E2E_SKIP_SCENES ? ['builtin-scenes.spec.ts'] : [])] },
     // The Electron app launches itself (e2e/desktop.spec.ts); it needs `npm run build:desktop` first.
     { name: 'desktop', testMatch: 'desktop.spec.ts' },
   ],

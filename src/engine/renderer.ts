@@ -1,15 +1,16 @@
 // WebGL2 pipeline:
 //   1. scene shader(s)  -> scene targets (two while crossfading)
-//   2. feedback pass    -> mixes scene with a zoomed/rotated/hue-shifted copy of the
-//                          previous frame (ping-pong), giving Milkdrop-style trails
-//   3. display pass     -> tonemap, chromatic aberration, vignette, grain -> canvas
+//   2. feedback pass    -> the previous frame, faded in place by the trails amount, and the scene:
+//                          the brighter of the two wins per channel (ping-pong). That is the
+//                          trails' afterglow, where each line was drawn
+//   3. display pass     -> tonemap, chromatic aberration, vignette, grain (not on black) -> canvas
 //
 // Programs compile in the background (KHR_parallel_shader_compile) so typing in the editor never
 // stalls the show; the previous program keeps running until the new one is ready. Media uploads go
 // through immutable storage + texSubImage2D, once per decoded video frame. Snapshots read back
 // asynchronously through a pixel buffer and a fence, so thumbnails don't stall the GPU.
 
-import { COMMON } from './scenes';
+import { COMMON } from '../scenes';
 import type { MediaLayer } from './media';
 import type { UniformValue } from './params';
 import { stillSpectrum, writeInputs, type SnapshotUniforms } from './scene-inputs';
@@ -28,29 +29,13 @@ precision highp float;
 in vec2 vUv;
 out vec4 fragColor;
 uniform sampler2D uSceneA, uSceneB, uPrev;
-uniform float uMix, uFeedback, uZoom, uRot, uHueDrift, uWarp, uTime, uAspect;
-
-mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
-vec3 hueShift(vec3 c, float a) {
-  const vec3 k = vec3(.57735);
-  float ca = cos(a);
-  return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1. - ca);
-}
+uniform float uMix, uFeedback;
 
 void main() {
   vec3 scene = mix(texture(uSceneB, vUv).rgb, texture(uSceneA, vUv).rgb, uMix);
-
-  vec2 c = vUv - .5;
-  c.x *= uAspect;
-
-  c *= rot(uRot);
-  c /= uZoom;
-  float r = length(c);
-  c += c / max(r, 1e-4) * sin(r * 18. - uTime * 2.) * .003 * uWarp;
-  c.x /= uAspect;
-
-  vec3 prev = texture(uPrev, c + .5).rgb;
-  prev = max(hueShift(prev, uHueDrift), 0.) * uFeedback;
+  // The previous frame, at the same pixel (it never moves or spins), faded by the trails amount; the
+  // brighter of the scene and that afterglow wins, per channel. Capped so it can never run away.
+  vec3 prev = texture(uPrev, vUv).rgb * uFeedback;
   fragColor = vec4(min(max(scene, prev), vec3(8.)), 1.);
 }
 `;
@@ -75,9 +60,11 @@ void main() {
   col = 1. - exp(-col * 1.3);
   col = pow(col, vec3(uContrast));            // >1 crisper darks, <1 hazy and soft
   float l = dot(col, vec3(.299, .587, .114));
-  col = mix(vec3(l), col, 1.15 * uSat);
+  col = mix(vec3(l), col, uSat);
   col *= 1. - dot(c, c) * .6;
-  col += (hash(gl_FragCoord.xy + fract(uTime) * 100.) - .5) * .015;
+  // Grain fades out below a low brightness, so black stays exactly black on a projector.
+  float lit = smoothstep(0., .05, max(col.r, max(col.g, col.b)));
+  col += (hash(gl_FragCoord.xy + fract(uTime) * 100.) - .5) * .015 * lit;
   fragColor = vec4(clamp(col, 0., 1.) * uMaster, 1.);
 }
 `;
@@ -98,17 +85,14 @@ export interface ProgramState {
   high: number;
   level: number;
   beat: number;
+  tickPhase: number;
+  ticks: number;
   hue: number;
   spectrum: Uint8Array;
-  extra: Record<string, UniformValue>;
   bright: number;
   mood: number;
   grade: Grade;
   feedback: number;
-  zoom: number;
-  rotation: number;
-  hueDrift: number;
-  warp: number;
   aberration: number;
   master?: number;
   mediaTime?: number;
@@ -162,6 +146,7 @@ export class Renderer {
   private maxPixelRatio = 2;   // Settings → Display (src/state/prefs.ts)
   private readonly observer: ResizeObserver | null;
   private thumb: { scene: Target; out: Target } | null = null;
+  private burst: { targets: Targets; out: Target } | null = null;   // still frames with a Look (stillAsync)
   private fakeSpectrum: Uint8Array | null = null;
   private pbo: WebGLBuffer | null = null;
   private pboSize = 0;
@@ -228,6 +213,7 @@ export class Renderer {
     this.inUse.length = 0;
     this.targets = null;
     this.thumb = null;
+    this.burst = null;
     this.pbo = null;
     this.pboSize = 0;
     this.size = [0, 0];
@@ -443,10 +429,10 @@ export class Renderer {
 
   // ---------- Snapshots ----------
 
-  private renderThumb(index: number, uniforms: SnapshotUniforms, w: number, h: number): Target {
+  private renderThumb(index: number, uniforms: SnapshotUniforms, w: number, h: number, spectrum?: Uint8Array): Target {
     const gl = this.gl;
     if (this.thumb && (this.thumb.out.w !== w || this.thumb.out.h !== h)) {   // previews and assistant frames differ in size
-      for (const t of [this.thumb.scene, this.thumb.out]) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
+      for (const t of [this.thumb.scene, this.thumb.out]) this.deleteTarget(t);
       this.thumb = null;
     }
     if (!this.thumb) this.thumb = { scene: this.createTarget(w, h), out: this.createTarget(w, h, true) };
@@ -454,7 +440,7 @@ export class Renderer {
     const t = this.thumb;
     gl.bindVertexArray(this.vao);
     gl.bindTexture(gl.TEXTURE_2D, this.specTex);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 1, gl.RG, gl.UNSIGNED_BYTE, this.fakeSpectrum);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 1, gl.RG, gl.UNSIGNED_BYTE, spectrum ?? this.fakeSpectrum);
     const prog = this.program(index, true);
     if (prog) {
       this.use(prog, uniforms as unknown as SceneUniforms, this.mediaUniforms(index, -1), { uRes: [w, h], uSpec: this.specTex }, this.sceneParams[index]);
@@ -480,13 +466,66 @@ export class Renderer {
     return new ImageData(flipRows(px, w, h), w, h);
   }
 
-  // Same picture, but the GPU is never stalled: the pixels come back through a pixel buffer once
-  // a fence says the frame is done. Calls are queued so they share one set of targets.
-  snapshotAsync(index: number, uniforms: SnapshotUniforms, w = 320, h = 180): Promise<ImageData> {
+  // Same picture, but the GPU is never stalled (see readbackAsync). `spectrum` (256 × RG bytes)
+  // replaces the stand-in one, e.g. with silence.
+  snapshotAsync(index: number, uniforms: SnapshotUniforms, w = 320, h = 180, spectrum?: Uint8Array): Promise<ImageData> {
+    return this.readbackAsync(() => this.renderThumb(index, uniforms, w, h, spectrum), w, h);
+  }
+
+  // A still frame through the whole pipeline (scene, trails, fringing, grade): draws `frames` in order
+  // into targets of its own, starting from black, and returns the last. composeStill() (look.ts) makes them.
+  stillAsync(frames: readonly ProgramState[], w = 320, h = 180): Promise<ImageData> {
+    return this.readbackAsync(() => this.renderBurst(frames, w, h), w, h);
+  }
+
+  // The last two frames of such a burst: the change from one to the other is one frame's change on
+  // screen. One burst for both, so the strobe check renders it once. Queued back to back: nothing draws
+  // into the burst's targets in between.
+  stillPairAsync(frames: readonly ProgramState[], w = 320, h = 180): Promise<[ImageData, ImageData]> {
+    return Promise.all([
+      this.readbackAsync(() => this.renderBurst(frames.slice(0, -1), w, h), w, h),
+      this.readbackAsync(() => this.renderBurst(frames.slice(-1), w, h, false), w, h),
+    ]);
+  }
+
+  private renderBurst(frames: readonly ProgramState[], w: number, h: number, fromBlack = true): Target {
+    const gl = this.gl;
+    if (this.burst && (this.burst.out.w !== w || this.burst.out.h !== h)) this.deleteBurst();
+    this.burst ??= {
+      targets: { sceneA: this.createTarget(w, h), sceneB: this.createTarget(w, h), read: this.createTarget(w, h), write: this.createTarget(w, h) },
+      out: this.createTarget(w, h, true),
+    };
+    const { targets, out } = this.burst;
+    if (fromBlack) for (const t of [targets.read, targets.write]) {   // no afterglow from the last burst
+      gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    for (const s of frames) {
+      this.program(s.scene, true);   // compiled now, or the burst would draw black while it compiles
+      this.pipeline(s, targets, out);
+    }
+    return out;
+  }
+
+  private deleteBurst(): void {
+    if (!this.burst) return;
+    for (const t of [...Object.values(this.burst.targets), this.burst.out]) this.deleteTarget(t);
+    this.burst = null;
+  }
+
+  private deleteTarget(t: Target): void {
+    this.gl.deleteTexture(t.tex);
+    this.gl.deleteFramebuffer(t.fbo);
+  }
+
+  // Reads back what `render()` drew without stalling the GPU: the pixels come through a pixel buffer
+  // once a fence says the frame is done. Calls are queued, so they share one set of targets.
+  private readbackAsync(render: () => Target, w: number, h: number): Promise<ImageData> {
     const run = async (): Promise<ImageData> => {
       const gl = this.gl;
       if (this.disposed || this.lost) throw new Error('Renderer unavailable');
-      const out = this.renderThumb(index, uniforms, w, h);
+      const out = render();
       const bytes = w * h * 4;
       this.pbo ??= gl.createBuffer();
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
@@ -555,12 +594,11 @@ export class Renderer {
     if (!this.pendingSize) [w, h] = this.pixels(this.canvas.clientWidth, this.canvas.clientHeight);   // before the observer has reported: one layout read
     this.pendingSize = null;
     if (!force && w === this.size[0] && h === this.size[1] && this.targets) return;
-    const gl = this.gl;
     this.size = [w, h];
     this.canvas.width = w;
     this.canvas.height = h;
 
-    if (this.targets) for (const t of Object.values(this.targets)) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
+    if (this.targets) for (const t of Object.values(this.targets)) this.deleteTarget(t);
     const iw = Math.max(1, Math.round(w * this.scale));
     const ih = Math.max(1, Math.round(h * this.scale));
     this.targets = {
@@ -571,7 +609,10 @@ export class Renderer {
     };
   }
 
+  // The share of the canvas the scenes render at. A rescale restarts the trails, so the same scale
+  // again does nothing: callers can pass the Resolution setting every time preferences apply.
   setScale(scale: number): void {
+    if (scale === this.scale && this.targets) return;
     this.scale = scale;
     this.resize(true);
   }
@@ -648,9 +689,13 @@ export class Renderer {
   }
 
   private renderFrame(s: ProgramState): void {
-    const gl = this.gl;
     this.resize();
-    const t = this.targets!;
+    this.pipeline(s, this.targets!, null);
+  }
+
+  // One frame from the scene(s) to `out` (null: the canvas), keeping the trails in `t`.
+  private pipeline(s: ProgramState, t: Targets, out: Target | null): void {
+    const gl = this.gl;
     gl.bindVertexArray(this.vao);
 
     gl.bindTexture(gl.TEXTURE_2D, this.specTex);
@@ -661,14 +706,13 @@ export class Renderer {
     writeInputs(u, s);
     u.uSpec = this.specTex;
     const media = this.mediaUniforms(s.scene, s.prevScene);
-    this.drawScene(s.scene, t.sceneA, u, media, s.extra);
+    this.drawScene(s.scene, t.sceneA, u, media);
     const crossfading = s.prevScene >= 0 && s.mix < 1;
-    if (crossfading) this.drawScene(s.prevScene, t.sceneB, u, media, s.extra);
+    if (crossfading) this.drawScene(s.prevScene, t.sceneB, u, media);
 
     const f = this.feedbackUniforms;
     f.uSceneA = t.sceneA.tex; f.uSceneB = crossfading ? t.sceneB.tex : t.sceneA.tex; f.uPrev = t.read.tex;
-    f.uMix = crossfading ? s.mix : 1; f.uFeedback = s.feedback; f.uZoom = s.zoom; f.uRot = s.rotation;
-    f.uHueDrift = s.hueDrift; f.uWarp = s.warp; f.uTime = s.time; f.uAspect = t.read.w / t.read.h;
+    f.uMix = crossfading ? s.mix : 1; f.uFeedback = s.feedback;
     this.use(this.feedbackProgram, f);
     this.draw(t.write);
     [t.read, t.write] = [t.write, t.read];
@@ -678,7 +722,7 @@ export class Renderer {
     d.uTex = t.read.tex; d.uAberr = s.aberration; d.uTime = s.time;
     d.uExposure = g.exposure; d.uContrast = g.contrast; d.uSat = g.saturation; d.uTint = g.tint; d.uMaster = s.master ?? 1;
     this.use(this.displayProgram, d);
-    this.draw(null);
+    this.draw(out);
   }
 
   dispose(): void {
@@ -696,8 +740,9 @@ export class Renderer {
     gl.deleteProgram(this.feedbackProgram);
     gl.deleteProgram(this.displayProgram);
     gl.deleteShader(this.vert);
-    if (this.targets) for (const t of Object.values(this.targets)) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
-    if (this.thumb) for (const t of [this.thumb.scene, this.thumb.out]) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
+    if (this.targets) for (const t of Object.values(this.targets)) this.deleteTarget(t);
+    if (this.thumb) for (const t of [this.thumb.scene, this.thumb.out]) this.deleteTarget(t);
+    this.deleteBurst();
     gl.deleteTexture(this.mediaTex);
     gl.deleteTexture(this.specTex);
     if (this.pbo) gl.deleteBuffer(this.pbo);

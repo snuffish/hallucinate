@@ -5,6 +5,8 @@
 // the new-scene template and the stand-ins for library thumbnails and the assistant's screenshots.
 // Adding an input is one row here, plus its field on ProgramState and the code that fills it.
 
+import type { Hearing } from './listener';
+
 const BAND = '0…1, up to 1.5 at high reactivity';
 const SLOW = '0…1, changes over seconds, not scaled by reactivity';
 
@@ -15,6 +17,8 @@ export const SCENE_INPUTS = [
   { uniform: 'uHigh', field: 'high', node: 'high', range: BAND, help: 'loudness of the highs', still: 0.5 },
   { uniform: 'uLevel', field: 'level', node: 'level', range: BAND, help: 'loudness of the three bands together', still: 0.6 },
   { uniform: 'uBeat', field: 'beat', node: 'beat', range: BAND, help: '1 on each kick, fading out within half a second', still: 0.4 },
+  { uniform: 'uTick', field: 'tickPhase', node: 'tick', range: '0…1, back to 0 on each tick', help: "how far through the current tick (one beat of the music's tempo); keeps going through breakdowns, holds still while nothing plays", still: 0.3 },
+  { uniform: 'uTicks', field: 'ticks', node: 'ticks', range: 'whole ticks, counting up', help: 'how many ticks so far; mod() it to change things every few beats', still: 6 },
   { uniform: 'uHue', field: 'hue', node: null, range: '0…1, wraps', help: 'the colour slider plus colour cycling', still: 0 },
   { uniform: 'uBright', field: 'bright', node: 'tone', range: SLOW, help: 'the tone: 0 dark, muffled sound … 1 bright, crisp', still: 0.5 },
   { uniform: 'uMood', field: 'mood', node: 'mood', range: SLOW, help: 'the mood: 0 calm … 1 energetic', still: 0.5 },
@@ -28,6 +32,12 @@ export type InputField = SceneInput['field'];
 export type SnapshotUniforms = Record<InputUniform, number>;
 export const stillUniforms = (over: Partial<SnapshotUniforms> = {}): SnapshotUniforms =>
   ({ ...Object.fromEntries(SCENE_INPUTS.map((i) => [i.uniform, i.still])), ...over }) as SnapshotUniforms;
+
+// What a still frame hears: the music `inputs` stand for, as the listener would report it, kicking or not.
+export const stillHearing = (inputs: Readonly<SnapshotUniforms>, kick: boolean): Hearing => ({
+  bass: inputs.uBass, mid: inputs.uMid, high: inputs.uHigh, level: inputs.uLevel, beat: inputs.uBeat, kick, tick: false,
+  tickPhase: inputs.uTick, ticks: inputs.uTicks, bpm: null, bright: inputs.uBright, centroid: 0, energy: inputs.uLevel, mood: inputs.uMood,
+});
 
 // Writes a frame's inputs into a uniform table (the renderer's, once a frame; no allocation).
 export function writeInputs(to: Record<string, unknown>, frame: Readonly<Record<InputField, number>>): void {
@@ -46,6 +56,13 @@ export const AUDIO_HELP = AUDIO_OUTPUTS
   .reduce<(typeof AUDIO_OUTPUTS)[]>((runs, o) => { const run = runs.at(-1); if (run?.[0]!.range === o.range) run.push(o); else runs.push([o]); return runs; }, [])
   .map((run) => `${run.map((o) => `${o.name}: ${o.help}`).join('; ')} (${run[0]!.range})`)
   .join('. ');
+
+// The spectrum of silence: nothing in any band, a flat waveform.
+export function silentSpectrum(): Uint8Array {
+  const spectrum = new Uint8Array(512);
+  for (let i = 0; i < 256; i++) spectrum[i * 2 + 1] = 128;
+  return spectrum;
+}
 
 // A stand-in spectrum for still frames: falling off towards the treble, and a wavy waveform.
 export function stillSpectrum(): Uint8Array {

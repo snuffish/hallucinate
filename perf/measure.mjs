@@ -59,9 +59,9 @@ await page.click('#start [data-source="demo"]');
 await page.waitForTimeout(1500);
 await sample('demo-first-scene', 8000);
 
-for (let i = 0; i < 10; i++) { await page.keyboard.press('ArrowRight'); await page.waitForTimeout(50); }   // Star Nest (index 10)
+await page.keyboard.press('7');   // Point Storm (the slider scenarios below drag its parameters)
 await page.waitForTimeout(2500);
-await sample('star-nest', 8000);
+await sample('point-storm', 8000);
 
 await page.keyboard.press('l');
 await page.waitForTimeout(100);
@@ -104,11 +104,6 @@ if (gpu) {
   await stress.waitForTimeout(1500);
   // A scene change cuts a GPU test short. A DOM click: the idle fade may have made the widgets unclickable.
   await stress.evaluate(() => { const auto = document.getElementById('auto'); if (auto.checked) auto.click(); });
-  await stress.evaluate(() => {   // the native setter, so React sees the change
-    const el = document.getElementById('resolution');
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, el.max);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-  });
   console.log('ranking on', JSON.stringify(await stress.evaluate(() => { const r = window.__profiler.report(); return { canvas: r.size, scale: r.scale }; })));
   const ranking = [];
   for (const { index, name } of await stress.evaluate(() => window.__profiler.scenes())) {
