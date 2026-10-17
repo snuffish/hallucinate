@@ -16,7 +16,6 @@ export interface Look {
   aberration: number;
   resolution: number;
   synesthesia: number;
-  mood: boolean;
   auto: boolean;
   randomScene: boolean;   // Randomize also jumps to a random scene
   drift: boolean;         // the sliders wander on their own (src/state/look-drift.ts)
@@ -39,7 +38,7 @@ export const LOOK_RANGES: Record<LookKey, { min: number; max: number; step: numb
 
 export const defaultLook = (): Look => ({
   reactivity: 1, speed: 1, trails: 0.86, hue: 0, cycle: 0.6, aberration: 0.012, resolution: 0.75,
-  synesthesia: 0.7, mood: true, auto: true, randomScene: false, drift: false, driftSpeed: 1, spin: 1,
+  synesthesia: 0.7, auto: true, randomScene: false, drift: false, driftSpeed: 1, spin: 1,
 });
 
 export interface Clock {

@@ -148,7 +148,7 @@ const SLIDERS: { key: LookKey; label: string; hint?: string }[] = [
   { key: 'trails', label: 'Trails' },
   { key: 'hue', label: 'Colour' },
   { key: 'cycle', label: 'Colour cycling' },
-  { key: 'synesthesia', label: 'Synesthesia', hint: 'dark sound → dim & cool · bright sound → light & warm' },
+  { key: 'synesthesia', label: 'Synesthesia', hint: 'dark sound → dim & cool · bright sound → light & warm · energetic mood → vivid & warm' },
 ];
 
 export function LookBody() {
@@ -161,7 +161,6 @@ export function LookBody() {
   return (
     <>
       {SLIDERS.map((s) => <label key={s.key}>{s.label} {s.hint && <small>{s.hint}</small>}{slider(s.key)}</label>)}
-      <label className="toggle"><input type="checkbox" id="mood" checked={look.mood} onChange={(e) => app.setLookFlag('mood', e.target.checked)} /> Mood from tempo <small>fast → vivid & warm · slow → muted & cool</small></label>
       <label>Aberration {slider('aberration')}</label>
       <label>Resolution {slider('resolution')}</label>
       <label className="toggle"><input type="checkbox" id="drift" checked={look.drift} onChange={(e) => app.setLookFlag('drift', e.target.checked)} /> Drift <small>sliders glide to random values, each at its own pace</small></label>

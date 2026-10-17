@@ -48,7 +48,7 @@ export class LiveSlot {
   private readonly mainScreen: Frame = { program: programState(), params: undefined };
   private readonly mainProjector = output();
   private readonly routed: Routed = { screen: this.mainScreen, projector: null };
-  private readonly look: FrameLook = { reactivity: 1, speed: 1, cycle: 0, spin: 1, hue: 0, trails: 0.86, aberration: 0, synesthesia: 0, mood: true };
+  private readonly look: FrameLook = { reactivity: 1, speed: 1, cycle: 0, spin: 1, hue: 0, trails: 0.86, aberration: 0, synesthesia: 0 };
   private readonly liveMotion: Motion = { time: 0, timeRate: 1, huePhase: 0 };
   private readonly previewMotion: Motion = { time: 0, timeRate: 1, huePhase: 0 };
   private previewShot: Shot | null = null;   // what Preview's motion runs for
@@ -171,7 +171,6 @@ export class LiveSlot {
     l.trails = look.trails ?? app.trails;
     l.aberration = look.aberration ?? app.aberration;
     l.synesthesia = app.synesthesia;
-    l.mood = app.mood;
     l.spin = app.spin;
     return l;
   }

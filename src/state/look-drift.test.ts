@@ -25,7 +25,6 @@ describe('LookDrift', () => {
       expect(look[k]).not.toBe(defaultLook()[k]);
     }
     expect(look.resolution).toBe(defaultLook().resolution);
-    expect(look.mood).toBe(true);
   });
 
   it('carries on from a value the user set instead of snapping back', () => {
