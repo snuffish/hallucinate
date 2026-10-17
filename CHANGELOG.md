@@ -7,6 +7,8 @@
 - An **Effects** widget, docked under the Look: add a **Mirror** to the main screen (left↔right, top↕bottom or both),
   switch it on and off and remove it. It stays through scene changes and reloads, and projectors showing the main
   screen show it too. See [ADR 0003](docs/adr/0003-effects-belong-to-the-show-scene.md).
+- A **Kaleidoscope** effect: the picture folded into 3 to 12 segments around the centre, turning at a spin speed. The
+  bass pushes the turn ahead and each kick jumps it on, scaled by the Look's Reactivity.
 
 ### Changed
 
