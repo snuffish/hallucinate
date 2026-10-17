@@ -128,6 +128,13 @@ export class AppController {
       const frames = composeStill(index, stillUniforms(inputs), look, s!.trails ?? 1, spectrum ?? stillSpectrum());
       return { error: null, image: await this.renderer.stillAsync(frames, 1280, 720) };
     },
+    stillChange: async (index, { from, to, look }) => {
+      const s = this.state.scenes[index];
+      const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
+      if (error) return { error, images: null };
+      const frames = composeStill(index, stillUniforms(from), look, s!.trails ?? 1, stillSpectrum(), stillUniforms(to));
+      return { error: null, images: await this.renderer.stillPairAsync(frames, 1280, 720) };
+    },
   };
   // Another tab imported settings: this one's state is stale, so it must not write, and reloads.
   // Another tab changed a preference: take it over, so this tab's next write doesn't undo it.

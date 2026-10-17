@@ -27,6 +27,7 @@ npm run lint        # ESLint (TypeScript + React hooks rules)
 npm run typecheck   # tsc for the app and the server
 npm test            # Vitest unit tests (parameters, node compiler, scene list, hotkeys, persistence, assistant plumbing)
 npm run test:e2e    # Playwright: boot, scenes, every panel, library keys, widgets & layout, help, params, randomize, backup, studio, assistant chats
+E2E_SKIP_SCENES=1 npm run test:e2e   # the same without the built-in scenes' pixel checks (CI runs those in a job of their own, e2e-scenes)
 npm run test:e2e:desktop   # builds the desktop app and drives it (needs a GPU, so not in CI; lint, typecheck, unit and e2e are)
 ASSISTANT_E2E=1 npx playwright test e2e/assistant.spec.ts   # one real assistant round-trip (uses your Claude backend)
 node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json   # performance probe, with the dev server running

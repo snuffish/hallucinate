@@ -388,6 +388,10 @@ export interface ProfilerApi {
   // returned one, as the audience would see it. The built-in conformance spec uses it to hear silence
   // and kicks on cue. An image, or why the scene doesn't compile.
   still(index: number, sound?: { inputs?: Partial<SnapshotUniforms>; silent?: boolean; look?: FrameLook }): Promise<{ error: string | null; image: ImageData | null }>;
+  // One frame's change with a Look applied: a burst with `from`'s inputs as still() draws it, then one
+  // more frame with `to`'s. The images either side of it (the strobe rule compares them), or why the
+  // scene doesn't compile. Half the frames of two stills.
+  stillChange(index: number, sound: { from: Partial<SnapshotUniforms>; to: Partial<SnapshotUniforms>; look: FrameLook }): Promise<{ error: string | null; images: [ImageData, ImageData] | null }>;
 }
 
 // A scene as scripts see it: its category, how many parameters it has, and whether it ships with the app.

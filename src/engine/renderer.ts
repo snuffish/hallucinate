@@ -478,7 +478,17 @@ export class Renderer {
     return this.readbackAsync(() => this.renderBurst(frames, w, h), w, h);
   }
 
-  private renderBurst(frames: readonly ProgramState[], w: number, h: number): Target {
+  // The last two frames of such a burst: the change from one to the other is one frame's change on
+  // screen. One burst for both, so the strobe check renders it once. Queued back to back: nothing draws
+  // into the burst's targets in between.
+  stillPairAsync(frames: readonly ProgramState[], w = 320, h = 180): Promise<[ImageData, ImageData]> {
+    return Promise.all([
+      this.readbackAsync(() => this.renderBurst(frames.slice(0, -1), w, h), w, h),
+      this.readbackAsync(() => this.renderBurst(frames.slice(-1), w, h, false), w, h),
+    ]);
+  }
+
+  private renderBurst(frames: readonly ProgramState[], w: number, h: number, fromBlack = true): Target {
     const gl = this.gl;
     if (this.burst && (this.burst.out.w !== w || this.burst.out.h !== h)) this.deleteBurst();
     this.burst ??= {
@@ -486,7 +496,7 @@ export class Renderer {
       out: this.createTarget(w, h, true),
     };
     const { targets, out } = this.burst;
-    for (const t of [targets.read, targets.write]) {   // no afterglow from the last burst
+    if (fromBlack) for (const t of [targets.read, targets.write]) {   // no afterglow from the last burst
       gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);

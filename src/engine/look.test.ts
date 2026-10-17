@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { defaultLook } from '../state/app-state';
 import type { Hearing } from './listener';
-import { composeFrame, programState, type Motion } from './look';
+import { BURST_FRAMES, composeFrame, composeStill, programState, type Motion } from './look';
+import { stillSpectrum, stillUniforms } from './scene-inputs';
 
 const sound = (o: Partial<Hearing> = {}): Hearing => ({ bass: 0.5, mid: 0.5, high: 0.5, level: 0.5, beat: 0, kick: false, tick: false, tickPhase: 0, ticks: 0, bpm: 120, bright: 0.5, centroid: 2500, energy: 0.5, mood: 0.5, ...o });
 const still = (): Motion => ({ time: 0, timeRate: 1, huePhase: 0 });
@@ -101,5 +102,26 @@ describe('composeFrame', () => {
   it('jumps the hue on a kick no further at higher reactivity', () => {
     const jump = (reactivity: number) => { const m = still(); frame(sound({ kick: true }), { ...defaultLook(), cycle: 1, reactivity }, m, 0); return m.huePhase; };
     expect(jump(2)).toBe(jump(1));
+  });
+});
+
+describe('composeStill', () => {
+  const calm = stillUniforms({ uBeat: 0 });
+  const kick = stillUniforms({ uBeat: 1, uBass: 1 });
+  const burst = (inputs = calm, then?: typeof calm) => composeStill(3, inputs, defaultLook(), 1, stillSpectrum(), then);
+
+  it('is a burst of frames ending at the inputs\' time', () => {
+    const frames = burst(kick);
+    expect(frames).toHaveLength(BURST_FRAMES);
+    expect(frames.at(-1)!.time).toBeCloseTo(kick.uTime);
+  });
+
+  it('with `then`, adds one frame of that sound after a burst of the first, ending at its time', () => {
+    const frames = burst(calm, kick);
+    expect(frames).toHaveLength(BURST_FRAMES + 1);
+    expect(frames.slice(0, -1).every((p) => p.beat === 0 && p.bass === burst()[0]!.bass)).toBe(true);
+    expect(frames.at(-1)!.beat).toBeGreaterThan(0);
+    expect(frames.at(-1)!.time).toBeCloseTo(kick.uTime);
+    expect(frames.every((p) => p.scene === 3)).toBe(true);
   });
 });
