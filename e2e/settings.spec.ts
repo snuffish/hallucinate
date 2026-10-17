@@ -185,12 +185,29 @@ test('assistant: a server without a keychain points to the environment instead',
   await expect(page.locator('#ai-key')).toHaveCount(0);
 });
 
-test('start resolution seeds the Look slider at the next start', async ({ page }) => {
-  await openApp(page);
+test('resolution is a live display setting, at 100% to start, and remembered', async ({ page }) => {
+  // What the scenes render at, as the profiler sees it (?perf offers it).
+  const scale = () => page.evaluate(() => (window as { __profiler?: { report(): { scale: number } | null } }).__profiler?.report()?.scale);
+  await page.goto('/?perf');
+  await page.getByRole('button', { name: 'Play demo beat' }).click();
+  await expect(page.locator('#w-look')).toBeVisible();
+  await expect(page.locator('#w-look #resolution')).toHaveCount(0);   // not part of the Look
+
   await page.keyboard.press(',');
-  await page.locator('#pref-start-resolution').fill('0.5');
-  await expect(page.locator('#resolution')).toHaveValue('0.75');   // the live slider isn't touched now
-  await expect.poll(() => storedPrefs(page)).toMatchObject({ startResolution: 0.5 });
+  await expect(page.locator('#settings-tab-display')).toHaveAttribute('aria-selected', 'true');
+  const field = page.locator('.settings-field', { has: page.locator('#pref-resolution') });
+  await expect(field).toContainText('Resolution · 100%');
+  await expect(page.locator('#pref-resolution')).toHaveValue('1');
+  await expect.poll(scale).toBe(1);
+
+  await page.locator('#pref-resolution').fill('0.5');   // takes effect now, no restart
+  await expect(field).toContainText('Resolution · 50%');
+  await expect.poll(scale).toBe(0.5);
+  await expect.poll(() => storedPrefs(page)).toMatchObject({ resolution: 0.5 });
+
   await page.reload();
-  await expect(page.locator('#resolution')).toHaveValue('0.5');
+  await page.getByRole('button', { name: 'Play demo beat' }).click();
+  await expect.poll(scale).toBe(0.5);
+  await page.keyboard.press(',');
+  await expect(page.locator('#pref-resolution')).toHaveValue('0.5');
 });

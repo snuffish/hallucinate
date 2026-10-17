@@ -46,8 +46,9 @@ warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm col
 
 ## 🎨 The Look widget
 
-Look sliders: reactivity, speed, trails, colour, colour cycling, chromatic aberration, synesthesia, Drift
-speed and render resolution (lower it if frames drop).
+Look sliders: reactivity, speed, trails, colour, colour cycling, chromatic aberration, synesthesia and Drift
+speed. Resolution isn't part of the Look: it is in [Settings → Display & performance](settings.md#display--performance)
+(lower it if frames drop).
 
 - **Trails** – an afterglow: a line keeps glowing where it was drawn and fades there, without moving. At 0 there is
   no afterglow; higher values fade more slowly. The trail keeps the line's colour.

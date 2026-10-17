@@ -2,8 +2,8 @@
 // overlay, stored under KEYS.prefs and deliberately left out of the export (they describe this
 // machine; a setup moved to a projector laptop shouldn't carry them).
 //
-// A preference is a default that seeds live state, never a second control for it: Start resolution
-// sets the Look's Resolution when the app starts; the slider stays the live control.
+// A preference is a default that seeds live state, never a second control for it. The exception is
+// Display & performance (Resolution, Pixel density): those are the live controls, applied at once.
 
 import { z } from 'zod';
 import type { OutputPrefs } from '../engine/output-link';
@@ -12,11 +12,12 @@ import { Store, useStore } from './store';
 
 export const PIXEL_RATIOS = [1, 1.5, 2] as const;
 export const IDLE_SECONDS = [3, 5, 10, 30] as const;
+export const RESOLUTION = { min: 0.3, max: 1, step: 0.05 } as const;
 
 // Every field falls back on its own (`.catch`), so one bad value doesn't reset the others.
 export const PrefsSchema = z.object({
   v: z.literal(1),
-  startResolution: z.number().min(0.3).max(1).catch(0.75),
+  resolution: z.number().min(RESOLUTION.min).max(RESOLUTION.max).catch(1),   // the scenes render at this share of the canvas
   maxPixelRatio: z.literal(PIXEL_RATIOS).catch(2),
   audioSmoothing: z.number().min(0).max(0.95).catch(0.6),
   micEchoCancellation: z.boolean().catch(false),
@@ -36,7 +37,7 @@ export const loadPrefs = (): Prefs => readJSON(KEYS.prefs, PrefsSchema, DEFAULT_
 // the studio's Preview monitor and every projector window (sent over the output link).
 export type Applies = 'startup' | 'live' | 'next-mic' | 'all-renderers';
 export const APPLIES: Record<PrefKey, Applies> = {
-  startResolution: 'startup',
+  resolution: 'live',
   maxPixelRatio: 'all-renderers',
   audioSmoothing: 'live',
   micEchoCancellation: 'next-mic',

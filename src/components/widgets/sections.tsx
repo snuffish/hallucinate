@@ -162,7 +162,6 @@ export function LookBody() {
     <>
       {SLIDERS.map((s) => <label key={s.key}>{s.label} {s.hint && <small>{s.hint}</small>}{slider(s.key)}</label>)}
       <label>Aberration {slider('aberration')}</label>
-      <label>Resolution {slider('resolution')}</label>
       <label className="toggle"><input type="checkbox" id="drift" checked={look.drift} onChange={(e) => app.setLookFlag('drift', e.target.checked)} /> Drift <small>sliders glide to random values, each at its own pace</small></label>
       {look.drift && <label>Drift speed {slider('driftSpeed')}</label>}
     </>

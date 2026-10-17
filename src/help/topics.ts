@@ -49,7 +49,7 @@ export const HELP_TOPICS = {
       'These sliders apply to every scene: how strongly it reacts, how fast it moves, how long the afterglow of its trails lasts, and its colour.',
       'Synesthesia grades the picture by the sound: dark sound goes dim and cool, bright sound light and warm, and an energetic mood more vivid. At 0 it is off.',
       'Drift lets the sliders glide to new random values on their own, each at its own pace, for a look that keeps slowly changing; Drift speed sets how fast. Move a slider yourself and it drifts on from there.',
-      'Lower the resolution if the frame rate drops.',
+      'If the frame rate drops, lower Resolution in Settings → Display & performance.',
     ],
     hotkeys: ['randomize', 'randomizeBack', 'auto'],
   },
@@ -127,7 +127,7 @@ export const HELP_TOPICS = {
     id: 'settings',
     title: 'Settings',
     body: [
-      'Display: where Resolution starts each time Hallucinate opens, and the pixel density everything renders at (the main screen, the studio monitor and projectors). Lower both if the frame rate drops.',
+      'Display & performance: the Resolution and pixel density everything renders at (the main screen, the studio\'s Preview and projectors). They apply at once: lower them if the frame rate drops.',
       'Audio: how much the analysis smooths the sound, and the browser\'s microphone processing, off by default because it ducks and gates music.',
       'Interface: when the controls hide, the key badges on buttons and the assistant\'s reasoning.',
       ...(STATIC_DEMO ? [] : ['Assistant: which way Hallucinate reaches Claude, the model and effort, and (in the desktop app) an API key, kept encrypted. A variable set in the environment wins and locks its field.']),

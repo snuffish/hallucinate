@@ -15,9 +15,9 @@ describe('device preferences', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('starts from the values the app used before Settings existed', () => {
+  it('starts from the defaults, with the scenes at full resolution', () => {
     expect(loadPrefs()).toEqual({
-      v: 1, startResolution: 0.75, maxPixelRatio: 2, audioSmoothing: 0.6,
+      v: 1, resolution: 1, maxPixelRatio: 2, audioSmoothing: 0.6,
       micEchoCancellation: false, micNoiseSuppression: false, micAutoGain: false, idleHideSeconds: 3, showKeyBadges: true,
     });
     expect(DEFAULT_PREFS).toEqual(loadPrefs());
@@ -28,6 +28,12 @@ describe('device preferences', () => {
     expect(loadPrefs()).toEqual({ ...DEFAULT_PREFS, idleHideSeconds: null, showKeyBadges: false });
   });
 
+  it('leaves the old Start resolution behind: Resolution starts at 100%', () => {
+    store.set(KEYS.prefs, JSON.stringify({ v: 1, startResolution: 0.5, showKeyBadges: false }));
+    expect(loadPrefs()).toEqual({ ...DEFAULT_PREFS, showKeyBadges: false });
+    expect(loadPrefs().resolution).toBe(1);
+  });
+
   it('falls back to the defaults for another version or unreadable data', () => {
     store.set(KEYS.prefs, JSON.stringify({ v: 2, showKeyBadges: false }));
     expect(loadPrefs()).toEqual(DEFAULT_PREFS);
@@ -36,7 +42,7 @@ describe('device preferences', () => {
   });
 
   it('round-trips what it stores', () => {
-    const prefs = { ...DEFAULT_PREFS, startResolution: 0.5, maxPixelRatio: 1.5 as const, idleHideSeconds: 10 as const, micAutoGain: true };
+    const prefs = { ...DEFAULT_PREFS, resolution: 0.5, maxPixelRatio: 1.5 as const, idleHideSeconds: 10 as const, micAutoGain: true };
     store.set(KEYS.prefs, JSON.stringify(prefs));
     expect(PrefsSchema.parse(JSON.parse(store.get(KEYS.prefs)!))).toEqual(prefs);
     expect(loadPrefs()).toEqual(prefs);
