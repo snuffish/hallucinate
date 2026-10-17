@@ -47,7 +47,7 @@ void main() {
     level += 1.6 * max(1. - age, 0.) * max(1. - age, 0.);               // the tick: a bright birth
     level += 1.8 * flare * (1. - .6 * f);                               // the kick flares the inner rings most
     level *= smoothstep(GONE, FADE, R) * smoothstep(0., .4, age);
-    vec3 c = mix(rainbow(uHue + (fract(k * .618) - .5) * .1), vec3(1.), .5 * flare);
+    vec3 c = mix(laser(uHue + (fract(k * .618) - .5) * .1), vec3(1.), .5 * flare);
     col += c * beam(apo - R, WIDTH * px) * level;
   }
   fragColor = vec4(col, 1.);

@@ -22,6 +22,9 @@ mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 vec3 pal(float t, vec3 a, vec3 b, vec3 c, vec3 d) { return a + b * cos(TAU * (c * t + d)); }
 vec3 rainbow(float t) { return pal(t, vec3(.5), vec3(.5), vec3(1.), vec3(0., .33, .67)); }
 vec3 neon(float t) { return pal(t, vec3(.5), vec3(.5), vec3(1., 1., .5), vec3(.8, .9, .3)); }
+// The laser palette: pure, fully saturated colours on a continuous wheel, red -> yellow -> green -> cyan -> blue ->
+// magenta -> red, repeating every 1.0. Every colour is at full strength (no brightness balancing), like RGB lasers.
+vec3 laser(float t) { return clamp(abs(fract(t + vec3(0., 2., 1.) / 3.) * 6. - 3.) - 1., 0., 1.); }
 
 float spec(float x) { return texture(uSpec, vec2(clamp(x, 0., 1.) * .996 + .002, .5)).r; }
 float wave(float x) { return texture(uSpec, vec2(clamp(x, 0., 1.) * .996 + .002, .5)).g * 2. - 1.; }

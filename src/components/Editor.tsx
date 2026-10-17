@@ -136,7 +136,7 @@ export function Editor() {
           <dt><code>centered()</code></dt><dd>pixel position, (0,0) = centre, y from −0.5 to 0.5</dd>
           {SCENE_INPUTS.map((i) => <Fragment key={i.uniform}><dt><code>{i.uniform}</code></dt><dd>{i.help} ({i.range})</dd></Fragment>)}
           <dt><code>spec(x) wave(x)</code></dt><dd>spectrum (0…1, bass→treble) and waveform (−1…1) at x</dd>
-          <dt><code>rainbow(t) neon(t)</code></dt><dd>colour palettes, repeat every 1.0</dd>
+          <dt><code>laser(t) rainbow(t) neon(t)</code></dt><dd>colour palettes, repeat every 1.0; <code>laser</code> is pure, fully saturated colours (the built-in scenes use it)</dd>
           <dt><code>rot(a) noise(p) fbm(p) hash(p)</code></dt><dd>rotate a vec2, smooth noise, layered noise, random</dd>
           <dt><code>beam(d, w)</code></dt><dd>a thin laser line at distance d: a hard core w wide and a short halo; give w in pixels, as <code>2. * onePixel()</code></dd>
           <dt><code>onePixel()</code></dt><dd>the size of one pixel in <code>centered()</code> units</dd>
