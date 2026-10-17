@@ -137,8 +137,8 @@ vec3 effect(vec2 uv) {
   float swell = (1. + .5 * min(uBass, 1.)) * (1. - min(uBeat, 1.));
   return pick(uv) + halo * uStrength * swell;
 }`,
-    },
-    {
+  },
+  {
     id: 'wave',
     label: 'Wave',
     help: 'Ripples and bends the picture: Amount sets how far it bends, Wavelength how far apart the ripples are.',

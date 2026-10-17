@@ -354,7 +354,7 @@ export class StudioSession {
     const mode = step?.mode ?? this.mode;
     const fade = mode === 'cut' ? 0 : step?.seconds ?? this.seconds;
     if (source === 'user') this.touched();
-    const shot = { scene: i, values: cue.values, look: cue.look, effects: cue.effects };
+    const shot = this.shot(cue, i);
     if (this.open) {
       app.applyScene(shot, fade);
     } else {

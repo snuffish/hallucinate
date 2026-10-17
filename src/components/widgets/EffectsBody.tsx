@@ -47,17 +47,18 @@ export function EffectsBody() {
 }
 
 // How a row shows a drag in progress: the dragged row, and the line where it would land.
-function dropMarker(stack: EffectStack, drop: Drop | null, id: EffectId): string {
-  if (!drop) return '';
-  if (drop.id === id) return ' dragging';
+type Marker = 'dragging' | 'drop-before' | 'drop-after' | null;
+function dropMarker(stack: EffectStack, drop: Drop | null, id: EffectId): Marker {
+  if (!drop) return null;
+  if (drop.id === id) return 'dragging';
   const rest = stack.filter((e) => e.id !== drop.id);
-  if (rest[drop.to]?.id === id) return ' drop-before';
-  return drop.to >= rest.length && rest.at(-1)?.id === id ? ' drop-after' : '';
+  if (rest[drop.to]?.id === id) return 'drop-before';
+  return drop.to >= rest.length && rest.at(-1)?.id === id ? 'drop-after' : null;
 }
 
 interface RowDrag { move: (id: EffectId, y: number) => void; end: (id: EffectId, y: number) => void; cancel: () => void }
 
-function EffectRow({ entry, index, marker, drag }: { entry: EffectEntry; index: number; marker: string; drag: RowDrag }) {
+function EffectRow({ entry, index, marker, drag }: { entry: EffectEntry; index: number; marker: Marker; drag: RowDrag }) {
   const app = useApp();
   const def = effectDef(entry.id);
   const handle = useRef<HTMLButtonElement>(null);
@@ -85,7 +86,7 @@ function EffectRow({ entry, index, marker, drag }: { entry: EffectEntry; index: 
     app.moveEffect(entry.id, Math.max(0, index + by));
   };
   return (
-    <li className={`fx${entry.on ? '' : ' off'}${marker}`} data-effect={entry.id}>
+    <li className={['fx', entry.on ? null : 'off', marker].filter(Boolean).join(' ')} data-effect={entry.id}>
       <div className="fx-head">
         <button ref={handle} type="button" id={`${id}-move`} className="icon fx-move" aria-label={`Move ${def.label}`}
           title="Drag to change the order (or ↑ / ↓)" onPointerDown={onPointerDown} onClickCapture={onClickCapture} onKeyDown={onKeyDown}>⠿</button>
