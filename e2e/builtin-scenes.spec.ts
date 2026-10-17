@@ -139,24 +139,31 @@ for (const effect of EFFECTS) for (const { name: sceneName } of SCENES) {
   });
 }
 
-// Every effect stacked, each at its strongest: whatever runs before it, each effect fades back to the
-// scene's own picture across the border, so the edges stay the scene's. Only the silent still, a third of
-// what a test above renders: the kick and the tick are each effect's own, checked alone above. A test
-// per scene all the same, so they share the workers: one test rendering all eight ran past four minutes
-// on a loaded machine. (In this stack the Kaleidoscope's disc leaves the corners black too, so the edges
-// hold with a margin.)
-const ALL_STRONGEST: EffectStack = EFFECTS.flatMap((e) => strongest(e.id));
+// Effects stacked, each at its strongest: whatever runs before it, each effect fades back to the scene's
+// own picture across the border, so the edges stay the scene's. Two stacks: all of them, and all but the
+// Kaleidoscope in an order that carries light outward (the Mirror copies one side's lines onto the other's
+// edge, the Wave bends them further out, the Glow spreads them): the Kaleidoscope's disc leaves the
+// corners black whatever the fade does, so only the second stack shows the fade itself at work. Only the
+// silent stills, two thirds of what a test above renders: the kick and the tick are each effect's own,
+// checked alone above. A test per scene, so they share the workers: one test rendering all eight scenes
+// ran past four minutes on a loaded machine.
+const STACKS: { name: string; effects: EffectStack }[] = [
+  { name: 'every effect', effects: EFFECTS.flatMap((e) => strongest(e.id)) },
+  { name: 'Mirror, Wave and Glow', effects: (['mirror', 'wave', 'glow'] as const).flatMap((id) => strongest(id)) },
+];
 for (const { name: sceneName } of SCENES) {
-  test(`${sceneName} with all the effects stacked at their strongest, at the strongest Look: black edges in silence`, async ({ page }) => {
+  test(`${sceneName} with the effects stacked at their strongest, at the strongest Look: black edges in silence`, async ({ page }) => {
     test.setTimeout(4 * 60_000);
     const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
-    const { error, edgeBlack } = await page.evaluate(async ({ index, look, effects, band, SILENCE, source }) => {
-      const { image, error } = await (window as Hook).__profiler!.still(index, { inputs: SILENCE, silent: true, look, effects });
-      return { error, edgeBlack: image ? ((0, eval)(source) as EdgeBlack)(image, band) : 0 };
-    }, { index: scene.index, look: STRONGEST_LOOK, effects: ALL_STRONGEST, band: EDGE_BAND, SILENCE, source: EDGE_BLACK });
-    console.log(`${sceneName} with every effect stacked: ${(edgeBlack * 100).toFixed(1)}% of the edge is black in silence`);
-    expect(error, `${sceneName} renders`).toBeNull();
-    expect(edgeBlack, `${sceneName}: the edges are pure black in silence`).toBeGreaterThanOrEqual(0.75);
+    for (const stack of STACKS) {
+      const { error, edgeBlack } = await page.evaluate(async ({ index, look, effects, band, SILENCE, source }) => {
+        const { image, error } = await (window as Hook).__profiler!.still(index, { inputs: SILENCE, silent: true, look, effects });
+        return { error, edgeBlack: image ? ((0, eval)(source) as EdgeBlack)(image, band) : 0 };
+      }, { index: scene.index, look: STRONGEST_LOOK, effects: stack.effects, band: EDGE_BAND, SILENCE, source: EDGE_BLACK });
+      console.log(`${sceneName} with ${stack.name} stacked: ${(edgeBlack * 100).toFixed(1)}% of the edge is black in silence`);
+      expect(error, `${sceneName} renders`).toBeNull();
+      expect.soft(edgeBlack, `${sceneName} with ${stack.name}: the edges are pure black in silence`).toBeGreaterThanOrEqual(0.75);
+    }
   });
 }
 
