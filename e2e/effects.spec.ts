@@ -1,4 +1,4 @@
-import { EDGE_CLEAR, EDGE_FADE } from '../src/engine/effects';
+import { EDGE_CLEAR, EDGE_FADE, effectDef } from '../src/engine/effects';
 import { expect, seedScenes, test, type Page } from './fixtures';
 
 // How far the main screen's picture is from symmetric, left to right and top to bottom: the share of
@@ -96,6 +96,24 @@ test('effects: the widget docks under the Look and adds, switches, sets and remo
   await expect(row(page, 'mirror')).toHaveCount(0);
   await expect(addMenu(page).locator('option', { hasText: 'Mirror' })).toHaveCount(1);
   await mirrored(page, { lr: false, tb: false });
+});
+
+test('effects: a Kaleidoscope gets segments and spin speed sliders from its catalogue ranges', async ({ page }) => {
+  await start(page);
+  await addMenu(page).selectOption('kaleidoscope');
+  await expect(row(page, 'kaleidoscope')).toBeVisible();
+  for (const s of effectDef('kaleidoscope')!.settings) {
+    const slider = page.locator(`#fx-kaleidoscope-${s.key}`);
+    await expect(slider, s.label).toHaveAttribute('type', 'range');
+    await expect(slider, s.label).toHaveAttribute('min', String(s.min));
+    await expect(slider, s.label).toHaveAttribute('max', String(s.max));
+    await expect(slider, s.label).toHaveAttribute('step', String(s.step));
+    await expect(slider, s.label).toHaveValue(String(s.default));
+  }
+  await expect(page.locator('#fx-kaleidoscope-segments')).toHaveAttribute('min', '3');
+  await expect(page.locator('#fx-kaleidoscope-segments')).toHaveAttribute('max', '12');
+  await page.locator('#fx-kaleidoscope-segments').fill('9');
+  await expect(page.locator('#fx-kaleidoscope-segments')).toHaveValue('9');
 });
 
 // No crossfade runs here (that draws the outgoing picture too): the first scene, auto-switch off.

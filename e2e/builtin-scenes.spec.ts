@@ -30,6 +30,8 @@ const TICK_END = { uBeat: 0, uTick: 0.99, uTicks: 6 };
 const TICK_START = { uBeat: 0, uTick: 0, uTicks: 7 };
 
 const MIRROR_SCENE = 'Light Sheet';   // a scene that isn't symmetric left to right on its own
+const KALEIDOSCOPE_SCENE = 'Beam Fan';   // a scene that isn't symmetric around its centre on its own
+const STEADY_SCENE = 'Spectrum Rays';    // a scene whose shapes don't move round with the bass or a kick on their own
 
 const LOOKS: { name: string; look: FrameLook }[] = [
   { name: 'default Look', look: defaultLook() },
@@ -210,4 +212,82 @@ test('a still with a left↔right Mirror is symmetric across its axis', async ({
   }, { look: defaultLook(), sceneName: MIRROR_SCENE, source: DIFFERS, inner: INNER });
   expect(asymmetry.plain, `${MIRROR_SCENE} isn't symmetric on its own`).toBeGreaterThan(0.001);
   expect(asymmetry.mirrored, 'mirrored, it is').toBe(0);
+});
+
+// How the light falls around a still's centre: the light in each 3° slice of a ring inside the edge fade
+// (where effects run at full strength), and a comparison of the slices with themselves turned `k` slices
+// round (the share of the light that differs). A turned still can't match pixel for pixel, as thin lines
+// land between pixels, but the light in a slice does. Passed into the page as source.
+const RING_SLICES = 120;
+const AROUND = `(image, inner) => {
+  const { data, width: w, height: h } = image;
+  const short = Math.min(w, h), n = ${RING_SLICES}, slices = new Float64Array(n);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = x + .5 - w / 2, dy = y + .5 - h / 2, r = Math.hypot(dx, dy) / short;
+    if (r < .05 || r > .5 - inner) continue;
+    const i = (y * w + x) * 4;
+    slices[Math.floor((Math.atan2(dy, dx) / (2 * Math.PI) + 1) * n) % n] += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  }
+  const total = slices.reduce((a, b) => a + b, 0);
+  return { slices, against: (other, k) => other.reduce((sum, v, i) => sum + Math.abs(v - slices[(i - k + n) % n]), 0) / total };
+}`;
+type Around = (image: ImageData, inner: number) => { slices: Float64Array; against: (other: Float64Array, k: number) => number };
+
+// A Kaleidoscope with n segments makes the picture repeat every n-th of a turn around its centre. Half a
+// segment round is the control: the light falls differently there, so the picture repeats at its
+// segments and not at every angle.
+test('a still with a five-segment Kaleidoscope repeats every fifth of a turn around its centre', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await openProfiler(page);
+  const segments = 5;
+  const r = await page.evaluate(async ({ look, sceneName, source, inner, segments, n }) => {
+    const p = (window as Hook).__profiler!;
+    const around = (0, eval)(source) as Around;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    const plain = around((await p.still(index, { look })).image!, inner);
+    const folded = around((await p.still(index, { look, effects: [{ id: 'kaleidoscope', on: true, settings: { segments, spin: 0.3 } }] })).image!, inner);
+    return { plain: plain.against(plain.slices, n / segments), segment: folded.against(folded.slices, n / segments), half: folded.against(folded.slices, n / segments / 2) };
+  }, { look: defaultLook(), sceneName: KALEIDOSCOPE_SCENE, source: AROUND, inner: INNER, segments, n: RING_SLICES });
+  console.log(`${KALEIDOSCOPE_SCENE}: turned a fifth of a turn, ${(r.plain * 100).toFixed(1)}% of the light differs plain, ${(r.segment * 100).toFixed(1)}% with 5 segments (half a segment: ${(r.half * 100).toFixed(1)}%)`);
+  expect(r.plain, `${KALEIDOSCOPE_SCENE} doesn't repeat around its centre on its own`).toBeGreaterThan(0.3);
+  expect(r.segment, 'with a Kaleidoscope it repeats at each segment').toBeLessThan(0.05);
+  expect(r.half, '…and only there').toBeGreaterThan(0.2);
+});
+
+// The Kaleidoscope's music movement, through the scene inputs the scene reads: the bass pushes the turn
+// ahead and a kick jumps it on, unless its spin speed is 0. Seen as how far round the light has moved
+// (the turn, within 45°, that best lines up the slices) between a still without the bass or the kick and
+// one with it, on the same clock. Three segments, so the picture repeats only every third of a turn. At
+// spin speed 1 and the default Look the full bass (1.5) pushes it 0.375 rad (21.5°) and a kick 0.2 rad
+// (11.5°).
+test('a Kaleidoscope turns on with the bass and with each kick, and holds still at spin speed 0', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await openProfiler(page);
+  const turns = await page.evaluate(async ({ look, sceneName, source, inner, n }) => {
+    const p = (window as Hook).__profiler!;
+    const around = (0, eval)(source) as Around;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    const at = async (spin: number, inputs: Record<string, number>) =>
+      around((await p.still(index, { inputs, look, effects: [{ id: 'kaleidoscope', on: true, settings: { segments: 3, spin } }] })).image!, inner);
+    const turned = (from: ReturnType<Around>, to: ReturnType<Around>) => {
+      let best = 0;
+      for (let k = -n / 8; k <= n / 8; k++) if (from.against(to.slices, k) < from.against(to.slices, best)) best = k;
+      return best * 360 / n;
+    };
+    const out: Record<string, number> = {};
+    for (const spin of [0, 1]) {
+      const quiet = await at(spin, { uBass: 0, uBeat: 0 });
+      out[`bass${spin}`] = turned(quiet, await at(spin, { uBass: 1.5, uBeat: 0 }));
+      out[`kick${spin}`] = turned(quiet, await at(spin, { uBass: 0, uBeat: 1 }));
+    }
+    return out;
+  }, { look: defaultLook(), sceneName: STEADY_SCENE, source: AROUND, inner: INNER, n: RING_SLICES });
+  console.log(`${STEADY_SCENE} with a Kaleidoscope: the bass turns it ${turns.bass1}°, a kick ${turns.kick1}° (at spin speed 0: ${turns.bass0}°, ${turns.kick0}°)`);
+  expect(Math.abs(turns.bass1!), 'the bass turns it on').toBeGreaterThanOrEqual(15);
+  expect(Math.abs(turns.bass1!), 'the bass turns it on').toBeLessThanOrEqual(30);
+  expect(Math.abs(turns.kick1!), 'a kick jumps it on').toBeGreaterThanOrEqual(6);
+  expect(Math.abs(turns.kick1!), 'a kick jumps it on').toBeLessThanOrEqual(18);
+  expect(Math.sign(turns.bass1!), 'both the way it spins').toBe(Math.sign(turns.kick1!));
+  expect(Math.abs(turns.bass0!), 'at spin speed 0 the bass leaves it').toBeLessThanOrEqual(3);
+  expect(Math.abs(turns.kick0!), '…and so does a kick').toBeLessThanOrEqual(3);
 });
