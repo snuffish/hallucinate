@@ -129,7 +129,7 @@ export function Studio() {
                   <button title="Move up" onClick={() => studio.move(cue, -1)}>▲</button>
                   <button title="Move down" onClick={() => studio.move(cue, 1)}>▼</button>
                   <button title="Rename" onClick={() => studio.rename(cue)}>✎</button>
-                  <button title="Update from Live: store the scene, parameters and look that are live now" onClick={() => studio.updateFromLive(cue)}>⤓</button>
+                  <button title="Update from Live: store the scene, parameters, look and effects that are live now" onClick={() => studio.updateFromLive(cue)}>⤓</button>
                   <button title="Duplicate" onClick={() => studio.duplicate(cue)}>⧉</button>
                   <button title="Remove" onClick={() => studio.remove(cue)}>×</button>
                 </div>

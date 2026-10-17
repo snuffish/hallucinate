@@ -31,7 +31,7 @@ browser                                              dev server (Vite middleware
   kicks, the tempo (BPM and the `TempoClock` behind the ticks), the tone and the mood. It returns one `Hearing` a
   frame, read by everything else (the sessions as `app.hearing`), and is tested with synthetic bins.
   `src/engine/look.ts` holds every rule from the sound to the picture: `composeFrame` turns a `Hearing`, a look and
-  an output's `Motion` (its time, the time's pace, the hue's walk) into that output's frame state (reactivity, the
+  an output's `Motion` (its time, the time's pace, the hue's walk, the effects' turn) into that output's frame state (reactivity, the
   synesthesia grade, the trails' afterglow, fringing). The main screen (whose motion is the clock's), the pinned
   Live slot and the studio's Preview monitor each compose their own, and `crossfade` is the one rule for how far a
   transition is. What a scene's shader can read each frame (`uTime`, the bands, `uBeat`, the tick's `uTick` / `uTicks`, `uHue`, `uBright`, `uMood`)
@@ -50,7 +50,8 @@ browser                                              dev server (Vite middleware
   sharing, the microphone went away). It is the only writer of `activeSource`, and the one place that says whether
   the music is `playing` (a paused or finished file is still the source, but not playing).
 - **The Live slot** (`src/app/live-slot.ts`, the controller's `live`): closing the studio with a show scene Live pins
-  it there. Projectors keep it, and crossfade from it on the next take with each show scene's own values, while the
+  it there. Projectors keep it, and crossfade from it on the next take with each show scene's own values and
+  effects (a take of the same scene switches both at once: one scene draws with one set of values), while the
   screen is free to browse (or shows Live too, from the Screen widget). `route()` decides each frame what the main
   canvas and the projectors draw; the studio's Preview monitor is composed by the same code (`preview()`), and the
   slot publishes `liveName` and `screenMode`. Live and Preview compose with their show scene's own look (reactivity,
@@ -72,8 +73,9 @@ browser                                              dev server (Vite middleware
   The panels only subscribe and render; the shortcuts and the tools reach the same objects. The sessions see
   the app through `AppPort` (`src/app/app-port.ts`), the part of the controller they use; the tests use one
   in-memory fake of it (`src/app/fake-app.ts`), so neither can drift from what the sessions need. A scene goes
-  on screen as a whole through `applyScene` / `captureScene` (scene, parameter values, look), the way the studio
-  takes it. A scene's code, its `@params` and their stored values belong to the scene library
+  on screen as a whole through `applyScene` / `captureScene` (scene, parameter values, look, effects), the way the
+  studio takes it. On the main screen both pictures of a crossfade draw with the screen's effects, except that a
+  show scene put there by `applyScene` leaves the outgoing picture the stack it had until the fade ends. A scene's code, its `@params` and their stored values belong to the scene library
   (`src/app/scene-library.ts`, the controller's `library`): compiling into a scene, adding one of yours (one rule for
   "Save to library" and the assistant's `create_scene`), removing it and setting values all go through it, and it
   tells the controller what changed, which keeps the renderer, the projector and the Parameters panel current. It
@@ -165,7 +167,8 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
 auto-switch, a tick is the studio's and the director's beat (both before the frame is
 composed) → `composeFrame` fills one reused `ProgramState` for the main screen (on the clock's motion) →
 `LiveSlot.route` composes Live (on its own motion) and decides what the screen and the
-projectors draw → `Renderer.render` (scene pass → feedback pass → display pass) → `OutputLink.sendFrame` when a
+projectors draw → `Renderer.render` (scene pass → effects, one pass per switched-on effect of each picture's stack plus that effect's
+own `passes` (Glow's blur), none when none is on → feedback pass → display pass) → `OutputLink.sendFrame` when a
 projector is connected → `hooks.onFrame` (studio preview and master
 fader) → every second frame: publish meters to the UI store. `FrameProfiler` (Shift+P, `?perf`) laps between these stages;
 while it is off each lap is one flag check.
@@ -205,6 +208,18 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 
 - **A scene:** add a module to `src/scenes/` that builds it with `scene(name, category, description, glsl)`, and list it in `SCENES` in `src/scenes/index.ts` (key order). The shared shader header (`header.ts`) and the new-scene template (`template.ts`) live there too. A scene reads only scene inputs and the header's helpers (lines with `beam(d, w)`); a helper two scenes need goes into the header. `e2e/builtin-scenes.spec.ts` picks every listed scene up and checks it against the laser-show checklist, the safety rules with the Look applied: at the default Look and at the strongest (`STRONGEST_LOOK`), through `still(index, { look })`.
   Tag uniforms or constants with `// @param` for live controls.
+- **An effect:** add a row to `EFFECTS` in `src/engine/effects.ts`: its id and label, its settings (range, step,
+  default; a choice lists its `options`), how it moves with the music, and its picture step, GLSL defining
+  `vec3 effect(vec2 uv)` that reads the picture with `pick(uv)`, its settings by their `uniform` names and the scene
+  inputs (so Reactivity scales its movement); a movement that must never run back (a turn) reads `uTurn`, the
+  effects' turn, which `composeFrame` runs on with the bass and the kicks. An effect that needs more than one pass (Glow's blur) lists `passes`:
+  each renders at a share of the picture (`scale`) and defines `vec3 pass(vec2 uv)` reading its input with `pick`;
+  the picture step reads the last one with `passed(uv)`. The renderer keeps two targets per pass size. The widget, the clean-up of stored stacks, the renderer (each picture
+  step compiled once, wrapped with the edge fade) and `e2e/builtin-scenes.spec.ts` (alone at its strongest on every
+  scene at the strongest Look, and all of them stacked at their strongest) all pick it up from there. The edge fade's
+  sizes live beside the catalogue: the spec measures the border band `EDGE_BAND`, effects leave the scene's own
+  picture alone out to `EDGE_CLEAR` (the band plus a margin for the Look's fringing) and run at full strength from
+  `EDGE_FULL`.
 - **A visual-maker block:** add an entry to `NODE_TYPES` in `src/engine/nodes.ts` (and a helper to `LIBS` if it
   needs GLSL). The examples test compiles every example graph.
 - **An assistant tool:** add a `tool({ … })` entry to `TOOLS` in `src/assistant/tools.ts` (schema, description, its

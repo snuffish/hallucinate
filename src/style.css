@@ -240,6 +240,18 @@ body.idle { cursor: none; }
 #mood-label { margin-left: auto; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 
+.effects select { font: inherit; font-size: 12px; color: var(--text); background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+.effects select option { background: #1a1326; }
+.fx-stack { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.fx { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.fx-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.fx-head > .toggle { margin-right: auto; }
+.fx.off > label { opacity: 0.5; }
+.fx-move { padding: 2px 6px; cursor: grab; touch-action: none; }
+.fx.dragging { opacity: 0.5; }
+.fx.drop-before { box-shadow: 0 -3px 0 var(--accent); }
+.fx.drop-after { box-shadow: 0 3px 0 var(--accent); }
+
 .actions button { flex: 1; }
 .actions .random-scene { flex-basis: 100%; font-size: 12px; }
 

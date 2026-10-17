@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased — effects (2026-10-17)
+
+### Added
+
+- An **Effects** widget, docked under the Look: add a **Mirror** to the main screen (left↔right, top↕bottom or both),
+  switch it on and off and remove it. It stays through scene changes and reloads, and projectors showing the main
+  screen show it too. See [ADR 0003](docs/adr/0003-effects-belong-to-the-show-scene.md).
+- A **Kaleidoscope** effect: the picture folded into 3 to 12 segments around the centre, turning at a spin speed. It
+  turns faster with the bass and each kick sends it a step further on, scaled by the Look's Reactivity; it never turns
+  back.
+- A **Glow** effect: a soft bloom around the lines with a strength and a radius. It swells with the bass and gives
+  way to each kick, so a kick never doubles the picture. Its blur runs at half size in two passes: about +1.2 ms a
+  frame at 1080p on an M2 at its defaults (PERF.md).
+- A **Wave** effect: the picture ripples and bends, with an amount and a wavelength, and each kick sends a ripple
+  outward from the centre, scaled by Reactivity.
+- Show scenes keep their effects: *What's on Live now* and *Update from Live* store the screen's, a take with the
+  studio open brings them back to the screen, and Preview, Live and every projector show them. Through a fade each
+  picture keeps its own effects; a cut switches them with the scene. Shows saved before effects load with none, a
+  damaged effect is dropped without losing the show, and an exported show carries its effects while still opening
+  (without them) in an older copy. Show scenes the director and the assistant write have none.
+- Effects can be dragged into another order by the ⠿ handle on their row (or moved with ↑ / ↓ from the focused
+  handle); they run from the top down, so the order changes the picture. The order is kept on the screen, in show
+  scenes and through a reload.
+- `__profiler.effectsCost(stack)` times what effects cost per frame at the screen's resolution, against none, and
+  `perf/measure.mjs` reports it for Glow and for all four stacked (about +1.6 ms at 720p and +3.4 ms at 1080p on an
+  M2 at their strongest; PERF.md).
+
+### Changed
+
+- The built-in scenes spec measures the edges as a 7-pixel band at 720p (it was the outermost pixel), the band every
+  effect leaves to the scene's own picture, checks every effect alone at its strongest on every scene, and checks the
+  edges of every scene with all four stacked at their strongest.
+
 ## Unreleased — the Look serves the laser set (2026-10-17)
 
 The Look widget now works with the laser set instead of against it. See

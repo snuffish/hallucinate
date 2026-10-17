@@ -5,8 +5,8 @@
 ## Export
 
 **☰ → Export scenes & settings** saves everything you made and set up to one `.json` file: your saved scenes, your
-edits to built-in scenes, *My Shader*, the visual maker graph, live parameter values, the Studio show (cues, plan,
-autopilot and director settings), favourites and the auto-switch rotation, volume and *pitch follows tempo*, the
+edits to built-in scenes, *My Shader*, the visual maker graph, live parameter values, the Studio show (cues with
+their effects, plan, autopilot and director settings), favourites and the auto-switch rotation, volume and *pitch follows tempo*, the
 widget layout and *Use the video's sound*.
 
 It doesn't include recently played tracks, the loaded media, the assistant's conversations
