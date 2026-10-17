@@ -102,8 +102,9 @@ export function cleanStack(raw: unknown): EffectStack {
 }
 
 // A stored stack (the main screen's, a show scene's) as zod reads it: anything, cleaned up, so it never
-// fails the value it sits in; missing reads as no effects.
-export const EffectStackSchema: z.ZodType<EffectStack, unknown> = z.unknown().transform(cleanStack);
+// fails the value it sits in; missing reads as no effects (optional, or zod 4 refuses an object without
+// the key before the clean-up runs).
+export const EffectStackSchema: z.ZodType<EffectStack, unknown> = z.unknown().optional().transform(cleanStack);
 
 const defaults = (def: EffectDef): Record<string, number> => Object.fromEntries(def.settings.map((s) => [s.key, s.default]));
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { EFFECTS, addEffect, cleanStack, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
+import { z } from 'zod';
+import { EFFECTS, EffectStackSchema, addEffect, cleanStack, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
 
 describe('cleaning up a stored effect stack', () => {
   it('keeps a well-formed stack as it is', () => {
@@ -34,6 +35,12 @@ describe('cleaning up a stored effect stack', () => {
   it('reads anything that is not a list of effects as no effects', () => {
     for (const garbage of [null, undefined, 3, 'mirror', { id: 'mirror' }]) expect(cleanStack(garbage)).toEqual([]);
     expect(cleanStack([null, 7, 'mirror', { on: true }])).toEqual([]);
+  });
+
+  it('reads a stored value without a stack as one with no effects, and never fails it', () => {
+    const Stored = z.object({ name: z.string(), effects: EffectStackSchema });
+    expect(Stored.parse({ name: 'old' })).toEqual({ name: 'old', effects: [] });
+    expect(Stored.parse({ name: 'broken', effects: { id: 'mirror' } })).toEqual({ name: 'broken', effects: [] });
   });
 });
 
