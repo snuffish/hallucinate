@@ -285,3 +285,70 @@ test('effects: a Take brings the show scene\'s effects to the screen and each pi
   await expect.poll(() => passes(page), { timeout: 60_000 }).toBe(plain);
   await expect(row(page, 'mirror')).toHaveCount(0);
 });
+
+// The effects in the order the widget shows them, which is the order they run in.
+const order = (page: Page) => page.locator('#w-effects [data-effect]').evaluateAll((els) => els.map((e) => e.getAttribute('data-effect')));
+const handle = (page: Page, label: string) => page.getByRole('button', { name: `Move ${label}`, exact: true });
+const offered = (page: Page) => addMenu(page).locator('option:not([value=""])').allTextContents();
+
+// Drags an effect by its handle onto the top part of another effect's row, in steps so pointermove fires
+// along the way: the dragged effect takes that row's place. The widget sits low in the left dock, so it
+// is scrolled into view first.
+async function dragAbove(page: Page, from: string, onto: string) {
+  await page.locator('#w-effects').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  const h = (await handle(page, from).boundingBox())!;
+  const target = (await row(page, onto.toLowerCase()).boundingBox())!;
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2 - 10, { steps: 3 });
+  await page.mouse.move(target.x + target.width / 2, target.y + 4, { steps: 12 });
+  await page.mouse.up();
+}
+
+test('effects: the widget adds, reorders, switches, sets and removes effects, and the order is kept on the screen, in a show scene and through a reload', async ({ page }) => {
+  await start(page);
+  for (const id of ['mirror', 'kaleidoscope', 'wave']) await addMenu(page).selectOption(id);
+  await expect.poll(() => order(page)).toEqual(['mirror', 'kaleidoscope', 'wave']);
+  expect(await offered(page), 'the menu offers only the effect not yet added').toEqual(['Glow']);
+
+  await dragAbove(page, 'Wave', 'Mirror');
+  await expect.poll(() => order(page)).toEqual(['wave', 'mirror', 'kaleidoscope']);
+
+  // From the keyboard too: the handle is a button, and the arrow keys move its effect one place.
+  await handle(page, 'Kaleidoscope').focus();
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => order(page)).toEqual(['wave', 'kaleidoscope', 'mirror']);
+  await expect(handle(page, 'Kaleidoscope')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(() => order(page)).toEqual(['wave', 'mirror', 'kaleidoscope']);
+  await expect(handle(page, 'Kaleidoscope')).toBeFocused();
+  await page.keyboard.press('ArrowDown');   // already last: it stays there
+  await expect.poll(() => order(page)).toEqual(['wave', 'mirror', 'kaleidoscope']);
+
+  await page.locator('#fx-wave-on').uncheck();
+  await expect(row(page, 'wave')).toHaveClass(/\boff\b/);
+  await page.locator('#fx-wave-on').check();
+  await expect(row(page, 'wave')).not.toHaveClass(/\boff\b/);
+  await page.locator('#fx-wave-amount').fill('0.7');
+  await expect(page.locator('#fx-wave-amount')).toHaveValue('0.7');
+
+  // The main screen keeps the order (stored for the next start), and a show scene captured from it too.
+  const storedScreen = () => page.evaluate(() => (JSON.parse(localStorage.getItem('hallucinate.screenEffects') ?? '[]') as { id: string }[]).map((e) => e.id));
+  await expect.poll(storedScreen).toEqual(['wave', 'mirror', 'kaleidoscope']);
+  await press(page, 'o');
+  await expect(page.locator('#studio')).toBeVisible();
+  await page.selectOption('#st-add', '@live');
+  const storedCue = () => page.evaluate(() => (JSON.parse(localStorage.getItem('hallucinate.show') ?? '{"cues":[]}').cues as { effects: { id: string }[] }[]).at(-1)?.effects.map((e) => e.id));
+  await expect.poll(storedCue).toEqual(['wave', 'mirror', 'kaleidoscope']);
+  await press(page, 'o');
+  await expect(page.locator('#studio')).toBeHidden();
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Play demo beat' }).click();
+  await expect.poll(() => order(page)).toEqual(['wave', 'mirror', 'kaleidoscope']);
+  await expect(page.locator('#fx-wave-amount')).toHaveValue('0.7');
+
+  await row(page, 'kaleidoscope').getByRole('button', { name: 'Remove Kaleidoscope' }).click();
+  await expect.poll(() => order(page)).toEqual(['wave', 'mirror']);
+  expect(await offered(page), 'a removed effect is offered again').toEqual(['Kaleidoscope', 'Glow']);
+});
