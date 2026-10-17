@@ -109,12 +109,13 @@ export interface ProgramState {
 
 
 interface Target { tex: WebGLTexture; fbo: WebGLFramebuffer; w: number; h: number }
-// The effects ping-pong between two targets per picture (fxA1/fxA2 for the incoming one, fxB1/fxB2 for
-// the outgoing one): each pass also reads the scene's own picture for the edge fade, so none writes over it.
+// The effects ping-pong between two targets per picture (effectA1/effectA2 for the incoming one,
+// effectB1/effectB2 for the outgoing one): each pass also reads the scene's own picture for the edge fade,
+// so none writes over it.
 // An effect's own passes (Glow's blur) ping-pong between two targets per size they render at (`passes`,
 // by scale, one pair per scale in PASS_SCALES); the pictures take turns, so both share them.
-interface Targets { sceneA: Target; sceneB: Target; read: Target; write: Target; fxA1: Target; fxA2: Target; fxB1: Target; fxB2: Target; passes: Map<number, [Target, Target]> }
-const targetList = (t: Targets): Target[] => [t.sceneA, t.sceneB, t.read, t.write, t.fxA1, t.fxA2, t.fxB1, t.fxB2, ...[...t.passes.values()].flat()];
+interface Targets { sceneA: Target; sceneB: Target; read: Target; write: Target; effectA1: Target; effectA2: Target; effectB1: Target; effectB2: Target; passes: Map<number, [Target, Target]> }
+const targetList = (t: Targets): Target[] => [t.sceneA, t.sceneB, t.read, t.write, t.effectA1, t.effectA2, t.effectB1, t.effectB2, ...[...t.passes.values()].flat()];
 type Locations = Map<string, WebGLUniformLocation | null>;
 interface Pending { prog: WebGLProgram; fs: WebGLShader; name: string; promise: Promise<string | null>; resolve: (error: string | null) => void; settled: boolean }
 
@@ -643,7 +644,7 @@ export class Renderer {
   private createTargets(w: number, h: number): Targets {
     const t = (scale = 1) => this.createTarget(Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
     const passes = new Map(PASS_SCALES.map((scale): [number, [Target, Target]] => [scale, [t(scale), t(scale)]]));
-    return { sceneA: t(), sceneB: t(), read: t(), write: t(), fxA1: t(), fxA2: t(), fxB1: t(), fxB2: t(), passes };
+    return { sceneA: t(), sceneB: t(), read: t(), write: t(), effectA1: t(), effectA2: t(), effectB1: t(), effectB2: t(), passes };
   }
 
   // The share of the canvas the scenes render at. A rescale restarts the trails, so the same scale
@@ -747,8 +748,8 @@ export class Renderer {
     const crossfading = s.prevScene >= 0 && s.mix < 1;
     if (crossfading) this.drawScene(s.prevScene, t.sceneB, u, media);
     this.effectUniforms.uTurn = s.turn;
-    const a = this.runEffects(s.effects, t.sceneA, t.fxA1, t.fxA2, t.passes, u);
-    const b = crossfading ? this.runEffects(s.prevEffects, t.sceneB, t.fxB1, t.fxB2, t.passes, u) : a;
+    const a = this.runEffects(s.effects, t.sceneA, t.effectA1, t.effectA2, t.passes, u);
+    const b = crossfading ? this.runEffects(s.prevEffects, t.sceneB, t.effectB1, t.effectB2, t.passes, u) : a;
 
     const f = this.feedbackUniforms;
     f.uSceneA = a; f.uSceneB = b; f.uPrev = t.read.tex;
@@ -774,12 +775,12 @@ export class Renderer {
     const e = this.effectUniforms;
     for (const entry of stack) {
       if (!entry.on) continue;
-      const fx = this.effectPrograms.get(entry.id);
-      if (!fx) continue;
-      for (const setting of fx.def.settings) e[setting.uniform] = entry.settings[setting.key] ?? setting.default;
+      const effect = this.effectPrograms.get(entry.id);
+      if (!effect) continue;
+      for (const setting of effect.def.settings) e[setting.uniform] = entry.settings[setting.key] ?? setting.default;
       let input = src;
-      for (let i = 0; i < fx.passes.length; i++) {
-        const pass = fx.passes[i]!;
+      for (let i = 0; i < effect.passes.length; i++) {
+        const pass = effect.passes[i]!;
         const out = passes.get(pass.scale)![i % 2]!;   // never the one the pass before wrote, at the same size
         e.uTex = input.tex;
         this.use(pass.prog, u, e);
@@ -787,7 +788,7 @@ export class Renderer {
         input = out;
       }
       e.uTex = src.tex; e.uScene = scene.tex; e.uPassed = input.tex;
-      this.use(fx.prog, u, e);
+      this.use(effect.prog, u, e);
       this.draw(dst);
       src = dst;
       dst = dst === one ? two : one;
@@ -809,7 +810,7 @@ export class Renderer {
     this.programs.clear();
     gl.deleteProgram(this.feedbackProgram);
     gl.deleteProgram(this.displayProgram);
-    for (const fx of this.effectPrograms.values()) for (const prog of [fx.prog, ...fx.passes.map((p) => p.prog)]) gl.deleteProgram(prog);
+    for (const effect of this.effectPrograms.values()) for (const prog of [effect.prog, ...effect.passes.map((p) => p.prog)]) gl.deleteProgram(prog);
     gl.deleteShader(this.vert);
     if (this.targets) for (const t of targetList(this.targets)) this.deleteTarget(t);
     if (this.thumb) for (const t of [this.thumb.scene, this.thumb.out]) this.deleteTarget(t);
