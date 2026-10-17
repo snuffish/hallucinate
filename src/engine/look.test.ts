@@ -5,7 +5,7 @@ import { BURST_FRAMES, composeFrame, composeStill, programState, type Motion } f
 import { stillSpectrum, stillUniforms } from './scene-inputs';
 
 const sound = (o: Partial<Hearing> = {}): Hearing => ({ bass: 0.5, mid: 0.5, high: 0.5, level: 0.5, beat: 0, kick: false, tick: false, tickPhase: 0, ticks: 0, bpm: 120, bright: 0.5, centroid: 2500, energy: 0.5, mood: 0.5, ...o });
-const still = (): Motion => ({ time: 0, timeRate: 1, huePhase: 0 });
+const still = (): Motion => ({ time: 0, timeRate: 1, huePhase: 0, turn: 0 });
 
 function frame(h: Hearing, look = defaultLook(), motion = still(), dt = 1 / 60) {
   const p = programState();
@@ -105,6 +105,53 @@ describe('composeFrame', () => {
   });
 });
 
+// The effects' turning clock (uTurn, the Kaleidoscope's turn): heard as the listener reports it, a kick
+// setting the beat to 1 and the beat fading by e^-5t (listener.ts).
+describe("composeFrame: the effects' turn", () => {
+  const FPS = 60;
+  // The turn after `seconds` of `hearing(t)`, frame by frame, and every frame's turn on the way.
+  function run(seconds: number, hearing: (t: number) => Partial<Hearing>, look = defaultLook()) {
+    const m = still(), turns: number[] = [];
+    for (let i = 0; i < seconds * FPS; i++) turns.push(frame(sound(hearing(i / FPS)), look, m).turn);
+    return { turn: turns.at(-1)!, turns };
+  }
+  const kicksEvery = (gap: number) => (t: number) => Math.exp(-5 * (t % gap));
+
+  it('never turns back: not as a kick fades, nor as the bass falls', () => {
+    const { turns } = run(4, (t) => ({ beat: kicksEvery(0.5)(t), bass: Math.max(0, 1 - t / 3) }));
+    for (let i = 1; i < turns.length; i++) expect(turns[i]!, `frame ${i}`).toBeGreaterThanOrEqual(turns[i - 1]!);
+    expect(turns.at(-1)!).toBeGreaterThan(turns[0]!);
+  });
+
+  it('leaves it a step further on after each kick: about a fifth of a radian', () => {
+    const calm = run(1, () => ({ beat: 0 })).turn;
+    const kicked = run(1, (t) => ({ beat: Math.exp(-5 * t) })).turn;
+    expect(kicked - calm).toBeGreaterThan(0.15);
+    expect(kicked - calm).toBeLessThan(0.25);
+  });
+
+  it('turns faster with the bass', () => {
+    const quiet = run(2, () => ({ bass: 0 })).turn, loud = run(2, () => ({ bass: 1 })).turn;
+    expect(loud).toBeGreaterThan(quiet * 2);
+  });
+
+  it('turns on steadily without music', () => {
+    expect(run(2, () => ({ bass: 0, beat: 0 })).turn).toBeGreaterThan(0.2);
+  });
+
+  it('moves with the music only as far as Reactivity lets it: none of it at 0', () => {
+    const music = (t: number) => ({ beat: kicksEvery(0.5)(t), bass: 1 });
+    const at = (reactivity: number) => run(2, music, { ...defaultLook(), reactivity }).turn;
+    expect(at(0)).toBeCloseTo(run(2, () => ({ bass: 0, beat: 0 })).turn);
+    expect(at(1)).toBeGreaterThan(at(0.5));
+    expect(at(0.5)).toBeGreaterThan(at(0));
+  });
+
+  it('holds still at Speed 0', () => {
+    expect(run(2, (t) => ({ beat: kicksEvery(0.5)(t), bass: 1 }), { ...defaultLook(), speed: 0 }).turn).toBe(0);
+  });
+});
+
 describe('composeStill', () => {
   const calm = stillUniforms({ uBeat: 0 });
   const kick = stillUniforms({ uBeat: 1, uBass: 1 });
@@ -123,6 +170,12 @@ describe('composeStill', () => {
     expect(frames.at(-1)!.beat).toBeGreaterThan(0);
     expect(frames.at(-1)!.time).toBeCloseTo(kick.uTime);
     expect(frames.every((p) => p.scene === 3)).toBe(true);
+  });
+
+  it("ends the effects' turn at the inputs' time too, whatever the sound", () => {
+    expect(burst(kick).at(-1)!.turn).toBeCloseTo(kick.uTime);
+    expect(burst(calm, kick).at(-1)!.turn).toBeCloseTo(kick.uTime);
+    expect(burst(calm).at(-1)!.turn).toBeCloseTo(calm.uTime);
   });
 
   it('draws every frame with the effects it is given, and none without', () => {

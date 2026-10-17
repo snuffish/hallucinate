@@ -31,7 +31,7 @@ browser                                              dev server (Vite middleware
   kicks, the tempo (BPM and the `TempoClock` behind the ticks), the tone and the mood. It returns one `Hearing` a
   frame, read by everything else (the sessions as `app.hearing`), and is tested with synthetic bins.
   `src/engine/look.ts` holds every rule from the sound to the picture: `composeFrame` turns a `Hearing`, a look and
-  an output's `Motion` (its time, the time's pace, the hue's walk) into that output's frame state (reactivity, the
+  an output's `Motion` (its time, the time's pace, the hue's walk, the effects' turn) into that output's frame state (reactivity, the
   synesthesia grade, the trails' afterglow, fringing). The main screen (whose motion is the clock's), the pinned
   Live slot and the studio's Preview monitor each compose their own, and `crossfade` is the one rule for how far a
   transition is. What a scene's shader can read each frame (`uTime`, the bands, `uBeat`, the tick's `uTick` / `uTicks`, `uHue`, `uBright`, `uMood`)
@@ -211,7 +211,8 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 - **An effect:** add a row to `EFFECTS` in `src/engine/effects.ts`: its id and label, its settings (range, step,
   default; a choice lists its `options`), how it moves with the music, and its picture step, GLSL defining
   `vec3 effect(vec2 uv)` that reads the picture with `pick(uv)`, its settings by their `uniform` names and the scene
-  inputs (so Reactivity scales its movement). An effect that needs more than one pass (Glow's blur) lists `passes`:
+  inputs (so Reactivity scales its movement); a movement that must never run back (a turn) reads `uTurn`, the
+  effects' turn, which `composeFrame` runs on with the bass and the kicks. An effect that needs more than one pass (Glow's blur) lists `passes`:
   each renders at a share of the picture (`scale`) and defines `vec3 pass(vec2 uv)` reading its input with `pick`;
   the picture step reads the last one with `passed(uv)`. The renderer keeps two targets per pass size. The widget, the clean-up of stored stacks, the renderer (each picture
   step compiled once, wrapped with the edge fade) and `e2e/builtin-scenes.spec.ts` (alone at its strongest on every

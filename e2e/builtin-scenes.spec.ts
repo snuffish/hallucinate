@@ -1,7 +1,8 @@
 import { expect, seedScenes, test, type Page } from './fixtures';
 import type { ListedScene, ProfilerApi } from '../src/engine/profiler';
 import { EDGE_BAND, EDGE_CLEAR, EDGE_FADE, EFFECTS, strongest, type EffectStack } from '../src/engine/effects';
-import type { FrameLook } from '../src/engine/look';
+import { composeFrame, programState, type FrameLook } from '../src/engine/look';
+import { stillHearing, stillUniforms } from '../src/engine/scene-inputs';
 import { SCENES } from '../src/scenes';
 import { defaultLook } from '../src/state/app-state';
 import { STRONGEST_LOOK } from '../src/state/look-drift';
@@ -33,7 +34,6 @@ const TICK_START = { uBeat: 0, uTick: 0, uTicks: 7 };
 const MIRROR_SCENE = 'Light Sheet';   // a scene that isn't symmetric left to right on its own
 const KALEIDOSCOPE_SCENE = 'Beam Fan';   // a scene that isn't symmetric around its centre on its own
 const GLOW_SCENE = 'Ring Run';           // thin lines with wide black between them
-const STEADY_SCENE = 'Spectrum Rays';    // a scene whose shapes don't move round with the bass or a kick on their own
 // Thin lines that hold still whatever the music does, for watching an effect's own movement.
 const STILL_GRID = { name: 'Still grid', body: 'void main() { vec2 g = abs(fract(centered() * 8.) - .5); fragColor = vec4(vec3(smoothstep(.03, .0, min(g.x, g.y))), 1.); }' };
 
@@ -403,40 +403,69 @@ test('a still with a five-segment Kaleidoscope repeats every fifth of a turn aro
   expect(r.half, '…and only there').toBeGreaterThan(0.2);
 });
 
-// The Kaleidoscope's music movement, through the scene inputs the scene reads: the bass pushes the turn
-// ahead and a kick jumps it on, unless its spin speed is 0. Seen as how far round the light has moved
-// (the turn, within 45°, that best lines up the slices) between a still without the bass or the kick and
-// one with it, on the same clock. Three segments, so the picture repeats only every third of a turn. At
-// spin speed 1 and the default Look the full bass (1.5) pushes it 0.375 rad (21.5°) and a kick 0.2 rad
-// (11.5°).
-test('a Kaleidoscope turns on with the bass and with each kick, and holds still at spin speed 0', async ({ page }) => {
-  test.setTimeout(2 * 60_000);
+// The Kaleidoscope's music movement: it turns on the effects' turn (uTurn), which composeFrame runs on
+// with the bass and the kicks and never back. Here the turn is heard frame by frame across a kick, as the
+// listener reports one (the beat set to 1, then fading by e^-5t), and the stills show the mandala where
+// it stands at moments on the way (a still's turn ends at its uTime). Watched on a slope of light around
+// the centre that ignores the music and the clock, so whatever turns is the Kaleidoscope; seen as how far
+// round the light has moved (the turn, within 45°, that best lines up the slices). Three segments, so the
+// picture repeats only every third of a turn. It never turns back as the kick fades, the kick leaves it a
+// step further on than the same second without it, the bass or the beat on the same turn move nothing
+// (read directly, they would spring it back as they fall), and at spin speed 0 it holds still.
+const SLOPE = { name: 'Still slope', body: 'void main() { vec2 p = centered(); fragColor = vec4(vec3(.5 + .45 * cos(atan(p.y, p.x))), 1.); }' };
+const KICK_AT = 0.2;   // seconds into the heard second
+const MOMENTS = { before: KICK_AT - 0.02, kicked: KICK_AT + 0.05, fading: KICK_AT + 0.2, after: 1 };
+
+// The effects' turn at each moment of a second with a kick at KICK_AT (or without it), at `look`.
+function heardTurns(look: FrameLook, kick: boolean): Record<keyof typeof MOMENTS, number> {
+  const motion = { time: 0, timeRate: look.speed, huePhase: 0, turn: 0 }, p = programState();
+  const out = {} as Record<keyof typeof MOMENTS, number>;
+  for (let i = 1; i <= 60; i++) {
+    const t = i / 60, beat = kick && t >= KICK_AT ? Math.exp(-5 * (t - KICK_AT)) : 0;
+    composeFrame(p, motion, stillHearing(stillUniforms({ uBass: 0, uBeat: beat }), kick && i === Math.round(KICK_AT * 60)), look, 1, 1 / 60);
+    for (const [name, at] of Object.entries(MOMENTS)) if (Math.round(at * 60) === i) out[name as keyof typeof MOMENTS] = motion.turn;
+  }
+  return out;
+}
+
+test('a Kaleidoscope turns on with each kick and never back, and holds still at spin speed 0', async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  await seedScenes(page, [SLOPE]);
   await openProfiler(page);
-  const turns = await page.evaluate(async ({ look, sceneName, source, inner, n }) => {
+  const look = defaultLook();
+  const kicked = heardTurns(look, true), calm = heardTurns(look, false);
+  const r = await page.evaluate(async ({ look, sceneName, source, inner, n, kicked, calmAfter }) => {
     const p = (window as Hook).__profiler!;
     const around = (0, eval)(source) as Around;
     const index = p.scenes().find((s) => s.name === sceneName)!.index;
-    const at = async (spin: number, inputs: Record<string, number>) =>
-      around((await p.still(index, { inputs, look, effects: [{ id: 'kaleidoscope', on: true, settings: { segments: 3, spin } }] })).image!, inner);
+    const at = async (spin: number, turn: number, music: Record<string, number> = { uBass: 0, uBeat: 0 }) =>
+      around((await p.still(index, { inputs: { ...music, uTime: 14 + turn }, look, effects: [{ id: 'kaleidoscope', on: true, settings: { segments: 3, spin } }] })).image!, inner);
     const turned = (from: ReturnType<Around>, to: ReturnType<Around>) => {
       let best = 0;
       for (let k = -n / 8; k <= n / 8; k++) if (from.against(to.slices, k) < from.against(to.slices, best)) best = k;
       return best * 360 / n;
     };
-    const out: Record<string, number> = {};
-    for (const spin of [0, 1]) {
-      const quiet = await at(spin, { uBass: 0, uBeat: 0 });
-      out[`bass${spin}`] = turned(quiet, await at(spin, { uBass: 1.5, uBeat: 0 }));
-      out[`kick${spin}`] = turned(quiet, await at(spin, { uBass: 0, uBeat: 1 }));
-    }
-    return out;
-  }, { look: defaultLook(), sceneName: STEADY_SCENE, source: AROUND, inner: INNER, n: RING_SLICES });
-  console.log(`${STEADY_SCENE} with a Kaleidoscope: the bass turns it ${turns.bass1}°, a kick ${turns.kick1}° (at spin speed 0: ${turns.bass0}°, ${turns.kick0}°)`);
-  expect(Math.abs(turns.bass1!), 'the bass turns it on').toBeGreaterThanOrEqual(15);
-  expect(Math.abs(turns.bass1!), 'the bass turns it on').toBeLessThanOrEqual(30);
-  expect(Math.abs(turns.kick1!), 'a kick jumps it on').toBeGreaterThanOrEqual(6);
-  expect(Math.abs(turns.kick1!), 'a kick jumps it on').toBeLessThanOrEqual(18);
-  expect(Math.sign(turns.bass1!), 'both the way it spins').toBe(Math.sign(turns.kick1!));
-  expect(Math.abs(turns.bass0!), 'at spin speed 0 the bass leaves it').toBeLessThanOrEqual(3);
-  expect(Math.abs(turns.kick0!), '…and so does a kick').toBeLessThanOrEqual(3);
+    const before = await at(1, kicked.before);
+    return {
+      kicked: turned(before, await at(1, kicked.kicked)),
+      fading: turned(before, await at(1, kicked.fading)),
+      after: turned(before, await at(1, kicked.after)),
+      calm: turned(before, await at(1, calmAfter)),
+      music: turned(before, await at(1, kicked.before, { uBass: 1.5, uBeat: 1 })),
+      spin0: turned(await at(0, kicked.before), await at(0, kicked.after)),
+    };
+  }, { look, sceneName: SLOPE.name, source: AROUND, inner: INNER, n: RING_SLICES, kicked, calmAfter: calm.after });
+  const deg = (rad: number) => rad * 180 / Math.PI;
+  const step = deg((kicked.after - kicked.before) - (calm.after - calm.before));
+  console.log(`A Kaleidoscope across a kick turns ${r.kicked}°, ${r.fading}°, ${r.after}° (expected ${deg(kicked.kicked - kicked.before).toFixed(1)}°, ${deg(kicked.fading - kicked.before).toFixed(1)}°, ${deg(kicked.after - kicked.before).toFixed(1)}°); the same second without the kick ${r.calm}° (the kick's step: ${step.toFixed(1)}°); the bass and the beat on the same turn ${r.music}°; at spin speed 0 ${r.spin0}°`);
+  const forward = Math.sign(r.after);   // the way it turns on screen
+  expect(forward, 'it turns').not.toBe(0);
+  expect(forward * r.kicked, 'it never turns back: not on the kick').toBeGreaterThanOrEqual(-3);   // a slice is 3°
+  expect(forward * r.fading, '…nor as the kick fades').toBeGreaterThanOrEqual(forward * r.kicked - 3);
+  expect(forward * r.after, '…nor once it has faded').toBeGreaterThanOrEqual(forward * r.fading - 3);
+  expect(Math.abs(forward * r.after - deg(kicked.after - kicked.before)), 'it turns as far as the effects\' turn says').toBeLessThanOrEqual(4);
+  expect(step, 'a kick is worth a step').toBeGreaterThanOrEqual(8);
+  expect(forward * (r.after - r.calm), 'the kick leaves it a step further on').toBeGreaterThanOrEqual(step - 4);
+  expect(Math.abs(r.music), 'the bass and the beat on the same turn move nothing').toBeLessThanOrEqual(3);
+  expect(Math.abs(r.spin0), 'at spin speed 0 it holds still').toBeLessThanOrEqual(3);
 });

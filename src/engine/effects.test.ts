@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { SCENE_INPUTS } from './scene-inputs';
-import { EFFECTS, EffectStackSchema, addEffect, cleanStack, effectDef, passesOf, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
+import { EFFECTS, EffectStackSchema, addEffect, cleanStack, effectDef, effectShader, passesOf, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
 
 describe('cleaning up a stored effect stack', () => {
   it('keeps a well-formed stack as it is', () => {
@@ -129,6 +129,15 @@ describe('the catalogue', () => {
     expect(cleanStack([{ id: 'kaleidoscope', settings: { segments: 7.6, spin: 4 } }])[0]!.settings).toEqual({ segments: 8, spin: 1 });
     expect(cleanStack([{ id: 'kaleidoscope', settings: { segments: 1 } }])[0]!.settings.segments).toBe(3);
     expect(strongest('kaleidoscope')).toEqual([{ id: 'kaleidoscope', on: true, settings: { segments: 12, spin: 1 } }]);
+  });
+
+  // The bass or a fading kick read directly would spring the turn back as they fall; the effects' turn
+  // (uTurn, composeFrame) holds their pace and only ever runs on.
+  it('turns a Kaleidoscope on the effects\' turn alone, so nothing it hears can turn it back', () => {
+    const k = EFFECTS.find((e) => e.id === 'kaleidoscope')!;
+    const read = new Set(k.glsl.match(/\bu[A-Z]\w*/g));
+    expect([...read].sort()).toEqual(['uRes', 'uSegments', 'uSpin', 'uTurn']);
+    expect(effectShader(k)).toMatch(/uniform float uTurn;/);
   });
 });
 

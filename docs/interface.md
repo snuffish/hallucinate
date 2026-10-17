@@ -27,8 +27,8 @@ settings. They run from the top of the list down, so the order changes the pictu
 bends what gets folded; after it, it bends the mandala): drag a row by its ⠿ handle to another place, or focus the
 handle and press ↑ / ↓. Show scenes keep the order. **Mirror** reflects the left half onto the right, the top half onto the bottom, or both, and holds still on
 the beat. **Kaleidoscope** folds the picture into 3 to 12 segments around the centre and turns the mandala at its spin
-speed; the bass pushes the turn ahead and each kick jumps it on, as strongly as Reactivity says (at spin speed 0 it
-holds still). **Glow** lays a soft bloom of light around the lines (*Strength*: how bright, *Radius*: how far it
+speed; it turns faster with the bass and each kick sends it a step further on, as strongly as Reactivity says, and it
+never turns back (at spin speed 0 it holds still). **Glow** lays a soft bloom of light around the lines (*Strength*: how bright, *Radius*: how far it
 spreads); it swells with the bass and gives way to each kick, dipping while the lines flash and blooming back after,
 so a kick never doubles it. It costs about a millisecond a frame at 1080p on an M2, the most of the effects (all four
 stacked: about 3 ms, [PERF.md](../PERF.md)).

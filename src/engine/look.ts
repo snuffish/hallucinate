@@ -17,10 +17,16 @@ export interface FrameLook {
 }
 
 // Where an output's picture is in its own time: the clock the shaders see, how fast it runs (it eases
-// with the music) and how far the hue has walked. Each output keeps one.
-export interface Motion { time: number; timeRate: number; huePhase: number }
+// with the music), how far the hue has walked and how far the effects have turned. Each output keeps one.
+export interface Motion { time: number; timeRate: number; huePhase: number; turn: number }
 
-export const copyMotion = (to: Motion, from: Readonly<Motion>): void => { to.time = from.time; to.timeRate = from.timeRate; to.huePhase = from.huePhase; };
+export const copyMotion = (to: Motion, from: Readonly<Motion>): void => { to.time = from.time; to.timeRate = from.timeRate; to.huePhase = from.huePhase; to.turn = from.turn; };
+
+// The effects' turn (uTurn, radians at an effect's full spin): it only ever runs on, at a steady pace
+// plus the bass, plus the beat, so each kick leaves it a step further on (the beat fades out within half
+// a second: about a fifth of a radian a kick) and nothing it hears can turn it back. Speed scales it all,
+// Reactivity the bass's and the kick's share (they arrive scaled).
+const TURN = { pace: 0.15, bass: 0.2, beat: 1 } as const;
 
 const COOL = [0.7, 0.85, 1.35];
 const WARM = [1.3, 1.05, 0.7];
@@ -41,8 +47,10 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
   motion.time += dt * motion.timeRate;
   // Colour cycling sets both the hue's walk and how far a kick jumps it, so at 0 the colour holds.
   motion.huePhase += look.cycle * (dt * 0.06 + (h.kick ? 0.05 : 0));
+  motion.turn += dt * look.speed * (TURN.pace + TURN.bass * bass + TURN.beat * beat);
 
   p.time = motion.time;
+  p.turn = motion.turn;
   p.bass = bass; p.mid = mid; p.high = high; p.level = level; p.beat = beat;
   p.tickPhase = h.tickPhase; p.ticks = h.ticks;
   p.bright = h.bright;
@@ -71,7 +79,8 @@ function grade(p: ProgramState, look: Readonly<FrameLook>): void {
 }
 
 // A still frame with a Look applied, as the audience would see it: a short burst of frames with the same
-// sound, so the afterglow builds up as it does on screen. The burst ends at the inputs' time; the hue
+// sound, so the afterglow builds up as it does on screen. The burst ends at the inputs' time, and the
+// effects' turn there too (so a still turns an effect only as far as uTime says); the hue
 // starts at theirs and walks as Colour cycling says. A kick (uBeat 1) lands on the last frame, as the
 // moment it happens. With `then`, one more frame follows with those inputs: the change from the burst's
 // last frame to it is one frame's change on screen (the strobe rule's). Every frame is drawn with
@@ -87,9 +96,10 @@ export function composeStill(scene: number, inputs: Readonly<SnapshotUniforms>, 
     composeFrame(p, motion, h, look, sceneTrails, BURST_DT);
     return p;
   });
-  const start = (): Motion => ({ time: 0, timeRate: look.speed, huePhase: inputs.uHue });
-  const elapsed = play(start()).at(-1)!.time;   // the clock's pace eases with the sound: measure it, then start early by that much
-  return play({ ...start(), time: (then ?? inputs).uTime - elapsed });
+  const start = (): Motion => ({ time: 0, timeRate: look.speed, huePhase: inputs.uHue, turn: 0 });
+  const elapsed = play(start()).at(-1)!;   // the clock's pace eases with the sound: measure it, then start early by that much
+  const end = (then ?? inputs).uTime;
+  return play({ ...start(), time: end - elapsed.time, turn: end - elapsed.turn });
 }
 
 export const smoothstep = (x: number): number => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
@@ -108,7 +118,7 @@ export function crossfade(t: Transition, now: number): number {
 // A new, neutral frame state. Each pipeline keeps one and refills it every frame.
 export function programState(spectrum: Uint8Array = new Uint8Array(512)): ProgramState {
   return {
-    scene: -1, prevScene: -1, effects: NO_EFFECTS, prevEffects: NO_EFFECTS, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, tickPhase: 0, ticks: 0, hue: 0,
+    scene: -1, prevScene: -1, effects: NO_EFFECTS, prevEffects: NO_EFFECTS, mix: 1, time: 0, turn: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, tickPhase: 0, ticks: 0, hue: 0,
     spectrum, bright: 0.5, mood: 0.5,
     grade: { exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] },
     feedback: 0.86, aberration: 0, master: 1,

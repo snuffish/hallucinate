@@ -44,6 +44,7 @@ export interface Clock {
   time: number;
   timeRate: number;
   huePhase: number;
+  turn: number;
   scene: number;
   prevScene: number;
   transitionStart: number;
@@ -53,7 +54,7 @@ export interface Clock {
 }
 
 export const defaultClock = (): Clock => ({
-  clock: 0, time: 0, timeRate: 1, huePhase: 0,
+  clock: 0, time: 0, timeRate: 1, huePhase: 0, turn: 0,
   scene: 0, prevScene: -1, transitionStart: -10, sceneStart: 0, fade: CROSSFADE_SECONDS,
   beatsInScene: 0,
 });

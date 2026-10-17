@@ -86,6 +86,7 @@ export interface ProgramState {
   prevEffects: EffectStack;   // and `prevScene`, while it crossfades out
   mix: number;
   time: number;
+  turn: number;               // the effects' turn (uTurn): only ever runs on, see composeFrame
   bass: number;
   mid: number;
   high: number;
@@ -745,6 +746,7 @@ export class Renderer {
     this.drawScene(s.scene, t.sceneA, u, media);
     const crossfading = s.prevScene >= 0 && s.mix < 1;
     if (crossfading) this.drawScene(s.prevScene, t.sceneB, u, media);
+    this.effectUniforms.uTurn = s.turn;
     const a = this.runEffects(s.effects, t.sceneA, t.fxA1, t.fxA2, t.passes, u);
     const b = crossfading ? this.runEffects(s.prevEffects, t.sceneB, t.fxB1, t.fxB2, t.passes, u) : a;
 

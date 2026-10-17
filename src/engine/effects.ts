@@ -2,11 +2,12 @@
 // picture before the Look (ADR 0003): its id and label, its settings (each with a range, step and
 // default), any passes it runs first (Glow's blur), its picture step (GLSL that reads the picture with
 // pick() and the same scene inputs the scene reads, so the Look's Reactivity scales its music movement
-// the way it scales the scene) and how it moves with the music. Everything that lists effects is made
-// from this table: the Effects widget and its "Add effect" menu, the clean-up of a stored stack, the
-// renderer's effect programs and the built-in scenes safety spec, which checks each effect alone at its
-// strongest (the top of each range). Adding an effect is one row here. Pure: the safety spec imports it
-// in Node.
+// the way it scales the scene, plus the effects' turn uTurn, which only ever runs on) and how it moves
+// with the music. Everything that lists effects is made from this table: the Effects widget and its
+// "Add effect" menu, the clean-up of a stored stack, the renderer's effect programs and the built-in
+// scenes safety spec, which checks each effect alone at its strongest (the top of each range) and all of
+// them stacked at their strongest. Adding an effect is one row here. Pure: the safety spec imports it in
+// Node.
 
 import { z } from 'zod';
 import { INPUT_DECLARATIONS } from './scene-inputs';
@@ -86,7 +87,7 @@ vec3 effect(vec2 uv) {
     id: 'kaleidoscope',
     label: 'Kaleidoscope',
     help: 'Folds the picture into segments around the centre, every other one mirrored, and turns the whole mandala.',
-    music: "Turns on the music's clock, which runs faster when the music is loud; the bass pushes the turn ahead and each kick jumps it on a step. At spin speed 0 it holds still.",
+    music: 'Turns steadily, faster with the bass, and each kick sends it a step further on; it never turns back. At spin speed 0 it holds still.',
     settings: [
       { key: 'segments', label: 'Segments', uniform: 'uSegments', min: 3, max: 12, step: 1, default: 6 },
       { key: 'spin', label: 'Spin speed', uniform: 'uSpin', min: 0, max: 1, step: 0.01, default: 0.3 },
@@ -96,10 +97,10 @@ vec3 effect(vec2 uv) {
   float side = min(uRes.x, uRes.y);
   vec2 p = (uv - .5) * uRes / side;            // from the centre, in shares of the short side
   float seg = TAU / floor(uSegments + .5);
-  // The turn runs on the music's clock (faster when the music is loud), the bass pushes it ahead and a kick
-  // jumps it on a step. Spin speed scales all three, so at 0 the mandala holds still.
-  float turn = uSpin * (.3 * uTime + .25 * min(uBass, 1.5) + .2 * uBeat);
-  float a = mod(atan(p.y, p.x) - turn, seg);
+  // The effects' turn: it runs on, faster with the bass and a step with each kick, and never back (the
+  // bass or the beat read here directly would spring it back as they fall). Spin speed scales it, so at 0
+  // the mandala holds still.
+  float a = mod(atan(p.y, p.x) - uSpin * uTurn, seg);
   a = min(a, seg - a);                          // every other segment mirrored, so neighbours meet without a seam
   a += PI * .5 - seg * .25;                     // each segment shows the wedge just above the centre
   vec2 q = .5 + length(p) * vec2(cos(a), sin(a)) * side / uRes;
@@ -282,7 +283,7 @@ const glslFloat = (x: number): string => (Number.isInteger(x) ? `${x}.` : String
 
 // An effect's picture step as a whole fragment shader. It reads the picture so far (uTex), the scene's own
 // picture (uScene), the result of its own passes if it has any (uPassed), the scene inputs (the same
-// uniforms, so the Look's Reactivity reaches its movement) and its settings, and blends back to the scene's
+// uniforms, so the Look's Reactivity reaches its movement), the effects' turn (uTurn) and its settings, and blends back to the scene's
 // own picture towards the edges (the edge fade). Each effect of a stack fades the same way, so however many
 // run, the border shows the scene alone.
 export function effectShader(def: EffectDef): string {
@@ -319,6 +320,7 @@ out vec4 fragColor;
 uniform sampler2D uTex;
 uniform vec2 uRes;
 ${INPUT_DECLARATIONS}
+uniform float uTurn;    // the effects' turn: runs on, faster with the bass and a step each kick, never back (radians, counting up)
 ${def.settings.map((s) => `uniform float ${s.uniform};   // ${s.label}`).join('\n')}
 #define PI 3.14159265359
 #define TAU 6.28318530718

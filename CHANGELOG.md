@@ -7,8 +7,9 @@
 - An **Effects** widget, docked under the Look: add a **Mirror** to the main screen (left↔right, top↕bottom or both),
   switch it on and off and remove it. It stays through scene changes and reloads, and projectors showing the main
   screen show it too. See [ADR 0003](docs/adr/0003-effects-belong-to-the-show-scene.md).
-- A **Kaleidoscope** effect: the picture folded into 3 to 12 segments around the centre, turning at a spin speed. The
-  bass pushes the turn ahead and each kick jumps it on, scaled by the Look's Reactivity.
+- A **Kaleidoscope** effect: the picture folded into 3 to 12 segments around the centre, turning at a spin speed. It
+  turns faster with the bass and each kick sends it a step further on, scaled by the Look's Reactivity; it never turns
+  back.
 - A **Glow** effect: a soft bloom around the lines with a strength and a radius. It swells with the bass and gives
   way to each kick, so a kick never doubles the picture. Its blur runs at half size in two passes: about +1.2 ms a
   frame at 1080p on an M2 at its defaults (PERF.md).
