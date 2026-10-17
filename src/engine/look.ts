@@ -8,11 +8,10 @@ import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
 
 // The sliders a frame is composed with: a show scene stores the numbers it keeps (LOOK_KEYS), the rest
-// (synesthesia, mood, spin) are the app's.
+// (synesthesia, spin) are the app's.
 export interface FrameLook {
   reactivity: number; speed: number; cycle: number; spin: number;
   hue: number; trails: number; aberration: number; synesthesia: number;
-  mood: boolean;   // "Mood from tempo": off, the mood reads neutral to the grade and the shaders
 }
 
 // Where an output's picture is in its own time: the clock the shaders see, how fast it runs (it eases
@@ -44,7 +43,7 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
   p.bass = bass; p.mid = mid; p.high = high; p.level = level; p.beat = beat;
   p.tickPhase = h.tickPhase; p.ticks = h.ticks;
   p.bright = h.bright;
-  p.mood = look.mood ? h.mood : 0.5;
+  p.mood = h.mood;
   grade(p, look);
   // Dark sound lingers (longer trails), bright sound is crisp (shorter trails, more fringing).
   const s = look.synesthesia;
@@ -61,7 +60,7 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
 // as light, warm and sharp. Fast, energetic music reads as saturated and warm; slow as muted and cool.
 function grade(p: ProgramState, look: Readonly<FrameLook>): void {
   const A = look.synesthesia, bright = p.bright, mood = p.mood;
-  const warmth = look.mood ? bright * 0.6 + mood * 0.4 : bright;
+  const warmth = bright * 0.6 + mood * 0.4;
   const g = p.grade, tint = g.tint;
   for (let i = 0; i < 3; i++) tint[i] = COOL[i]! + (WARM[i]! - COOL[i]!) * warmth;
   const luma = tint[0]! * 0.299 + tint[1]! * 0.587 + tint[2]! * 0.114;   // tint shifts colour, not brightness

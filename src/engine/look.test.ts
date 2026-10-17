@@ -43,12 +43,18 @@ describe('composeFrame', () => {
     expect(bright.aberration).toBeGreaterThan(dark.aberration);            // more fringing
   });
 
-  it('with "Mood from tempo" off, the mood reads neutral to the grade and the shaders', () => {
-    const on = frame(sound({ mood: 1 }));
-    const off = frame(sound({ mood: 1 }), { ...defaultLook(), mood: false });
-    expect(on.grade.saturation).toBeGreaterThan(1);
-    expect(off.grade.saturation).toBe(1);
-    expect(off.mood).toBe(0.5);
+  it('at synesthesia 0 leaves the colour untouched: a neutral grade, saturation exactly 1', () => {
+    const p = frame(sound({ mood: 1, bright: 1 }), { ...defaultLook(), synesthesia: 0 });
+    expect(p.grade).toEqual({ exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] });
+  });
+
+  it('always lets the mood grade the picture: energetic music is more saturated and warmer, no flag needed', () => {
+    const look = { ...defaultLook(), synesthesia: 1 };
+    const energetic = frame(sound({ mood: 1 }), look), calm = frame(sound({ mood: 0 }), look);
+    expect(energetic.grade.saturation).toBeGreaterThan(1);
+    expect(calm.grade.saturation).toBeLessThan(1);
+    expect(energetic.grade.tint[0]! - energetic.grade.tint[2]!).toBeGreaterThan(calm.grade.tint[0]! - calm.grade.tint[2]!);
+    expect(energetic.mood).toBe(1);
   });
 
   it('runs the clock faster with louder music and jumps the hue on a kick', () => {

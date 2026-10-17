@@ -36,9 +36,11 @@ warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm col
 - **Tone** – the spectral centroid (loudness-weighted average frequency) mapped from ~1.1 kHz (dark: piano,
   ambient) to ~5.5 kHz (bright: hi-hat-heavy house, psytrance) and smoothed over a few seconds. Shown in the panel.
 - **Mood** – tempo (80 → 160 BPM) plus how loud the music is over the last few seconds, smoothed over ~4 s more.
-  Toggle with *Mood from tempo*. When nothing plays, mood and tone both drift back to neutral.
-- **Synesthesia slider** – how strongly they grade every scene: dark sound → dimmer, cooler, hazier, longer trails;
-  bright sound → lighter, warmer, crisper, more colour fringing; energetic mood → more saturated and warmer.
+  When nothing plays, mood and tone both drift back to neutral.
+- **Synesthesia slider** – how strongly the tone and the mood grade every scene: dark sound → dimmer, cooler, hazier,
+  longer trails; bright sound → lighter, warmer, crisper, more colour fringing; energetic mood → more saturated and
+  warmer. At 0 it is off: the picture's colour is left untouched. Trails and fringing only grow or shrink from what you
+  set, so at 0 they stay at 0.
 - Both values are also available to your own shaders (`uBright`, `uMood`) and as *tone* / *mood* outputs on the
   visual maker's Audio block.
 
@@ -49,6 +51,6 @@ speed and render resolution (lower it if frames drop).
 
 - **Drift** – the Look sliders glide to new random values on their own, each at its own pace, so the look keeps
   changing smoothly; *Drift speed* sets how fast. A slider you move by hand drifts on from there.
-- **Randomize** (R) jumps the Look sliders (not Resolution) to new values instead, and flips *Mood from tempo* and the
-  spin direction at random. Tick *Randomize also picks a random
+- **Randomize** (R) jumps the Look sliders (not Resolution) to new values instead, and flips the spin direction at
+  random. Tick *Randomize also picks a random
   scene* to change the scene too. Shift+R steps back to the look (and scene) before each randomize, up to 20 steps.
