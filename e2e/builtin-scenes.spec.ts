@@ -1,5 +1,6 @@
 import { expect, test, type Page } from './fixtures';
 import type { ListedScene, ProfilerApi } from '../src/engine/profiler';
+import { EDGE_BAND, EDGE_CLEAR, EDGE_FADE, EFFECTS, strongest, type EffectStack } from '../src/engine/effects';
 import type { FrameLook } from '../src/engine/look';
 import { SCENES } from '../src/scenes';
 import { defaultLook } from '../src/state/app-state';
@@ -13,6 +14,9 @@ import { STRONGEST_LOOK } from '../src/state/look-drift';
 // Each scene and Look is a test of its own: every still with a Look is a burst of frames at 1280×720,
 // which under software WebGL takes a minute or so per pair, so they get a timeout each and share the
 // workers. CI runs this spec in a job of its own (e2e-scenes), off the runner the timing specs use.
+// Every effect in the catalogue (src/engine/effects.ts) joins the same way: alone, at its strongest, on
+// every scene at the strongest Look (ADR 0003). The edges these rules measure are the border band the
+// effects' edge fade leaves to the scene alone, defined once in the catalogue (EDGE_BAND).
 
 interface Verdict { error: string | null; edgeBlack: number; kick: number; tick: number }
 type Hook = { __profiler?: Pick<ProfilerApi, 'scenes' | 'still' | 'stillChange'> };
@@ -25,6 +29,8 @@ const KICK = { uBeat: 1, uBass: 1 };      // the same music, on a kick
 const TICK_END = { uBeat: 0, uTick: 0.99, uTicks: 6 };
 const TICK_START = { uBeat: 0, uTick: 0, uTicks: 7 };
 
+const MIRROR_SCENE = 'Light Sheet';   // a scene that isn't symmetric left to right on its own
+
 const LOOKS: { name: string; look: FrameLook }[] = [
   { name: 'default Look', look: defaultLook() },
   { name: 'strongest Look', look: STRONGEST_LOOK },
@@ -34,7 +40,8 @@ test.describe.configure({ mode: 'parallel' });   // the scene × Look tests shar
 
 async function openProfiler(page: Page): Promise<ListedScene[]> {
   await page.goto('/?perf');
-  await expect.poll(() => page.evaluate(() => typeof (window as Hook).__profiler?.stillChange)).toBe('function');
+  // The app can take a while to start while the other workers render bursts.
+  await expect.poll(() => page.evaluate(() => typeof (window as Hook).__profiler?.stillChange), { timeout: 30_000 }).toBe('function');
   return (await page.evaluate(() => (window as Hook).__profiler!.scenes())).filter((s) => s.builtin);
 }
 
@@ -55,50 +62,69 @@ test('every built-in scene is listed, has a tab and 3–8 parameters', async ({ 
   }
 });
 
+// The safety rules for one scene with `look` (and `effects`): the share of the border band that is pure
+// black in silence, and the share of the frame a kick and a tick make more than twice as bright.
+async function verdict(page: Page, index: number, look: FrameLook, effects: EffectStack = []): Promise<Verdict> {
+  return page.evaluate(async ({ index, look, effects, band, SILENCE, CALM, KICK, TICK_END, TICK_START }) => {
+    const { still, stillChange } = (window as Hook).__profiler!;
+    const lum = (d: Uint8ClampedArray, i: number) => (0.299 * d[i]! + 0.587 * d[i + 1]! + 0.114 * d[i + 2]!) / 255;
+    const silent = await still(index, { inputs: SILENCE, silent: true, look, effects });
+    if (!silent.image) return { error: silent.error, edgeBlack: 0, kick: 1, tick: 1 };
+    // The frame's border band: the share of its pixels that are exactly black. Not all of it: lines and
+    // their halos may run off an edge (Beam Fan's beams rise from the bottom one, Light Sheet's lines
+    // cross both sides), so a quarter is left for them. The rest is background and must be pure
+    // black: a glow fill, haze, a smeared afterglow or the display's grain would leave next to none
+    // of it black.
+    const { width: w, height: h, data } = silent.image;
+    const reach = band * Math.min(w, h);
+    let edge = 0, black = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (Math.min(x, w - 1 - x, y, h - 1 - y) >= reach) continue;
+      const i = (y * w + x) * 4;
+      edge++;
+      if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 0) black++;
+    }
+    // The strobe rule: the share of pixels a change from one frame to the next makes more than twice
+    // as bright. A change smaller than a tenth of full brightness isn't a flash (WCAG's threshold),
+    // so near-black halos don't count. The two frames are the end of one burst: `from`'s sound
+    // settled, then the next frame with `to`'s.
+    const doubled = async (from: Record<string, number>, to: Record<string, number>) => {
+      const [a, b] = (await stillChange(index, { from, to, look, effects })).images!.map((image) => image.data);
+      let n = 0;
+      for (let i = 0; i < a!.length; i += 4) {
+        const la = lum(a!, i), lb = lum(b!, i);
+        if (lb > 2 * la && lb - la > 0.1) n++;
+      }
+      return n / (a!.length / 4);
+    };
+    return { error: null, edgeBlack: black / edge, kick: await doubled(CALM, KICK), tick: await doubled(TICK_END, TICK_START) };
+  }, { index, look, effects, band: EDGE_BAND, SILENCE, CALM, KICK, TICK_END, TICK_START }) as Promise<Verdict>;
+}
+
+function judge(v: Verdict, what: string): void {
+  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+  console.log(`${what}: a kick doubles ${pct(v.kick)} of the frame, a tick ${pct(v.tick)}, and ${pct(v.edgeBlack)} of the edge is black in silence`);
+  expect(v.error, `${what} compiles`).toBeNull();
+  expect.soft(v.edgeBlack, `${what}: the edges are pure black in silence`).toBeGreaterThanOrEqual(0.75);
+  expect.soft(v.kick, `${what}: a kick doubles under 25% of the frame`).toBeLessThan(0.25);
+  expect.soft(v.tick, `${what}: a tick doubles under 25% of the frame`).toBeLessThan(0.25);
+}
+
 for (const { name: sceneName } of SCENES) for (const { name, look } of LOOKS) {
   test(`${sceneName} at the ${name}: black edges in silence, and a strobe-safe kick and tick`, async ({ page }) => {
     test.setTimeout(4 * 60_000);
     const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
-    const verdict = await page.evaluate(async ({ index, look, SILENCE, CALM, KICK, TICK_END, TICK_START }) => {
-      const { still, stillChange } = (window as Hook).__profiler!;
-      const lum = (d: Uint8ClampedArray, i: number) => (0.299 * d[i]! + 0.587 * d[i + 1]! + 0.114 * d[i + 2]!) / 255;
-      const silent = await still(index, { inputs: SILENCE, silent: true, look });
-      if (!silent.image) return { error: silent.error, edgeBlack: 0, kick: 1, tick: 1 };
-      // The frame's border: the share of its pixels that are exactly black. Not all of it: lines and
-      // their halos may run off an edge (Beam Fan's beams rise from the bottom one, Light Sheet's lines
-      // cross both sides), so a quarter is left for them. The rest is background and must be pure
-      // black: a glow fill, haze, a smeared afterglow or the display's grain would leave next to none
-      // of it black.
-      const { width: w, height: h, data } = silent.image;
-      let edge = 0, black = 0;
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        if (x > 0 && x < w - 1 && y > 0 && y < h - 1) continue;
-        const i = (y * w + x) * 4;
-        edge++;
-        if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 0) black++;
-      }
-      // The strobe rule: the share of pixels a change from one frame to the next makes more than twice
-      // as bright. A change smaller than a tenth of full brightness isn't a flash (WCAG's threshold),
-      // so near-black halos don't count. The two frames are the end of one burst: `from`'s sound
-      // settled, then the next frame with `to`'s.
-      const doubled = async (from: Record<string, number>, to: Record<string, number>) => {
-        const [a, b] = (await stillChange(index, { from, to, look })).images!.map((image) => image.data);
-        let n = 0;
-        for (let i = 0; i < a!.length; i += 4) {
-          const la = lum(a!, i), lb = lum(b!, i);
-          if (lb > 2 * la && lb - la > 0.1) n++;
-        }
-        return n / (a!.length / 4);
-      };
-      return { error: null, edgeBlack: black / edge, kick: await doubled(CALM, KICK), tick: await doubled(TICK_END, TICK_START) };
-    }, { index: scene.index, look, SILENCE, CALM, KICK, TICK_END, TICK_START }) as Verdict;
+    judge(await verdict(page, scene.index, look), `${sceneName} at the ${name}`);
+  });
+}
 
-    const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
-    console.log(`${sceneName}: at the ${name} a kick doubles ${pct(verdict.kick)} of the frame, a tick ${pct(verdict.tick)}, and ${pct(verdict.edgeBlack)} of the edge is black in silence`);
-    expect(verdict.error, `${sceneName} compiles`).toBeNull();
-    expect.soft(verdict.edgeBlack, `${sceneName}'s edges are pure black in silence at the ${name}`).toBeGreaterThanOrEqual(0.75);
-    expect.soft(verdict.kick, `${sceneName}'s kick doubles under 25% of the frame at the ${name}`).toBeLessThan(0.25);
-    expect.soft(verdict.tick, `${sceneName}'s tick doubles under 25% of the frame at the ${name}`).toBeLessThan(0.25);
+// Each effect alone at its strongest: it may reshape the picture, but never light the edges or make a
+// kick or a tick strobe. Only at the strongest Look, where it reacts the most.
+for (const effect of EFFECTS) for (const { name: sceneName } of SCENES) {
+  test(`${sceneName} with ${effect.label} at its strongest, at the strongest Look: black edges in silence, and a strobe-safe kick and tick`, async ({ page }) => {
+    test.setTimeout(4 * 60_000);
+    const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
+    judge(await verdict(page, scene.index, STRONGEST_LOOK, strongest(effect.id)), `${sceneName} with ${effect.label} at the strongest Look`);
   });
 }
 
@@ -126,4 +152,62 @@ test("a still frame shows the Look's trails and fringing", async ({ page }) => {
   expect(changed.again, 'the same Look renders the same frame').toBe(0);
   expect(changed.trails, 'trails leave an afterglow').toBeGreaterThan(0.001);
   expect(changed.fringing, 'fringing splits the colours').toBeGreaterThan(0.001);
+});
+
+// The share of pixels where two frames differ by more than `tolerance` levels in some channel, counting
+// only those further than `inner` (a share of the short side) from every edge, where effects run at full
+// strength. Passed into the page as source.
+const DIFFERS = `(a, b, w, h, inner, tolerance) => {
+  const reach = inner * Math.min(w, h);
+  let n = 0, all = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (Math.min(x, w - 1 - x, y, h - 1 - y) < reach) continue;
+    const i = (y * w + x) * 4;
+    all++;
+    if (Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])) > tolerance) n++;
+  }
+  return n / all;
+}`;
+type Differs = (a: Uint8ClampedArray, b: Uint8ClampedArray, w: number, h: number, inner: number, tolerance: number) => number;
+const INNER = EDGE_CLEAR + EDGE_FADE;
+
+// Each effect does something: at its strongest the picture differs from the same still without it.
+for (const effect of EFFECTS) {
+  test(`${effect.label} at its strongest changes the picture`, async ({ page }) => {
+    test.setTimeout(2 * 60_000);
+    await openProfiler(page);
+    const changed = await page.evaluate(async ({ effects, look, source, inner }) => {
+      const p = (window as Hook).__profiler!;
+      const differs = (0, eval)(source) as Differs;
+      const index = p.scenes().find((s) => s.builtin)!.index;
+      const plain = (await p.still(index, { look })).image!;
+      const shaped = (await p.still(index, { look, effects })).image!;
+      return differs(plain.data, shaped.data, plain.width, plain.height, inner, 2);
+    }, { effects: strongest(effect.id), look: defaultLook(), source: DIFFERS, inner: INNER });
+    expect(changed).toBeGreaterThan(0.001);
+  });
+}
+
+// A left↔right Mirror makes the picture symmetric across its middle, away from the edges, where the
+// scene's own picture shows through.
+test('a still with a left↔right Mirror is symmetric across its axis', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await openProfiler(page);
+  const asymmetry = await page.evaluate(async ({ look, sceneName, source, inner }) => {
+    const p = (window as Hook).__profiler!;
+    const differs = (0, eval)(source) as Differs;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    const flipped = ({ data, width: w, height: h }: ImageData) => {
+      const out = new Uint8ClampedArray(data.length);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out.set(data.subarray((y * w + x) * 4, (y * w + x) * 4 + 4), (y * w + (w - 1 - x)) * 4);
+      return out;
+    };
+    // The display's grain differs by up to ±2 levels per pixel, which no mirror can match.
+    const across = (image: ImageData) => differs(image.data, flipped(image), image.width, image.height, inner, 5);
+    const plain = (await p.still(index, { look })).image!;
+    const mirrored = (await p.still(index, { look, effects: [{ id: 'mirror', on: true, settings: { axis: 0 } }] })).image!;
+    return { plain: across(plain), mirrored: across(mirrored) };
+  }, { look: defaultLook(), sceneName: MIRROR_SCENE, source: DIFFERS, inner: INNER });
+  expect(asymmetry.plain, `${MIRROR_SCENE} isn't symmetric on its own`).toBeGreaterThan(0.001);
+  expect(asymmetry.mirrored, 'mirrored, it is').toBe(0);
 });

@@ -4,6 +4,7 @@
 // move. Every rule from the sound to the picture lives here: reactivity, the clock's pace, the hue's walk,
 // the synesthesia grade, the trails' afterglow and fringing.
 
+import { NO_EFFECTS, type EffectStack } from './effects';
 import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
 import { stillHearing, type SnapshotUniforms } from './scene-inputs';
@@ -73,16 +74,16 @@ function grade(p: ProgramState, look: Readonly<FrameLook>): void {
 // sound, so the afterglow builds up as it does on screen. The burst ends at the inputs' time; the hue
 // starts at theirs and walks as Colour cycling says. A kick (uBeat 1) lands on the last frame, as the
 // moment it happens. With `then`, one more frame follows with those inputs: the change from the burst's
-// last frame to it is one frame's change on screen (the strobe rule's). The renderer draws the frames in
-// order and keeps the last.
+// last frame to it is one frame's change on screen (the strobe rule's). Every frame is drawn with
+// `effects`. The renderer draws the frames in order and keeps the last.
 export const BURST_FRAMES = 20;   // a third of a second: long enough for the strongest Look's afterglow to settle
 const BURST_DT = 1 / 60;
 
-export function composeStill(scene: number, inputs: Readonly<SnapshotUniforms>, look: Readonly<FrameLook>, sceneTrails: number, spectrum: Uint8Array, then?: Readonly<SnapshotUniforms>): ProgramState[] {
+export function composeStill(scene: number, inputs: Readonly<SnapshotUniforms>, look: Readonly<FrameLook>, sceneTrails: number, spectrum: Uint8Array, then?: Readonly<SnapshotUniforms>, effects: EffectStack = NO_EFFECTS): ProgramState[] {
   const sounds = Array.from({ length: BURST_FRAMES }, (_, i) => stillHearing(inputs, !then && i === BURST_FRAMES - 1 && inputs.uBeat >= 1));
   if (then) sounds.push(stillHearing(then, then.uBeat >= 1));
   const play = (motion: Motion): ProgramState[] => sounds.map((h) => {
-    const p = { ...programState(spectrum), scene, prevScene: -1, mix: 1 };
+    const p = { ...programState(spectrum), scene, prevScene: -1, mix: 1, effects };
     composeFrame(p, motion, h, look, sceneTrails, BURST_DT);
     return p;
   });
@@ -107,7 +108,7 @@ export function crossfade(t: Transition, now: number): number {
 // A new, neutral frame state. Each pipeline keeps one and refills it every frame.
 export function programState(spectrum: Uint8Array = new Uint8Array(512)): ProgramState {
   return {
-    scene: -1, prevScene: -1, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, tickPhase: 0, ticks: 0, hue: 0,
+    scene: -1, prevScene: -1, effects: NO_EFFECTS, prevEffects: NO_EFFECTS, mix: 1, time: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, tickPhase: 0, ticks: 0, hue: 0,
     spectrum, bright: 0.5, mood: 0.5,
     grade: { exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] },
     feedback: 0.86, aberration: 0, master: 1,

@@ -124,4 +124,11 @@ describe('composeStill', () => {
     expect(frames.at(-1)!.time).toBeCloseTo(kick.uTime);
     expect(frames.every((p) => p.scene === 3)).toBe(true);
   });
+
+  it('draws every frame with the effects it is given, and none without', () => {
+    const effects = [{ id: 'mirror' as const, on: true, settings: { axis: 0 } }];
+    const frames = composeStill(3, kick, defaultLook(), 1, stillSpectrum(), calm, effects);
+    expect(frames.every((p) => p.effects === effects && p.prevEffects.length === 0)).toBe(true);
+    expect(burst().every((p) => p.effects.length === 0)).toBe(true);
+  });
 });

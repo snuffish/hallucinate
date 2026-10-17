@@ -119,20 +119,20 @@ export class AppController {
     reset: () => this.profiler.reset(),
     scenes: () => this.state.scenes.flatMap((s, index) => (s.removed ? [] : [{ index, name: s.name, cat: s.cat, params: s.params.length, builtin: isBuiltin(s) }])),
     setScene: (index) => this.setScene(index),
-    still: async (index, { inputs = {}, silent = false, look } = {}) => {
+    still: async (index, { inputs = {}, silent = false, look, effects } = {}) => {
       const s = this.state.scenes[index];
       const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
       if (error) return { error, image: null };
       const spectrum = silent ? silentSpectrum() : undefined;
-      if (!look) return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, spectrum) };
-      const frames = composeStill(index, stillUniforms(inputs), look, s!.trails ?? 1, spectrum ?? stillSpectrum());
+      if (!look && !effects) return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, spectrum) };
+      const frames = composeStill(index, stillUniforms(inputs), look ?? defaultLook(), s!.trails ?? 1, spectrum ?? stillSpectrum(), undefined, effects);
       return { error: null, image: await this.renderer.stillAsync(frames, 1280, 720) };
     },
-    stillChange: async (index, { from, to, look }) => {
+    stillChange: async (index, { from, to, look, effects }) => {
       const s = this.state.scenes[index];
       const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
       if (error) return { error, images: null };
-      const frames = composeStill(index, stillUniforms(from), look, s!.trails ?? 1, stillSpectrum(), stillUniforms(to));
+      const frames = composeStill(index, stillUniforms(from), look, s!.trails ?? 1, stillSpectrum(), stillUniforms(to), effects);
       return { error: null, images: await this.renderer.stillPairAsync(frames, 1280, 720) };
     },
   };
