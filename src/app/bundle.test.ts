@@ -7,7 +7,8 @@ import { BUNDLE_VERSION, MAX_BUNDLE_BYTES, SECTIONS, applyWrites, buildBundle, p
 
 // A stand-in built-in, so the tests don't depend on which ones the app ships.
 const BUILTIN = scene('Alpha', 'Beams', 'Stand-in', 'void main() { fragColor = vec4(1.); }');
-const SHOW = { cues: [{ id: 'c1', name: 'Opener', scene: 'Mine', values: {}, look: {} }], mode: 'cut', seconds: 2, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120 };
+const MIRRORED = [{ id: 'mirror', on: true, settings: { axis: 2 } }];
+const SHOW = { cues: [{ id: 'c1', name: 'Opener', scene: 'Mine', values: {}, look: {}, effects: MIRRORED }], mode: 'cut', seconds: 2, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120 };
 
 describe('settings bundle', () => {
   let store: Map<string, string>;
@@ -56,6 +57,26 @@ describe('settings bundle', () => {
       else expect(decode(key, store.get(key))).toEqual(decode(key, value));
     }
     expect(parsed.bundle.summary).toBe('2 scenes, 1 edited built-in, My Shader, the visual maker graph, parameter values, a show with 1 cue, favourites, player settings, layout');
+  });
+
+  it("carries the show scenes' effects and still says version 1, so an older app opens it without them", () => {
+    seed();
+    const bundle = buildBundle();
+    expect(bundle.version).toBe(1);
+    expect((bundle.data.show as typeof SHOW).cues[0]!.effects).toEqual(MIRRORED);
+    store.clear();
+    const parsed = parseBundle(JSON.stringify(bundle));
+    if (!parsed.ok) throw new Error(parsed.error);
+    applyWrites(parsed.bundle.writes);
+    expect(JSON.parse(store.get(KEYS.show)!).cues[0].effects).toEqual(MIRRORED);
+  });
+
+  it('imports a show from before effects with none, and cleans up a broken stack instead of refusing the show', () => {
+    const cue = (id: string, effects?: unknown) => ({ id, name: id, scene: 'Mine', values: {}, look: {}, ...(effects !== undefined && { effects }) });
+    const parsed = parseBundle(file({ show: { cues: [cue('old'), cue('broken', [{ id: 'echo' }, { id: 'mirror', settings: { axis: 7 } }])] } }));
+    if (!parsed.ok) throw new Error(parsed.error);
+    const show = JSON.parse(Object.fromEntries(parsed.bundle.writes)[KEYS.show]!);
+    expect(show.cues.map((c: { effects: unknown }) => c.effects)).toEqual([[], [{ id: 'mirror', on: true, settings: { axis: 2 } }]]);
   });
 
   it('carries exactly the keys that hold setup; everything else stays on this computer', () => {

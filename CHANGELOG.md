@@ -7,9 +7,18 @@
 - An **Effects** widget, docked under the Look: add a **Mirror** to the main screen (left↔right, top↕bottom or both),
   switch it on and off and remove it. It stays through scene changes and reloads, and projectors showing the main
   screen show it too. See [ADR 0003](docs/adr/0003-effects-belong-to-the-show-scene.md).
+- A **Kaleidoscope** effect: the picture folded into 3 to 12 segments around the centre, turning at a spin speed. The
+  bass pushes the turn ahead and each kick jumps it on, scaled by the Look's Reactivity.
 - A **Glow** effect: a soft bloom around the lines with a strength and a radius. It swells with the bass and gives
   way to each kick, so a kick never doubles the picture. Its blur runs at half size in two passes: about +1.2 ms a
   frame at 1080p on an M2 at its defaults (PERF.md).
+- A **Wave** effect: the picture ripples and bends, with an amount and a wavelength, and each kick sends a ripple
+  outward from the centre, scaled by Reactivity.
+- Show scenes keep their effects: *What's on Live now* and *Update from Live* store the screen's, a take with the
+  studio open brings them back to the screen, and Preview, Live and every projector show them. Through a fade each
+  picture keeps its own effects; a cut switches them with the scene. Shows saved before effects load with none, a
+  damaged effect is dropped without losing the show, and an exported show carries its effects while still opening
+  (without them) in an older copy. Show scenes the director and the assistant write have none.
 - `__profiler.effectsCost(stack)` times what effects cost per frame at the screen's resolution, against none, and
   `perf/measure.mjs` reports it for Glow.
 

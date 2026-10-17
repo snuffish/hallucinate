@@ -24,13 +24,20 @@ The ☰ menu is also where you [export and import your setup](backup.md).
 The **Effects** widget, under the Look, reshapes the picture on the main screen before the Look does. *Add effect*
 offers the effects you haven't added yet; each one then gets a row with an on/off checkbox, a × to remove it and its
 settings. **Mirror** reflects the left half onto the right, the top half onto the bottom, or both, and holds still on
-the beat. **Glow** lays a soft bloom of light around the lines (*Strength*: how bright, *Radius*: how far it
+the beat. **Kaleidoscope** folds the picture into 3 to 12 segments around the centre and turns the mandala at its spin
+speed; the bass pushes the turn ahead and each kick jumps it on, as strongly as Reactivity says (at spin speed 0 it
+holds still). **Glow** lays a soft bloom of light around the lines (*Strength*: how bright, *Radius*: how far it
 spreads); it swells with the bass and gives way to each kick, dipping while the lines flash and blooming back after,
-so a kick never doubles it. It costs about a millisecond a frame at 1080p on an M2, the most of the effects. The
-effects belong to what is on screen, like the Look: they stay when the scene changes (by hand,
-auto-switch or the library), come back after a reload, and show on any projector showing the main screen. Randomize
-and Drift leave them alone, and library previews show scenes without them. Near the edges every effect fades back to
-the scene's own picture, so the border stays as dark as the scene keeps it.
+so a kick never doubles it. It costs about a millisecond a frame at 1080p on an M2, the most of the effects.
+**Wave** ripples and bends the picture (*Amount* sets how far, *Wavelength* how far apart the ripples are), and on
+each kick sends a ripple outward from the centre, as strongly as Reactivity says. The effects belong to
+what is on screen, like the Look: they stay when the scene changes (by hand, auto-switch or the library), come back
+after a reload, and show on any projector showing the main screen. Randomize and Drift leave them alone, and library
+previews show scenes without them. Near the edges every effect fades back to the scene's own picture, so the border
+stays as dark as the scene keeps it.
+
+A show scene keeps its effects too ([Studio](studio.md)): *What's on Live now* and ⤓ *Update from Live* store the
+screen's effects in it, and taking it with the studio open puts its effects on the screen in place of yours.
 
 **⚙** (or **,**) opens [Settings](settings.md): how this computer renders and listens, how soon the controls hide, and
 whether buttons show their key badges.

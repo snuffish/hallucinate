@@ -1,5 +1,5 @@
-import { EDGE_CLEAR, EDGE_FADE, effectDef, passesOf } from '../src/engine/effects';
-import { expect, seedScenes, test, type Page } from './fixtures';
+import { EDGE_CLEAR, EDGE_FADE, EFFECTS, effectDef, passesOf } from '../src/engine/effects';
+import { expect, seedScenes, solidScene, test, type Page } from './fixtures';
 
 // How far the main screen's picture is from symmetric, left to right and top to bottom: the share of
 // pixels, away from the edges (where effects fade back to the scene's own picture), that differ from
@@ -30,8 +30,9 @@ async function asymmetry(page: Page): Promise<{ lr: number; tb: number }> {
   }), EDGE_CLEAR + EDGE_FADE);
 }
 
-// How many passes the main screen draws in one frame: WebGL draw calls between two animation frames
-// (the app draws in its own animation frame, which runs before ours). Needs countDraws() first.
+// How many passes the main screen draws in one frame: WebGL draw calls on the main canvas between two
+// animation frames (the app draws in its own animation frame, which runs before ours; the studio's
+// Preview monitor has a canvas of its own). Needs countDraws() first.
 async function passes(page: Page): Promise<number> {
   return page.evaluate(() => new Promise<number>((resolve) => {
     const w = window as unknown as { __draws: number };
@@ -42,7 +43,10 @@ const countDraws = (page: Page) => page.addInitScript(() => {
   const w = window as unknown as { __draws: number };
   w.__draws = 0;
   const draw = WebGL2RenderingContext.prototype.drawArrays;
-  WebGL2RenderingContext.prototype.drawArrays = function (...args) { w.__draws++; return draw.apply(this, args); };
+  WebGL2RenderingContext.prototype.drawArrays = function (...args) {
+    if ((this.canvas as HTMLCanvasElement).id === 'gl') w.__draws++;
+    return draw.apply(this, args);
+  };
 });
 
 const SYMMETRIC = 0.0005;   // a few stray pixels at most
@@ -96,6 +100,24 @@ test('effects: the widget docks under the Look and adds, switches, sets and remo
   await expect(row(page, 'mirror')).toHaveCount(0);
   await expect(addMenu(page).locator('option', { hasText: 'Mirror' })).toHaveCount(1);
   await mirrored(page, { lr: false, tb: false });
+});
+
+test('effects: a Kaleidoscope gets segments and spin speed sliders from its catalogue ranges', async ({ page }) => {
+  await start(page);
+  await addMenu(page).selectOption('kaleidoscope');
+  await expect(row(page, 'kaleidoscope')).toBeVisible();
+  for (const s of effectDef('kaleidoscope')!.settings) {
+    const slider = page.locator(`#fx-kaleidoscope-${s.key}`);
+    await expect(slider, s.label).toHaveAttribute('type', 'range');
+    await expect(slider, s.label).toHaveAttribute('min', String(s.min));
+    await expect(slider, s.label).toHaveAttribute('max', String(s.max));
+    await expect(slider, s.label).toHaveAttribute('step', String(s.step));
+    await expect(slider, s.label).toHaveValue(String(s.default));
+  }
+  await expect(page.locator('#fx-kaleidoscope-segments')).toHaveAttribute('min', '3');
+  await expect(page.locator('#fx-kaleidoscope-segments')).toHaveAttribute('max', '12');
+  await page.locator('#fx-kaleidoscope-segments').fill('9');
+  await expect(page.locator('#fx-kaleidoscope-segments')).toHaveValue('9');
 });
 
 // No crossfade runs here (that draws the outgoing picture too): the first scene, auto-switch off.
@@ -200,4 +222,66 @@ test('effects: library previews show scenes without effects', async ({ page }) =
     return lr / all;
   }, EDGE_CLEAR + EDGE_FADE);
   expect(asym, "Light Sheet's preview isn't mirrored").toBeGreaterThan(0.01);
+});
+
+// Each catalogue effect's settings become the widget's controls: the Wave's amount and wavelength
+// sliders, with its ranges and defaults.
+test('effects: a Wave gets amount and wavelength sliders from its catalogue ranges', async ({ page }) => {
+  await start(page);
+  await addMenu(page).selectOption('wave');
+  await expect(row(page, 'wave')).toBeVisible();
+  await expect(addMenu(page).locator('option', { hasText: 'Wave' })).toHaveCount(0);
+  const wave = EFFECTS.find((e) => e.id === 'wave')!;
+  for (const s of wave.settings) {
+    const slider = page.locator(`#fx-wave-${s.key}`);
+    await expect(slider).toHaveAttribute('type', 'range');
+    await expect(slider).toHaveAttribute('min', String(s.min));
+    await expect(slider).toHaveAttribute('max', String(s.max));
+    await expect(slider).toHaveAttribute('step', String(s.step));
+    await expect(slider).toHaveValue(String(s.default));
+  }
+  await expect(row(page, 'wave')).toContainText('Amount');
+  await expect(row(page, 'wave')).toContainText('Wavelength');
+  await page.locator('#fx-wave-amount').fill('1');
+  await expect(page.locator('#fx-wave-amount')).toHaveValue('1');
+});
+
+// With the studio open the main screen is the Live monitor: a take puts the show scene's effects on it.
+// Through the crossfade each picture keeps its own, which shows in the passes: one more for the outgoing
+// picture, and one per picture with a switched-on Mirror.
+test('effects: a Take brings the show scene\'s effects to the screen and each picture keeps its own through the crossfade', async ({ page }) => {
+  test.setTimeout(3 * 60_000);   // three 8 s crossfades on the show clock, which runs slow under software WebGL
+  const MIRROR = [{ id: 'mirror', on: true, settings: { axis: 2 } }];
+  const cue = (name: string, effects: unknown[] = []) => ({ id: `id-${name}`, name, scene: name, values: {}, look: {}, effects });
+  await countDraws(page);
+  await seedScenes(page, [solidScene('Red Room', '1., 0., 0.'), solidScene('Green Room', '0., 1., 0.')], {
+    'hallucinate.show': JSON.stringify({ cues: [cue('Red Room'), cue('Green Room', MIRROR)], mode: 'fade', seconds: 8 }),
+  });
+  await start(page);
+  await expect.poll(() => passes(page), { timeout: 15_000 }).toBeGreaterThan(0);
+  const plain = await passes(page);   // one picture, no effects
+  const storedCues = () => page.evaluate(() => JSON.parse(localStorage.getItem('hallucinate.show') ?? '{}').cues as { name: string; effects: unknown }[]);
+
+  await press(page, 'o');
+  await expect(page.locator('#studio')).toBeVisible();
+  await press(page, 't');
+  await expect(page.locator('#st-live-name')).toHaveText('Red Room');
+  await expect.poll(() => passes(page), { timeout: 60_000 }).toBe(plain);
+
+  await press(page, 't');             // Green Room, mirrored: the outgoing Red Room keeps none
+  await expect(page.locator('#st-live-name')).toHaveText('Green Room');
+  await expect.poll(() => passes(page), { timeout: 15_000 }).toBe(plain + 2);
+  await expect.poll(() => passes(page), { timeout: 60_000 }).toBe(plain + 1);
+  await expect(row(page, 'mirror')).toHaveCount(1);   // on the screen's stack now
+  await expect(page.locator('#fx-mirror-axis')).toHaveValue('2');
+
+  await page.selectOption('#st-add', '@live');          // capture what is on Live, effects and all
+  await expect.poll(async () => (await storedCues()).at(-1)?.effects).toEqual(MIRROR);
+
+  await page.locator('#st-cues li', { hasText: 'Red Room' }).click();
+  await press(page, 't');             // Red Room again: the outgoing Green Room stays mirrored
+  await expect(page.locator('#st-live-name')).toHaveText('Red Room');
+  await expect.poll(() => passes(page), { timeout: 15_000 }).toBe(plain + 2);
+  await expect.poll(() => passes(page), { timeout: 60_000 }).toBe(plain);
+  await expect(row(page, 'mirror')).toHaveCount(0);
 });

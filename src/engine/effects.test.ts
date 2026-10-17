@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { EFFECTS, addEffect, effectDef, passesOf, cleanStack, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
+import { z } from 'zod';
+import { SCENE_INPUTS } from './scene-inputs';
+import { EFFECTS, EffectStackSchema, addEffect, cleanStack, effectDef, passesOf, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
 
 describe('cleaning up a stored effect stack', () => {
   it('keeps a well-formed stack as it is', () => {
@@ -34,6 +36,12 @@ describe('cleaning up a stored effect stack', () => {
   it('reads anything that is not a list of effects as no effects', () => {
     for (const garbage of [null, undefined, 3, 'mirror', { id: 'mirror' }]) expect(cleanStack(garbage)).toEqual([]);
     expect(cleanStack([null, 7, 'mirror', { on: true }])).toEqual([]);
+  });
+
+  it('reads a stored value without a stack as one with no effects, and never fails it', () => {
+    const Stored = z.object({ name: z.string(), effects: EffectStackSchema });
+    expect(Stored.parse({ name: 'old' })).toEqual({ name: 'old', effects: [] });
+    expect(Stored.parse({ name: 'broken', effects: { id: 'mirror' } })).toEqual({ name: 'broken', effects: [] });
   });
 });
 
@@ -113,5 +121,38 @@ describe('the catalogue', () => {
       expect(pass.scale, e.id).toBeLessThanOrEqual(1);
     }
     expect(passesOf(effectDef('glow')!).length, 'a blur before the glow').toBeGreaterThan(0);
+  });
+
+  it('folds a Kaleidoscope into 3 to 12 whole segments, strongest at 12 and its fastest spin', () => {
+    const k = EFFECTS.find((e) => e.id === 'kaleidoscope')!;
+    expect(k.settings.map((s) => [s.key, s.min, s.max, s.step])).toEqual([['segments', 3, 12, 1], ['spin', 0, 1, 0.01]]);
+    expect(cleanStack([{ id: 'kaleidoscope', settings: { segments: 7.6, spin: 4 } }])[0]!.settings).toEqual({ segments: 8, spin: 1 });
+    expect(cleanStack([{ id: 'kaleidoscope', settings: { segments: 1 } }])[0]!.settings.segments).toBe(3);
+    expect(strongest('kaleidoscope')).toEqual([{ id: 'kaleidoscope', on: true, settings: { segments: 12, spin: 1 } }]);
+  });
+});
+
+describe('the Wave', () => {
+  it('has an amount and a wavelength, each a slider', () => {
+    expect(addEffect([], 'wave')).toEqual([{ id: 'wave', on: true, settings: { amount: 0.4, wavelength: 0.4 } }]);
+    const wave = EFFECTS.find((e) => e.id === 'wave')!;
+    expect(wave.settings.map((s) => [s.key, 'options' in s])).toEqual([['amount', false], ['wavelength', false]]);
+  });
+
+  it('is strongest at its largest amount and its longest wavelength', () => {
+    expect(strongest('wave')).toEqual([{ id: 'wave', on: true, settings: { amount: 1, wavelength: 1 } }]);
+  });
+
+  it('keeps a stored Wave within its ranges', () => {
+    expect(cleanStack([{ id: 'wave', on: true, settings: { amount: 5, wavelength: 0 } }])[0]!.settings).toEqual({ amount: 1, wavelength: 0.1 });
+  });
+
+  // Its kick ripple reads the scene inputs the scene reads: no input of its own.
+  it('moves with the kick through the existing scene inputs', () => {
+    const wave = EFFECTS.find((e) => e.id === 'wave')!;
+    const known = new Set<string>([...SCENE_INPUTS.map((i) => i.uniform), ...wave.settings.map((s) => s.uniform), 'uRes']);
+    const read = new Set(wave.glsl.match(/\bu[A-Z]\w*/g));
+    expect([...read].filter((u) => !known.has(u))).toEqual([]);
+    expect(read).toContain('uBeat');
   });
 });

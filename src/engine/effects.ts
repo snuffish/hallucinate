@@ -83,6 +83,31 @@ vec3 effect(vec2 uv) {
 }`,
   },
   {
+    id: 'kaleidoscope',
+    label: 'Kaleidoscope',
+    help: 'Folds the picture into segments around the centre, every other one mirrored, and turns the whole mandala.',
+    music: "Turns on the music's clock, which runs faster when the music is loud; the bass pushes the turn ahead and each kick jumps it on a step. At spin speed 0 it holds still.",
+    settings: [
+      { key: 'segments', label: 'Segments', uniform: 'uSegments', min: 3, max: 12, step: 1, default: 6 },
+      { key: 'spin', label: 'Spin speed', uniform: 'uSpin', min: 0, max: 1, step: 0.01, default: 0.3 },
+    ],
+    glsl: /* glsl */ `
+vec3 effect(vec2 uv) {
+  float side = min(uRes.x, uRes.y);
+  vec2 p = (uv - .5) * uRes / side;            // from the centre, in shares of the short side
+  float seg = TAU / floor(uSegments + .5);
+  // The turn runs on the music's clock (faster when the music is loud), the bass pushes it ahead and a kick
+  // jumps it on a step. Spin speed scales all three, so at 0 the mandala holds still.
+  float turn = uSpin * (.3 * uTime + .25 * min(uBass, 1.5) + .2 * uBeat);
+  float a = mod(atan(p.y, p.x) - turn, seg);
+  a = min(a, seg - a);                          // every other segment mirrored, so neighbours meet without a seam
+  a += PI * .5 - seg * .25;                     // each segment shows the wedge just above the centre
+  vec2 q = .5 + length(p) * vec2(cos(a), sin(a)) * side / uRes;
+  if (q.x < 0. || q.x > 1. || q.y < 0. || q.y > 1.) return vec3(0.);   // past the picture: dark, never a smeared edge
+  return pick(q);
+}`,
+  },
+  {
     id: 'glow',
     label: 'Glow',
     help: 'A soft bloom of light around the lines: Strength sets how bright, Radius how far it spreads.',
@@ -110,6 +135,35 @@ vec3 effect(vec2 uv) {
   vec3 halo = 1. - exp(-passed(uv) * uRadius * .6);
   float swell = (1. + .5 * min(uBass, 1.)) * (1. - min(uBeat, 1.));
   return pick(uv) + halo * uStrength * swell;
+}`,
+    },
+    {
+    id: 'wave',
+    label: 'Wave',
+    help: 'Ripples and bends the picture: Amount sets how far it bends, Wavelength how far apart the ripples are.',
+    music: 'A ripple runs outward from the centre on each kick.',
+    settings: [
+      { key: 'amount', label: 'Amount', uniform: 'uAmount', min: 0, max: 1, step: 0.01, default: 0.4 },
+      { key: 'wavelength', label: 'Wavelength', uniform: 'uWavelength', min: 0.1, max: 1, step: 0.01, default: 0.4 },
+    ],
+    // Distances are shares of the short side. The bend is a share of the wavelength, so at any setting it
+    // stays a bend and never folds the picture over onto itself: the most it moves the picture is at the
+    // top of both ranges, where the safety spec checks it.
+    glsl: /* glsl */ `
+vec3 effect(vec2 uv) {
+  float side = min(uRes.x, uRes.y);
+  vec2 p = (uv - .5) * uRes / side;   // from the centre
+  float k = TAU / uWavelength;
+  float reach = .08 * uAmount * uWavelength;
+  // The bend: two slow waves across each other, carried along by the music's clock.
+  vec2 bend = vec2(sin(p.y * k + uTime * 1.3), sin(p.x * k * .8 - uTime * 1.1));
+  // The kick ripple: a ring that starts at the centre on a kick and runs outward as the kick fades
+  // (uBeat falls from 1 to 0 within half a second), pushing the picture to and fro along its radius.
+  float r = length(p);
+  float front = (1. - uBeat) * 1.1;
+  float ring = uBeat * exp(-pow((r - front) / (.35 * uWavelength), 2.));
+  vec2 ripple = (r > 1e-4 ? p / r : vec2(0.)) * sin((r - front) * k) * ring;
+  return pick(uv + (bend + ripple) * reach * side / uRes);
 }`,
   },
 ] as const satisfies readonly EffectDef[];
@@ -170,8 +224,9 @@ export function cleanStack(raw: unknown): EffectStack {
 }
 
 // A stored stack (the main screen's, a show scene's) as zod reads it: anything, cleaned up, so it never
-// fails the value it sits in; missing reads as no effects.
-export const EffectStackSchema: z.ZodType<EffectStack, unknown> = z.unknown().transform(cleanStack);
+// fails the value it sits in; missing reads as no effects (optional, or zod 4 refuses an object without
+// the key before the clean-up runs).
+export const EffectStackSchema: z.ZodType<EffectStack, unknown> = z.unknown().optional().transform(cleanStack);
 
 const defaults = (def: EffectDef): Record<string, number> => Object.fromEntries(def.settings.map((s) => [s.key, s.default]));
 

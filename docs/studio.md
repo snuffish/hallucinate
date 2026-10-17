@@ -8,14 +8,20 @@ Run a show like OBS's Studio Mode and put it on a projector. The two monitors ar
 
 ## 1. Build the show
 
-*+ Add scene…* adds any library scene, or *What's on Live now* (the current scene, its live parameter values and the
-look sliders). Rename, reorder (▲▼), duplicate, and use ⤓ *Update from Live* to store a look you've just tweaked live.
+*+ Add scene…* adds any library scene, or *What's on Live now* (the current scene, its live parameter values, the
+look sliders and the [effects](interface.md#effects)). Rename, reorder (▲▼), duplicate, and use ⤓ *Update from Live*
+to store a look or effects you've just tweaked live. The same scene can be in the show twice with different effects.
+Show scenes the assistant or the director add have no effects.
 
 ## 2. Preview → Live
 
 Click a show scene (or 1–9, ←/→) to put it in **Preview**, then **Take** (T) sends it to **Live** with a *Cut* or a
 *Fade* (0.2–8 s). Double-click a scene to take it straight away. Preview then moves on to the next scene, so you can
 keep pressing T.
+
+Preview, Live and every projector show a show scene with its effects. Through a fade each picture keeps its own
+effects; a cut switches them at the same instant as the scene. Two show scenes of the same scene switch at once, even
+with a fade. With the studio open, a take also puts the show scene's effects in the Effects widget, ready to tweak.
 
 The Preview monitor renders at the same *Resolution* as Live ([Settings → Display & performance](settings.md#display--performance)),
 so a show scene looks in Preview exactly as it will Live.
@@ -52,7 +58,7 @@ on screen (switch scenes, tweak sliders) is only a preview. The panel shows *●
 the next Preview scene straight to Live. Reopening the studio puts Live back on screen.
 
 The **Screen** widget switches this screen between your **Preview** and **● Live** without opening the studio: Live
-shows exactly what the projectors get (Live's scene, parameters and look), and the scene you browsed to stays the
+shows exactly what the projectors get (Live's scene, parameters, look and effects), and the scene you browsed to stays the
 preview for when you switch back.
 
 ## 7. Plans and the Director
