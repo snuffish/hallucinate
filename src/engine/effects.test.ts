@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EFFECTS, addEffect, cleanStack, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
+import { EFFECTS, addEffect, effectDef, passesOf, cleanStack, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
 
 describe('cleaning up a stored effect stack', () => {
   it('keeps a well-formed stack as it is', () => {
@@ -99,5 +99,19 @@ describe('the catalogue', () => {
 
   it("runs an effect at its strongest at the top of every setting's range", () => {
     expect(strongest('mirror')).toEqual([{ id: 'mirror', on: true, settings: { axis: 2 } }]);   // both axes
+    expect(strongest('glow')).toEqual([{ id: 'glow', on: true, settings: { strength: 1.5, radius: 24 } }]);
+  });
+
+  it('offers a Glow with a strength and a radius, at its defaults when added', () => {
+    expect(addEffect([], 'glow')).toEqual([{ id: 'glow', on: true, settings: { strength: 0.8, radius: 10 } }]);
+    expect(cleanStack([{ id: 'glow', settings: { strength: 9, radius: -1 } }])[0]!.settings).toEqual({ strength: 1.5, radius: 2 });
+  });
+
+  it('renders the passes before a picture step at a share of the picture no larger than all of it', () => {
+    for (const e of EFFECTS) for (const pass of passesOf(e)) {
+      expect(pass.scale, e.id).toBeGreaterThan(0);
+      expect(pass.scale, e.id).toBeLessThanOrEqual(1);
+    }
+    expect(passesOf(effectDef('glow')!).length, 'a blur before the glow').toBeGreaterThan(0);
   });
 });

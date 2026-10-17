@@ -1,11 +1,12 @@
 // The effect catalogue: every built-in effect, one row each. An effect is a step that reshapes a scene's
 // picture before the Look (ADR 0003): its id and label, its settings (each with a range, step and
-// default), its picture step (GLSL that reads the picture with pick() and the same scene inputs the scene
-// reads, so the Look's Reactivity scales its music movement the way it scales the scene) and how it moves
-// with the music. Everything that lists effects is made from this table: the Effects widget and its "Add
-// effect" menu, the clean-up of a stored stack, the renderer's effect programs and the built-in scenes
-// safety spec, which checks each effect alone at its strongest (the top of each range). Adding an effect
-// is one row here. Pure: the safety spec imports it in Node.
+// default), any passes it runs first (Glow's blur), its picture step (GLSL that reads the picture with
+// pick() and the same scene inputs the scene reads, so the Look's Reactivity scales its music movement
+// the way it scales the scene) and how it moves with the music. Everything that lists effects is made
+// from this table: the Effects widget and its "Add effect" menu, the clean-up of a stored stack, the
+// renderer's effect programs and the built-in scenes safety spec, which checks each effect alone at its
+// strongest (the top of each range). Adding an effect is one row here. Pure: the safety spec imports it
+// in Node.
 
 import { z } from 'zod';
 import { INPUT_DECLARATIONS } from './scene-inputs';
@@ -21,15 +22,48 @@ export interface EffectSetting {
   readonly options?: readonly string[];   // a choice: one label per whole number from min to max
 }
 
+// A pass an effect runs before its picture step, such as one direction of a blur. It renders at `scale`
+// (a share of the picture's width and height: a blur needs less than all of it) and defines
+// `vec3 pass(vec2 uv)`, reading its input with `pick(uv)`: the picture so far for the first pass, the
+// pass before for the others. It sees the same uniforms as the picture step (uRes is the picture's size).
+export interface EffectPass {
+  readonly scale: number;
+  readonly glsl: string;
+}
+
 export interface EffectDef {
   readonly id: string;
   readonly label: string;
   readonly help: string;
   readonly music: string;   // how it moves with the music
   readonly settings: readonly EffectSetting[];
+  // Passes run first, in order (most effects need none); the picture step reads the last one's result
+  // with `passed(uv)`.
+  readonly passes?: readonly EffectPass[];
   // The picture step: defines `vec3 effect(vec2 uv)`, reading the picture with `pick(uv)`.
   readonly glsl: string;
 }
+
+// A Gaussian blur along `dir` (one axis), for Glow's two passes. Its reach is uRadius pixels of a
+// 720-high picture, so it looks the same at any size; a tap every 2 of those pixels, which the half-size
+// pass's linear sampling averages in between, so a thin line can't fall between two taps. Weights sum to
+// 1: a blur of black is exactly black, so the glow can't light the background away from the lines.
+const GLOW_BLUR = /* glsl */ `
+vec3 blur(vec2 uv, vec2 dir) {
+  float unit = min(uRes.x, uRes.y) / 720.;      // picture pixels per pixel of a 720-high picture
+  vec2 tap = dir * 2. * unit / uRes;            // a tap every 2 of those, in uv
+  float sigma = uRadius * .5;
+  int n = int(ceil(uRadius * 1.25 / 2.));       // out to 2.5 sigma
+  vec3 sum = vec3(0.);
+  float total = 0.;
+  for (int k = -n; k <= n; k++) {
+    float x = float(k) * 2.;
+    float w = exp(-x * x / (2. * sigma * sigma));
+    sum += pick(uv + tap * float(k)) * w;
+    total += w;
+  }
+  return sum / total;
+}`;
 
 export const EFFECTS = [
   {
@@ -46,6 +80,36 @@ vec3 effect(vec2 uv) {
   if (axis != 1.) uv.x = .5 - abs(uv.x - .5);   // the left half, reflected onto the right
   if (axis != 0.) uv.y = .5 + abs(uv.y - .5);   // the top half (GL rows run bottom-up), onto the bottom, as in water
   return pick(uv);
+}`,
+  },
+  {
+    id: 'glow',
+    label: 'Glow',
+    help: 'A soft bloom of light around the lines: Strength sets how bright, Radius how far it spreads.',
+    music: 'Swells with the bass, and gives way to each kick: the halo dips while the lines flash and blooms back after.',
+    settings: [
+      { key: 'strength', label: 'Strength', uniform: 'uStrength', min: 0, max: 1.5, step: 0.05, default: 0.8 },
+      { key: 'radius', label: 'Radius', uniform: 'uRadius', min: 2, max: 24, step: 1, default: 10 },
+    ],
+    // The blur, at half size (a bloom is soft, and a quarter of the pixels costs a quarter as much):
+    // across, from the picture, then down, from that.
+    passes: [
+      { scale: 0.5, glsl: `${GLOW_BLUR}\nvec3 pass(vec2 uv) { return blur(uv, vec2(1., 0.)); }` },
+      { scale: 0.5, glsl: `${GLOW_BLUR}\nvec3 pass(vec2 uv) { return blur(uv, vec2(0., 1.)); }` },
+    ],
+    // The blurred lines, added to the picture. A thin line's blur is faint, and fainter the wider it
+    // spreads, so it is lifted in proportion to the radius and then eased towards 1 (1 - e^-x): a line's
+    // halo gets about as bright at any radius, and a filled area can gain no more than Strength. The bass
+    // swells it by up to half again. A kick ducks it (gone at a full beat, back as the beat fades): on a
+    // kick the scene's lines flash and move, and a halo following them at once would light a wide band
+    // around every line that moved, doubling far more of the frame than the scene does alone (Point
+    // Storm: 38%, against the strobe rule's 25%). Ducked, a kick with a Glow doubles no more of the frame
+    // than without it, at any strength or radius.
+    glsl: /* glsl */ `
+vec3 effect(vec2 uv) {
+  vec3 halo = 1. - exp(-passed(uv) * uRadius * .6);
+  float swell = (1. + .5 * min(uBass, 1.)) * (1. - min(uBeat, 1.));
+  return pick(uv) + halo * uStrength * swell;
 }`,
   },
 ] as const satisfies readonly EffectDef[];
@@ -72,6 +136,10 @@ export const NO_EFFECTS: EffectStack = Object.freeze([]);
 
 const BY_ID = new Map<string, EffectDef>(EFFECTS.map((e) => [e.id, e]));
 export const effectDef = (id: string): EffectDef | undefined => BY_ID.get(id);
+// The passes an effect runs before its picture step (none for most).
+export const passesOf = (def: EffectDef): readonly EffectPass[] => def.passes ?? [];
+// Every size a pass renders at, as a share of the picture: the renderer keeps targets for each.
+export const PASS_SCALES: readonly number[] = [...new Set(EFFECTS.flatMap((e) => passesOf(e).map((p) => p.scale)))];
 
 const decimals = (step: number): number => (String(step).split('.')[1] ?? '').length;
 
@@ -158,22 +226,14 @@ export function strongest(id: EffectId): EffectStack {
 const glslFloat = (x: number): string => (Number.isInteger(x) ? `${x}.` : String(x));
 
 // An effect's picture step as a whole fragment shader. It reads the picture so far (uTex), the scene's own
-// picture (uScene), the scene inputs (the same uniforms, so the Look's Reactivity reaches its movement) and
-// its settings, and blends back to the scene's own picture towards the edges (the edge fade). Each pass of
-// a stack fades the same way, so however many run, the border shows the scene alone.
+// picture (uScene), the result of its own passes if it has any (uPassed), the scene inputs (the same
+// uniforms, so the Look's Reactivity reaches its movement) and its settings, and blends back to the scene's
+// own picture towards the edges (the edge fade). Each effect of a stack fades the same way, so however many
+// run, the border shows the scene alone.
 export function effectShader(def: EffectDef): string {
-  return /* glsl */ `#version 300 es
-precision highp float;
-in vec2 vUv;
-out vec4 fragColor;
-uniform sampler2D uTex, uScene;
-uniform vec2 uRes;
-${INPUT_DECLARATIONS}
-${def.settings.map((s) => `uniform float ${s.uniform};   // ${s.label}`).join('\n')}
-#define PI 3.14159265359
-#define TAU 6.28318530718
-
-vec3 pick(vec2 uv) { return texture(uTex, uv).rgb; }
+  return /* glsl */ `${header(def)}
+uniform sampler2D uScene, uPassed;
+vec3 passed(vec2 uv) { return texture(uPassed, uv).rgb; }
 ${def.glsl}
 
 void main() {
@@ -184,4 +244,29 @@ void main() {
   fragColor = vec4(w > 0. ? mix(scene, effect(vUv), w) : scene, 1.);
 }
 `;
+}
+
+// One of an effect's passes as a whole fragment shader: the same uniforms as its picture step, and its
+// input (uTex) read with pick(). No edge fade: the picture step that reads it fades.
+export function passShader(def: EffectDef, pass: EffectPass): string {
+  return /* glsl */ `${header(def)}
+${pass.glsl}
+
+void main() { fragColor = vec4(pass(vUv), 1.); }
+`;
+}
+
+function header(def: EffectDef): string {
+  return /* glsl */ `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 fragColor;
+uniform sampler2D uTex;
+uniform vec2 uRes;
+${INPUT_DECLARATIONS}
+${def.settings.map((s) => `uniform float ${s.uniform};   // ${s.label}`).join('\n')}
+#define PI 3.14159265359
+#define TAU 6.28318530718
+
+vec3 pick(vec2 uv) { return texture(uTex, uv).rgb; }`;
 }

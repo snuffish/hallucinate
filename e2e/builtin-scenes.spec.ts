@@ -30,6 +30,7 @@ const TICK_END = { uBeat: 0, uTick: 0.99, uTicks: 6 };
 const TICK_START = { uBeat: 0, uTick: 0, uTicks: 7 };
 
 const MIRROR_SCENE = 'Light Sheet';   // a scene that isn't symmetric left to right on its own
+const GLOW_SCENE = 'Ring Run';        // thin lines with wide black between them
 
 const LOOKS: { name: string; look: FrameLook }[] = [
   { name: 'default Look', look: defaultLook() },
@@ -210,4 +211,58 @@ test('a still with a left↔right Mirror is symmetric across its axis', async ({
   }, { look: defaultLook(), sceneName: MIRROR_SCENE, source: DIFFERS, inner: INNER });
   expect(asymmetry.plain, `${MIRROR_SCENE} isn't symmetric on its own`).toBeGreaterThan(0.001);
   expect(asymmetry.mirrored, 'mirrored, it is').toBe(0);
+});
+
+// A Glow lights the black around the lines and leaves black alone further away than it spreads: the
+// still at its strongest, against the same still without it. "Beside" is the black 6–12 px from a line,
+// past the soft edge a brighter line would show anyway; "far" is further from every line than the blur reaches (its radius, 24 px of this 720-high
+// still, to 2.5 sigma: 30 px) plus the half-size blur's sampling and the Look's fringing: 40 px.
+test('a still with a Glow has light around the lines and black left black away from them', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await openProfiler(page);
+  const glow = await page.evaluate(async ({ look, effects, sceneName, inner }) => {
+    const p = (window as Hook).__profiler!;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    const plain = (await p.still(index, { look })).image!;
+    const glowed = (await p.still(index, { look, effects })).image!;
+    const { width: w, height: h } = plain;
+    const lit = (d: Uint8ClampedArray, i: number) => Math.max(d[i * 4]!, d[i * 4 + 1]!, d[i * 4 + 2]!);
+    // Every pixel within `r` (a square) of a lit pixel of the still without the Glow.
+    const within = (r: number) => {
+      const across = new Uint8Array(w * h), out = new Uint8Array(w * h);
+      for (let y = 0; y < h; y++) {
+        let run = 0;
+        for (let x = -r; x < w; x++) {
+          if (x + r < w && lit(plain.data, y * w + x + r) > 0) run++;
+          if (x - r - 1 >= 0 && lit(plain.data, y * w + x - r - 1) > 0) run--;
+          if (x >= 0) across[y * w + x] = run > 0 ? 1 : 0;
+        }
+      }
+      for (let x = 0; x < w; x++) {
+        let run = 0;
+        for (let y = -r; y < h; y++) {
+          if (y + r < h && across[(y + r) * w + x]) run++;
+          if (y - r - 1 >= 0 && across[(y - r - 1) * w + x]) run--;
+          if (y >= 0) out[y * w + x] = run > 0 ? 1 : 0;
+        }
+      }
+      return out;
+    };
+    const close = within(5), beside = within(12), reach = within(40);
+    const margin = inner * Math.min(w, h);
+    let besideAll = 0, besideLit = 0, farAll = 0, farBlack = 0, all = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (Math.min(x, w - 1 - x, y, h - 1 - y) < margin) continue;
+      const i = y * w + x;
+      all++;
+      if (beside[i] && !close[i]) { besideAll++; if (lit(glowed.data, i) > 4) besideLit++; }
+      if (!reach[i]) { farAll++; if (lit(glowed.data, i) === 0) farBlack++; }
+    }
+    return { besideLit: besideLit / besideAll, far: farAll / all, farBlack: farBlack / farAll };
+  }, { look: defaultLook(), effects: strongest('glow'), sceneName: GLOW_SCENE, inner: INNER });
+  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+  console.log(`${GLOW_SCENE} with a Glow: ${pct(glow.besideLit)} of the black beside its lines lit; ${pct(glow.far)} of the picture is far from them, ${pct(glow.farBlack)} of that black`);
+  expect(glow.besideLit, 'the black beside the lines is lit').toBeGreaterThan(0.5);
+  expect(glow.far, `${GLOW_SCENE} has black far from its lines`).toBeGreaterThan(0.05);
+  expect(glow.farBlack, 'the black far from them stays black').toBe(1);
 });
