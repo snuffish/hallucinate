@@ -52,7 +52,7 @@ void main() {
     level *= .6 + .8 * h / max(push, 1e-4);                        // bright picture, bright line
     level += SCAN * 1.4 * exp(-abs(base - scanY) / (2. * gap));    // the tick scan
     level += mod(i, 3.) == lit ? 2.2 * FLASH * uBeat : 0.;         // the kick, on a third of the lines
-    col += rainbow(uHue + (f - .5) * .1) * beam(d, WIDTH * px) * level;
+    col += laser(uHue + (f - .5) * .1) * beam(d, WIDTH * px) * level;
   }
   fragColor = vec4(col * fade, 1.);
 }
