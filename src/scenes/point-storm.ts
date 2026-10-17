@@ -56,7 +56,7 @@ void main() {
       rad *= scale * push * (1. + .03 * sin(uTime * .8 + h * TAU));      // a slow shimmer in silence
       vec2 q = rad * vec2(cos(da), sin(da));
       float level = .5 + 1.4 * band + 1.5 * uBeat * step(.7, h);         // a kick flares a few dots, not all
-      vec3 c = mix(rainbow(uHue + k * .06 + (h - .5) * .05), vec3(1.), .3 * step(.92, h2) * band);
+      vec3 c = mix(laser(uHue + k * .06 + (h - .5) * .05), vec3(1.), .3 * step(.92, h2) * band);
       col += c * beam(length(p - q), SIZE * px) * level * window;
     }
   }

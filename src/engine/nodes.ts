@@ -40,6 +40,7 @@ export const CATEGORIES: readonly string[] = ['Input', 'Coordinates', 'Pattern',
 type Unary = (x: string) => string;
 type Binary = (a: string, b: string) => string;
 const PALETTES: Record<string, Unary> = {
+  laser: (t) => `laser(${t} + uHue)`,
   rainbow: (t) => `rainbow(${t} + uHue)`,
   neon: (t) => `neon(${t} + uHue)`,
   fire: (t) => `pal(${t} + uHue, vec3(.6, .3, .1), vec3(.5, .35, .2), vec3(1.), vec3(0., .15, .25))`,

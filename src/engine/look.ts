@@ -32,13 +32,14 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
   const mid = Math.min(1.5, h.mid * R);
   const high = Math.min(1.5, h.high * R);
   const level = Math.min(1.5, h.level * R);
-  const beat = Math.min(1.5, h.beat * R);
+  const beat = Math.min(1, h.beat * R);   // the kick flash: never brighter than the strobe rule was checked at
 
   // Ease the clock's pace instead of jumping it on every beat, so motion stays fluid.
   const targetRate = look.speed * (0.55 + level * 0.9 + beat * 0.35);
   motion.timeRate += (targetRate - motion.timeRate) * (1 - Math.exp(-dt * 3));
   motion.time += dt * motion.timeRate;
-  motion.huePhase += dt * look.cycle * 0.06 + (h.kick ? 0.03 * R : 0);
+  // Colour cycling sets both the hue's walk and how far a kick jumps it, so at 0 the colour holds.
+  motion.huePhase += look.cycle * (dt * 0.06 + (h.kick ? 0.05 : 0));
 
   p.time = motion.time;
   p.bass = bass; p.mid = mid; p.high = high; p.level = level; p.beat = beat;

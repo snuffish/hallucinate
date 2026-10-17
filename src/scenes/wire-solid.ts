@@ -75,7 +75,7 @@ void main() {
       float level = (.45 + 1.2 * spec(.08 + .6 * f)) * mix(1., .45, smoothstep(-1., 1., z));
       float flare = uBeat * FLARE * front;
       level += 2.2 * flare;
-      vec3 c = mix(rainbow(uHue + (f - .5) * .1), vec3(1.), .5 * flare);
+      vec3 c = mix(laser(uHue + (f - .5) * .1), vec3(1.), .5 * flare);
       col += c * beam(segment(p, v2[i], v2[j]), w) * level;
       e++;
     }
@@ -84,7 +84,7 @@ void main() {
   for (int i = 0; i < 12; i++) {
     if (i >= n) break;
     float hot = float(i) == spark ? 1.8 * tickFlash() : 0.;
-    col += rainbow(uHue + .05) * beam(length(p - v2[i]), 2.5 * w) * (.35 + hot);
+    col += laser(uHue + .05) * beam(length(p - v2[i]), 2.5 * w) * (.35 + hot);
   }
   fragColor = vec4(col, 1.);
 }
