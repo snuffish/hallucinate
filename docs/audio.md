@@ -36,19 +36,38 @@ warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm col
 - **Tone** – the spectral centroid (loudness-weighted average frequency) mapped from ~1.1 kHz (dark: piano,
   ambient) to ~5.5 kHz (bright: hi-hat-heavy house, psytrance) and smoothed over a few seconds. Shown in the panel.
 - **Mood** – tempo (80 → 160 BPM) plus how loud the music is over the last few seconds, smoothed over ~4 s more.
-  Toggle with *Mood from tempo*. When nothing plays, mood and tone both drift back to neutral.
-- **Synesthesia slider** – how strongly they grade every scene: dark sound → dimmer, cooler, hazier, longer trails;
-  bright sound → lighter, warmer, crisper, more colour fringing; energetic mood → more saturated and warmer.
+  When nothing plays, mood and tone both drift back to neutral.
+- **Synesthesia slider** – how strongly the tone and the mood grade every scene: dark sound → dimmer, cooler, hazier,
+  longer trails; bright sound → lighter, warmer, crisper, more colour fringing; energetic mood → more saturated and
+  warmer. At 0 it is off: the picture's colour is left untouched. Trails and fringing only grow or shrink from what you
+  set, so at 0 they stay at 0.
 - Both values are also available to your own shaders (`uBright`, `uMood`) and as *tone* / *mood* outputs on the
   visual maker's Audio block.
 
 ## 🎨 The Look widget
 
-Look sliders: reactivity, speed, trails (feedback), colour, colour cycling, chromatic aberration, synesthesia, Drift
-speed and render resolution (lower it if frames drop).
+Look sliders: Reactivity, Speed, Trails, Colour, Colour cycling, Synesthesia, Fringing and Drift
+speed. Resolution isn't part of the Look: it is in [Settings → Display & performance](settings.md#display--performance)
+(lower it if frames drop).
 
+The app opens with a laser look:
+
+| Slider | Default | Randomize and Drift pick from |
+|---|---|---|
+| Reactivity | 1 | 0.6–1.4 |
+| Speed | 1 | 0.5–1.6 |
+| Trails | 0.35 | 0–0.6 |
+| Colour | 0 | 0–1 |
+| Colour cycling | 0.2 | 0–1 |
+| Synesthesia | 0.3 | 0–0.6 |
+| Fringing | 0 | 0–0.006 |
+
+By hand every slider still reaches its full range.
+
+- **Fringing** – how far each line splits into red, green and blue copies towards the edges of the picture.
+- **Trails** – an afterglow: a line keeps glowing where it was drawn and fades there, without moving. At 0 there is
+  no afterglow; higher values fade more slowly. The trail keeps the line's colour.
 - **Drift** – the Look sliders glide to new random values on their own, each at its own pace, so the look keeps
   changing smoothly; *Drift speed* sets how fast. A slider you move by hand drifts on from there.
-- **Randomize** (R) jumps the Look sliders (not Resolution) to new values instead, and flips *Mood from tempo* and the
-  spin direction at random. Tick *Randomize also picks a random
+- **Randomize** (R) jumps the Look sliders to new values in the ranges above instead. Tick *Randomize also picks a random
   scene* to change the scene too. Shift+R steps back to the look (and scene) before each randomize, up to 20 steps.

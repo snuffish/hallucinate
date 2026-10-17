@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { type ParamSpec, type ParamValue, ParamValueSchema, type ParamValues } from '../engine/params';
 import { Renderer, type ProgramState } from '../engine/renderer';
 import { applyRendererPrefs, type ScreenDetailed } from '../engine/output-link';
-import { outputPrefs } from '../state/prefs';
+import { outputPrefs, type Prefs } from '../state/prefs';
 import { listedScenes } from '../state/library-prefs';
 import { KEYS, debouncedWriter, readWithDefaults } from '../state/persistence';
 import { paramKey } from '../state/scene-list';
@@ -125,7 +125,7 @@ export class StudioSession {
   // ---------- Lifecycle ----------
 
   // The main window's hooks: Preview monitor + master fader every frame, autopilot on the beat, the
-  // Parameters dock editing the selected show scene, and the pixel-density setting for the monitor.
+  // Parameters dock editing the selected show scene, and the display settings for the monitor.
   attach(): () => void {
     return this.app.setHooks({
       onFrame: (dt, program) => { this.update(dt); this.renderPreview(program, dt); },
@@ -136,8 +136,17 @@ export class StudioSession {
       master: () => this.master,
       autopilot: () => this.autopilot.on,
       paramsOverride: () => this.paramsOverride(),
-      onPrefs: (prefs) => { if (this.previewRenderer) applyRendererPrefs(this.previewRenderer, outputPrefs(prefs)); },
+      onPrefs: (prefs) => this.applyPreviewPrefs(prefs),
     });
+  }
+
+  // The monitor renders like Live: at the Resolution setting (so Preview shows how a show scene will
+  // look) and the pixel density.
+  private applyPreviewPrefs(prefs: Prefs): void {
+    const r = this.previewRenderer;
+    if (!r) return;
+    r.setScale(prefs.resolution);
+    applyRendererPrefs(r, outputPrefs(prefs));
   }
 
   // The studio's shortcuts: step Preview, pick a cue (only while the studio is open).
@@ -150,8 +159,7 @@ export class StudioSession {
     if (open && previewCanvas && !this.previewRenderer) {
       this.previewRenderer = new Renderer(previewCanvas, this.app.state.scenes);
       this.previewRenderer.setMedia(this.app.media);
-      this.previewRenderer.setScale(0.6);
-      applyRendererPrefs(this.previewRenderer, outputPrefs(this.app.prefs.get()));
+      this.applyPreviewPrefs(this.app.prefs.get());
     }
     // Closing with a cue Live pins the Live slot: projectors keep it while the screen is free to
     // browse. Reopening puts Live back on the screen (the main canvas is the Live monitor).

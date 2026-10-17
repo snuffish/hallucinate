@@ -1,14 +1,13 @@
 // Settings: the device preferences (src/state/prefs.ts), a few app-wide conveniences and the setup's
-// data. A preference is a default, never a second control for something live: the Look widget keeps
-// Resolution, the transport keeps volume and tempo.
+// data. A preference is a default, never a second control for something live (the transport keeps
+// volume and tempo), except Display & performance: Resolution and Pixel density are the live controls.
 
 import { useRef, useState, type ReactNode } from 'react';
 import { useApp, usePrefs, useUI } from '../app/AppContext';
 import { STATIC_DEMO } from '../app/static-demo';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
-import { LOOK_RANGES } from '../state/app-state';
-import { APPLIES, IDLE_SECONDS, PIXEL_RATIOS, setShowThinking, useShowThinking, type PrefKey } from '../state/prefs';
+import { APPLIES, IDLE_SECONDS, PIXEL_RATIOS, RESOLUTION, setShowThinking, useShowThinking, type PrefKey } from '../state/prefs';
 import { HelpButton } from './Help';
 import { AssistantSettings } from './SettingsAssistant';
 
@@ -75,17 +74,18 @@ function Toggle({ id, checked, onChange, children, hint }: { id: string; checked
 
 function DisplaySection() {
   const app = useApp();
-  const startResolution = usePrefs((p) => p.startResolution);
+  const resolution = usePrefs((p) => p.resolution);
   const maxPixelRatio = usePrefs((p) => p.maxPixelRatio);
-  const r = LOOK_RANGES.resolution;
+  const r = RESOLUTION;
   const screenRatio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   return (
     <>
       <h3>Display & performance</h3>
-      <Field label={`Start resolution · ${Math.round(startResolution * 100)}%`} pref="startResolution"
-        hint="Where the Look widget's Resolution slider starts each time Hallucinate opens. Lower it on a slower computer.">
-        <input type="range" id="pref-start-resolution" min={r.min} max={r.max} step={r.step} value={startResolution}
-          onChange={(e) => app.setPref('startResolution', Number(e.target.value))} />
+      <p className="settings-note">These apply at once: lower them if frames start dropping mid-show.</p>
+      <Field label={`Resolution · ${Math.round(resolution * 100)}%`} pref="resolution"
+        hint="How much of the screen's pixels the scenes render at, here, in the studio's Preview and on projectors. 100% keeps laser lines one pixel thin; lower is faster and softer.">
+        <input type="range" id="pref-resolution" min={r.min} max={r.max} step={r.step} value={resolution}
+          onChange={(e) => app.setPref('resolution', Number(e.target.value))} />
       </Field>
       <Field label="Pixel density" pref="maxPixelRatio"
         hint={`This screen has ${screenRatio}× pixels. On a HiDPI screen, 1× draws a quarter of the pixels of 2×: much faster, a little softer.`}>

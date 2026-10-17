@@ -20,7 +20,7 @@ void main() {
 
   const float HORIZON = -.18, FOCAL = 1.;
   float h0 = HEIGHT * (1. - .25 * uBeat);    // the sheet drops a little on each kick
-  vec3 c = rainbow(uHue);
+  vec3 c = laser(uHue);
   vec3 col = vec3(0.);
 
   // Haze texture: slow noise drifting out towards the horizon, read once per pixel.

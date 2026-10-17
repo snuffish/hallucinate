@@ -5,16 +5,19 @@
 Open Settings with **⚙** in the Hallucinate widget, **☰ → Settings…**, or the **,** key. Esc closes it.
 
 Settings hold how *this computer* renders, listens and shows the controls, and how the assistant reaches Claude. They
-are defaults, not live controls: the Look widget keeps the Resolution slider and the player keeps volume and tempo.
+are defaults, not live controls (the player keeps volume and tempo), with one exception: Display & performance is the
+live control for how the picture renders, and a change there applies at once.
 Display, Audio and Interface are kept in this browser (or in the [desktop app](desktop.md)'s own profile), Assistant
 on the local server. None of them are in Export: a setup moved to a projector laptop shouldn't bring the GPU and
 microphone settings of the computer it came from.
 
-## Display
+## Display & performance
+
+These apply at once, so you can recover mid-show when frames start dropping.
 
 | Setting | What it does | Default |
 | --- | --- | --- |
-| Start resolution | Where the Look widget's Resolution slider starts each time Hallucinate opens. Takes effect at the next start. | 75 % |
+| Resolution | The share of the screen's pixels the scenes render at: on the main screen, in the studio's Preview monitor (so Preview looks exactly like Live) and in every projector window. At 100 % laser lines stay one pixel thin; lower is faster and softer. Randomize and Drift leave it alone. | 100 % |
 | Pixel density | Caps the pixel ratio everything renders at: the main screen, the studio's Preview monitor and every projector window. On a HiDPI screen 1× draws a quarter of the pixels of 2×: much faster, a little softer. | Up to 2× |
 
 If the frame rate drops, lower these first; the [performance monitor](../PERF.md) (Shift+P) says whether the GPU is

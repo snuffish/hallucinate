@@ -17,6 +17,9 @@ Click a show scene (or 1–9, ←/→) to put it in **Preview**, then **Take** (
 *Fade* (0.2–8 s). Double-click a scene to take it straight away. Preview then moves on to the next scene, so you can
 keep pressing T.
 
+The Preview monitor renders at the same *Resolution* as Live ([Settings → Display & performance](settings.md#display--performance)),
+so a show scene looks in Preview exactly as it will Live.
+
 ## 3. Projector
 
 *Detect displays* (asks once for the browser's *window management* permission, Chrome/Edge), pick the projector,

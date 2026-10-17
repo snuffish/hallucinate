@@ -36,7 +36,7 @@ void main() {
   float landed = mod(k, 3.) == mod(uTicks, 3.) ? 1. : 0.;  // a kick lights every third contour, turning with the tick
   lit += uBeat * KICK * (1.4 * landed + .25);
 
-  vec3 c = mix(rainbow(uHue + (f - .5) * .12), vec3(1.), .35 * uBeat * KICK * landed);
+  vec3 c = mix(laser(uHue + (f - .5) * .12), vec3(1.), .35 * uBeat * KICK * landed);
   vec3 col = c * beam(d, WIDTH * px) * lit * land;
   fragColor = vec4(col, 1.);
 }

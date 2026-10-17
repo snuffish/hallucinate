@@ -4,16 +4,16 @@
 
 import { AudioEngine } from '../engine/audio';
 import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
-import { composeFrame, crossfade, programState } from '../engine/look';
+import { composeFrame, composeStill, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
 import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState } from '../engine/renderer';
-import { silentSpectrum, stillUniforms } from '../engine/scene-inputs';
+import { silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
 import type { Scene } from '../scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
-import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type LookKey, type SourceButton } from '../state/app-state';
+import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
@@ -105,7 +105,7 @@ export class AppController {
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly drift = new LookDrift();
   private driftFrames = 0;
-  private readonly beforeRandom: { look: Partial<Look>; scene: number }[] = [];   // Shift+R steps back through these
+  private readonly beforeRandom: { look: Record<DriftKey, number>; scene: number }[] = [];   // Shift+R steps back through these
   private toastKey = 0;
   private readonly downloads = new Map<'sc' | 'yt', DownloadView>();
   private disposed = false;
@@ -119,11 +119,21 @@ export class AppController {
     reset: () => this.profiler.reset(),
     scenes: () => this.state.scenes.flatMap((s, index) => (s.removed ? [] : [{ index, name: s.name, cat: s.cat, params: s.params.length, builtin: isBuiltin(s) }])),
     setScene: (index) => this.setScene(index),
-    still: async (index, { inputs = {}, silent = false } = {}) => {
+    still: async (index, { inputs = {}, silent = false, look } = {}) => {
       const s = this.state.scenes[index];
       const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
       if (error) return { error, image: null };
-      return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, silent ? silentSpectrum() : undefined) };
+      const spectrum = silent ? silentSpectrum() : undefined;
+      if (!look) return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, spectrum) };
+      const frames = composeStill(index, stillUniforms(inputs), look, s!.trails ?? 1, spectrum ?? stillSpectrum());
+      return { error: null, image: await this.renderer.stillAsync(frames, 1280, 720) };
+    },
+    stillChange: async (index, { from, to, look }) => {
+      const s = this.state.scenes[index];
+      const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
+      if (error) return { error, images: null };
+      const frames = composeStill(index, stillUniforms(from), look, s!.trails ?? 1, stillSpectrum(), stillUniforms(to));
+      return { error: null, images: await this.renderer.stillPairAsync(frames, 1280, 720) };
     },
   };
   // Another tab imported settings: this one's state is stale, so it must not write, and reloads.
@@ -156,12 +166,11 @@ export class AppController {
     this.paramStore = new ParamStore();
     this.state = {
       scenes: list.scenes, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
-      look: { ...defaultLook(), resolution: this.prefs.get().startResolution }, clock: defaultClock(), activeSource: null,
+      look: defaultLook(), clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
     this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound });
     this.renderer.setMedia(this.media);
-    this.renderer.setScale(this.state.look.resolution);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
     this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what));
     this.live = new LiveSlot({ state: this.state, hearing: this.listener.hearing, specs: (i) => this.library.specs(i), stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
@@ -312,9 +321,12 @@ export class AppController {
   }
 
   // Pushes the preferences to whatever uses them: this renderer, the projectors, the studio's Preview
-  // monitor (its hook), the audio analysis, the badges and the idle timer. Start resolution is read once, at startup.
+  // monitor (its hook), the audio analysis, the badges and the idle timer. Resolution reaches the
+  // projectors with each frame.
   private applyPrefs(): void {
     const p = this.prefs.get();
+    if (p.resolution !== this.renderer.scale) this.profiler.cancelFill();   // a GPU test measures one resolution: any other ends it
+    this.renderer.setScale(p.resolution);
     applyRendererPrefs(this.renderer, outputPrefs(p));
     this.output.sendPrefs(outputPrefs(p));
     this.hooks.onPrefs?.(p);
@@ -558,14 +570,10 @@ export class AppController {
     const r = LOOK_RANGES[key];
     const v = Math.min(r.max, Math.max(r.min, value));
     this.state.look[key] = v;
-    if (key === 'resolution') {
-      this.profiler.cancelFill();   // a GPU test measures one resolution
-      this.renderer.setScale(v);
-    }
     this.ui.set({ look: { ...this.state.look } });
   }
 
-  setLookFlag(key: 'mood' | 'auto' | 'randomScene' | 'drift', value: boolean): void {
+  setLookFlag(key: 'auto' | 'randomScene' | 'drift', value: boolean): void {
     if (key === 'drift' && value) this.drift.reset();   // start from the sliders as they are
     this.state.look[key] = value;
     this.ui.set({ look: { ...this.state.look } });
@@ -577,15 +585,13 @@ export class AppController {
     return this.state.look.auto;
   }
 
-  // Rolls the Look widget's values (not Resolution: that's a performance setting), within ranges that
-  // stay watchable. The scene only changes when "Also pick a random scene" is on.
+  // Rolls the Look widget's values, within ranges that stay watchable. The scene only changes when
+  // "Also pick a random scene" is on.
   randomize(): void {
-    const { reactivity, speed, trails, hue, cycle, synesthesia, aberration, mood, spin } = this.state.look;
-    this.beforeRandom.push({ look: { reactivity, speed, trails, hue, cycle, synesthesia, aberration, mood, spin }, scene: this.state.clock.scene });
+    const look = this.state.look;
+    this.beforeRandom.push({ look: Object.fromEntries(DRIFT_KEYS.map((k) => [k, look[k]])) as Record<DriftKey, number>, scene: this.state.clock.scene });
     if (this.beforeRandom.length > RANDOM_HISTORY) this.beforeRandom.shift();
-    for (const [key, [min, max]] of Object.entries(RANDOM_RANGES)) this.setLook(key as DriftKey, min + Math.random() * (max - min));
-    this.setLookFlag('mood', Math.random() < 0.5);
-    this.state.look.spin = Math.random() < 0.5 ? -1 : 1;
+    for (const key of DRIFT_KEYS) { const [min, max] = RANDOM_RANGES[key]; this.setLook(key, min + Math.random() * (max - min)); }
     if (this.state.look.randomScene) this.nextRandomScene();
   }
 
@@ -594,9 +600,7 @@ export class AppController {
   randomizeBack(): void {
     const prev = this.beforeRandom.pop();
     if (!prev) { this.toast('No earlier random look to go back to', 1500); return; }
-    for (const key of ['reactivity', 'speed', 'trails', 'hue', 'cycle', 'synesthesia', 'aberration'] as const) this.setLook(key, prev.look[key]!);
-    this.setLookFlag('mood', prev.look.mood!);
-    this.state.look.spin = prev.look.spin!;
+    for (const key of DRIFT_KEYS) this.setLook(key, prev.look[key]);
     if (prev.scene !== this.state.clock.scene) this.setScene(prev.scene);
     const left = this.beforeRandom.length;
     this.toast(`Back to the previous look${left ? ` (${left} more)` : ''}`, 1500);
@@ -820,7 +824,7 @@ export class AppController {
   // the trails restart), then back. Resolves with null if it was cut short.
   runFillTest(): Promise<FillResult | null> {
     if (!this.profiler.on) this.setPerf(true);
-    const done = this.profiler.startFill((s) => this.renderer.setScale(s), () => this.state.look.resolution, this.state.clock.scene);
+    const done = this.profiler.startFill((s) => this.renderer.setScale(s), () => this.prefs.get().resolution, this.state.clock.scene);
     this.ui.set({ perf: this.perfReport() });
     return done;
   }
@@ -829,7 +833,7 @@ export class AppController {
     return this.profiler.report({
       size: this.renderer.size,
       scale: this.renderer.scale,
-      resolution: this.state.look.resolution,
+      resolution: this.prefs.get().resolution,
       scene: this.state.clock.scene,
       projectors: this.ui.get().outputs.length,
       preview: this.ui.get().overlay === 'studio',
@@ -886,14 +890,14 @@ export class AppController {
     const out = this.live.route(p, this.output.connected, dt);
     this.renderer.render(out.screen.program, out.screen.params);
     this.profiler.lap(Stage.render);
-    if (out.projector) this.output.sendFrame(out.projector.program, out.projector.params, look.resolution);
+    if (out.projector) this.output.sendFrame(out.projector.program, out.projector.params, this.prefs.get().resolution);
     this.profiler.lap(Stage.output);
     this.hooks.onFrame?.(dt, p);
     this.profiler.lap(Stage.studio);
 
     if (++this.meterTick % 2 === 0) {
       const tone = toneWord(f.bright);
-      const moodLabel: MoodLabel = !look.mood || !this.music.playing ? '' : `mood: ${moodWord(f.mood)}`;
+      const moodLabel: MoodLabel = !this.music.playing ? '' : `mood: ${moodWord(f.mood)}`;
       this.ui.set({
         meters: { bass: f.bass, mid: f.mid, high: f.high, bright: f.bright, beat: f.beat },
         bpm: f.bpm,
