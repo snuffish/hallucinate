@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { programState } from './look';
 import { OutputLink, ProjectorView, STALE_MS, WAITING_MS, type OutputMessage, type OutputPort, type OutputStatus, type ProjectorMedia, type ProjectorRenderer } from './output-link';
-import type { SceneSource } from './renderer';
+import type { ProgramState, SceneSource } from './renderer';
 
 // A BroadcastChannel in memory: a message reaches every other port on the bus, at once.
 function bus() {
@@ -21,12 +21,13 @@ function bus() {
 function projector(port: OutputPort, clock: { t: number }, id = 'p1') {
   const scenes: SceneSource[] = [];
   const drawn: { scene: number }[] = [];
+  const frames: ProgramState[] = [];
   const renderer: ProjectorRenderer & { params: Record<number, unknown>; scale: number; ratio: number } = {
     size: [1920, 1080], params: {}, scale: 0, ratio: 0,
     setParams(i, u) { renderer.params[i] = u; },
     setScale(s) { renderer.scale = s; },
     setMaxPixelRatio(r) { renderer.ratio = r; },
-    render(s) { drawn.push({ scene: s.scene }); },
+    render(s) { drawn.push({ scene: s.scene }); frames.push(s); },
   };
   const loaded: unknown[] = [];
   const media: ProjectorMedia = {
@@ -35,7 +36,7 @@ function projector(port: OutputPort, clock: { t: number }, id = 'p1') {
     follow: () => {},
   };
   const view = new ProjectorView(port, renderer, media, scenes, { id, now: () => clock.t });
-  return { view, scenes, renderer, drawn, loaded };
+  return { view, scenes, renderer, drawn, frames, loaded };
 }
 
 afterEach(() => { vi.useRealTimers(); });
@@ -98,6 +99,18 @@ describe('the projector link', () => {
     expect(p.drawn).toEqual([{ scene: 0 }]);   // the newest frame, once
     expect(p.renderer.params).toEqual({ 0: { uGlow: 1 } });
     expect(p.renderer.scale).toBe(0.75);
+  });
+
+  it('carries the effects of the incoming and the outgoing picture in each frame', () => {
+    const { connect, clock, link } = setup();
+    const p = projector(connect(), clock);
+    p.view.start();
+    p.view.report(false);
+    const effects = [{ id: 'mirror' as const, on: true, settings: { axis: 2 } }];
+    const prevEffects = [{ id: 'mirror' as const, on: false, settings: { axis: 0 } }];
+    link.sendFrame({ ...programState(), scene: 1, prevScene: 0, mix: 0.5, effects, prevEffects }, {}, 1);
+    p.view.draw();
+    expect(p.frames.at(-1)).toMatchObject({ scene: 1, prevScene: 0, effects, prevEffects });
   });
 
   it('a projector says it is waiting when no frame came for a while, and reports the frames it drew', () => {

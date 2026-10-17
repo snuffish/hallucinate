@@ -63,6 +63,31 @@ await page.keyboard.press('7');   // Point Storm (the slider scenarios below dra
 await page.waitForTimeout(2500);
 await sample('point-storm', 8000);
 
+// What effects cost per frame at the default resolution, against none: the app's profiler times the
+// pipeline on the scene on screen (Point Storm) at the canvas's size and at 1920×1080 (a projector's
+// load), with and without each stack. The stacks are built in the page from the catalogue the dev server
+// serves (src/engine/effects.ts): Glow and every effect, at their defaults and at their strongest.
+const EFFECT_STACKS = await page.evaluate(async () => {
+  const { EFFECTS, addEffect, strongest } = await import('/src/engine/effects.ts');
+  const defaults = (ids) => ids.reduce((stack, id) => addEffect(stack, id), []);
+  const all = EFFECTS.map((e) => e.id);
+  return {
+    'glow-default': defaults(['glow']),
+    'glow-strongest': strongest('glow'),
+    'all-four-default': defaults(all),
+    'all-four-strongest': all.flatMap((id) => strongest(id)),
+  };
+});
+if (!gpu) await page.keyboard.press('Shift+P');   // installs window.__profiler
+results['effects-cost'] = {};
+for (const [name, effects] of Object.entries(EFFECT_STACKS)) for (const size of [undefined, [1920, 1080]]) {
+  const cost = await page.evaluate(([effects, size]) => window.__profiler.effectsCost(effects, size ? { size } : {}), [effects, size]);
+  const row = { none: +cost.none.toFixed(2), with: +cost.with.toFixed(2), extra: +cost.extra.toFixed(2), size: cost.size, scale: cost.scale };
+  results['effects-cost'][`${name} @ ${cost.size.join('x')}`] = row;
+  console.log('effects', name, JSON.stringify(row));
+}
+if (!gpu) await page.keyboard.press('Shift+P');
+
 await page.keyboard.press('l');
 await page.waitForTimeout(100);
 await sample('library-open', 6000);

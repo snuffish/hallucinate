@@ -1,4 +1,7 @@
 import { expect, test, type Page } from './fixtures';
+import { EFFECTS, strongest, type EffectStack } from '../src/engine/effects';
+import type { ProfilerApi } from '../src/engine/profiler';
+import { DEFAULT_PREFS } from '../src/state/prefs';
 
 const overlay = (page: Page) => page.locator('#perf');
 
@@ -43,4 +46,29 @@ test('perf: Test GPU measures at half resolution and puts the resolution back', 
   await expect(page.locator('#perf-fill-result')).toContainText('fps at half resolution', { timeout: 30_000 });
   await expect(overlay(page).getByRole('button', { name: 'Test GPU' })).toBeEnabled();
   expect((await report(page))?.scale).toBe(before?.scale);
+});
+
+// An effect's cost lands on every output and projector: the profiler times the frame with and without
+// `effects` at the resolution the screen renders at, the default one here. Software WebGL makes the
+// numbers anything; what matters is that it reports both and the effects cost something. A small canvas
+// and few frames keep it to seconds under software WebGL (PERF.md has the GPU numbers, from
+// perf/measure.mjs).
+async function reportsCost(page: Page, what: string, effects: EffectStack) {
+  await start(page, '/?perf');
+  const cost = await page.evaluate((effects) => (window as unknown as { __profiler: ProfilerApi }).__profiler.effectsCost(effects, { size: [480, 270], frames: 4, rounds: 3 }), effects);
+  console.log(`${what}: ${cost.with.toFixed(2)} ms a frame against ${cost.none.toFixed(2)} ms without effects (+${cost.extra.toFixed(2)} ms) at ${cost.size.join('×')}, resolution ${cost.scale}`);
+  expect(cost.scale).toBe(DEFAULT_PREFS.resolution);
+  expect(cost.size).toEqual([480, 270].map((x) => Math.round(x * cost.scale)));
+  expect(cost.none).toBeGreaterThan(0);
+  expect(cost.with).toBeGreaterThan(cost.none);
+  expect(cost.extra).toBeCloseTo(cost.with - cost.none, 6);
+}
+
+test('perf: the profiler reports what a Glow costs per frame at the default resolution, against no effects', async ({ page }) => {
+  await reportsCost(page, 'Glow at its strongest', strongest('glow'));
+});
+
+// Every effect stacked, each at its strongest: what a show scene that uses them all costs.
+test('perf: the profiler reports what all the effects stacked cost per frame at the default resolution, against none', async ({ page }) => {
+  await reportsCost(page, `All ${EFFECTS.length} effects at their strongest`, EFFECTS.flatMap((e) => strongest(e.id)));
 });

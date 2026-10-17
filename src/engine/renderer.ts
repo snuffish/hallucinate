@@ -1,9 +1,12 @@
 // WebGL2 pipeline:
 //   1. scene shader(s)  -> scene targets (two while crossfading)
-//   2. feedback pass    -> the previous frame, faded in place by the trails amount, and the scene:
+//   2. effects          -> each picture's switched-on effects, in order (effects.ts), fading back to
+//                          the scene's own picture at the edges; an effect's own passes first (Glow's
+//                          blur, at half size); no pass when none is on
+//   3. feedback pass    -> the previous frame, faded in place by the trails amount, and the scene:
 //                          the brighter of the two wins per channel (ping-pong). That is the
 //                          trails' afterglow, where each line was drawn
-//   3. display pass     -> tonemap, chromatic aberration, vignette, grain (not on black) -> canvas
+//   4. display pass     -> tonemap, chromatic aberration, vignette, grain (not on black) -> canvas
 //
 // Programs compile in the background (KHR_parallel_shader_compile) so typing in the editor never
 // stalls the show; the previous program keeps running until the new one is ready. Media uploads go
@@ -11,6 +14,7 @@
 // asynchronously through a pixel buffer and a fence, so thumbnails don't stall the GPU.
 
 import { COMMON } from '../scenes';
+import { EFFECTS, PASS_SCALES, effectShader, passShader, passesOf, type EffectDef, type EffectStack } from './effects';
 import type { MediaLayer } from './media';
 import type { UniformValue } from './params';
 import { stillSpectrum, writeInputs, type SnapshotUniforms } from './scene-inputs';
@@ -78,8 +82,11 @@ export interface Grade { exposure: number; contrast: number; saturation: number;
 export interface ProgramState {
   scene: number;
   prevScene: number;
+  effects: EffectStack;       // the effects `scene` is drawn with
+  prevEffects: EffectStack;   // and `prevScene`, while it crossfades out
   mix: number;
   time: number;
+  turn: number;               // the effects' turn (uTurn): only ever runs on, see composeFrame
   bass: number;
   mid: number;
   high: number;
@@ -102,7 +109,13 @@ export interface ProgramState {
 
 
 interface Target { tex: WebGLTexture; fbo: WebGLFramebuffer; w: number; h: number }
-interface Targets { sceneA: Target; sceneB: Target; read: Target; write: Target }
+// The effects ping-pong between two targets per picture (effectA1/effectA2 for the incoming one,
+// effectB1/effectB2 for the outgoing one): each pass also reads the scene's own picture for the edge fade,
+// so none writes over it.
+// An effect's own passes (Glow's blur) ping-pong between two targets per size they render at (`passes`,
+// by scale, one pair per scale in PASS_SCALES); the pictures take turns, so both share them.
+interface Targets { sceneA: Target; sceneB: Target; read: Target; write: Target; effectA1: Target; effectA2: Target; effectB1: Target; effectB2: Target; passes: Map<number, [Target, Target]> }
+const targetList = (t: Targets): Target[] => [t.sceneA, t.sceneB, t.read, t.write, t.effectA1, t.effectA2, t.effectB1, t.effectB2, ...[...t.passes.values()].flat()];
 type Locations = Map<string, WebGLUniformLocation | null>;
 interface Pending { prog: WebGLProgram; fs: WebGLShader; name: string; promise: Promise<string | null>; resolve: (error: string | null) => void; settled: boolean }
 
@@ -127,6 +140,7 @@ export class Renderer {
   private readonly inUse: (string | undefined)[] = [];             // per scene index: the source currently compiled for it
   private feedbackProgram!: WebGLProgram;
   private displayProgram!: WebGLProgram;
+  private readonly effectPrograms = new Map<string, { prog: WebGLProgram; def: EffectDef; passes: { prog: WebGLProgram; scale: number }[] }>();   // effect id -> its picture step and passes
 
   private media: MediaLayer | null = null;
   private mediaVersion = -1;
@@ -153,6 +167,7 @@ export class Renderer {
   private snapshotQueue: Promise<unknown> = Promise.resolve();
   private readonly sceneUniforms: SceneUniforms = {};
   private readonly feedbackUniforms: SceneUniforms = {};
+  private readonly effectUniforms: SceneUniforms = {};
   private readonly displayUniforms: SceneUniforms = {};
   private lost = false;
   private disposed = false;
@@ -188,6 +203,11 @@ export class Renderer {
     gl.compileShader(this.vert);
     this.feedbackProgram = this.compileSync(FEEDBACK, 'feedback');
     this.displayProgram = this.compileSync(DISPLAY, 'display');
+    this.effectPrograms.clear();
+    for (const def of EFFECTS) {   // each compiled once
+      const passes = passesOf(def).map((pass, i) => ({ prog: this.compileSync(passShader(def, pass), `${def.label} pass ${i + 1}`), scale: pass.scale }));
+      this.effectPrograms.set(def.id, { prog: this.compileSync(effectShader(def), def.label), def, passes });
+    }
 
     this.mediaTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.mediaTex);
@@ -488,13 +508,30 @@ export class Renderer {
     ]);
   }
 
+  // How long the GPU takes to draw `frames` through the whole pipeline at w×h, in ms per frame: into the
+  // burst's targets, waiting for the GPU before and after (a one-pixel read can only return once every
+  // draw before it is done). Queued with the snapshots, which share those targets. Blocks the main
+  // thread while it waits: for the profiler only.
+  timeFramesAsync(frames: readonly ProgramState[], w: number, h: number): Promise<number> {
+    const run = async (): Promise<number> => {
+      if (this.disposed || this.lost) throw new Error('Renderer unavailable');
+      const gl = this.gl;
+      const pixel = new Uint8Array(4);
+      const wait = (out: Target) => { gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); };
+      wait(this.renderBurst(frames.slice(0, 1), w, h));   // targets made and programs compiled before the clock starts
+      const start = performance.now();
+      wait(this.renderBurst(frames, w, h));
+      return (performance.now() - start) / frames.length;
+    };
+    const next = this.snapshotQueue.then(run, run);
+    this.snapshotQueue = next.catch(() => {});
+    return next;
+  }
+
   private renderBurst(frames: readonly ProgramState[], w: number, h: number, fromBlack = true): Target {
     const gl = this.gl;
     if (this.burst && (this.burst.out.w !== w || this.burst.out.h !== h)) this.deleteBurst();
-    this.burst ??= {
-      targets: { sceneA: this.createTarget(w, h), sceneB: this.createTarget(w, h), read: this.createTarget(w, h), write: this.createTarget(w, h) },
-      out: this.createTarget(w, h, true),
-    };
+    this.burst ??= { targets: this.createTargets(w, h), out: this.createTarget(w, h, true) };
     const { targets, out } = this.burst;
     if (fromBlack) for (const t of [targets.read, targets.write]) {   // no afterglow from the last burst
       gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
@@ -510,7 +547,7 @@ export class Renderer {
 
   private deleteBurst(): void {
     if (!this.burst) return;
-    for (const t of [...Object.values(this.burst.targets), this.burst.out]) this.deleteTarget(t);
+    for (const t of [...targetList(this.burst.targets), this.burst.out]) this.deleteTarget(t);
     this.burst = null;
   }
 
@@ -598,15 +635,16 @@ export class Renderer {
     this.canvas.width = w;
     this.canvas.height = h;
 
-    if (this.targets) for (const t of Object.values(this.targets)) this.deleteTarget(t);
+    if (this.targets) for (const t of targetList(this.targets)) this.deleteTarget(t);
     const iw = Math.max(1, Math.round(w * this.scale));
     const ih = Math.max(1, Math.round(h * this.scale));
-    this.targets = {
-      sceneA: this.createTarget(iw, ih),
-      sceneB: this.createTarget(iw, ih),
-      read: this.createTarget(iw, ih),
-      write: this.createTarget(iw, ih),
-    };
+    this.targets = this.createTargets(iw, ih);
+  }
+
+  private createTargets(w: number, h: number): Targets {
+    const t = (scale = 1) => this.createTarget(Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
+    const passes = new Map(PASS_SCALES.map((scale): [number, [Target, Target]] => [scale, [t(scale), t(scale)]]));
+    return { sceneA: t(), sceneB: t(), read: t(), write: t(), effectA1: t(), effectA2: t(), effectB1: t(), effectB2: t(), passes };
   }
 
   // The share of the canvas the scenes render at. A rescale restarts the trails, so the same scale
@@ -709,9 +747,12 @@ export class Renderer {
     this.drawScene(s.scene, t.sceneA, u, media);
     const crossfading = s.prevScene >= 0 && s.mix < 1;
     if (crossfading) this.drawScene(s.prevScene, t.sceneB, u, media);
+    this.effectUniforms.uTurn = s.turn;
+    const a = this.runEffects(s.effects, t.sceneA, t.effectA1, t.effectA2, t.passes, u);
+    const b = crossfading ? this.runEffects(s.prevEffects, t.sceneB, t.effectB1, t.effectB2, t.passes, u) : a;
 
     const f = this.feedbackUniforms;
-    f.uSceneA = t.sceneA.tex; f.uSceneB = crossfading ? t.sceneB.tex : t.sceneA.tex; f.uPrev = t.read.tex;
+    f.uSceneA = a; f.uSceneB = b; f.uPrev = t.read.tex;
     f.uMix = crossfading ? s.mix : 1; f.uFeedback = s.feedback;
     this.use(this.feedbackProgram, f);
     this.draw(t.write);
@@ -723,6 +764,36 @@ export class Renderer {
     d.uExposure = g.exposure; d.uContrast = g.contrast; d.uSat = g.saturation; d.uTint = g.tint; d.uMaster = s.master ?? 1;
     this.use(this.displayProgram, d);
     this.draw(out);
+  }
+
+  // A picture's switched-on effects, in order, from the scene's picture in `scene`, ping-ponging between
+  // `one` and `two`; returns the texture holding the result (the scene's own when none is on: no pass).
+  // An effect's own passes run first, in the `passes` targets of their size, from the picture so far.
+  // `u` holds this frame's scene inputs, which the effects read too.
+  private runEffects(stack: EffectStack, scene: Target, one: Target, two: Target, passes: Targets['passes'], u: SceneUniforms): WebGLTexture {
+    let src = scene, dst = one;
+    const e = this.effectUniforms;
+    for (const entry of stack) {
+      if (!entry.on) continue;
+      const effect = this.effectPrograms.get(entry.id);
+      if (!effect) continue;
+      for (const setting of effect.def.settings) e[setting.uniform] = entry.settings[setting.key] ?? setting.default;
+      let input = src;
+      for (let i = 0; i < effect.passes.length; i++) {
+        const pass = effect.passes[i]!;
+        const out = passes.get(pass.scale)![i % 2]!;   // never the one the pass before wrote, at the same size
+        e.uTex = input.tex;
+        this.use(pass.prog, u, e);
+        this.draw(out);
+        input = out;
+      }
+      e.uTex = src.tex; e.uScene = scene.tex; e.uPassed = input.tex;
+      this.use(effect.prog, u, e);
+      this.draw(dst);
+      src = dst;
+      dst = dst === one ? two : one;
+    }
+    return src.tex;
   }
 
   dispose(): void {
@@ -739,8 +810,9 @@ export class Renderer {
     this.programs.clear();
     gl.deleteProgram(this.feedbackProgram);
     gl.deleteProgram(this.displayProgram);
+    for (const effect of this.effectPrograms.values()) for (const prog of [effect.prog, ...effect.passes.map((p) => p.prog)]) gl.deleteProgram(prog);
     gl.deleteShader(this.vert);
-    if (this.targets) for (const t of Object.values(this.targets)) this.deleteTarget(t);
+    if (this.targets) for (const t of targetList(this.targets)) this.deleteTarget(t);
     if (this.thumb) for (const t of [this.thumb.scene, this.thumb.out]) this.deleteTarget(t);
     this.deleteBurst();
     gl.deleteTexture(this.mediaTex);

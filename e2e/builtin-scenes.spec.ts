@@ -1,6 +1,8 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, seedScenes, test, type Page } from './fixtures';
 import type { ListedScene, ProfilerApi } from '../src/engine/profiler';
-import type { FrameLook } from '../src/engine/look';
+import { EDGE_BAND, EDGE_FULL, EFFECTS, strongest, type EffectStack } from '../src/engine/effects';
+import { composeFrame, programState, type FrameLook } from '../src/engine/look';
+import { stillHearing, stillUniforms } from '../src/engine/scene-inputs';
 import { SCENES } from '../src/scenes';
 import { defaultLook } from '../src/state/app-state';
 import { STRONGEST_LOOK } from '../src/state/look-drift';
@@ -13,6 +15,10 @@ import { STRONGEST_LOOK } from '../src/state/look-drift';
 // Each scene and Look is a test of its own: every still with a Look is a burst of frames at 1280×720,
 // which under software WebGL takes a minute or so per pair, so they get a timeout each and share the
 // workers. CI runs this spec in a job of its own (e2e-scenes), off the runner the timing specs use.
+// Every effect in the catalogue (src/engine/effects.ts) joins the same way: alone, at its strongest, on
+// every scene at the strongest Look (ADR 0003), and all of them stacked keep the edges black. The edges
+// these rules measure are the border band the effects' edge fade leaves to the scene alone, defined
+// once in the catalogue (EDGE_BAND).
 
 interface Verdict { error: string | null; edgeBlack: number; kick: number; tick: number }
 type Hook = { __profiler?: Pick<ProfilerApi, 'scenes' | 'still' | 'stillChange'> };
@@ -25,6 +31,12 @@ const KICK = { uBeat: 1, uBass: 1 };      // the same music, on a kick
 const TICK_END = { uBeat: 0, uTick: 0.99, uTicks: 6 };
 const TICK_START = { uBeat: 0, uTick: 0, uTicks: 7 };
 
+const MIRROR_SCENE = 'Light Sheet';   // a scene that isn't symmetric left to right on its own
+const KALEIDOSCOPE_SCENE = 'Beam Fan';   // a scene that isn't symmetric around its centre on its own
+const GLOW_SCENE = 'Ring Run';           // thin lines with wide black between them
+// Thin lines that hold still whatever the music does, for watching an effect's own movement.
+const STILL_GRID = { name: 'Still grid', body: 'void main() { vec2 g = abs(fract(centered() * 8.) - .5); fragColor = vec4(vec3(smoothstep(.03, .0, min(g.x, g.y))), 1.); }' };
+
 const LOOKS: { name: string; look: FrameLook }[] = [
   { name: 'default Look', look: defaultLook() },
   { name: 'strongest Look', look: STRONGEST_LOOK },
@@ -34,11 +46,14 @@ test.describe.configure({ mode: 'parallel' });   // the scene × Look tests shar
 
 async function openProfiler(page: Page): Promise<ListedScene[]> {
   await page.goto('/?perf');
-  await expect.poll(() => page.evaluate(() => typeof (window as Hook).__profiler?.stillChange)).toBe('function');
+  // The app can take a while to start while the other workers render bursts.
+  await expect.poll(() => page.evaluate(() => typeof (window as Hook).__profiler?.stillChange), { timeout: 30_000 }).toBe('function');
   return (await page.evaluate(() => (window as Hook).__profiler!.scenes())).filter((s) => s.builtin);
 }
 
-test('every built-in scene is listed, compiles, has a tab and 3–8 parameters', async ({ page }) => {
+// Whether each one compiles is checked by its scene × Look tests below: a still renders it. Rendering
+// all eight here too took over a minute under software WebGL.
+test('every built-in scene is listed, has a tab and 3–8 parameters', async ({ page }) => {
   const builtins = await openProfiler(page);
   expect(builtins.map((s) => s.name), 'the app lists the scenes this spec checks').toEqual(SCENES.map((s) => s.name));
 
@@ -47,83 +62,425 @@ test('every built-in scene is listed, compiles, has a tab and 3–8 parameters',
   await page.keyboard.press('Escape');
 
   for (const scene of builtins) {
-    const { error } = await page.evaluate((index) => (window as Hook).__profiler!.still(index), scene.index);
-    expect.soft(error, `${scene.name} compiles`).toBeNull();
     expect.soft(tabs, `${scene.name}'s category has a tab`).toContain(scene.cat);
     expect.soft(scene.params, `${scene.name} has at least 3 parameters`).toBeGreaterThanOrEqual(3);
     expect.soft(scene.params, `${scene.name} has at most 8 parameters`).toBeLessThanOrEqual(8);
   }
 });
 
+// The frame's border band (`band`, a share of the short side): the share of its pixels that are exactly
+// black. Not all of it: lines and their halos may run off an edge (Beam Fan's beams rise from the bottom
+// one, Light Sheet's lines cross both sides), so a quarter is left for them. The rest is background and
+// must be pure black: a glow fill, haze, a smeared afterglow or the display's grain would leave next to
+// none of it black. Passed into the page as source.
+const EDGE_BLACK = `({ width: w, height: h, data }, band) => {
+  const reach = band * Math.min(w, h);
+  let edge = 0, black = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (Math.min(x, w - 1 - x, y, h - 1 - y) >= reach) continue;
+    const i = (y * w + x) * 4;
+    edge++;
+    if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 0) black++;
+  }
+  return black / edge;
+}`;
+type EdgeBlack = (image: ImageData, band: number) => number;
+
+// The safety rules for one scene with `look` (and `effects`): the share of the border band that is pure
+// black in silence, and the share of the frame a kick and a tick make more than twice as bright.
+async function verdict(page: Page, index: number, look: FrameLook, effects: EffectStack = []): Promise<Verdict> {
+  return page.evaluate(async ({ index, look, effects, band, source, SILENCE, CALM, KICK, TICK_END, TICK_START }) => {
+    const { still, stillChange } = (window as Hook).__profiler!;
+    const lum = (d: Uint8ClampedArray, i: number) => (0.299 * d[i]! + 0.587 * d[i + 1]! + 0.114 * d[i + 2]!) / 255;
+    const silent = await still(index, { inputs: SILENCE, silent: true, look, effects });
+    if (!silent.image) return { error: silent.error, edgeBlack: 0, kick: 1, tick: 1 };
+    const edgeBlack = ((0, eval)(source) as EdgeBlack)(silent.image, band);
+    // The strobe rule: the share of pixels a change from one frame to the next makes more than twice
+    // as bright. A change smaller than a tenth of full brightness isn't a flash (WCAG's threshold),
+    // so near-black halos don't count. The two frames are the end of one burst: `from`'s sound
+    // settled, then the next frame with `to`'s.
+    const doubled = async (from: Record<string, number>, to: Record<string, number>) => {
+      const [a, b] = (await stillChange(index, { from, to, look, effects })).images!.map((image) => image.data);
+      let n = 0;
+      for (let i = 0; i < a!.length; i += 4) {
+        const la = lum(a!, i), lb = lum(b!, i);
+        if (lb > 2 * la && lb - la > 0.1) n++;
+      }
+      return n / (a!.length / 4);
+    };
+    return { error: null, edgeBlack, kick: await doubled(CALM, KICK), tick: await doubled(TICK_END, TICK_START) };
+  }, { index, look, effects, band: EDGE_BAND, source: EDGE_BLACK, SILENCE, CALM, KICK, TICK_END, TICK_START }) as Promise<Verdict>;
+}
+
+const pct = (x: number): string => `${(x * 100).toFixed(1)}%`;
+
+function judge(v: Verdict, what: string): void {
+  console.log(`${what}: a kick doubles ${pct(v.kick)} of the frame, a tick ${pct(v.tick)}, and ${pct(v.edgeBlack)} of the edge is black in silence`);
+  expect(v.error, `${what} compiles`).toBeNull();
+  expect.soft(v.edgeBlack, `${what}: the edges are pure black in silence`).toBeGreaterThanOrEqual(0.75);
+  expect.soft(v.kick, `${what}: a kick doubles under 25% of the frame`).toBeLessThan(0.25);
+  expect.soft(v.tick, `${what}: a tick doubles under 25% of the frame`).toBeLessThan(0.25);
+}
+
 for (const { name: sceneName } of SCENES) for (const { name, look } of LOOKS) {
   test(`${sceneName} at the ${name}: black edges in silence, and a strobe-safe kick and tick`, async ({ page }) => {
     test.setTimeout(4 * 60_000);
     const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
-    const verdict = await page.evaluate(async ({ index, look, SILENCE, CALM, KICK, TICK_END, TICK_START }) => {
-      const { still, stillChange } = (window as Hook).__profiler!;
-      const lum = (d: Uint8ClampedArray, i: number) => (0.299 * d[i]! + 0.587 * d[i + 1]! + 0.114 * d[i + 2]!) / 255;
-      const silent = await still(index, { inputs: SILENCE, silent: true, look });
-      if (!silent.image) return { error: silent.error, edgeBlack: 0, kick: 1, tick: 1 };
-      // The frame's border: the share of its pixels that are exactly black. Not all of it: lines and
-      // their halos may run off an edge (Beam Fan's beams rise from the bottom one, Light Sheet's lines
-      // cross both sides), so a quarter is left for them. The rest is background and must be pure
-      // black: a glow fill, haze, a smeared afterglow or the display's grain would leave next to none
-      // of it black.
-      const { width: w, height: h, data } = silent.image;
-      let edge = 0, black = 0;
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        if (x > 0 && x < w - 1 && y > 0 && y < h - 1) continue;
-        const i = (y * w + x) * 4;
-        edge++;
-        if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 0) black++;
-      }
-      // The strobe rule: the share of pixels a change from one frame to the next makes more than twice
-      // as bright. A change smaller than a tenth of full brightness isn't a flash (WCAG's threshold),
-      // so near-black halos don't count. The two frames are the end of one burst: `from`'s sound
-      // settled, then the next frame with `to`'s.
-      const doubled = async (from: Record<string, number>, to: Record<string, number>) => {
-        const [a, b] = (await stillChange(index, { from, to, look })).images!.map((image) => image.data);
-        let n = 0;
-        for (let i = 0; i < a!.length; i += 4) {
-          const la = lum(a!, i), lb = lum(b!, i);
-          if (lb > 2 * la && lb - la > 0.1) n++;
-        }
-        return n / (a!.length / 4);
-      };
-      return { error: null, edgeBlack: black / edge, kick: await doubled(CALM, KICK), tick: await doubled(TICK_END, TICK_START) };
-    }, { index: scene.index, look, SILENCE, CALM, KICK, TICK_END, TICK_START }) as Verdict;
-
-    const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
-    console.log(`${sceneName}: at the ${name} a kick doubles ${pct(verdict.kick)} of the frame, a tick ${pct(verdict.tick)}, and ${pct(verdict.edgeBlack)} of the edge is black in silence`);
-    expect(verdict.error, `${sceneName} compiles`).toBeNull();
-    expect.soft(verdict.edgeBlack, `${sceneName}'s edges are pure black in silence at the ${name}`).toBeGreaterThanOrEqual(0.75);
-    expect.soft(verdict.kick, `${sceneName}'s kick doubles under 25% of the frame at the ${name}`).toBeLessThan(0.25);
-    expect.soft(verdict.tick, `${sceneName}'s tick doubles under 25% of the frame at the ${name}`).toBeLessThan(0.25);
+    judge(await verdict(page, scene.index, look), `${sceneName} at the ${name}`);
   });
 }
+
+// Each effect alone at its strongest: it may reshape the picture, but never light the edges or make a
+// kick or a tick strobe. Only at the strongest Look, where it reacts the most.
+for (const effect of EFFECTS) for (const { name: sceneName } of SCENES) {
+  test(`${sceneName} with ${effect.label} at its strongest, at the strongest Look: black edges in silence, and a strobe-safe kick and tick`, async ({ page }) => {
+    test.setTimeout(4 * 60_000);
+    const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
+    judge(await verdict(page, scene.index, STRONGEST_LOOK, strongest(effect.id)), `${sceneName} with ${effect.label} at the strongest Look`);
+  });
+}
+
+// Effects stacked, each at its strongest: whatever runs before it, each effect fades back to the scene's
+// own picture across the border, so the edges stay the scene's. Two stacks: all of them, and all but the
+// Kaleidoscope in an order that carries light outward (the Mirror copies one side's lines onto the other's
+// edge, the Wave bends them further out, the Glow spreads them): the Kaleidoscope's disc leaves the
+// corners black whatever the fade does, so only the second stack shows the fade itself at work. Only the
+// silent stills, two thirds of what a test above renders: the kick and the tick are each effect's own,
+// checked alone above. A test per scene, so they share the workers: one test rendering all eight scenes
+// ran past four minutes on a loaded machine.
+const STACKS: { name: string; effects: EffectStack }[] = [
+  { name: 'every effect', effects: EFFECTS.flatMap((e) => strongest(e.id)) },
+  { name: 'Mirror, Wave and Glow', effects: (['mirror', 'wave', 'glow'] as const).flatMap((id) => strongest(id)) },
+];
+for (const { name: sceneName } of SCENES) {
+  test(`${sceneName} with the effects stacked at their strongest, at the strongest Look: black edges in silence`, async ({ page }) => {
+    test.setTimeout(4 * 60_000);
+    const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
+    for (const stack of STACKS) {
+      const { error, edgeBlack } = await page.evaluate(async ({ index, look, effects, band, SILENCE, source }) => {
+        const { image, error } = await (window as Hook).__profiler!.still(index, { inputs: SILENCE, silent: true, look, effects });
+        return { error, edgeBlack: image ? ((0, eval)(source) as EdgeBlack)(image, band) : 0 };
+      }, { index: scene.index, look: STRONGEST_LOOK, effects: stack.effects, band: EDGE_BAND, SILENCE, source: EDGE_BLACK });
+      console.log(`${sceneName} with ${stack.name} stacked: ${pct(edgeBlack)} of the edge is black in silence`);
+      expect(error, `${sceneName} renders`).toBeNull();
+      expect.soft(edgeBlack, `${sceneName} with ${stack.name}: the edges are pure black in silence`).toBeGreaterThanOrEqual(0.75);
+    }
+  });
+}
+
+// The share of pixels where two frames differ by more than `tolerance` levels in some channel, counting
+// only those further than `inner` (a share of the short side) from every edge, where effects run at full
+// strength. Passed into the page as source.
+const DIFFERS = `(a, b, w, h, inner, tolerance) => {
+  const reach = inner * Math.min(w, h);
+  let n = 0, all = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (Math.min(x, w - 1 - x, y, h - 1 - y) < reach) continue;
+    const i = (y * w + x) * 4;
+    all++;
+    if (Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])) > tolerance) n++;
+  }
+  return n / all;
+}`;
+type Differs = (a: Uint8ClampedArray, b: Uint8ClampedArray, w: number, h: number, inner: number, tolerance: number) => number;
 
 // The rules above only mean something if the Look reaches the picture: trails leave an afterglow and
 // fringing splits the colours in the frame still() returns.
 test("a still frame shows the Look's trails and fringing", async ({ page }) => {
+  test.setTimeout(2 * 60_000);   // four stills with a Look: over a minute on a loaded machine
   await openProfiler(page);
   const plain: FrameLook = { ...STRONGEST_LOOK, trails: 0, aberration: 0, synesthesia: 0 };
-  const changed = await page.evaluate(async ({ plain }) => {
+  const changed = await page.evaluate(async ({ plain, source }) => {
     const p = (window as Hook).__profiler!;
+    const differs = (0, eval)(source) as Differs;
     const index = p.scenes().find((s) => s.builtin)!.index;
-    const frame = async (look: typeof plain) => (await p.still(index, { look })).image!.data;
-    const differs = (a: Uint8ClampedArray, b: Uint8ClampedArray) => {
-      let n = 0;
-      for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i]! - b[i]!) + Math.abs(a[i + 1]! - b[i + 1]!) + Math.abs(a[i + 2]! - b[i + 2]!) > 6) n++;
-      return n / (a.length / 4);
-    };
+    const frame = async (look: typeof plain) => (await p.still(index, { look })).image!;
     const base = await frame(plain);
-    return {
-      again: differs(base, await frame(plain)),
-      trails: differs(base, await frame({ ...plain, trails: 0.9 })),
-      fringing: differs(base, await frame({ ...plain, aberration: 0.02 })),
-    };
-  }, { plain });
+    const against = async (look: typeof plain) => differs(base.data, (await frame(look)).data, base.width, base.height, 0, 2);
+    return { again: await against(plain), trails: await against({ ...plain, trails: 0.9 }), fringing: await against({ ...plain, aberration: 0.02 }) };
+  }, { plain, source: DIFFERS });
   expect(changed.again, 'the same Look renders the same frame').toBe(0);
   expect(changed.trails, 'trails leave an afterglow').toBeGreaterThan(0.001);
   expect(changed.fringing, 'fringing splits the colours').toBeGreaterThan(0.001);
+});
+
+// A still asked for with effects but none switched on is the still without any (the thumbnail's, when no
+// Look is asked for either), not a burst at the default Look.
+test('a still with no effect switched on is the still without effects', async ({ page }) => {
+  await openProfiler(page);
+  const changed = await page.evaluate(async ({ source }) => {
+    const p = (window as Hook).__profiler!;
+    const differs = (0, eval)(source) as Differs;
+    const index = p.scenes().find((s) => s.builtin)!.index;
+    const plain = (await p.still(index)).image!;
+    const against = async (effects: EffectStack) => differs(plain.data, (await p.still(index, { effects })).image!.data, plain.width, plain.height, 0, 0);
+    return { empty: await against([]), off: await against([{ id: 'mirror', on: false, settings: { axis: 0 } }]) };
+  }, { source: DIFFERS });
+  expect(changed.empty, 'an empty stack').toBe(0);
+  expect(changed.off, 'a stack switched off').toBe(0);
+});
+
+// Each effect does something: at its strongest the picture differs from the same still without it.
+for (const effect of EFFECTS) {
+  test(`${effect.label} at its strongest changes the picture`, async ({ page }) => {
+    test.setTimeout(2 * 60_000);
+    await openProfiler(page);
+    const changed = await page.evaluate(async ({ effects, look, source, inner }) => {
+      const p = (window as Hook).__profiler!;
+      const differs = (0, eval)(source) as Differs;
+      const index = p.scenes().find((s) => s.builtin)!.index;
+      const plain = (await p.still(index, { look })).image!;
+      const shaped = (await p.still(index, { look, effects })).image!;
+      return differs(plain.data, shaped.data, plain.width, plain.height, inner, 2);
+    }, { effects: strongest(effect.id), look: defaultLook(), source: DIFFERS, inner: EDGE_FULL });
+    expect(changed).toBeGreaterThan(0.001);
+  });
+}
+
+// The order of the stack is the order the effects run in: a Wave bending the picture before a
+// Kaleidoscope folds it gives a different picture than bending the folded one.
+test('a Wave before a Kaleidoscope gives a different picture than after it', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await openProfiler(page);
+  const wave = { id: 'wave', on: true, settings: { amount: 1, wavelength: 0.4 } } as const;
+  const kaleidoscope = { id: 'kaleidoscope', on: true, settings: { segments: 6, spin: 0.3 } } as const;
+  const r = await page.evaluate(async ({ look, sceneName, source, inner, before, after }) => {
+    const p = (window as Hook).__profiler!;
+    const differs = (0, eval)(source) as Differs;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    const a = (await p.still(index, { look, effects: before })).image!;
+    const again = (await p.still(index, { look, effects: before })).image!;
+    const b = (await p.still(index, { look, effects: after })).image!;
+    return { again: differs(a.data, again.data, a.width, a.height, inner, 2), swapped: differs(a.data, b.data, a.width, a.height, inner, 2) };
+  }, { look: defaultLook(), sceneName: KALEIDOSCOPE_SCENE, source: DIFFERS, inner: EDGE_FULL, before: [wave, kaleidoscope], after: [kaleidoscope, wave] });
+  console.log(`${KALEIDOSCOPE_SCENE}: swapping a Wave and a Kaleidoscope changes ${pct(r.swapped)} of the picture (the same order twice: ${pct(r.again)})`);
+  expect(r.again, 'the same order renders the same picture').toBe(0);
+  expect(r.swapped, 'the other order renders another').toBeGreaterThan(0.01);
+});
+
+// A Wave's ripple starts at the centre on a kick. Watched on a grid that ignores the music, so whatever
+// a kick changes the Wave changed: near the centre it moves the lines, further out, where the ripple
+// hasn't reached yet, next to nothing changes. It reads the kick the scene reads (uBeat), scaled by
+// Reactivity: at Reactivity 0 a kick moves nothing.
+test('a kick sends a Wave ripple out from the centre', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await seedScenes(page, [STILL_GRID]);
+  await openProfiler(page);
+  const moved = await page.evaluate(async ({ look, sceneName, effects, CALM, KICK }) => {
+    const p = (window as Hook).__profiler!;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    // The share of pixels inside a disc around the centre and outside a wider one that the kick changes
+    // by more than a quarter of full brightness: a line moved, not its edge sliding a fraction of a
+    // pixel as the bend drifts on by a frame.
+    const kickChanges = async (look: FrameLook, effects: EffectStack) => {
+      const [a, b] = (await p.stillChange(index, { from: CALM, to: KICK, look, effects })).images!;
+      const { width: w, height: h } = a!;
+      const disc = 0.2 * Math.min(w, h), beyond = 0.45 * Math.min(w, h);
+      const n = { centre: 0, out: 0 }, all = { centre: 0, out: 0 };
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const r = Math.hypot(x - w / 2, y - h / 2);
+        const where = r < disc ? 'centre' : r > beyond ? 'out' : null;
+        if (!where) continue;
+        const i = (y * w + x) * 4;
+        all[where]++;
+        if (Math.max(Math.abs(a!.data[i]! - b!.data[i]!), Math.abs(a!.data[i + 1]! - b!.data[i + 1]!), Math.abs(a!.data[i + 2]! - b!.data[i + 2]!)) > 64) n[where]++;
+      }
+      return { centre: n.centre / all.centre, out: n.out / all.out };
+    };
+    return {
+      plain: await kickChanges(look, []),
+      wave: await kickChanges(look, effects),
+      still: await kickChanges({ ...look, reactivity: 0 }, effects),
+    };
+  }, { look: defaultLook(), sceneName: STILL_GRID.name, effects: [{ id: 'wave', on: true, settings: { amount: 1, wavelength: 0.4 } }] as EffectStack, CALM, KICK });
+  console.log(`a kick changes ${pct(moved.plain.centre)} of the centre without a Wave; with one ${pct(moved.wave.centre)} of the centre and ${pct(moved.wave.out)} further out; at Reactivity 0 ${pct(moved.still.centre)}`);
+  expect(moved.plain.centre, 'the grid ignores the kick').toBeLessThan(0.001);
+  expect(moved.wave.centre, 'a kick ripples the centre').toBeGreaterThan(0.05);
+  expect(moved.wave.out, 'the ripple starts at the centre').toBeLessThan(moved.wave.centre / 2);
+  expect(moved.still.centre, 'at Reactivity 0 the kick adds nothing to the bend').toBeLessThan(moved.wave.centre / 2);
+});
+
+// A left↔right Mirror makes the picture symmetric across its middle, away from the edges, where the
+// scene's own picture shows through.
+test('a still with a left↔right Mirror is symmetric across its axis', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await openProfiler(page);
+  const asymmetry = await page.evaluate(async ({ look, sceneName, source, inner }) => {
+    const p = (window as Hook).__profiler!;
+    const differs = (0, eval)(source) as Differs;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    const flipped = ({ data, width: w, height: h }: ImageData) => {
+      const out = new Uint8ClampedArray(data.length);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out.set(data.subarray((y * w + x) * 4, (y * w + x) * 4 + 4), (y * w + (w - 1 - x)) * 4);
+      return out;
+    };
+    // The display's grain differs by up to ±2 levels per pixel, which no mirror can match.
+    const across = (image: ImageData) => differs(image.data, flipped(image), image.width, image.height, inner, 5);
+    const plain = (await p.still(index, { look })).image!;
+    const mirrored = (await p.still(index, { look, effects: [{ id: 'mirror', on: true, settings: { axis: 0 } }] })).image!;
+    return { plain: across(plain), mirrored: across(mirrored) };
+  }, { look: defaultLook(), sceneName: MIRROR_SCENE, source: DIFFERS, inner: EDGE_FULL });
+  expect(asymmetry.plain, `${MIRROR_SCENE} isn't symmetric on its own`).toBeGreaterThan(0.001);
+  expect(asymmetry.mirrored, 'mirrored, it is').toBe(0);
+});
+
+// A Glow lights the black around the lines and leaves black alone further away than it spreads: the
+// still at its strongest, against the same still without it. "Beside" is the black 6–12 px from a line,
+// past the soft edge a brighter line would show anyway; "far" is further from every line than the blur
+// reaches (its radius, 24 px of this 720-high still, to 2.5 sigma: 30 px) plus the half-size blur's
+// sampling and the Look's fringing: 40 px.
+test('a still with a Glow has light around the lines and black left black away from them', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await openProfiler(page);
+  const glow = await page.evaluate(async ({ look, effects, sceneName, inner }) => {
+    const p = (window as Hook).__profiler!;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    const plain = (await p.still(index, { look })).image!;
+    const glowed = (await p.still(index, { look, effects })).image!;
+    const { width: w, height: h } = plain;
+    const lit = (d: Uint8ClampedArray, i: number) => Math.max(d[i * 4]!, d[i * 4 + 1]!, d[i * 4 + 2]!);
+    // Every pixel within `r` (a square) of a lit pixel of the still without the Glow.
+    const within = (r: number) => {
+      const across = new Uint8Array(w * h), out = new Uint8Array(w * h);
+      for (let y = 0; y < h; y++) {
+        let run = 0;
+        for (let x = -r; x < w; x++) {
+          if (x + r < w && lit(plain.data, y * w + x + r) > 0) run++;
+          if (x - r - 1 >= 0 && lit(plain.data, y * w + x - r - 1) > 0) run--;
+          if (x >= 0) across[y * w + x] = run > 0 ? 1 : 0;
+        }
+      }
+      for (let x = 0; x < w; x++) {
+        let run = 0;
+        for (let y = -r; y < h; y++) {
+          if (y + r < h && across[(y + r) * w + x]) run++;
+          if (y - r - 1 >= 0 && across[(y - r - 1) * w + x]) run--;
+          if (y >= 0) out[y * w + x] = run > 0 ? 1 : 0;
+        }
+      }
+      return out;
+    };
+    const close = within(5), beside = within(12), reach = within(40);
+    const margin = inner * Math.min(w, h);
+    let besideAll = 0, besideLit = 0, farAll = 0, farBlack = 0, all = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (Math.min(x, w - 1 - x, y, h - 1 - y) < margin) continue;
+      const i = y * w + x;
+      all++;
+      if (beside[i] && !close[i]) { besideAll++; if (lit(glowed.data, i) > 4) besideLit++; }
+      if (!reach[i]) { farAll++; if (lit(glowed.data, i) === 0) farBlack++; }
+    }
+    return { besideLit: besideLit / besideAll, far: farAll / all, farBlack: farBlack / farAll };
+  }, { look: defaultLook(), effects: strongest('glow'), sceneName: GLOW_SCENE, inner: EDGE_FULL });
+  console.log(`${GLOW_SCENE} with a Glow: ${pct(glow.besideLit)} of the black beside its lines lit; ${pct(glow.far)} of the picture is far from them, ${pct(glow.farBlack)} of that black`);
+  expect(glow.besideLit, 'the black beside the lines is lit').toBeGreaterThan(0.5);
+  expect(glow.far, `${GLOW_SCENE} has black far from its lines`).toBeGreaterThan(0.05);
+  expect(glow.farBlack, 'the black far from them stays black').toBe(1);
+});
+
+// How the light falls around a still's centre: the light in each 3° slice of a ring inside the edge fade
+// (where effects run at full strength), and a comparison of the slices with themselves turned `k` slices
+// round (the share of the light that differs). A turned still can't match pixel for pixel, as thin lines
+// land between pixels, but the light in a slice does. Passed into the page as source.
+const RING_SLICES = 120;
+const AROUND = `(image, inner) => {
+  const { data, width: w, height: h } = image;
+  const short = Math.min(w, h), n = ${RING_SLICES}, slices = new Float64Array(n);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = x + .5 - w / 2, dy = y + .5 - h / 2, r = Math.hypot(dx, dy) / short;
+    if (r < .05 || r > .5 - inner) continue;
+    const i = (y * w + x) * 4;
+    slices[Math.floor((Math.atan2(dy, dx) / (2 * Math.PI) + 1) * n) % n] += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  }
+  const total = slices.reduce((a, b) => a + b, 0);
+  return { slices, against: (other, k) => other.reduce((sum, v, i) => sum + Math.abs(v - slices[(i - k + n) % n]), 0) / total };
+}`;
+type Around = (image: ImageData, inner: number) => { slices: Float64Array; against: (other: Float64Array, k: number) => number };
+
+// A Kaleidoscope with n segments makes the picture repeat every n-th of a turn around its centre. Half a
+// segment round is the control: the light falls differently there, so the picture repeats at its
+// segments and not at every angle.
+test('a still with a five-segment Kaleidoscope repeats every fifth of a turn around its centre', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await openProfiler(page);
+  const segments = 5;
+  const r = await page.evaluate(async ({ look, sceneName, source, inner, segments, n }) => {
+    const p = (window as Hook).__profiler!;
+    const around = (0, eval)(source) as Around;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    const plain = around((await p.still(index, { look })).image!, inner);
+    const folded = around((await p.still(index, { look, effects: [{ id: 'kaleidoscope', on: true, settings: { segments, spin: 0.3 } }] })).image!, inner);
+    return { plain: plain.against(plain.slices, n / segments), segment: folded.against(folded.slices, n / segments), half: folded.against(folded.slices, n / segments / 2) };
+  }, { look: defaultLook(), sceneName: KALEIDOSCOPE_SCENE, source: AROUND, inner: EDGE_FULL, segments, n: RING_SLICES });
+  console.log(`${KALEIDOSCOPE_SCENE}: turned a fifth of a turn, ${pct(r.plain)} of the light differs plain, ${pct(r.segment)} with 5 segments (half a segment: ${pct(r.half)})`);
+  expect(r.plain, `${KALEIDOSCOPE_SCENE} doesn't repeat around its centre on its own`).toBeGreaterThan(0.3);
+  expect(r.segment, 'with a Kaleidoscope it repeats at each segment').toBeLessThan(0.05);
+  expect(r.half, '…and only there').toBeGreaterThan(0.2);
+});
+
+// The Kaleidoscope's music movement: it turns on the effects' turn (uTurn), which composeFrame runs on
+// with the bass and the kicks and never back. Here the turn is heard frame by frame across a kick, as the
+// listener reports one (the beat set to 1, then fading by e^-5t), and the stills show the mandala where
+// it stands at moments on the way (a still's turn ends at its uTime). Watched on a slope of light around
+// the centre that ignores the music and the clock, so whatever turns is the Kaleidoscope; seen as how far
+// round the light has moved (the turn, within 45°, that best lines up the slices). Three segments, so the
+// picture repeats only every third of a turn. It never turns back as the kick fades, the kick leaves it a
+// step further on than the same second without it, the bass or the beat on the same turn move nothing
+// (read directly, they would spring it back as they fall), and at spin speed 0 it holds still.
+const SLOPE = { name: 'Still slope', body: 'void main() { vec2 p = centered(); fragColor = vec4(vec3(.5 + .45 * cos(atan(p.y, p.x))), 1.); }' };
+const KICK_AT = 0.2;   // seconds into the heard second
+const MOMENTS = { before: KICK_AT - 0.02, kicked: KICK_AT + 0.05, fading: KICK_AT + 0.2, after: 1 };
+
+// The effects' turn at each moment of a second with a kick at KICK_AT (or without it), at `look`.
+function heardTurns(look: FrameLook, kick: boolean): Record<keyof typeof MOMENTS, number> {
+  const motion = { time: 0, timeRate: look.speed, huePhase: 0, turn: 0 }, p = programState();
+  const out = {} as Record<keyof typeof MOMENTS, number>;
+  for (let i = 1; i <= 60; i++) {
+    const t = i / 60, beat = kick && t >= KICK_AT ? Math.exp(-5 * (t - KICK_AT)) : 0;
+    composeFrame(p, motion, stillHearing(stillUniforms({ uBass: 0, uBeat: beat }), kick && i === Math.round(KICK_AT * 60)), look, 1, 1 / 60);
+    for (const [name, at] of Object.entries(MOMENTS)) if (Math.round(at * 60) === i) out[name as keyof typeof MOMENTS] = motion.turn;
+  }
+  return out;
+}
+
+test('a Kaleidoscope turns on with each kick and never back, and holds still at spin speed 0', async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  await seedScenes(page, [SLOPE]);
+  await openProfiler(page);
+  const look = defaultLook();
+  const kicked = heardTurns(look, true), calm = heardTurns(look, false);
+  const r = await page.evaluate(async ({ look, sceneName, source, inner, n, kicked, calmAfter }) => {
+    const p = (window as Hook).__profiler!;
+    const around = (0, eval)(source) as Around;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    const at = async (spin: number, turn: number, music: Record<string, number> = { uBass: 0, uBeat: 0 }) =>
+      around((await p.still(index, { inputs: { ...music, uTime: 14 + turn }, look, effects: [{ id: 'kaleidoscope', on: true, settings: { segments: 3, spin } }] })).image!, inner);
+    const turned = (from: ReturnType<Around>, to: ReturnType<Around>) => {
+      let best = 0;
+      for (let k = -n / 8; k <= n / 8; k++) if (from.against(to.slices, k) < from.against(to.slices, best)) best = k;
+      return best * 360 / n;
+    };
+    const before = await at(1, kicked.before);
+    return {
+      kicked: turned(before, await at(1, kicked.kicked)),
+      fading: turned(before, await at(1, kicked.fading)),
+      after: turned(before, await at(1, kicked.after)),
+      calm: turned(before, await at(1, calmAfter)),
+      music: turned(before, await at(1, kicked.before, { uBass: 1.5, uBeat: 1 })),
+      spin0: turned(await at(0, kicked.before), await at(0, kicked.after)),
+    };
+  }, { look, sceneName: SLOPE.name, source: AROUND, inner: EDGE_FULL, n: RING_SLICES, kicked, calmAfter: calm.after });
+  const deg = (rad: number) => rad * 180 / Math.PI;
+  const step = deg((kicked.after - kicked.before) - (calm.after - calm.before));
+  console.log(`A Kaleidoscope across a kick turns ${r.kicked}°, ${r.fading}°, ${r.after}° (expected ${deg(kicked.kicked - kicked.before).toFixed(1)}°, ${deg(kicked.fading - kicked.before).toFixed(1)}°, ${deg(kicked.after - kicked.before).toFixed(1)}°); the same second without the kick ${r.calm}° (the kick's step: ${step.toFixed(1)}°); the bass and the beat on the same turn ${r.music}°; at spin speed 0 ${r.spin0}°`);
+  const forward = Math.sign(r.after);   // the way it turns on screen
+  expect(forward, 'it turns').not.toBe(0);
+  expect(forward * r.kicked, 'it never turns back: not on the kick').toBeGreaterThanOrEqual(-3);   // a slice is 3°
+  expect(forward * r.fading, '…nor as the kick fades').toBeGreaterThanOrEqual(forward * r.kicked - 3);
+  expect(forward * r.after, '…nor once it has faded').toBeGreaterThanOrEqual(forward * r.fading - 3);
+  expect(Math.abs(forward * r.after - deg(kicked.after - kicked.before)), 'it turns as far as the effects\' turn says').toBeLessThanOrEqual(4);
+  expect(step, 'a kick is worth a step').toBeGreaterThanOrEqual(8);
+  expect(forward * (r.after - r.calm), 'the kick leaves it a step further on').toBeGreaterThanOrEqual(step - 4);
+  expect(Math.abs(r.music), 'the bass and the beat on the same turn move nothing').toBeLessThanOrEqual(3);
+  expect(Math.abs(r.spin0), 'at spin speed 0 it holds still').toBeLessThanOrEqual(3);
 });

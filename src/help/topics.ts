@@ -53,6 +53,21 @@ export const HELP_TOPICS = {
     ],
     hotkeys: ['randomize', 'randomizeBack', 'auto'],
   },
+  effects: {
+    id: 'effects',
+    title: 'Effects',
+    body: [
+      'Effects reshape the picture on the main screen before the Look does: add one from the menu, switch it on or off with its checkbox, and set it with the controls under it. Each effect can be added once.',
+      'The effects run from the top of the list down, so their order changes the picture: a Wave before a Kaleidoscope bends what gets folded, after it bends the mandala. Drag an effect by its ⠿ handle to another place, or focus the handle and move it with ↑ and ↓.',
+      'They belong to what is on screen, like the Look: they stay when the scene changes, by hand, by auto-switch or from the library, and come back after a reload. Randomize and Drift leave them alone.',
+      'Mirror reflects the left half onto the right, the top half onto the bottom, or both. It holds still on the beat.',
+      'Kaleidoscope folds the picture into 3 to 12 segments around the centre, every other one mirrored, and turns the mandala at its spin speed. It turns faster with the bass and each kick sends it a step further on, as strongly as Reactivity says, and it never turns back; at spin speed 0 it holds still.',
+      'Glow lays a soft bloom of light around the lines: Strength sets how bright, Radius how far it spreads. It swells with the bass and gives way to each kick, dipping while the lines flash and blooming back after. It costs the most of the effects to draw; if the frame rate drops, lower its Radius or Resolution in Settings.',
+      'Wave ripples and bends the picture: Amount sets how far it bends, Wavelength how far apart the ripples are. On each kick a ripple runs outward from the centre, as strongly as Reactivity says.',
+      'Near the edges every effect fades back to the scene\'s own picture, so the border stays as dark as the scene keeps it.',
+    ],
+    hotkeys: [],
+  },
   library: {
     id: 'library',
     title: 'Scene library',
