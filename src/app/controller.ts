@@ -27,7 +27,7 @@ import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodL
 import { applyWrites, buildBundle, parseBundle } from './bundle';
 import { downloadFile, fileStamp } from './download';
 import { EditorCore } from './editor';
-import { LiveSlot } from './live-slot';
+import { LiveSlot, type Shot } from './live-slot';
 import { MusicSource } from './music-source';
 import { SceneLibrary, type SceneChange } from './scene-library';
 import { Transport } from './transport';
@@ -39,8 +39,9 @@ const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second
 const viewport = (): L.Size => ({ width: window.innerWidth, height: window.innerHeight });
 
 // Hooks other panels plug in. All optional; the controller works without them.
-// A scene with its parameter values and look sliders (only the keys a show scene keeps: LOOK_KEYS).
-export interface SceneSnapshot { scene: number; values: ParamValues; look: Readonly<Record<string, number>> }
+// A scene with its parameter values, look sliders (only the keys a show scene keeps: LOOK_KEYS) and
+// effects: a show scene on the main screen. The same shape as a show scene on an output.
+export type SceneSnapshot = Shot;
 
 export interface ControllerHooks {
   // The studio draws its Preview monitor and glides its master fader every frame.
@@ -114,6 +115,9 @@ export class AppController {
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly effectsWriter = screenEffectsWriter(() => this.state.effects);
+  // While a show scene crossfades in on the main screen, the stack the outgoing picture keeps (null: the
+  // outgoing picture draws with the screen's own, as on a manual scene change).
+  private outgoingEffects: FX.EffectStack | null = null;
   private readonly program: ProgramState;
   private readonly paramStore: ParamStore;   // likewise
   private readonly profilerApi: ProfilerApi = {
@@ -457,6 +461,7 @@ export class AppController {
     c.fade = fade;
     c.prevScene = c.scene;
     c.scene = i;
+    this.outgoingEffects = null;
     writeString(KEYS.lastScene, paramKey(scene));
     c.transitionStart = c.clock;
     c.sceneStart = c.clock;
@@ -516,21 +521,27 @@ export class AppController {
 
   // ---------- A scene as a whole: which one, its parameter values, the look ----------
 
-  // A scene as a show scene keeps it: its parameter values and the look sliders, as they are now.
+  // A scene as a show scene keeps it: its parameter values, the look sliders and the screen's effects, as
+  // they are now.
   captureScene(i = this.state.clock.scene): SceneSnapshot {
     const look: Record<string, number> = {};
     for (const k of LOOK_KEYS) look[k] = this.state.look[k];
-    return { scene: i, values: this.library.values(i), look };
+    return { scene: i, values: this.library.values(i), look, effects: this.state.effects };
   }
 
-  // Puts a scene on screen in one step, as the studio takes it: the look sliders it has, its values,
-  // then the scene, crossfading for `fade` seconds. Not a manual scene change.
+  // Puts a scene on screen in one step, as the studio takes it: the look sliders it has, its values, its
+  // effects (replacing the screen's), then the scene, crossfading for `fade` seconds. Not a manual scene
+  // change. The outgoing picture keeps the effects it had through the crossfade; a show scene of the
+  // scene already on screen takes over at once.
   applyScene(snap: SceneSnapshot, fade: number): void {
     const scene = this.state.scenes[snap.scene];
     if (!scene || scene.removed) return;
     for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) this.setLook(k, snap.look[k]!);
     this.library.replaceValues(snap.scene, snap.values);
+    const outgoing = this.state.effects, before = this.state.clock.scene;
+    this.setEffects(snap.effects);
     this.showScene(snap.scene, fade);
+    if (this.state.clock.scene !== before) this.outgoingEffects = outgoing;
   }
 
   // ---------- Live parameters ----------
@@ -904,7 +915,11 @@ export class AppController {
     const p = this.program;
     composeFrame(p, c, f, look, this.currentScene.trails ?? 1, dt);   // the main screen's motion is the clock's
     p.scene = c.scene; p.prevScene = c.prevScene; p.mix = crossfade(c, c.clock);
-    p.effects = p.prevEffects = this.state.effects;   // on the main screen effects belong to what is on screen, not to the scene
+    if (c.prevScene < 0) this.outgoingEffects = null;
+    // On the main screen effects belong to what is on screen, not to the scene: both pictures draw with
+    // the screen's, except that a show scene taken here leaves the outgoing picture its own.
+    p.effects = this.state.effects;
+    p.prevEffects = this.outgoingEffects ?? this.state.effects;
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
     this.profiler.lap(Stage.logic);

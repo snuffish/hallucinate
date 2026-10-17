@@ -48,7 +48,7 @@ describe('tool runner', () => {
     const app = fakeApp({ playing: false });
     const studio = new StudioSession(app);
     const undo = new UndoStack();
-    return { studio, undo, run: createToolRunner(app, undo, () => studio) };
+    return { app, studio, undo, run: createToolRunner(app, undo, () => studio) };
   }
 
   it('checks the input against the tool\'s schema before running it', async () => {
@@ -71,6 +71,17 @@ describe('tool runner', () => {
     studio.add({ name: 'Beta', scene: 'Beta', values: {}, look: {} });   // by hand, or the director
     expect(() => undo.pop()!.undo()).toThrow(UndoConflict);
     expect(studio.cues.map((c) => c.name)).toEqual(['Alpha', 'Beta']);   // nothing silently lost
+  });
+
+  it('writes show scenes without effects, and a change to one keeps the effects the user gave it', async () => {
+    const { run, studio, app } = setup();
+    const MIRRORED = [{ id: 'mirror' as const, on: true, settings: { axis: 2 } }];
+    app.state.effects = MIRRORED;                    // the screen's effects don't ride along
+    await run('add_show_scene', { scene: 'Alpha', look: { hue: 0.5 } });
+    expect(studio.cues[0]!.effects).toEqual([]);
+    const mine = studio.add({ name: 'Mine', scene: 'Alpha', values: {}, look: {}, effects: MIRRORED });
+    await run('update_show_scene', { cue: mine.id, scene: 'Beta', look: { hue: 0.25 } });
+    expect(studio.cueByRef(mine.id)!.effects).toEqual(MIRRORED);
   });
 
   it('leaves nothing to undo when the change itself fails', async () => {

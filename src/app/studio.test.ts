@@ -1,20 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { EffectStack } from '../engine/effects';
 import { parseParams } from '../engine/params';
 import { programState } from '../engine/look';
+import type { ProgramState } from '../engine/renderer';
 import { fakeApp, type FakeApp } from './fake-app';
 import { StudioSession } from './studio';
 import { KEYS, flushAll } from '../state/persistence';
 import type { Plan } from '../state/show-plan';
 import { DEFAULT_PREFS } from '../state/prefs';
 
-// The Preview monitor's renderer needs a GPU: a stand-in records the scale it is asked to render at.
+// The Preview monitor's renderer needs a GPU: a stand-in records the scale it is asked to render at and
+// what it is asked to draw.
 const previewScales: number[] = [];
+const previewFrames: Pick<ProgramState, 'scene' | 'effects' | 'prevEffects'>[] = [];
 vi.mock('../engine/renderer', async (original) => ({
   ...await original<typeof import('../engine/renderer')>(),
   Renderer: class {
     setMedia(): void {}
     setMaxPixelRatio(): void {}
     setScale(s: number): void { previewScales.push(s); }
+    render(p: ProgramState): void { previewFrames.push({ scene: p.scene, effects: p.effects, prevEffects: p.prevEffects }); }
   },
 }));
 
@@ -241,6 +246,114 @@ describe('StudioSession pinned Live', () => {
     expect(app.ui.get().liveName).toBeNull();
     expect(app.state.clock.scene).toBe(1);
     expect(app.library.values(1)).toEqual({ uGlow: 1 });
+  });
+});
+
+describe('StudioSession effects', () => {
+  const MIRRORED: EffectStack = [{ id: 'mirror', on: true, settings: { axis: 0 } }];
+  const FLIPPED: EffectStack = [{ id: 'mirror', on: true, settings: { axis: 1 } }];
+  const withFx = (name: string, effects: EffectStack, scene = name) => ({ ...cue(name, scene), effects });
+  const projector = (app: Fake) => app.live.route({ ...programState(), scene: app.state.clock.scene }, true, 0).projector!.program;
+  const stored = () => { flushAll(); return JSON.parse(storage.get(KEYS.show)!).cues as { name: string; effects: unknown }[]; };
+
+  it("capturing a show scene takes the main screen's effects with it, and saves them", () => {
+    const app = app3();
+    const s = session(app, { cues: [] });
+    app.state.effects = MIRRORED;
+    s.addFromSelect('@live');
+    expect(s.cues[0]!.effects).toEqual(MIRRORED);
+    expect(stored()[0]!.effects).toEqual(MIRRORED);
+  });
+
+  it("updating a show scene from the screen replaces its effects with the screen's", () => {
+    const app = app3();
+    const s = session(app, { cues: [withFx('Alpha', MIRRORED)] });
+    app.state.effects = FLIPPED;
+    s.updateFromLive(s.cues[0]!);
+    expect(s.cues[0]!.effects).toEqual(FLIPPED);
+    app.state.effects = [];
+    s.updateFromLive(s.cues[0]!);
+    expect(s.cues[0]!.effects).toEqual([]);
+  });
+
+  it("taking a show scene with the studio open puts its effects on the main screen, replacing the screen's", () => {
+    const app = app3();
+    const s = session(app, { cues: [withFx('Alpha', MIRRORED), cue('Beta')] });
+    app.state.effects = FLIPPED;
+    s.setOpen(true, null);
+    s.take(s.cues[0]!);
+    expect(app.state.effects).toEqual(MIRRORED);
+    s.take(s.cues[1]!);
+    expect(app.state.effects).toEqual([]);   // a show scene without effects clears them
+  });
+
+  it('Preview shows the picked show scene with its effects', () => {
+    const app = app3();
+    const s = session(app, { cues: [cue('Alpha'), withFx('Beta', FLIPPED)] });
+    s.setOpen(true, {} as HTMLCanvasElement);
+    app.state.effects = MIRRORED;              // the main screen's stack never reaches Preview
+    s.setPreview(s.cues[1]!);
+    app.hooks.onFrame!(0, { ...programState(), scene: 0, effects: MIRRORED, prevEffects: MIRRORED });
+    expect(previewFrames.at(-1)).toMatchObject({ scene: 1, effects: FLIPPED, prevEffects: [] });
+    s.setPreview(s.cues[0]!);
+    app.hooks.onFrame!(0, { ...programState(), scene: 0, effects: MIRRORED, prevEffects: MIRRORED });
+    expect(previewFrames.at(-1)).toMatchObject({ scene: 0, effects: [], prevEffects: [] });
+  });
+
+  it('Live and the projectors show a take with its effects, crossfading from the outgoing show scene\'s own, and a cut switches at once', () => {
+    const app = app3();
+    const s = session(app, { cues: [withFx('Alpha', MIRRORED), withFx('Beta', FLIPPED), cue('Gamma')], mode: 'fade', seconds: 2 });
+    s.take(s.cues[0]!);                        // studio closed: Live is pinned
+    expect(projector(app)).toMatchObject({ scene: 0, effects: MIRRORED });
+    s.take(s.cues[1]!);
+    app.state.clock.clock += 1;
+    expect(projector(app)).toMatchObject({ scene: 1, prevScene: 0, effects: FLIPPED, prevEffects: MIRRORED });
+    app.state.clock.clock += 2;
+    s.setMode('cut');
+    s.take(s.cues[2]!);
+    expect(projector(app)).toMatchObject({ scene: 2, prevScene: -1, effects: [], prevEffects: [] });
+  });
+
+  it('closing the studio keeps what is on screen Live with its effects, and reopening brings them back to the screen', () => {
+    const app = app3();
+    const s = session(app, { cues: [withFx('Alpha', MIRRORED)] });
+    s.setOpen(true, null);
+    s.take(s.cues[0]!);
+    s.setOpen(false, null);
+    app.state.effects = FLIPPED;               // the screen browses on with other effects
+    expect(projector(app)).toMatchObject({ scene: 0, effects: MIRRORED });
+    s.setOpen(true, null);
+    expect(app.state.effects).toEqual(MIRRORED);
+  });
+
+  it('plays two show scenes of the same scene with different effects', () => {
+    const app = app3();
+    const s = session(app, { cues: [withFx('Alpha mirrored', MIRRORED, 'Alpha'), withFx('Alpha flipped', FLIPPED, 'Alpha')], mode: 'fade', seconds: 2 });
+    s.take(s.cues[0]!);
+    s.take(s.cues[1]!);
+    expect(projector(app)).toMatchObject({ scene: 0, prevScene: -1, effects: FLIPPED, prevEffects: [] });
+    s.setOpen(true, null);
+    s.take(s.cues[0]!);
+    expect(app.state.effects).toEqual(MIRRORED);
+  });
+
+  it('loads a show saved before effects with none, and cleans up a broken stack instead of dropping the show', () => {
+    const app = app3();
+    const s = session(app, {
+      cues: [
+        cue('Alpha'),
+        { ...cue('Beta'), effects: [{ id: 'echo', on: true, settings: {} }, 'junk', { id: 'mirror', on: false, settings: { axis: 9 } }, { id: 'mirror', on: true, settings: {} }] },
+        { ...cue('Gamma'), effects: 5 },
+      ],
+    });
+    expect(s.cues.map((c) => c.effects)).toEqual([[], [{ id: 'mirror', on: false, settings: { axis: 2 } }], []]);
+  });
+
+  it('a show scene added without effects has none', () => {
+    const app = app3();
+    const s = session(app, { cues: [] });
+    app.state.effects = MIRRORED;
+    expect(s.add({ name: 'Beta', scene: 'Beta', values: {}, look: {} }).effects).toEqual([]);
   });
 });
 
