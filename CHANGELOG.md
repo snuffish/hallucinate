@@ -11,6 +11,11 @@
   bass pushes the turn ahead and each kick jumps it on, scaled by the Look's Reactivity.
 - A **Wave** effect: the picture ripples and bends, with an amount and a wavelength, and each kick sends a ripple
   outward from the centre, scaled by Reactivity.
+- Show scenes keep their effects: *What's on Live now* and *Update from Live* store the screen's, a take with the
+  studio open brings them back to the screen, and Preview, Live and every projector show them. Through a fade each
+  picture keeps its own effects; a cut switches them with the scene. Shows saved before effects load with none, a
+  damaged effect is dropped without losing the show, and an exported show carries its effects while still opening
+  (without them) in an older copy. Show scenes the director and the assistant write have none.
 
 ### Changed
 

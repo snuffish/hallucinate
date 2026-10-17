@@ -19,9 +19,8 @@ import { LOOK_KEYS, type AppState } from '../state/app-state';
 import type { Store } from '../state/store';
 import type { ScreenMode, UIState } from '../state/ui-state';
 
-// A show scene on an output: a scene, its parameter values, its look sliders and its effects (none when
-// it has no `effects`).
-export interface Shot { scene: number; values: ParamValues; look: Readonly<Record<string, number>>; effects?: EffectStack }
+// A show scene on an output: a scene, its parameter values, its look sliders and its effects.
+export interface Shot { scene: number; values: ParamValues; look: Readonly<Record<string, number>>; effects: EffectStack }
 
 // What one renderer draws this frame. `params` stands in for the stored @param values of the scenes it
 // lists (Renderer.render's second argument).
@@ -63,8 +62,9 @@ export class LiveSlot {
   get pinned(): boolean { return this.pin !== null; }
 
   // Pins `shot` as Live, shown as `name`. The look sliders it doesn't store are kept as they are now.
-  // With a fade it crossfades from what was pinned; a show scene of the same scene takes over at once
-  // (one scene draws with one set of values).
+  // With a fade it crossfades from what was pinned, each picture with its own show scene's effects; a show
+  // scene of the same scene takes over at once, values and effects together (one scene draws with one
+  // set of values).
   take(shot: Shot, name: string, fade = 0): void {
     const now = this.deps.state.look;
     const look = Object.fromEntries(LOOK_KEYS.map((k) => [k, shot.look[k] ?? now[k]]));
@@ -157,7 +157,7 @@ export class LiveSlot {
   private compose(f: FullFrame, base: ProgramState, shot: Shot, from: Shot | null, mix: number, motion: Motion, dt: number): FullFrame {
     const p = this.fill(f, base);
     p.scene = shot.scene; p.prevScene = from?.scene ?? -1; p.mix = mix;
-    p.effects = shot.effects ?? NO_EFFECTS; p.prevEffects = from?.effects ?? NO_EFFECTS;   // each picture keeps its own
+    p.effects = shot.effects; p.prevEffects = from?.effects ?? NO_EFFECTS;   // each picture keeps its own
     composeFrame(p, motion, this.deps.hearing, this.frameLook(shot.look), this.deps.state.scenes[shot.scene]?.trails ?? 1, dt);
     const params = f.params;
     for (const k in params) delete params[k];
