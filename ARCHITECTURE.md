@@ -165,7 +165,8 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
 auto-switch, a tick is the studio's and the director's beat (both before the frame is
 composed) → `composeFrame` fills one reused `ProgramState` for the main screen (on the clock's motion) →
 `LiveSlot.route` composes Live (on its own motion) and decides what the screen and the
-projectors draw → `Renderer.render` (scene pass → feedback pass → display pass) → `OutputLink.sendFrame` when a
+projectors draw → `Renderer.render` (scene pass → effects, one pass per switched-on effect of each picture's stack, none when
+none is on → feedback pass → display pass) → `OutputLink.sendFrame` when a
 projector is connected → `hooks.onFrame` (studio preview and master
 fader) → every second frame: publish meters to the UI store. `FrameProfiler` (Shift+P, `?perf`) laps between these stages;
 while it is off each lap is one flag check.
@@ -205,6 +206,12 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 
 - **A scene:** add a module to `src/scenes/` that builds it with `scene(name, category, description, glsl)`, and list it in `SCENES` in `src/scenes/index.ts` (key order). The shared shader header (`header.ts`) and the new-scene template (`template.ts`) live there too. A scene reads only scene inputs and the header's helpers (lines with `beam(d, w)`); a helper two scenes need goes into the header. `e2e/builtin-scenes.spec.ts` picks every listed scene up and checks it against the laser-show checklist, the safety rules with the Look applied: at the default Look and at the strongest (`STRONGEST_LOOK`), through `still(index, { look })`.
   Tag uniforms or constants with `// @param` for live controls.
+- **An effect:** add a row to `EFFECTS` in `src/engine/effects.ts`: its id and label, its settings (range, step,
+  default; a choice lists its `options`), how it moves with the music, and its picture step, GLSL defining
+  `vec3 effect(vec2 uv)` that reads the picture with `pick(uv)`, its settings by their `uniform` names and the scene
+  inputs (so Reactivity scales its movement). The widget, the clean-up of stored stacks, the renderer (each picture
+  step compiled once, wrapped with the edge fade) and `e2e/builtin-scenes.spec.ts` (alone at its strongest on every
+  scene at the strongest Look, edges measured across `EDGE_BAND`) all pick it up from there.
 - **A visual-maker block:** add an entry to `NODE_TYPES` in `src/engine/nodes.ts` (and a helper to `LIBS` if it
   needs GLSL). The examples test compiles every example graph.
 - **An assistant tool:** add a `tool({ … })` entry to `TOOLS` in `src/assistant/tools.ts` (schema, description, its
