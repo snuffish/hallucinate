@@ -169,15 +169,20 @@ vec3 effect(vec2 uv) {
   },
 ] as const satisfies readonly EffectDef[];
 
-// The edge fade, in shares of the picture's short side, so it holds at any size. The border band is what
-// the safety spec measures (ADR 0002: at least 75% pure black in silence). Effects leave the scene's own
-// picture alone across the band and a margin inside it, EDGE_CLEAR from the edge, because Fringing pulls
-// colour a few pixels outward from inside; then they fade in over EDGE_FADE. The border keeps whatever the
-// scene alone drew there, which the scenes' own safety checks already prove black enough, so no stack of
-// effects can light it.
-export const EDGE_BAND = 0.01;    // 7 px at 720
-export const EDGE_CLEAR = 0.025;  // 18 px at 720
-export const EDGE_FADE = 0.05;    // 36 px at 720
+// The edge fade, in shares of the picture's short side, so it holds at any size. Defined here once, read by
+// the renderer (which fades every effect) and the built-in scenes safety spec (which measures the band).
+//   EDGE_BAND   the border band the safety spec measures: at least 75% pure black in silence (ADR 0002).
+//   EDGE_CLEAR  how far in from the edge effects leave the scene's own picture alone: the band and a margin
+//               inside it, because the Look's fringing pulls colour a few pixels outward from inside.
+//   EDGE_FULL   where effects run at full strength, after fading in over EDGE_FADE.
+// The border keeps whatever the scene alone drew there, which the scenes' own safety checks already prove
+// black enough, so no stack of effects can light it. The margin is derived from the band, so widening the
+// band moves the fade with it; effects.test.ts checks the margin covers the strongest Look's fringing.
+export const EDGE_BAND = 0.01;                      // 7 px at 720
+const FRINGING_MARGIN = 0.015;                      // 11 px at 720
+export const EDGE_CLEAR = EDGE_BAND + FRINGING_MARGIN;
+export const EDGE_FADE = 0.05;                      // 36 px at 720
+export const EDGE_FULL = EDGE_CLEAR + EDGE_FADE;
 
 export type Effect = (typeof EFFECTS)[number];
 export type EffectId = Effect['id'];
@@ -295,7 +300,7 @@ ${def.glsl}
 void main() {
   vec2 px = min(vUv, 1. - vUv) * uRes;
   float fromEdge = min(px.x, px.y) / min(uRes.x, uRes.y);
-  float w = smoothstep(${glslFloat(EDGE_CLEAR)}, ${glslFloat(EDGE_CLEAR + EDGE_FADE)}, fromEdge);
+  float w = smoothstep(${glslFloat(EDGE_CLEAR)}, ${glslFloat(EDGE_FULL)}, fromEdge);
   vec3 scene = texture(uScene, vUv).rgb;
   fragColor = vec4(w > 0. ? mix(scene, effect(vUv), w) : scene, 1.);
 }

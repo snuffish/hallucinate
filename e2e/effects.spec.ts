@@ -1,4 +1,4 @@
-import { EDGE_CLEAR, EDGE_FADE, EFFECTS, effectDef, passesOf } from '../src/engine/effects';
+import { EDGE_FULL, EFFECTS, effectDef, passesOf } from '../src/engine/effects';
 import { expect, seedScenes, solidScene, test, type Page } from './fixtures';
 
 // How far the main screen's picture is from symmetric, left to right and top to bottom: the share of
@@ -27,7 +27,7 @@ async function asymmetry(page: Page): Promise<{ lr: number; tb: number }> {
       }
       resolve({ lr: lr / all, tb: tb / all });
     });
-  }), EDGE_CLEAR + EDGE_FADE);
+  }), EDGE_FULL);
 }
 
 // How many passes the main screen draws in one frame: WebGL draw calls on the main canvas between two
@@ -220,7 +220,7 @@ test('effects: library previews show scenes without effects', async ({ page }) =
       if (Math.max(Math.abs(d[i]! - d[j]!), Math.abs(d[i + 1]! - d[j + 1]!), Math.abs(d[i + 2]! - d[j + 2]!)) > 5) lr++;
     }
     return lr / all;
-  }, EDGE_CLEAR + EDGE_FADE);
+  }, EDGE_FULL);
   expect(asym, "Light Sheet's preview isn't mirrored").toBeGreaterThan(0.01);
 });
 

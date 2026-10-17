@@ -216,7 +216,10 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
   each renders at a share of the picture (`scale`) and defines `vec3 pass(vec2 uv)` reading its input with `pick`;
   the picture step reads the last one with `passed(uv)`. The renderer keeps two targets per pass size. The widget, the clean-up of stored stacks, the renderer (each picture
   step compiled once, wrapped with the edge fade) and `e2e/builtin-scenes.spec.ts` (alone at its strongest on every
-  scene at the strongest Look, edges measured across `EDGE_BAND`) all pick it up from there.
+  scene at the strongest Look, and all of them stacked at their strongest) all pick it up from there. The edge fade's
+  sizes live beside the catalogue: the spec measures the border band `EDGE_BAND`, effects leave the scene's own
+  picture alone out to `EDGE_CLEAR` (the band plus a margin for the Look's fringing) and run at full strength from
+  `EDGE_FULL`.
 - **A visual-maker block:** add an entry to `NODE_TYPES` in `src/engine/nodes.ts` (and a helper to `LIBS` if it
   needs GLSL). The examples test compiles every example graph.
 - **An assistant tool:** add a `tool({ … })` entry to `TOOLS` in `src/assistant/tools.ts` (schema, description, its

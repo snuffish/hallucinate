@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { SCENE_INPUTS } from './scene-inputs';
-import { EFFECTS, EffectStackSchema, addEffect, cleanStack, effectDef, effectShader, passesOf, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
+import { STRONGEST_LOOK } from '../state/look-drift';
+import { composeFrame, programState } from './look';
+import { SCENE_INPUTS, stillHearing, stillUniforms } from './scene-inputs';
+import { EDGE_BAND, EDGE_CLEAR, EDGE_FADE, EDGE_FULL, EFFECTS, EffectStackSchema, addEffect, cleanStack, effectDef, effectShader, passesOf, effectsToAdd, moveEffect, removeEffect, setEffectOn, setEffectSetting, strongest } from './effects';
 
 describe('cleaning up a stored effect stack', () => {
   it('keeps a well-formed stack as it is', () => {
@@ -138,6 +140,26 @@ describe('the catalogue', () => {
     const read = new Set(k.glsl.match(/\bu[A-Z]\w*/g));
     expect([...read].sort()).toEqual(['uRes', 'uSegments', 'uSpin', 'uTurn']);
     expect(effectShader(k)).toMatch(/uniform float uTurn;/);
+  });
+});
+
+// The safety spec measures the border band (EDGE_BAND) in silence; the effects leave the scene's own
+// picture alone from the edge to EDGE_CLEAR. Between the two lies the reach of the Look's fringing, which
+// pulls colour outward from inside: at its strongest (STRONGEST_LOOK, the most Randomize or Drift sets)
+// with no kick, in the brightest tone (a quiet stretch of a crisp track), the display pass reads up to
+// half the fringing amount of the picture's width away (16:9: the width is 16/9 short sides). An effect's
+// light pulled that far must still miss the band. (A kick fringes further, but the edge rule is about
+// silence; a kick answers to the strobe rule.)
+describe('the edge fade', () => {
+  it('leaves the scene alone across the measured band and the Look\'s strongest fringing beyond it', () => {
+    const p = programState();
+    const quiet = stillHearing(stillUniforms({ uBass: 0, uMid: 0, uHigh: 0, uLevel: 0, uBeat: 0, uBright: 1 }), false);
+    composeFrame(p, { time: 0, timeRate: 1, huePhase: 0, turn: 0 }, quiet, STRONGEST_LOOK, 1, 1 / 60);
+    const fringing = 0.5 * p.aberration * (16 / 9);
+    expect(fringing).toBeGreaterThan(0.005);   // 3.6 px of 720: there is a reach to cover
+    expect(EDGE_BAND).toBeGreaterThan(0);
+    expect(EDGE_CLEAR - EDGE_BAND).toBeGreaterThanOrEqual(fringing);
+    expect(EDGE_FULL).toBeCloseTo(EDGE_CLEAR + EDGE_FADE);
   });
 });
 

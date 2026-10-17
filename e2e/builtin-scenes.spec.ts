@@ -1,6 +1,6 @@
 import { expect, seedScenes, test, type Page } from './fixtures';
 import type { ListedScene, ProfilerApi } from '../src/engine/profiler';
-import { EDGE_BAND, EDGE_CLEAR, EDGE_FADE, EFFECTS, strongest, type EffectStack } from '../src/engine/effects';
+import { EDGE_BAND, EDGE_FULL, EFFECTS, strongest, type EffectStack } from '../src/engine/effects';
 import { composeFrame, programState, type FrameLook } from '../src/engine/look';
 import { stillHearing, stillUniforms } from '../src/engine/scene-inputs';
 import { SCENES } from '../src/scenes';
@@ -201,7 +201,6 @@ const DIFFERS = `(a, b, w, h, inner, tolerance) => {
   return n / all;
 }`;
 type Differs = (a: Uint8ClampedArray, b: Uint8ClampedArray, w: number, h: number, inner: number, tolerance: number) => number;
-const INNER = EDGE_CLEAR + EDGE_FADE;
 
 // Each effect does something: at its strongest the picture differs from the same still without it.
 for (const effect of EFFECTS) {
@@ -215,7 +214,7 @@ for (const effect of EFFECTS) {
       const plain = (await p.still(index, { look })).image!;
       const shaped = (await p.still(index, { look, effects })).image!;
       return differs(plain.data, shaped.data, plain.width, plain.height, inner, 2);
-    }, { effects: strongest(effect.id), look: defaultLook(), source: DIFFERS, inner: INNER });
+    }, { effects: strongest(effect.id), look: defaultLook(), source: DIFFERS, inner: EDGE_FULL });
     expect(changed).toBeGreaterThan(0.001);
   });
 }
@@ -235,7 +234,7 @@ test('a Wave before a Kaleidoscope gives a different picture than after it', asy
     const again = (await p.still(index, { look, effects: before })).image!;
     const b = (await p.still(index, { look, effects: after })).image!;
     return { again: differs(a.data, again.data, a.width, a.height, inner, 2), swapped: differs(a.data, b.data, a.width, a.height, inner, 2) };
-  }, { look: defaultLook(), sceneName: KALEIDOSCOPE_SCENE, source: DIFFERS, inner: INNER, before: [wave, kaleidoscope], after: [kaleidoscope, wave] });
+  }, { look: defaultLook(), sceneName: KALEIDOSCOPE_SCENE, source: DIFFERS, inner: EDGE_FULL, before: [wave, kaleidoscope], after: [kaleidoscope, wave] });
   console.log(`${KALEIDOSCOPE_SCENE}: swapping a Wave and a Kaleidoscope changes ${(r.swapped * 100).toFixed(1)}% of the picture (the same order twice: ${(r.again * 100).toFixed(1)}%)`);
   expect(r.again, 'the same order renders the same picture').toBe(0);
   expect(r.swapped, 'the other order renders another').toBeGreaterThan(0.01);
@@ -303,7 +302,7 @@ test('a still with a left↔right Mirror is symmetric across its axis', async ({
     const plain = (await p.still(index, { look })).image!;
     const mirrored = (await p.still(index, { look, effects: [{ id: 'mirror', on: true, settings: { axis: 0 } }] })).image!;
     return { plain: across(plain), mirrored: across(mirrored) };
-  }, { look: defaultLook(), sceneName: MIRROR_SCENE, source: DIFFERS, inner: INNER });
+  }, { look: defaultLook(), sceneName: MIRROR_SCENE, source: DIFFERS, inner: EDGE_FULL });
   expect(asymmetry.plain, `${MIRROR_SCENE} isn't symmetric on its own`).toBeGreaterThan(0.001);
   expect(asymmetry.mirrored, 'mirrored, it is').toBe(0);
 });
@@ -355,7 +354,7 @@ test('a still with a Glow has light around the lines and black left black away f
       if (!reach[i]) { farAll++; if (lit(glowed.data, i) === 0) farBlack++; }
     }
     return { besideLit: besideLit / besideAll, far: farAll / all, farBlack: farBlack / farAll };
-  }, { look: defaultLook(), effects: strongest('glow'), sceneName: GLOW_SCENE, inner: INNER });
+  }, { look: defaultLook(), effects: strongest('glow'), sceneName: GLOW_SCENE, inner: EDGE_FULL });
   const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
   console.log(`${GLOW_SCENE} with a Glow: ${pct(glow.besideLit)} of the black beside its lines lit; ${pct(glow.far)} of the picture is far from them, ${pct(glow.farBlack)} of that black`);
   expect(glow.besideLit, 'the black beside the lines is lit').toBeGreaterThan(0.5);
@@ -396,7 +395,7 @@ test('a still with a five-segment Kaleidoscope repeats every fifth of a turn aro
     const plain = around((await p.still(index, { look })).image!, inner);
     const folded = around((await p.still(index, { look, effects: [{ id: 'kaleidoscope', on: true, settings: { segments, spin: 0.3 } }] })).image!, inner);
     return { plain: plain.against(plain.slices, n / segments), segment: folded.against(folded.slices, n / segments), half: folded.against(folded.slices, n / segments / 2) };
-  }, { look: defaultLook(), sceneName: KALEIDOSCOPE_SCENE, source: AROUND, inner: INNER, segments, n: RING_SLICES });
+  }, { look: defaultLook(), sceneName: KALEIDOSCOPE_SCENE, source: AROUND, inner: EDGE_FULL, segments, n: RING_SLICES });
   console.log(`${KALEIDOSCOPE_SCENE}: turned a fifth of a turn, ${(r.plain * 100).toFixed(1)}% of the light differs plain, ${(r.segment * 100).toFixed(1)}% with 5 segments (half a segment: ${(r.half * 100).toFixed(1)}%)`);
   expect(r.plain, `${KALEIDOSCOPE_SCENE} doesn't repeat around its centre on its own`).toBeGreaterThan(0.3);
   expect(r.segment, 'with a Kaleidoscope it repeats at each segment').toBeLessThan(0.05);
@@ -454,7 +453,7 @@ test('a Kaleidoscope turns on with each kick and never back, and holds still at 
       music: turned(before, await at(1, kicked.before, { uBass: 1.5, uBeat: 1 })),
       spin0: turned(await at(0, kicked.before), await at(0, kicked.after)),
     };
-  }, { look, sceneName: SLOPE.name, source: AROUND, inner: INNER, n: RING_SLICES, kicked, calmAfter: calm.after });
+  }, { look, sceneName: SLOPE.name, source: AROUND, inner: EDGE_FULL, n: RING_SLICES, kicked, calmAfter: calm.after });
   const deg = (rad: number) => rad * 180 / Math.PI;
   const step = deg((kicked.after - kicked.before) - (calm.after - calm.before));
   console.log(`A Kaleidoscope across a kick turns ${r.kicked}°, ${r.fading}°, ${r.after}° (expected ${deg(kicked.kicked - kicked.before).toFixed(1)}°, ${deg(kicked.fading - kicked.before).toFixed(1)}°, ${deg(kicked.after - kicked.before).toFixed(1)}°); the same second without the kick ${r.calm}° (the kick's step: ${step.toFixed(1)}°); the bass and the beat on the same turn ${r.music}°; at spin speed 0 ${r.spin0}°`);
