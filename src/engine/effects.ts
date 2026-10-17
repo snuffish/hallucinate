@@ -48,6 +48,31 @@ vec3 effect(vec2 uv) {
   return pick(uv);
 }`,
   },
+  {
+    id: 'kaleidoscope',
+    label: 'Kaleidoscope',
+    help: 'Folds the picture into segments around the centre, every other one mirrored, and turns the whole mandala.',
+    music: "Turns on the music's clock, which runs faster when the music is loud; the bass pushes the turn ahead and each kick jumps it on a step. At spin speed 0 it holds still.",
+    settings: [
+      { key: 'segments', label: 'Segments', uniform: 'uSegments', min: 3, max: 12, step: 1, default: 6 },
+      { key: 'spin', label: 'Spin speed', uniform: 'uSpin', min: 0, max: 1, step: 0.01, default: 0.3 },
+    ],
+    glsl: /* glsl */ `
+vec3 effect(vec2 uv) {
+  float side = min(uRes.x, uRes.y);
+  vec2 p = (uv - .5) * uRes / side;            // from the centre, in shares of the short side
+  float seg = TAU / floor(uSegments + .5);
+  // The turn runs on the music's clock (faster when the music is loud), the bass pushes it ahead and a kick
+  // jumps it on a step. Spin speed scales all three, so at 0 the mandala holds still.
+  float turn = uSpin * (.3 * uTime + .25 * min(uBass, 1.5) + .2 * uBeat);
+  float a = mod(atan(p.y, p.x) - turn, seg);
+  a = min(a, seg - a);                          // every other segment mirrored, so neighbours meet without a seam
+  a += PI * .5 - seg * .25;                     // each segment shows the wedge just above the centre
+  vec2 q = .5 + length(p) * vec2(cos(a), sin(a)) * side / uRes;
+  if (q.x < 0. || q.x > 1. || q.y < 0. || q.y > 1.) return vec3(0.);   // past the picture: dark, never a smeared edge
+  return pick(q);
+}`,
+  },
 ] as const satisfies readonly EffectDef[];
 
 // The edge fade, in shares of the picture's short side, so it holds at any size. The border band is what
