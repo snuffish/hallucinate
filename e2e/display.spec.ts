@@ -58,3 +58,31 @@ test('display: lit pixels still get grain', async ({ page }) => {
   expect(brightest(a)).toBeGreaterThan(0);
   await expect.poll(async () => (await patch(page, 0.5, 0.5)).some((v, i) => v !== a[i]), { timeout: 30_000 }).toBe(true);
 });
+
+// One-pixel stripes: how far each pixel differs from its right-hand neighbour, on average. Sharp
+// stripes alternate black and white; rendered below 100% they blur together.
+const STRIPES = 'void main() { fragColor = vec4(vec3(mod(floor(gl_FragCoord.x), 2.)), 1.); }';
+function stripeContrast(px: number[]): number {
+  let sum = 0;
+  let n = 0;
+  for (let y = 0; y < 40; y++) for (let x = 0; x < 39; x++) {
+    const i = (y * 40 + x) * 3;
+    sum += Math.abs(px[i]! - px[i + 3]!);
+    n++;
+  }
+  return sum / n;
+}
+
+test('display: lines stay one pixel thin at the default Resolution, and soften as soon as it is lowered', async ({ page }) => {
+  await playUserScene(page, STRIPES);
+  await page.locator('#trails').fill('0');       // a still picture: no afterglow…
+  await page.locator('#aberration').fill('0');   // …and no colour split
+  const contrast = async () => stripeContrast(await patch(page, 0.5, 0.5));
+  await expect.poll(contrast, { timeout: 30_000 }).toBeGreaterThan(100);   // once the start-up crossfade has settled
+  const sharp = await contrast();
+
+  await page.keyboard.press(',');
+  await page.locator('#pref-resolution').fill('0.5');   // Settings → Display & performance
+  await page.keyboard.press('Escape');
+  await expect.poll(contrast, { timeout: 30_000 }).toBeLessThan(sharp / 2);
+});

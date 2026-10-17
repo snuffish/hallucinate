@@ -46,8 +46,9 @@ warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm col
 
 ## 🎨 The Look widget
 
-Look sliders: Reactivity, Speed, Trails, Colour, Colour cycling, Synesthesia, Fringing, Drift
-speed and render resolution (lower it if frames drop).
+Look sliders: Reactivity, Speed, Trails, Colour, Colour cycling, Synesthesia, Fringing and Drift
+speed. Resolution isn't part of the Look: it is in [Settings → Display & performance](settings.md#display--performance)
+(lower it if frames drop).
 
 The app opens with a laser look:
 

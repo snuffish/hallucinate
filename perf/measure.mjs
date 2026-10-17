@@ -104,11 +104,6 @@ if (gpu) {
   await stress.waitForTimeout(1500);
   // A scene change cuts a GPU test short. A DOM click: the idle fade may have made the widgets unclickable.
   await stress.evaluate(() => { const auto = document.getElementById('auto'); if (auto.checked) auto.click(); });
-  await stress.evaluate(() => {   // the native setter, so React sees the change
-    const el = document.getElementById('resolution');
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, el.max);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-  });
   console.log('ranking on', JSON.stringify(await stress.evaluate(() => { const r = window.__profiler.report(); return { canvas: r.size, scale: r.scale }; })));
   const ranking = [];
   for (const { index, name } of await stress.evaluate(() => window.__profiler.scenes())) {
