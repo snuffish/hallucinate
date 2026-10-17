@@ -112,8 +112,9 @@ async function verdict(page: Page, index: number, look: FrameLook, effects: Effe
   }, { index, look, effects, band: EDGE_BAND, source: EDGE_BLACK, SILENCE, CALM, KICK, TICK_END, TICK_START }) as Promise<Verdict>;
 }
 
+const pct = (x: number): string => `${(x * 100).toFixed(1)}%`;
+
 function judge(v: Verdict, what: string): void {
-  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
   console.log(`${what}: a kick doubles ${pct(v.kick)} of the frame, a tick ${pct(v.tick)}, and ${pct(v.edgeBlack)} of the edge is black in silence`);
   expect(v.error, `${what} compiles`).toBeNull();
   expect.soft(v.edgeBlack, `${what}: the edges are pure black in silence`).toBeGreaterThanOrEqual(0.75);
@@ -160,38 +161,12 @@ for (const { name: sceneName } of SCENES) {
         const { image, error } = await (window as Hook).__profiler!.still(index, { inputs: SILENCE, silent: true, look, effects });
         return { error, edgeBlack: image ? ((0, eval)(source) as EdgeBlack)(image, band) : 0 };
       }, { index: scene.index, look: STRONGEST_LOOK, effects: stack.effects, band: EDGE_BAND, SILENCE, source: EDGE_BLACK });
-      console.log(`${sceneName} with ${stack.name} stacked: ${(edgeBlack * 100).toFixed(1)}% of the edge is black in silence`);
+      console.log(`${sceneName} with ${stack.name} stacked: ${pct(edgeBlack)} of the edge is black in silence`);
       expect(error, `${sceneName} renders`).toBeNull();
       expect.soft(edgeBlack, `${sceneName} with ${stack.name}: the edges are pure black in silence`).toBeGreaterThanOrEqual(0.75);
     }
   });
 }
-
-// The rules above only mean something if the Look reaches the picture: trails leave an afterglow and
-// fringing splits the colours in the frame still() returns.
-test("a still frame shows the Look's trails and fringing", async ({ page }) => {
-  await openProfiler(page);
-  const plain: FrameLook = { ...STRONGEST_LOOK, trails: 0, aberration: 0, synesthesia: 0 };
-  const changed = await page.evaluate(async ({ plain }) => {
-    const p = (window as Hook).__profiler!;
-    const index = p.scenes().find((s) => s.builtin)!.index;
-    const frame = async (look: typeof plain) => (await p.still(index, { look })).image!.data;
-    const differs = (a: Uint8ClampedArray, b: Uint8ClampedArray) => {
-      let n = 0;
-      for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i]! - b[i]!) + Math.abs(a[i + 1]! - b[i + 1]!) + Math.abs(a[i + 2]! - b[i + 2]!) > 6) n++;
-      return n / (a.length / 4);
-    };
-    const base = await frame(plain);
-    return {
-      again: differs(base, await frame(plain)),
-      trails: differs(base, await frame({ ...plain, trails: 0.9 })),
-      fringing: differs(base, await frame({ ...plain, aberration: 0.02 })),
-    };
-  }, { plain });
-  expect(changed.again, 'the same Look renders the same frame').toBe(0);
-  expect(changed.trails, 'trails leave an afterglow').toBeGreaterThan(0.001);
-  expect(changed.fringing, 'fringing splits the colours').toBeGreaterThan(0.001);
-});
 
 // The share of pixels where two frames differ by more than `tolerance` levels in some channel, counting
 // only those further than `inner` (a share of the short side) from every edge, where effects run at full
@@ -208,6 +183,26 @@ const DIFFERS = `(a, b, w, h, inner, tolerance) => {
   return n / all;
 }`;
 type Differs = (a: Uint8ClampedArray, b: Uint8ClampedArray, w: number, h: number, inner: number, tolerance: number) => number;
+
+// The rules above only mean something if the Look reaches the picture: trails leave an afterglow and
+// fringing splits the colours in the frame still() returns.
+test("a still frame shows the Look's trails and fringing", async ({ page }) => {
+  test.setTimeout(2 * 60_000);   // four stills with a Look: over a minute on a loaded machine
+  await openProfiler(page);
+  const plain: FrameLook = { ...STRONGEST_LOOK, trails: 0, aberration: 0, synesthesia: 0 };
+  const changed = await page.evaluate(async ({ plain, source }) => {
+    const p = (window as Hook).__profiler!;
+    const differs = (0, eval)(source) as Differs;
+    const index = p.scenes().find((s) => s.builtin)!.index;
+    const frame = async (look: typeof plain) => (await p.still(index, { look })).image!;
+    const base = await frame(plain);
+    const against = async (look: typeof plain) => differs(base.data, (await frame(look)).data, base.width, base.height, 0, 2);
+    return { again: await against(plain), trails: await against({ ...plain, trails: 0.9 }), fringing: await against({ ...plain, aberration: 0.02 }) };
+  }, { plain, source: DIFFERS });
+  expect(changed.again, 'the same Look renders the same frame').toBe(0);
+  expect(changed.trails, 'trails leave an afterglow').toBeGreaterThan(0.001);
+  expect(changed.fringing, 'fringing splits the colours').toBeGreaterThan(0.001);
+});
 
 // Each effect does something: at its strongest the picture differs from the same still without it.
 for (const effect of EFFECTS) {
@@ -242,7 +237,7 @@ test('a Wave before a Kaleidoscope gives a different picture than after it', asy
     const b = (await p.still(index, { look, effects: after })).image!;
     return { again: differs(a.data, again.data, a.width, a.height, inner, 2), swapped: differs(a.data, b.data, a.width, a.height, inner, 2) };
   }, { look: defaultLook(), sceneName: KALEIDOSCOPE_SCENE, source: DIFFERS, inner: EDGE_FULL, before: [wave, kaleidoscope], after: [kaleidoscope, wave] });
-  console.log(`${KALEIDOSCOPE_SCENE}: swapping a Wave and a Kaleidoscope changes ${(r.swapped * 100).toFixed(1)}% of the picture (the same order twice: ${(r.again * 100).toFixed(1)}%)`);
+  console.log(`${KALEIDOSCOPE_SCENE}: swapping a Wave and a Kaleidoscope changes ${pct(r.swapped)} of the picture (the same order twice: ${pct(r.again)})`);
   expect(r.again, 'the same order renders the same picture').toBe(0);
   expect(r.swapped, 'the other order renders another').toBeGreaterThan(0.01);
 });
@@ -282,7 +277,6 @@ test('a kick sends a Wave ripple out from the centre', async ({ page }) => {
       still: await kickChanges({ ...look, reactivity: 0 }, effects),
     };
   }, { look: defaultLook(), sceneName: STILL_GRID.name, effects: [{ id: 'wave', on: true, settings: { amount: 1, wavelength: 0.4 } }] as EffectStack, CALM, KICK });
-  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
   console.log(`a kick changes ${pct(moved.plain.centre)} of the centre without a Wave; with one ${pct(moved.wave.centre)} of the centre and ${pct(moved.wave.out)} further out; at Reactivity 0 ${pct(moved.still.centre)}`);
   expect(moved.plain.centre, 'the grid ignores the kick').toBeLessThan(0.001);
   expect(moved.wave.centre, 'a kick ripples the centre').toBeGreaterThan(0.05);
@@ -362,7 +356,6 @@ test('a still with a Glow has light around the lines and black left black away f
     }
     return { besideLit: besideLit / besideAll, far: farAll / all, farBlack: farBlack / farAll };
   }, { look: defaultLook(), effects: strongest('glow'), sceneName: GLOW_SCENE, inner: EDGE_FULL });
-  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
   console.log(`${GLOW_SCENE} with a Glow: ${pct(glow.besideLit)} of the black beside its lines lit; ${pct(glow.far)} of the picture is far from them, ${pct(glow.farBlack)} of that black`);
   expect(glow.besideLit, 'the black beside the lines is lit').toBeGreaterThan(0.5);
   expect(glow.far, `${GLOW_SCENE} has black far from its lines`).toBeGreaterThan(0.05);
@@ -403,7 +396,7 @@ test('a still with a five-segment Kaleidoscope repeats every fifth of a turn aro
     const folded = around((await p.still(index, { look, effects: [{ id: 'kaleidoscope', on: true, settings: { segments, spin: 0.3 } }] })).image!, inner);
     return { plain: plain.against(plain.slices, n / segments), segment: folded.against(folded.slices, n / segments), half: folded.against(folded.slices, n / segments / 2) };
   }, { look: defaultLook(), sceneName: KALEIDOSCOPE_SCENE, source: AROUND, inner: EDGE_FULL, segments, n: RING_SLICES });
-  console.log(`${KALEIDOSCOPE_SCENE}: turned a fifth of a turn, ${(r.plain * 100).toFixed(1)}% of the light differs plain, ${(r.segment * 100).toFixed(1)}% with 5 segments (half a segment: ${(r.half * 100).toFixed(1)}%)`);
+  console.log(`${KALEIDOSCOPE_SCENE}: turned a fifth of a turn, ${pct(r.plain)} of the light differs plain, ${pct(r.segment)} with 5 segments (half a segment: ${pct(r.half)})`);
   expect(r.plain, `${KALEIDOSCOPE_SCENE} doesn't repeat around its centre on its own`).toBeGreaterThan(0.3);
   expect(r.segment, 'with a Kaleidoscope it repeats at each segment').toBeLessThan(0.05);
   expect(r.half, '…and only there').toBeGreaterThan(0.2);
