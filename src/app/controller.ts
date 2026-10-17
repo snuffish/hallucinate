@@ -12,8 +12,8 @@ import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, 
 import { Renderer, type ProgramState } from '../engine/renderer';
 import { silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
 import type { Scene } from '../scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type Look, type LookKey, type SourceButton } from '../state/app-state';
-import { LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type LookKey, type SourceButton } from '../state/app-state';
+import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
@@ -92,7 +92,6 @@ export class AppController {
   mediaSound = readFlag(KEYS.mediaSound);
   // Device preferences (Settings overlay, src/state/prefs.ts).
   readonly prefs = new Store<Prefs>(loadPrefs());
-  private resolution = 0;   // the Resolution setting the renderer was last set to
   // Where each frame's time goes (Shift+P, or ?perf / ?perf=trace in the URL). Off: one flag check per stage.
   readonly profiler = new FrameProfiler();
 
@@ -106,7 +105,7 @@ export class AppController {
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly drift = new LookDrift();
   private driftFrames = 0;
-  private readonly beforeRandom: { look: Partial<Look>; scene: number }[] = [];   // Shift+R steps back through these
+  private readonly beforeRandom: { look: Record<DriftKey, number>; scene: number }[] = [];   // Shift+R steps back through these
   private toastKey = 0;
   private readonly downloads = new Map<'sc' | 'yt', DownloadView>();
   private disposed = false;
@@ -319,10 +318,8 @@ export class AppController {
   // projectors with each frame.
   private applyPrefs(): void {
     const p = this.prefs.get();
-    if (p.resolution !== this.resolution) {
-      this.profiler.cancelFill();   // a GPU test measures one resolution
-      this.renderer.setScale((this.resolution = p.resolution));   // a rescale restarts the trails: only on a change
-    }
+    if (p.resolution !== this.renderer.scale) this.profiler.cancelFill();   // a GPU test measures one resolution: any other ends it
+    this.renderer.setScale(p.resolution);
     applyRendererPrefs(this.renderer, outputPrefs(p));
     this.output.sendPrefs(outputPrefs(p));
     this.hooks.onPrefs?.(p);
@@ -581,13 +578,13 @@ export class AppController {
     return this.state.look.auto;
   }
 
-  // Rolls the Look widget's values (not Resolution: that's a performance setting), within ranges that
-  // stay watchable. The scene only changes when "Also pick a random scene" is on.
+  // Rolls the Look widget's values, within ranges that stay watchable. The scene only changes when
+  // "Also pick a random scene" is on.
   randomize(): void {
-    const { reactivity, speed, trails, hue, cycle, synesthesia, aberration } = this.state.look;
-    this.beforeRandom.push({ look: { reactivity, speed, trails, hue, cycle, synesthesia, aberration }, scene: this.state.clock.scene });
+    const look = this.state.look;
+    this.beforeRandom.push({ look: Object.fromEntries(DRIFT_KEYS.map((k) => [k, look[k]])) as Record<DriftKey, number>, scene: this.state.clock.scene });
     if (this.beforeRandom.length > RANDOM_HISTORY) this.beforeRandom.shift();
-    for (const [key, [min, max]] of Object.entries(RANDOM_RANGES)) this.setLook(key as DriftKey, min + Math.random() * (max - min));
+    for (const key of DRIFT_KEYS) { const [min, max] = RANDOM_RANGES[key]; this.setLook(key, min + Math.random() * (max - min)); }
     if (this.state.look.randomScene) this.nextRandomScene();
   }
 
@@ -596,7 +593,7 @@ export class AppController {
   randomizeBack(): void {
     const prev = this.beforeRandom.pop();
     if (!prev) { this.toast('No earlier random look to go back to', 1500); return; }
-    for (const key of ['reactivity', 'speed', 'trails', 'hue', 'cycle', 'synesthesia', 'aberration'] as const) this.setLook(key, prev.look[key]!);
+    for (const key of DRIFT_KEYS) this.setLook(key, prev.look[key]);
     if (prev.scene !== this.state.clock.scene) this.setScene(prev.scene);
     const left = this.beforeRandom.length;
     this.toast(`Back to the previous look${left ? ` (${left} more)` : ''}`, 1500);

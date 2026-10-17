@@ -162,7 +162,6 @@ type FrameMessage = Extract<OutputMessage, { type: 'frame' }>;
 export class ProjectorView {
   private pending: FrameMessage | null = null;   // the newest frame not yet drawn
   private lastFrameAt = -Infinity;
-  private resolution = 0;
   private frames = 0;
   private statusAt: number;
 
@@ -186,7 +185,7 @@ export class ProjectorView {
     if (!m) return false;
     this.pending = null;
     for (const [index, uniforms] of Object.entries(m.params)) this.renderer.setParams(Number(index), uniforms);
-    if (m.resolution !== this.resolution) this.renderer.setScale((this.resolution = m.resolution));
+    this.renderer.setScale(m.resolution);   // a no-op unless it changed
     this.media.follow({ currentTime: m.state.mediaTime ?? 0, paused: m.state.mediaPaused ?? false, playbackRate: m.state.mediaRate ?? 1 } satisfies MediaClock);
     this.renderer.render(m.state);
     this.frames++;
