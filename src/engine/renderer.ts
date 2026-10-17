@@ -1,7 +1,7 @@
 // WebGL2 pipeline:
 //   1. scene shader(s)  -> scene targets (two while crossfading)
-//   2. feedback pass    -> mixes scene with a zoomed/rotated/hue-shifted copy of the
-//                          previous frame (ping-pong), giving Milkdrop-style trails
+//   2. feedback pass    -> mixes scene with a faded copy of the previous frame, in place
+//                          (ping-pong): the trails' afterglow, where each line was drawn
 //   3. display pass     -> tonemap, chromatic aberration, vignette, grain (not on black) -> canvas
 //
 // Programs compile in the background (KHR_parallel_shader_compile) so typing in the editor never
@@ -28,29 +28,11 @@ precision highp float;
 in vec2 vUv;
 out vec4 fragColor;
 uniform sampler2D uSceneA, uSceneB, uPrev;
-uniform float uMix, uFeedback, uZoom, uRot, uHueDrift, uWarp, uTime, uAspect;
-
-mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
-vec3 hueShift(vec3 c, float a) {
-  const vec3 k = vec3(.57735);
-  float ca = cos(a);
-  return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1. - ca);
-}
+uniform float uMix, uFeedback;
 
 void main() {
   vec3 scene = mix(texture(uSceneB, vUv).rgb, texture(uSceneA, vUv).rgb, uMix);
-
-  vec2 c = vUv - .5;
-  c.x *= uAspect;
-
-  c *= rot(uRot);
-  c /= uZoom;
-  float r = length(c);
-  c += c / max(r, 1e-4) * sin(r * 18. - uTime * 2.) * .003 * uWarp;
-  c.x /= uAspect;
-
-  vec3 prev = texture(uPrev, c + .5).rgb;
-  prev = max(hueShift(prev, uHueDrift), 0.) * uFeedback;
+  vec3 prev = texture(uPrev, vUv).rgb * uFeedback;   // the afterglow fades where the line was drawn
   fragColor = vec4(min(max(scene, prev), vec3(8.)), 1.);
 }
 `;
@@ -108,10 +90,6 @@ export interface ProgramState {
   mood: number;
   grade: Grade;
   feedback: number;
-  zoom: number;
-  rotation: number;
-  hueDrift: number;
-  warp: number;
   aberration: number;
   master?: number;
   mediaTime?: number;
@@ -671,8 +649,7 @@ export class Renderer {
 
     const f = this.feedbackUniforms;
     f.uSceneA = t.sceneA.tex; f.uSceneB = crossfading ? t.sceneB.tex : t.sceneA.tex; f.uPrev = t.read.tex;
-    f.uMix = crossfading ? s.mix : 1; f.uFeedback = s.feedback; f.uZoom = s.zoom; f.uRot = s.rotation;
-    f.uHueDrift = s.hueDrift; f.uWarp = s.warp; f.uTime = s.time; f.uAspect = t.read.w / t.read.h;
+    f.uMix = crossfading ? s.mix : 1; f.uFeedback = s.feedback;
     this.use(this.feedbackProgram, f);
     this.draw(t.write);
     [t.read, t.write] = [t.write, t.read];

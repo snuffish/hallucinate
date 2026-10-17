@@ -12,7 +12,7 @@ A scene is the body of a GLSL ES 3.00 fragment shader. The app prepends this hea
 ${COMMON.trim()}
 \`\`\`
 
-The body declares whatever it needs at the top level, then \`void main()\` writes \`fragColor\`. \`centered()\` gives the pixel position with (0,0) in the middle and y from -0.5 to 0.5. Colour output around 0-1.5 is right: the display tonemaps, adds motion trails and colour grading afterwards. Use laser() (the pure, fully saturated colours the built-in scenes use), rainbow() or neon() with + uHue so the user's colour slider and colour cycling keep working.
+The body declares whatever it needs at the top level, then \`void main()\` writes \`fragColor\`. \`centered()\` gives the pixel position with (0,0) in the middle and y from -0.5 to 0.5. Colour output around 0-1.5 is right: the display tonemaps, adds the trails' afterglow and colour grading afterwards. Use laser() (the pure, fully saturated colours the built-in scenes use), rainbow() or neon() with + uHue so the user's colour slider and colour cycling keep working.
 
 # Live parameters
 A top-level uniform or const followed by \`// @param\` gets a control in the Parameters overlay, adjustable while the scene runs:

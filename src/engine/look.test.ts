@@ -17,8 +17,21 @@ describe('composeFrame', () => {
     const p = frame(sound({ bass: 0.9, mid: 0.2 }), { ...defaultLook(), reactivity: 2 });
     expect(p.bass).toBe(1.5);
     expect(p.mid).toBeCloseTo(0.4);
-    expect(p.warp).toBe(1.5);
-    expect(p.zoom).toBeCloseTo(1.006 + 1.5 * 0.025);
+  });
+
+  it('leaves the trails in place: no zoom, rotation, warp or colour drift, however loud', () => {
+    const p = frame(sound({ bass: 1, mid: 1, high: 1, level: 1, beat: 1 }), { ...defaultLook(), reactivity: 2 });
+    for (const key of ['zoom', 'rotation', 'warp', 'hueDrift']) expect(p).not.toHaveProperty(key);
+  });
+
+  it('blends the afterglow by the trails amount, and none at all at trails 0', () => {
+    expect(frame(sound(), { ...defaultLook(), trails: 0.5, synesthesia: 0 }).feedback).toBeCloseTo(0.5);
+    expect(frame(sound({ bright: 0 }), { ...defaultLook(), trails: 0, synesthesia: 1 }).feedback).toBe(0);
+  });
+
+  it('lengthens the afterglow on dark sound through synesthesia', () => {
+    const look = { ...defaultLook(), trails: 0.5, synesthesia: 1 };
+    expect(frame(sound({ bright: 0 }), look).feedback).toBeGreaterThan(frame(sound({ bright: 0.5 }), look).feedback);
   });
 
   it('never flashes a kick brighter than 1, whatever the reactivity', () => {

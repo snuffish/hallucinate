@@ -32,7 +32,7 @@ browser                                              dev server (Vite middleware
   frame, read by everything else (the sessions as `app.hearing`), and is tested with synthetic bins.
   `src/engine/look.ts` holds every rule from the sound to the picture: `composeFrame` turns a `Hearing`, a look and
   an output's `Motion` (its time, the time's pace, the hue's walk) into that output's frame state (reactivity, the
-  synesthesia grade, trails, fringing, zoom, spin, warp). The main screen (whose motion is the clock's), the pinned
+  synesthesia grade, the trails' afterglow, fringing). The main screen (whose motion is the clock's), the pinned
   Live slot and the studio's Preview monitor each compose their own, and `crossfade` is the one rule for how far a
   transition is. What a scene's shader can read each frame (`uTime`, the bands, `uBeat`, the tick's `uTick` / `uTicks`, `uHue`, `uBright`, `uMood`)
   is one table, `src/engine/scene-inputs.ts`: the header's declarations (`COMMON`, which the assistant's prompt

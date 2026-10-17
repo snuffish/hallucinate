@@ -331,7 +331,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
       const images = await lookAt(i, ts.length ? ts : [14]);
       const parts: ContentParts = [
         ...images.map((data) => ({ type: 'image' as const, source: { type: 'data' as const, value: data, mimeType: 'image/jpeg' } })),
-        { type: 'text', content: `"${scenes()[i]!.name}" at t = ${ts.join(', ')} s, with stand-in audio. On screen it also gets motion trails and colour grading.` },
+        { type: 'text', content: `"${scenes()[i]!.name}" at t = ${ts.join(', ')} s, with stand-in audio. On screen it also gets the trails' afterglow and colour grading.` },
       ];
       return parts;
     },
