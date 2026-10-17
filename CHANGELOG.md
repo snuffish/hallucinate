@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — effects (2026-10-17)
+
+### Added
+
+- An **Effects** widget, docked under the Look: add a **Mirror** to the main screen (left↔right, top↕bottom or both),
+  switch it on and off and remove it. It stays through scene changes and reloads, and projectors showing the main
+  screen show it too. See [ADR 0003](docs/adr/0003-effects-belong-to-the-show-scene.md).
+
+### Changed
+
+- The built-in scenes spec measures the edges as a 7-pixel band at 720p (it was the outermost pixel), the band every
+  effect leaves to the scene's own picture, and checks every effect alone at its strongest on every scene.
+
 ## Unreleased — the Look serves the laser set (2026-10-17)
 
 The Look widget now works with the laser set instead of against it. See

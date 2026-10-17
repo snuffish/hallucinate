@@ -6,8 +6,8 @@
 
 ## Widgets & layout
 
-The controls are separate widgets: Hallucinate, Source, Media, Audio, Scene, Look, Actions, Screen and Parameters
-(Screen chooses what the main screen shows; see [Studio](studio.md)). Drag one by
+The controls are separate widgets: Hallucinate, Source, Media, Audio, Scene, Look, Effects, Actions, Screen and
+Parameters (Screen chooses what the main screen shows; see [Studio](studio.md)). Drag one by
 its title bar onto an edge of the screen to dock it there (a preview shows where it lands, and you can reorder a dock), or
 drop it anywhere else to float it. Floating widgets resize by their corner, docked ones by their bottom edge, and a
 dock's inner edge sets its width. Double-click a title bar to put that widget back where it started. The assistant
@@ -18,6 +18,16 @@ arrangement. The layout is remembered. H hides all the controls, and they also h
 mouse movement (Settings → Interface changes the delay, or turns it off). The scene that's playing is remembered too and comes back on the next start.
 
 The ☰ menu is also where you [export and import your setup](backup.md).
+
+## Effects
+
+The **Effects** widget, under the Look, reshapes the picture on the main screen before the Look does. *Add effect*
+offers the effects you haven't added yet; each one then gets a row with an on/off checkbox, a × to remove it and its
+settings. **Mirror** reflects the left half onto the right, the top half onto the bottom, or both, and holds still on
+the beat. The effects belong to what is on screen, like the Look: they stay when the scene changes (by hand,
+auto-switch or the library), come back after a reload, and show on any projector showing the main screen. Randomize
+and Drift leave them alone, and library previews show scenes without them. Near the edges every effect fades back to
+the scene's own picture, so the border stays as dark as the scene keeps it.
 
 **⚙** (or **,**) opens [Settings](settings.md): how this computer renders and listens, how soon the controls hide, and
 whether buttons show their key badges.
