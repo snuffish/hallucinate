@@ -50,13 +50,14 @@ test('perf: Test GPU measures at half resolution and puts the resolution back', 
 
 // An effect's cost lands on every output and projector: the profiler times the frame with and without it
 // at the resolution the screen renders at, the default one here. Software WebGL makes the numbers
-// anything; what matters is that it reports both and a Glow's blur costs something.
+// anything; what matters is that it reports both and a Glow's blur costs something. A small canvas and
+// few frames keep it to seconds under software WebGL (PERF.md has the GPU numbers, from perf/measure.mjs).
 test('perf: the profiler reports what a Glow costs per frame at the default resolution, against no effects', async ({ page }) => {
   await start(page, '/?perf');
-  const cost = await page.evaluate((effects) => (window as unknown as { __profiler: ProfilerApi }).__profiler.effectsCost(effects), strongest('glow'));
+  const cost = await page.evaluate((effects) => (window as unknown as { __profiler: ProfilerApi }).__profiler.effectsCost(effects, { size: [480, 270], frames: 4, rounds: 3 }), strongest('glow'));
   console.log(`Glow at its strongest: ${cost.with.toFixed(2)} ms a frame against ${cost.none.toFixed(2)} ms without effects (+${cost.extra.toFixed(2)} ms) at ${cost.size.join('×')}, resolution ${cost.scale}`);
   expect(cost.scale).toBe(DEFAULT_PREFS.resolution);
-  expect(cost.size[0]).toBeGreaterThan(0);
+  expect(cost.size).toEqual([480, 270].map((x) => Math.round(x * cost.scale)));
   expect(cost.none).toBeGreaterThan(0);
   expect(cost.with).toBeGreaterThan(cost.none);
   expect(cost.extra).toBeCloseTo(cost.with - cost.none, 6);
