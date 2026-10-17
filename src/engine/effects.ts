@@ -7,6 +7,7 @@
 // safety spec, which checks each effect alone at its strongest (the top of each range). Adding an effect
 // is one row here. Pure: the safety spec imports it in Node.
 
+import { z } from 'zod';
 import { INPUT_DECLARATIONS } from './scene-inputs';
 
 export interface EffectSetting {
@@ -99,6 +100,10 @@ export function cleanStack(raw: unknown): EffectStack {
   }
   return stack;
 }
+
+// A stored stack (the main screen's, a show scene's) as zod reads it: anything, cleaned up, so it never
+// fails the value it sits in; missing reads as no effects.
+export const EffectStackSchema: z.ZodType<EffectStack, unknown> = z.unknown().transform(cleanStack);
 
 const defaults = (def: EffectDef): Record<string, number> => Object.fromEntries(def.settings.map((s) => [s.key, s.default]));
 

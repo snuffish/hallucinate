@@ -1,6 +1,7 @@
 // The app's mutable state, shared by the engines (read every frame, no React) and the React tree
 // (through store.ts, which publishes immutable snapshots at UI rate). Nothing here allocates per frame.
 
+import type { EffectStack } from '../engine/effects';
 import type { Scene } from '../scenes';
 
 export const BEATS_PER_SCENE = 32;
@@ -65,6 +66,7 @@ export interface AppState {
   nodesIndex: number;
   keyedScenes: number[];
   look: Look;
+  effects: EffectStack;   // the main screen's: what is on screen, like the Look, not the scene's (ADR 0003)
   clock: Clock;
   activeSource: SourceButton | null;
 }

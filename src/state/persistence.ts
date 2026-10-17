@@ -18,6 +18,7 @@ export const KEYS = {
   mediaSound: 'hallucinate.mediaSound',
   layout: 'hallucinate.layout',
   lastScene: 'hallucinate.lastScene',   // the scene on screen (its paramKey), restored on the next start; not exported
+  screenEffects: 'hallucinate.screenEffects',   // the main screen's effects (src/state/screen-effects.ts), restored on the next start; not exported
   // The assistant's conversations: this index; the transcripts live in IndexedDB (src/assistant/history-store.ts).
   assistantChats: 'hallucinate.assistantChats',
   assistantThinking: 'hallucinate.assistantThinking',   // the panel's "Show reasoning" toggle
@@ -45,7 +46,7 @@ export const KEY_CLASS: Record<keyof typeof KEYS, KeyClass> = {
   sceneEdits: 'setup', userScenes: 'setup', library: 'setup', params: 'setup', customShader: 'setup', nodeGraph: 'setup',
   show: 'setup', player: 'setup', mediaSound: 'setup', layout: 'setup',
   prefs: 'device', assistantThinking: 'device',
-  scRecent: 'history', ytRecent: 'history', lastScene: 'history', renameReport: 'history', assistantChats: 'history', paramGroups: 'history', helpHint: 'history',
+  scRecent: 'history', ytRecent: 'history', lastScene: 'history', screenEffects: 'history', renameReport: 'history', assistantChats: 'history', paramGroups: 'history', helpHint: 'history',
   paramsCollapsed: 'migration', paramsPos: 'migration',
   importedAt: 'import', importReport: 'import',
 };

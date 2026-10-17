@@ -3,6 +3,7 @@
 // AppContext. Panels that need deeper hooks (editor, studio, assistant) register them here.
 
 import { AudioEngine } from '../engine/audio';
+import * as FX from '../engine/effects';
 import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
 import { composeFrame, composeStill, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
@@ -20,6 +21,7 @@ import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, 
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
 import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
 import { takeRenameReport } from '../state/scene-renames';
+import { loadScreenEffects, screenEffectsWriter } from '../state/screen-effects';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { applyWrites, buildBundle, parseBundle } from './bundle';
@@ -111,6 +113,7 @@ export class AppController {
   private disposed = false;
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
+  private readonly effectsWriter = screenEffectsWriter(() => this.state.effects);
   private readonly program: ProgramState;
   private readonly paramStore: ParamStore;   // likewise
   private readonly profilerApi: ProfilerApi = {
@@ -166,10 +169,10 @@ export class AppController {
     this.paramStore = new ParamStore();
     this.state = {
       scenes: list.scenes, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
-      look: defaultLook(), clock: defaultClock(), activeSource: null,
+      look: defaultLook(), effects: loadScreenEffects(), clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
-    this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound });
+    this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, effects: this.state.effects });
     this.renderer.setMedia(this.media);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
     this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what));
@@ -238,6 +241,7 @@ export class AppController {
     this.recorder?.stop();
     this.layoutWriter.dispose();
     this.prefsWriter.dispose();
+    this.effectsWriter.dispose();
     this.transport.dispose();
     this.output.dispose();
     this.paramStore.dispose();
@@ -579,6 +583,23 @@ export class AppController {
     this.ui.set({ look: { ...this.state.look } });
   }
 
+  // ---------- Effects (the main screen's: they stay through scene changes, like the Look) ----------
+
+  addEffect(id: FX.EffectId): void { this.setEffects(FX.addEffect(this.state.effects, id)); }
+  removeEffect(id: FX.EffectId): void { this.setEffects(FX.removeEffect(this.state.effects, id)); }
+  moveEffect(id: FX.EffectId, to: number): void { this.setEffects(FX.moveEffect(this.state.effects, id, to)); }
+  setEffectOn(id: FX.EffectId, on: boolean): void { this.setEffects(FX.setEffectOn(this.state.effects, id, on)); }
+  setEffectSetting(id: FX.EffectId, key: string, value: number): void { this.setEffects(FX.setEffectSetting(this.state.effects, id, key, value)); }
+
+  // A new stack (never edited in place, so whatever holds the old one keeps it): drawn from the next
+  // frame, published to the widget and kept for the next start.
+  private setEffects(stack: FX.EffectStack): void {
+    if (stack === this.state.effects) return;
+    this.state.effects = stack;
+    this.ui.set({ effects: stack });
+    this.effectsWriter.schedule();
+  }
+
   toggleAuto(): boolean {
     this.setLookFlag('auto', !this.state.look.auto);
     this.toast(`Auto-switch ${this.state.look.auto ? 'on' : 'off'}`, 1500);
@@ -883,6 +904,7 @@ export class AppController {
     const p = this.program;
     composeFrame(p, c, f, look, this.currentScene.trails ?? 1, dt);   // the main screen's motion is the clock's
     p.scene = c.scene; p.prevScene = c.prevScene; p.mix = crossfade(c, c.clock);
+    p.effects = p.prevEffects = this.state.effects;   // on the main screen effects belong to what is on screen, not to the scene
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
     this.profiler.lap(Stage.logic);
