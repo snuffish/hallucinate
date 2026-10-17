@@ -4,19 +4,23 @@
 
 import type { Look } from './app-state';
 
-// What Randomize and Drift may pick from: narrower than the sliders' full range where the extremes
-// look broken (no reactivity, frozen motion, no trails).
+// What Randomize and Drift may pick from: laser-friendly territory (ADR 0002). Narrower than the
+// sliders' full range, which stays open for hand use.
 export const RANDOM_RANGES = {
-  reactivity: [0.5, 1.6],
+  reactivity: [0.6, 1.4],
   speed: [0.5, 1.6],
-  trails: [0.6, 0.95],
+  trails: [0, 0.6],
   hue: [0, 1],
-  cycle: [0, 1.5],
-  synesthesia: [0, 1],
-  aberration: [0, 0.025],
+  cycle: [0, 1],
+  synesthesia: [0, 0.6],
+  aberration: [0, 0.006],   // Fringing
 } as const;
 export type DriftKey = keyof typeof RANDOM_RANGES;
 const KEYS = Object.keys(RANDOM_RANGES) as DriftKey[];
+
+// The strongest Look Randomize or Drift can reach: the top of every range. The safety rules check
+// scenes with this applied.
+export const STRONGEST_LOOK = Object.fromEntries(KEYS.map((k) => [k, RANDOM_RANGES[k][1]])) as Record<DriftKey, number>;
 
 // Seconds one glide takes at drift speed 1; each slider also gets its own tempo.
 const MIN_SECONDS = 6;

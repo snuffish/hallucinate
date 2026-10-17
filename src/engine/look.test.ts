@@ -53,7 +53,8 @@ describe('composeFrame', () => {
   });
 
   it('reads bright sound as light, warm and crisp, dark sound as dim, cool and lingering', () => {
-    const bright = frame(sound({ bright: 1 })), dark = frame(sound({ bright: 0 }));
+    const look = { ...defaultLook(), synesthesia: 0.7, aberration: 0.006 };   // some fringing for the tone to grow or shrink
+    const bright = frame(sound({ bright: 1 }), look), dark = frame(sound({ bright: 0 }), look);
     expect(bright.grade.exposure).toBeGreaterThan(1);
     expect(dark.grade.exposure).toBeLessThan(1);
     expect(bright.grade.tint[0]).toBeGreaterThan(bright.grade.tint[2]!);   // warm: more red than blue

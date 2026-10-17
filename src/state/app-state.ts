@@ -34,8 +34,8 @@ export const LOOK_RANGES: Record<LookKey, { min: number; max: number; step: numb
 };
 
 export const defaultLook = (): Look => ({
-  reactivity: 1, speed: 1, trails: 0.86, hue: 0, cycle: 0.6, aberration: 0.012,
-  synesthesia: 0.7, auto: true, randomScene: false, drift: false, driftSpeed: 1,
+  reactivity: 1, speed: 1, trails: 0.35, hue: 0, cycle: 0.2, aberration: 0,
+  synesthesia: 0.3, auto: true, randomScene: false, drift: false, driftSpeed: 1,
 });
 
 export interface Clock {

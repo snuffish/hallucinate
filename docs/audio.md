@@ -46,13 +46,28 @@ warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm col
 
 ## 🎨 The Look widget
 
-Look sliders: reactivity, speed, trails, colour, colour cycling, chromatic aberration, synesthesia and Drift
+Look sliders: Reactivity, Speed, Trails, Colour, Colour cycling, Synesthesia, Fringing and Drift
 speed. Resolution isn't part of the Look: it is in [Settings → Display & performance](settings.md#display--performance)
 (lower it if frames drop).
 
+The app opens with a laser look:
+
+| Slider | Default | Randomize and Drift pick from |
+|---|---|---|
+| Reactivity | 1 | 0.6–1.4 |
+| Speed | 1 | 0.5–1.6 |
+| Trails | 0.35 | 0–0.6 |
+| Colour | 0 | 0–1 |
+| Colour cycling | 0.2 | 0–1 |
+| Synesthesia | 0.3 | 0–0.6 |
+| Fringing | 0 | 0–0.006 |
+
+By hand every slider still reaches its full range.
+
+- **Fringing** – how far each line splits into red, green and blue copies towards the edges of the picture.
 - **Trails** – an afterglow: a line keeps glowing where it was drawn and fades there, without moving. At 0 there is
   no afterglow; higher values fade more slowly. The trail keeps the line's colour.
 - **Drift** – the Look sliders glide to new random values on their own, each at its own pace, so the look keeps
   changing smoothly; *Drift speed* sets how fast. A slider you move by hand drifts on from there.
-- **Randomize** (R) jumps the Look sliders (not Resolution) to new values instead. Tick *Randomize also picks a random
+- **Randomize** (R) jumps the Look sliders to new values in the ranges above instead. Tick *Randomize also picks a random
   scene* to change the scene too. Shift+R steps back to the look (and scene) before each randomize, up to 20 steps.
