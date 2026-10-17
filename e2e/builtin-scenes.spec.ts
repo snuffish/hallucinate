@@ -15,8 +15,9 @@ import { STRONGEST_LOOK } from '../src/state/look-drift';
 // which under software WebGL takes a minute or so per pair, so they get a timeout each and share the
 // workers. CI runs this spec in a job of its own (e2e-scenes), off the runner the timing specs use.
 // Every effect in the catalogue (src/engine/effects.ts) joins the same way: alone, at its strongest, on
-// every scene at the strongest Look (ADR 0003). The edges these rules measure are the border band the
-// effects' edge fade leaves to the scene alone, defined once in the catalogue (EDGE_BAND).
+// every scene at the strongest Look (ADR 0003), and all of them stacked keep the edges black. The edges
+// these rules measure are the border band the effects' edge fade leaves to the scene alone, defined
+// once in the catalogue (EDGE_BAND).
 
 interface Verdict { error: string | null; edgeBlack: number; kick: number; tick: number }
 type Hook = { __profiler?: Pick<ProfilerApi, 'scenes' | 'still' | 'stillChange'> };
@@ -67,28 +68,33 @@ test('every built-in scene is listed, has a tab and 3–8 parameters', async ({ 
   }
 });
 
+// The frame's border band (`band`, a share of the short side): the share of its pixels that are exactly
+// black. Not all of it: lines and their halos may run off an edge (Beam Fan's beams rise from the bottom
+// one, Light Sheet's lines cross both sides), so a quarter is left for them. The rest is background and
+// must be pure black: a glow fill, haze, a smeared afterglow or the display's grain would leave next to
+// none of it black. Passed into the page as source.
+const EDGE_BLACK = `({ width: w, height: h, data }, band) => {
+  const reach = band * Math.min(w, h);
+  let edge = 0, black = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (Math.min(x, w - 1 - x, y, h - 1 - y) >= reach) continue;
+    const i = (y * w + x) * 4;
+    edge++;
+    if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 0) black++;
+  }
+  return black / edge;
+}`;
+type EdgeBlack = (image: ImageData, band: number) => number;
+
 // The safety rules for one scene with `look` (and `effects`): the share of the border band that is pure
 // black in silence, and the share of the frame a kick and a tick make more than twice as bright.
 async function verdict(page: Page, index: number, look: FrameLook, effects: EffectStack = []): Promise<Verdict> {
-  return page.evaluate(async ({ index, look, effects, band, SILENCE, CALM, KICK, TICK_END, TICK_START }) => {
+  return page.evaluate(async ({ index, look, effects, band, source, SILENCE, CALM, KICK, TICK_END, TICK_START }) => {
     const { still, stillChange } = (window as Hook).__profiler!;
     const lum = (d: Uint8ClampedArray, i: number) => (0.299 * d[i]! + 0.587 * d[i + 1]! + 0.114 * d[i + 2]!) / 255;
     const silent = await still(index, { inputs: SILENCE, silent: true, look, effects });
     if (!silent.image) return { error: silent.error, edgeBlack: 0, kick: 1, tick: 1 };
-    // The frame's border band: the share of its pixels that are exactly black. Not all of it: lines and
-    // their halos may run off an edge (Beam Fan's beams rise from the bottom one, Light Sheet's lines
-    // cross both sides), so a quarter is left for them. The rest is background and must be pure
-    // black: a glow fill, haze, a smeared afterglow or the display's grain would leave next to none
-    // of it black.
-    const { width: w, height: h, data } = silent.image;
-    const reach = band * Math.min(w, h);
-    let edge = 0, black = 0;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      if (Math.min(x, w - 1 - x, y, h - 1 - y) >= reach) continue;
-      const i = (y * w + x) * 4;
-      edge++;
-      if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 0) black++;
-    }
+    const edgeBlack = ((0, eval)(source) as EdgeBlack)(silent.image, band);
     // The strobe rule: the share of pixels a change from one frame to the next makes more than twice
     // as bright. A change smaller than a tenth of full brightness isn't a flash (WCAG's threshold),
     // so near-black halos don't count. The two frames are the end of one burst: `from`'s sound
@@ -102,8 +108,8 @@ async function verdict(page: Page, index: number, look: FrameLook, effects: Effe
       }
       return n / (a!.length / 4);
     };
-    return { error: null, edgeBlack: black / edge, kick: await doubled(CALM, KICK), tick: await doubled(TICK_END, TICK_START) };
-  }, { index, look, effects, band: EDGE_BAND, SILENCE, CALM, KICK, TICK_END, TICK_START }) as Promise<Verdict>;
+    return { error: null, edgeBlack, kick: await doubled(CALM, KICK), tick: await doubled(TICK_END, TICK_START) };
+  }, { index, look, effects, band: EDGE_BAND, source: EDGE_BLACK, SILENCE, CALM, KICK, TICK_END, TICK_START }) as Promise<Verdict>;
 }
 
 function judge(v: Verdict, what: string): void {
@@ -132,6 +138,32 @@ for (const effect of EFFECTS) for (const { name: sceneName } of SCENES) {
     judge(await verdict(page, scene.index, STRONGEST_LOOK, strongest(effect.id)), `${sceneName} with ${effect.label} at the strongest Look`);
   });
 }
+
+// Every effect stacked, each at its strongest: whatever runs before it, each effect fades back to the
+// scene's own picture across the border, so the edges stay the scene's. One test for every scene and
+// only the silent still: the kick and the tick are each effect's own, checked alone above. (In this
+// stack the Kaleidoscope's disc leaves the corners black too, so the edges hold with a margin.)
+const ALL_STRONGEST: EffectStack = EFFECTS.flatMap((e) => strongest(e.id));
+test('every scene with all the effects stacked at their strongest, at the strongest Look: black edges in silence', async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const scenes = await openProfiler(page);
+  const edges = await page.evaluate(async ({ scenes, look, effects, band, SILENCE, source }) => {
+    const p = (window as Hook).__profiler!;
+    const edgeBlack = (0, eval)(source) as EdgeBlack;
+    const out: { name: string; error: string | null; edgeBlack: number }[] = [];
+    for (const { name, index } of scenes) {
+      const { image, error } = await p.still(index, { inputs: SILENCE, silent: true, look, effects });
+      out.push({ name, error, edgeBlack: image ? edgeBlack(image, band) : 0 });
+    }
+    return out;
+  }, { scenes: scenes.map(({ name, index }) => ({ name, index })), look: STRONGEST_LOOK, effects: ALL_STRONGEST, band: EDGE_BAND, SILENCE, source: EDGE_BLACK });
+  expect(edges.map((e) => e.name), 'every built-in scene').toEqual(SCENES.map((s) => s.name));
+  for (const { name, error, edgeBlack } of edges) {
+    console.log(`${name} with every effect stacked: ${(edgeBlack * 100).toFixed(1)}% of the edge is black in silence`);
+    expect.soft(error, `${name} renders`).toBeNull();
+    expect.soft(edgeBlack, `${name}: the edges are pure black in silence`).toBeGreaterThanOrEqual(0.75);
+  }
+});
 
 // The rules above only mean something if the Look reaches the picture: trails leave an afterglow and
 // fringing splits the colours in the frame still() returns.
@@ -192,6 +224,27 @@ for (const effect of EFFECTS) {
     expect(changed).toBeGreaterThan(0.001);
   });
 }
+
+// The order of the stack is the order the effects run in: a Wave bending the picture before a
+// Kaleidoscope folds it gives a different picture than bending the folded one.
+test('a Wave before a Kaleidoscope gives a different picture than after it', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await openProfiler(page);
+  const wave = { id: 'wave', on: true, settings: { amount: 1, wavelength: 0.4 } } as const;
+  const kaleidoscope = { id: 'kaleidoscope', on: true, settings: { segments: 6, spin: 0.3 } } as const;
+  const r = await page.evaluate(async ({ look, sceneName, source, inner, before, after }) => {
+    const p = (window as Hook).__profiler!;
+    const differs = (0, eval)(source) as Differs;
+    const index = p.scenes().find((s) => s.name === sceneName)!.index;
+    const a = (await p.still(index, { look, effects: before })).image!;
+    const again = (await p.still(index, { look, effects: before })).image!;
+    const b = (await p.still(index, { look, effects: after })).image!;
+    return { again: differs(a.data, again.data, a.width, a.height, inner, 2), swapped: differs(a.data, b.data, a.width, a.height, inner, 2) };
+  }, { look: defaultLook(), sceneName: KALEIDOSCOPE_SCENE, source: DIFFERS, inner: INNER, before: [wave, kaleidoscope], after: [kaleidoscope, wave] });
+  console.log(`${KALEIDOSCOPE_SCENE}: swapping a Wave and a Kaleidoscope changes ${(r.swapped * 100).toFixed(1)}% of the picture (the same order twice: ${(r.again * 100).toFixed(1)}%)`);
+  expect(r.again, 'the same order renders the same picture').toBe(0);
+  expect(r.swapped, 'the other order renders another').toBeGreaterThan(0.01);
+});
 
 // A Wave's ripple starts at the centre on a kick. Watched on a grid that ignores the music, so whatever
 // a kick changes the Wave changed: near the centre it moves the lines, further out, where the ripple
