@@ -53,8 +53,13 @@ _Avoid_: vibe
 
 **Scene**:
 A picture that moves with the music, with its own parameters and a category. Built-in scenes ship with the app;
-your own are saved from the editor. Any scene may also show your video, camera or images.
-_Avoid_: visual, effect, shader, preset
+your own are saved from the editor. Any scene may also show your video or images.
+_Avoid_: visual, shader, preset
+
+**Effect**:
+A built-in step that reshapes a scene's picture, such as a mirror or a glow, moving with the music in its own way. A
+show scene keeps its effects in order, each switched on or off, and they shape the picture before the Look does.
+_Avoid_: filter (the library's category tabs), layer, FX, post-processing
 
 **Look**:
 The sliders that shape how a scene reacts and colours: reactivity, speed, trails, hue, colour cycling, fringing,
@@ -88,7 +93,7 @@ it, or the softer rainbow.
 _Avoid_: rainbow (that is the softer one)
 
 **Show scene**:
-A scene with its parameter values and the look it keeps, as the studio plays it.
+A scene with its parameter values, its effects and the look it keeps, as the studio plays it.
 _Avoid_: cue (the code's name for it), preset
 
 **Live**:
