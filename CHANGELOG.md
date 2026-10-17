@@ -19,13 +19,18 @@
   picture keeps its own effects; a cut switches them with the scene. Shows saved before effects load with none, a
   damaged effect is dropped without losing the show, and an exported show carries its effects while still opening
   (without them) in an older copy. Show scenes the director and the assistant write have none.
+- Effects can be dragged into another order by the ⠿ handle on their row (or moved with ↑ / ↓ from the focused
+  handle); they run from the top down, so the order changes the picture. The order is kept on the screen, in show
+  scenes and through a reload.
 - `__profiler.effectsCost(stack)` times what effects cost per frame at the screen's resolution, against none, and
-  `perf/measure.mjs` reports it for Glow.
+  `perf/measure.mjs` reports it for Glow and for all four stacked (about +1.6 ms at 720p and +3.4 ms at 1080p on an
+  M2 at their strongest; PERF.md).
 
 ### Changed
 
 - The built-in scenes spec measures the edges as a 7-pixel band at 720p (it was the outermost pixel), the band every
-  effect leaves to the scene's own picture, and checks every effect alone at its strongest on every scene.
+  effect leaves to the scene's own picture, checks every effect alone at its strongest on every scene, and checks the
+  edges of every scene with all four stacked at their strongest.
 
 ## Unreleased — the Look serves the laser set (2026-10-17)
 

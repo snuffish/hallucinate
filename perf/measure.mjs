@@ -69,6 +69,18 @@ await sample('point-storm', 8000);
 const EFFECT_STACKS = {
   'glow-default': [{ id: 'glow', on: true, settings: { strength: 0.8, radius: 10 } }],
   'glow-strongest': [{ id: 'glow', on: true, settings: { strength: 1.5, radius: 24 } }],
+  'all-four-default': [
+    { id: 'mirror', on: true, settings: { axis: 0 } },
+    { id: 'kaleidoscope', on: true, settings: { segments: 6, spin: 0.3 } },
+    { id: 'glow', on: true, settings: { strength: 0.8, radius: 10 } },
+    { id: 'wave', on: true, settings: { amount: 0.4, wavelength: 0.4 } },
+  ],
+  'all-four-strongest': [
+    { id: 'mirror', on: true, settings: { axis: 2 } },
+    { id: 'kaleidoscope', on: true, settings: { segments: 12, spin: 1 } },
+    { id: 'glow', on: true, settings: { strength: 1.5, radius: 24 } },
+    { id: 'wave', on: true, settings: { amount: 1, wavelength: 1 } },
+  ],
 };
 if (!gpu) await page.keyboard.press('Shift+P');   // installs window.__profiler
 results['effects-cost'] = {};

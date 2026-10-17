@@ -83,8 +83,10 @@ An effect runs on every output that draws its show scene: the main screen, the s
 `__profiler.effectsCost(stack, { size? })` (with `?perf` or Shift+P) times it: the scene on screen through the whole
 pipeline at the size the screen renders at (`size`, default the canvas, × the Resolution setting), with no effects and
 with the stack, in turns, waiting for the GPU each time (a one-pixel read). It reports the median milliseconds per
-frame of each and the difference. `perf/measure.mjs` reports it for Glow at its defaults and at its strongest, on the
-canvas and at 1920×1080; `e2e/perf.spec.ts` checks it reports.
+frame of each and the difference. `perf/measure.mjs` reports it for Glow and for all four effects stacked, each at its
+defaults and at its strongest, on the canvas and at 1920×1080; `e2e/perf.spec.ts` checks it reports for a Glow and for
+all four stacked (the stack on a 640×360 picture at the default Resolution, 10 frames × 3 rounds, to stay within
+seconds under software WebGL).
 
 **Glow** (2026-10-17, default Resolution 1). Its blur is two passes at half size (a Gaussian across, then down, a tap
 every 2 pixels of a 720-high picture, out to 2.5 sigma), then its picture step at full size, so it adds three passes.
@@ -102,6 +104,23 @@ The cost scales with the pixels and barely with the scene. At 4K the strongest G
 SwiftShader (headless Chromium's software WebGL, as `e2e/perf.spec.ts` and `node perf/measure.mjs` without `--gpu`
 run) the same Glow at 1280×720 adds 33 ms (defaults) and 61 ms (strongest) to 94 ms on Point Storm: software
 rendering pays for every blur tap on the CPU, so those numbers say nothing about a GPU.
+
+**All four stacked** (2026-10-17, default Resolution 1, Mirror → Kaleidoscope → Glow → Wave). Mirror, Kaleidoscope
+and Wave are one full-size pass each, so the stack is six passes. Same M2 and browser as above, on Beam Fan, each
+number from a fresh browser after a 20 s rest:
+
+| Render size | No effects | Glow at its strongest | All four at their defaults | All four at their strongest |
+| --- | --- | --- | --- | --- |
+| 1280×720 | 0.7 ms | +0.9 ms | +1.3 ms | +1.6 ms |
+| 1920×1080 | 1.4 ms | +1.8 ms | +2.8 ms | +3.4 ms |
+
+So the three single-pass effects together cost less than the Glow alone (about +0.5 ms at 720p, +1.1 ms at 1080p),
+and a show scene with everything on stays well inside a 60 Hz frame up to 1080p. 4K didn't measure steadily: the M2
+throttles under a sustained GPU load, and in the same run the Glow alone read +13 ms (the table above has +6.3 ms),
+all four at their defaults +15 ms and at their strongest +42 ms while "no effects" crept from 5.7 to 7.1 ms. A run
+of `effectsCost` calls on one page without rests drifted the same way at every size, "no effects" included,
+several-fold within minutes, so compare numbers from a rested run only. Under SwiftShader (`e2e/perf.spec.ts`), the four at their strongest add about 80 ms a
+frame to 31 ms at 640×360.
 
 ## Before → after
 

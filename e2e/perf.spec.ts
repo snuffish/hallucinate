@@ -1,5 +1,5 @@
 import { expect, test, type Page } from './fixtures';
-import { strongest } from '../src/engine/effects';
+import { EFFECTS, strongest } from '../src/engine/effects';
 import type { ProfilerApi } from '../src/engine/profiler';
 import { DEFAULT_PREFS } from '../src/state/prefs';
 
@@ -57,6 +57,22 @@ test('perf: the profiler reports what a Glow costs per frame at the default reso
   console.log(`Glow at its strongest: ${cost.with.toFixed(2)} ms a frame against ${cost.none.toFixed(2)} ms without effects (+${cost.extra.toFixed(2)} ms) at ${cost.size.join('×')}, resolution ${cost.scale}`);
   expect(cost.scale).toBe(DEFAULT_PREFS.resolution);
   expect(cost.size[0]).toBeGreaterThan(0);
+  expect(cost.none).toBeGreaterThan(0);
+  expect(cost.with).toBeGreaterThan(cost.none);
+  expect(cost.extra).toBeCloseTo(cost.with - cost.none, 6);
+});
+
+// Every effect stacked, each at its strongest: what a show scene that uses them all costs per frame,
+// against none, at the default resolution. A smaller picture than the canvas (at the same resolution
+// scale) and fewer frames keep it to seconds under software WebGL, where a full-size Glow alone takes
+// a minute.
+test('perf: the profiler reports what all the effects stacked cost per frame at the default resolution, against none', async ({ page }) => {
+  await start(page, '/?perf');
+  const all = EFFECTS.flatMap((e) => strongest(e.id));
+  const cost = await page.evaluate((effects) => (window as unknown as { __profiler: ProfilerApi }).__profiler.effectsCost(effects, { size: [640, 360], frames: 10, rounds: 3 }), all);
+  console.log(`All ${all.length} effects at their strongest: ${cost.with.toFixed(2)} ms a frame against ${cost.none.toFixed(2)} ms without effects (+${cost.extra.toFixed(2)} ms) at ${cost.size.join('×')}, resolution ${cost.scale}`);
+  expect(cost.scale).toBe(DEFAULT_PREFS.resolution);
+  expect(cost.size).toEqual([640, 360].map((x) => Math.round(x * DEFAULT_PREFS.resolution)));
   expect(cost.none).toBeGreaterThan(0);
   expect(cost.with).toBeGreaterThan(cost.none);
   expect(cost.extra).toBeCloseTo(cost.with - cost.none, 6);

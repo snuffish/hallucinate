@@ -23,12 +23,15 @@ The ☰ menu is also where you [export and import your setup](backup.md).
 
 The **Effects** widget, under the Look, reshapes the picture on the main screen before the Look does. *Add effect*
 offers the effects you haven't added yet; each one then gets a row with an on/off checkbox, a × to remove it and its
-settings. **Mirror** reflects the left half onto the right, the top half onto the bottom, or both, and holds still on
+settings. They run from the top of the list down, so the order changes the picture (a Wave before a Kaleidoscope
+bends what gets folded; after it, it bends the mandala): drag a row by its ⠿ handle to another place, or focus the
+handle and press ↑ / ↓. Show scenes keep the order. **Mirror** reflects the left half onto the right, the top half onto the bottom, or both, and holds still on
 the beat. **Kaleidoscope** folds the picture into 3 to 12 segments around the centre and turns the mandala at its spin
 speed; the bass pushes the turn ahead and each kick jumps it on, as strongly as Reactivity says (at spin speed 0 it
 holds still). **Glow** lays a soft bloom of light around the lines (*Strength*: how bright, *Radius*: how far it
 spreads); it swells with the bass and gives way to each kick, dipping while the lines flash and blooming back after,
-so a kick never doubles it. It costs about a millisecond a frame at 1080p on an M2, the most of the effects.
+so a kick never doubles it. It costs about a millisecond a frame at 1080p on an M2, the most of the effects (all four
+stacked: about 3 ms, [PERF.md](../PERF.md)).
 **Wave** ripples and bends the picture (*Amount* sets how far, *Wavelength* how far apart the ripples are), and on
 each kick sends a ripple outward from the centre, as strongly as Reactivity says. The effects belong to
 what is on screen, like the Look: they stay when the scene changes (by hand, auto-switch or the library), come back
