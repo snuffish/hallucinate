@@ -6,7 +6,7 @@
 
 import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
-import type { SnapshotUniforms } from './scene-inputs';
+import { stillHearing, type SnapshotUniforms } from './scene-inputs';
 
 // The sliders a frame is composed with: a show scene stores the numbers it keeps (LOOK_KEYS), the rest
 // (synesthesia) is the app's.
@@ -77,13 +77,9 @@ const BURST_FRAMES = 20;   // a third of a second: long enough for the strongest
 const BURST_DT = 1 / 60;
 
 export function composeStill(scene: number, inputs: Readonly<SnapshotUniforms>, look: Readonly<FrameLook>, sceneTrails: number, spectrum: Uint8Array): ProgramState[] {
-  const sound = (kick: boolean): Hearing => ({
-    bass: inputs.uBass, mid: inputs.uMid, high: inputs.uHigh, level: inputs.uLevel, beat: inputs.uBeat, kick, tick: false,
-    tickPhase: inputs.uTick, ticks: inputs.uTicks, bpm: null, bright: inputs.uBright, centroid: 0, energy: inputs.uLevel, mood: inputs.uMood,
-  });
   const play = (motion: Motion): ProgramState[] => Array.from({ length: BURST_FRAMES }, (_, i) => {
     const p = { ...programState(spectrum), scene, prevScene: -1, mix: 1 };
-    composeFrame(p, motion, sound(i === BURST_FRAMES - 1 && inputs.uBeat >= 1), look, sceneTrails, BURST_DT);
+    composeFrame(p, motion, stillHearing(inputs, i === BURST_FRAMES - 1 && inputs.uBeat >= 1), look, sceneTrails, BURST_DT);
     return p;
   });
   const start = (): Motion => ({ time: 0, timeRate: look.speed, huePhase: inputs.uHue });
@@ -91,7 +87,7 @@ export function composeStill(scene: number, inputs: Readonly<SnapshotUniforms>, 
   return play({ ...start(), time: inputs.uTime - elapsed });
 }
 
-export const smoothstep =(x: number): number => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+export const smoothstep = (x: number): number => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 
 // A crossfade from `prevScene`, `fade` seconds long from `transitionStart`.
 export interface Transition { prevScene: number; transitionStart: number; fade: number }

@@ -85,7 +85,6 @@ export class StudioSession {
   private lastTimerTick = -1;
   private readonly listeners = new Set<(event: StudioEvent) => void>();
   private previewRenderer: Renderer | null = null;
-  private previewResolution = 0;
   private readonly shots = new WeakMap<Cue, Shot>();   // the Preview monitor's, per cue
   private readonly writer = debouncedWriter(KEYS.show, () => this.serialised(), 300);
   private open = false;
@@ -142,11 +141,11 @@ export class StudioSession {
   }
 
   // The monitor renders like Live: at the Resolution setting (so Preview shows how a show scene will
-  // look) and the pixel density. A rescale restarts the trails, so only a changed Resolution does one.
+  // look) and the pixel density.
   private applyPreviewPrefs(prefs: Prefs): void {
     const r = this.previewRenderer;
     if (!r) return;
-    if (prefs.resolution !== this.previewResolution) r.setScale((this.previewResolution = prefs.resolution));
+    r.setScale(prefs.resolution);
     applyRendererPrefs(r, outputPrefs(prefs));
   }
 

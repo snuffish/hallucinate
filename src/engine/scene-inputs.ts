@@ -5,6 +5,8 @@
 // the new-scene template and the stand-ins for library thumbnails and the assistant's screenshots.
 // Adding an input is one row here, plus its field on ProgramState and the code that fills it.
 
+import type { Hearing } from './listener';
+
 const BAND = '0…1, up to 1.5 at high reactivity';
 const SLOW = '0…1, changes over seconds, not scaled by reactivity';
 
@@ -30,6 +32,12 @@ export type InputField = SceneInput['field'];
 export type SnapshotUniforms = Record<InputUniform, number>;
 export const stillUniforms = (over: Partial<SnapshotUniforms> = {}): SnapshotUniforms =>
   ({ ...Object.fromEntries(SCENE_INPUTS.map((i) => [i.uniform, i.still])), ...over }) as SnapshotUniforms;
+
+// What a still frame hears: the music `inputs` stand for, as the listener would report it, kicking or not.
+export const stillHearing = (inputs: Readonly<SnapshotUniforms>, kick: boolean): Hearing => ({
+  bass: inputs.uBass, mid: inputs.uMid, high: inputs.uHigh, level: inputs.uLevel, beat: inputs.uBeat, kick, tick: false,
+  tickPhase: inputs.uTick, ticks: inputs.uTicks, bpm: null, bright: inputs.uBright, centroid: 0, energy: inputs.uLevel, mood: inputs.uMood,
+});
 
 // Writes a frame's inputs into a uniform table (the renderer's, once a frame; no allocation).
 export function writeInputs(to: Record<string, unknown>, frame: Readonly<Record<InputField, number>>): void {

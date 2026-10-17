@@ -1,7 +1,8 @@
 // WebGL2 pipeline:
 //   1. scene shader(s)  -> scene targets (two while crossfading)
-//   2. feedback pass    -> mixes scene with a faded copy of the previous frame, in place
-//                          (ping-pong): the trails' afterglow, where each line was drawn
+//   2. feedback pass    -> the previous frame, faded in place by the trails amount, and the scene:
+//                          the brighter of the two wins per channel (ping-pong). That is the
+//                          trails' afterglow, where each line was drawn
 //   3. display pass     -> tonemap, chromatic aberration, vignette, grain (not on black) -> canvas
 //
 // Programs compile in the background (KHR_parallel_shader_compile) so typing in the editor never
@@ -32,7 +33,9 @@ uniform float uMix, uFeedback;
 
 void main() {
   vec3 scene = mix(texture(uSceneB, vUv).rgb, texture(uSceneA, vUv).rgb, uMix);
-  vec3 prev = texture(uPrev, vUv).rgb * uFeedback;   // the afterglow fades where the line was drawn
+  // The previous frame, at the same pixel (it never moves or spins), faded by the trails amount; the
+  // brighter of the scene and that afterglow wins, per channel. Capped so it can never run away.
+  vec3 prev = texture(uPrev, vUv).rgb * uFeedback;
   fragColor = vec4(min(max(scene, prev), vec3(8.)), 1.);
 }
 `;
@@ -429,7 +432,7 @@ export class Renderer {
   private renderThumb(index: number, uniforms: SnapshotUniforms, w: number, h: number, spectrum?: Uint8Array): Target {
     const gl = this.gl;
     if (this.thumb && (this.thumb.out.w !== w || this.thumb.out.h !== h)) {   // previews and assistant frames differ in size
-      for (const t of [this.thumb.scene, this.thumb.out]) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
+      for (const t of [this.thumb.scene, this.thumb.out]) this.deleteTarget(t);
       this.thumb = null;
     }
     if (!this.thumb) this.thumb = { scene: this.createTarget(w, h), out: this.createTarget(w, h, true) };
@@ -497,8 +500,13 @@ export class Renderer {
 
   private deleteBurst(): void {
     if (!this.burst) return;
-    for (const t of [...Object.values(this.burst.targets), this.burst.out]) { this.gl.deleteTexture(t.tex); this.gl.deleteFramebuffer(t.fbo); }
+    for (const t of [...Object.values(this.burst.targets), this.burst.out]) this.deleteTarget(t);
     this.burst = null;
+  }
+
+  private deleteTarget(t: Target): void {
+    this.gl.deleteTexture(t.tex);
+    this.gl.deleteFramebuffer(t.fbo);
   }
 
   // Reads back what `render()` drew without stalling the GPU: the pixels come through a pixel buffer
@@ -576,12 +584,11 @@ export class Renderer {
     if (!this.pendingSize) [w, h] = this.pixels(this.canvas.clientWidth, this.canvas.clientHeight);   // before the observer has reported: one layout read
     this.pendingSize = null;
     if (!force && w === this.size[0] && h === this.size[1] && this.targets) return;
-    const gl = this.gl;
     this.size = [w, h];
     this.canvas.width = w;
     this.canvas.height = h;
 
-    if (this.targets) for (const t of Object.values(this.targets)) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
+    if (this.targets) for (const t of Object.values(this.targets)) this.deleteTarget(t);
     const iw = Math.max(1, Math.round(w * this.scale));
     const ih = Math.max(1, Math.round(h * this.scale));
     this.targets = {
@@ -592,7 +599,10 @@ export class Renderer {
     };
   }
 
+  // The share of the canvas the scenes render at. A rescale restarts the trails, so the same scale
+  // again does nothing: callers can pass the Resolution setting every time preferences apply.
   setScale(scale: number): void {
+    if (scale === this.scale && this.targets) return;
     this.scale = scale;
     this.resize(true);
   }
@@ -720,8 +730,8 @@ export class Renderer {
     gl.deleteProgram(this.feedbackProgram);
     gl.deleteProgram(this.displayProgram);
     gl.deleteShader(this.vert);
-    if (this.targets) for (const t of Object.values(this.targets)) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
-    if (this.thumb) for (const t of [this.thumb.scene, this.thumb.out]) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
+    if (this.targets) for (const t of Object.values(this.targets)) this.deleteTarget(t);
+    if (this.thumb) for (const t of [this.thumb.scene, this.thumb.out]) this.deleteTarget(t);
     this.deleteBurst();
     gl.deleteTexture(this.mediaTex);
     gl.deleteTexture(this.specTex);

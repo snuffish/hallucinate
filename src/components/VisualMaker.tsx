@@ -301,7 +301,7 @@ function NodeBox({ node, graph, selected, onRemove, onParam, onValue }: {
         <label key={p.name} className="ne-param">
           <span>{p.name}</span>
           {p.kind === 'select' ? (
-            <select value={String(node.params[p.name] ?? p.def)} onChange={(e) => onParam(p.name, e.target.value)}>
+            <select value={String(node.params[p.name] ?? p.saved ?? p.def)} onChange={(e) => onParam(p.name, e.target.value)}>
               {p.options.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
           ) : p.kind === 'number' ? (
