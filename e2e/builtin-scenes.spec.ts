@@ -204,6 +204,22 @@ test("a still frame shows the Look's trails and fringing", async ({ page }) => {
   expect(changed.fringing, 'fringing splits the colours').toBeGreaterThan(0.001);
 });
 
+// A still asked for with effects but none switched on is the still without any (the thumbnail's, when no
+// Look is asked for either), not a burst at the default Look.
+test('a still with no effect switched on is the still without effects', async ({ page }) => {
+  await openProfiler(page);
+  const changed = await page.evaluate(async ({ source }) => {
+    const p = (window as Hook).__profiler!;
+    const differs = (0, eval)(source) as Differs;
+    const index = p.scenes().find((s) => s.builtin)!.index;
+    const plain = (await p.still(index)).image!;
+    const against = async (effects: EffectStack) => differs(plain.data, (await p.still(index, { effects })).image!.data, plain.width, plain.height, 0, 0);
+    return { empty: await against([]), off: await against([{ id: 'mirror', on: false, settings: { axis: 0 } }]) };
+  }, { source: DIFFERS });
+  expect(changed.empty, 'an empty stack').toBe(0);
+  expect(changed.off, 'a stack switched off').toBe(0);
+});
+
 // Each effect does something: at its strongest the picture differs from the same still without it.
 for (const effect of EFFECTS) {
   test(`${effect.label} at its strongest changes the picture`, async ({ page }) => {

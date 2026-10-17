@@ -3,7 +3,7 @@
 // AppContext. Panels that need deeper hooks (editor, studio, assistant) register them here.
 
 import { AudioEngine } from '../engine/audio';
-import * as FX from '../engine/effects';
+import * as Effects from '../engine/effects';
 import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
 import { composeFrame, composeStill, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
@@ -39,10 +39,6 @@ const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second
 const viewport = (): L.Size => ({ width: window.innerWidth, height: window.innerHeight });
 
 // Hooks other panels plug in. All optional; the controller works without them.
-// A scene with its parameter values, look sliders (only the keys a show scene keeps: LOOK_KEYS) and
-// effects: a show scene on the main screen. The same shape as a show scene on an output.
-export type SceneSnapshot = Shot;
-
 export interface ControllerHooks {
   // The studio draws its Preview monitor and glides its master fader every frame.
   onFrame?: (dt: number, program: ProgramState) => void;
@@ -115,9 +111,9 @@ export class AppController {
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly effectsWriter = screenEffectsWriter(() => this.state.effects);
-  // While a show scene crossfades in on the main screen, the stack the outgoing picture keeps (null: the
-  // outgoing picture draws with the screen's own, as on a manual scene change).
-  private outgoingEffects: FX.EffectStack | null = null;
+  // While a show scene crossfades in on the main screen, the stack the outgoing picture keeps; null once the
+  // crossfade ends (or on a manual scene change), when the outgoing picture draws with the screen's own.
+  private outgoingEffects: Effects.EffectStack | null = null;
   private readonly program: ProgramState;
   private readonly paramStore: ParamStore;   // likewise
   private readonly profilerApi: ProfilerApi = {
@@ -131,7 +127,8 @@ export class AppController {
       const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
       if (error) return { error, image: null };
       const spectrum = silent ? silentSpectrum() : undefined;
-      if (!look && !effects) return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, spectrum) };
+      const shaped = effects?.some((e) => e.on) ?? false;   // a stack with nothing switched on is no effects
+      if (!look && !shaped) return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, spectrum) };
       const frames = composeStill(index, stillUniforms(inputs), look ?? defaultLook(), s!.trails ?? 1, spectrum ?? stillSpectrum(), undefined, effects);
       return { error: null, image: await this.renderer.stillAsync(frames, 1280, 720) };
     },
@@ -146,10 +143,10 @@ export class AppController {
       const scale = this.renderer.scale;
       const [w, h] = size.map((x) => Math.max(1, Math.round(x * scale))) as [number, number];
       // The frame on screen now, held still, without a crossfade.
-      const burst = (stack: FX.EffectStack) => Array.from({ length: frames }, (): ProgramState => ({ ...this.program, prevScene: -1, mix: 1, effects: stack, prevEffects: FX.NO_EFFECTS }));
+      const burst = (stack: Effects.EffectStack) => Array.from({ length: frames }, (): ProgramState => ({ ...this.program, prevScene: -1, mix: 1, effects: stack, prevEffects: Effects.NO_EFFECTS }));
       const none: number[] = [], shaped: number[] = [];
       for (let i = 0; i < rounds; i++) {   // in turns, so a slower moment weighs on both alike
-        none.push(await this.renderer.timeFramesAsync(burst(FX.NO_EFFECTS), w, h));
+        none.push(await this.renderer.timeFramesAsync(burst(Effects.NO_EFFECTS), w, h));
         shaped.push(await this.renderer.timeFramesAsync(burst(effects), w, h));
       }
       const median = (xs: number[]) => xs.sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
@@ -537,7 +534,7 @@ export class AppController {
 
   // A scene as a show scene keeps it: its parameter values, the look sliders and the screen's effects, as
   // they are now.
-  captureScene(i = this.state.clock.scene): SceneSnapshot {
+  captureScene(i = this.state.clock.scene): Shot {
     const look: Record<string, number> = {};
     for (const k of LOOK_KEYS) look[k] = this.state.look[k];
     return { scene: i, values: this.library.values(i), look, effects: this.state.effects };
@@ -547,7 +544,7 @@ export class AppController {
   // effects (replacing the screen's), then the scene, crossfading for `fade` seconds. Not a manual scene
   // change. The outgoing picture keeps the effects it had through the crossfade; a show scene of the
   // scene already on screen takes over at once.
-  applyScene(snap: SceneSnapshot, fade: number): void {
+  applyScene(snap: Shot, fade: number): void {
     const scene = this.state.scenes[snap.scene];
     if (!scene || scene.removed) return;
     for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) this.setLook(k, snap.look[k]!);
@@ -610,15 +607,15 @@ export class AppController {
 
   // ---------- Effects (the main screen's: they stay through scene changes, like the Look) ----------
 
-  addEffect(id: FX.EffectId): void { this.setEffects(FX.addEffect(this.state.effects, id)); }
-  removeEffect(id: FX.EffectId): void { this.setEffects(FX.removeEffect(this.state.effects, id)); }
-  moveEffect(id: FX.EffectId, to: number): void { this.setEffects(FX.moveEffect(this.state.effects, id, to)); }
-  setEffectOn(id: FX.EffectId, on: boolean): void { this.setEffects(FX.setEffectOn(this.state.effects, id, on)); }
-  setEffectSetting(id: FX.EffectId, key: string, value: number): void { this.setEffects(FX.setEffectSetting(this.state.effects, id, key, value)); }
+  addEffect(id: Effects.EffectId): void { this.setEffects(Effects.addEffect(this.state.effects, id)); }
+  removeEffect(id: Effects.EffectId): void { this.setEffects(Effects.removeEffect(this.state.effects, id)); }
+  moveEffect(id: Effects.EffectId, to: number): void { this.setEffects(Effects.moveEffect(this.state.effects, id, to)); }
+  setEffectOn(id: Effects.EffectId, on: boolean): void { this.setEffects(Effects.setEffectOn(this.state.effects, id, on)); }
+  setEffectSetting(id: Effects.EffectId, key: string, value: number): void { this.setEffects(Effects.setEffectSetting(this.state.effects, id, key, value)); }
 
   // A new stack (never edited in place, so whatever holds the old one keeps it): drawn from the next
   // frame, published to the widget and kept for the next start.
-  private setEffects(stack: FX.EffectStack): void {
+  private setEffects(stack: Effects.EffectStack): void {
     if (stack === this.state.effects) return;
     this.state.effects = stack;
     this.ui.set({ effects: stack });
@@ -929,7 +926,7 @@ export class AppController {
     const p = this.program;
     composeFrame(p, c, f, look, this.currentScene.trails ?? 1, dt);   // the main screen's motion is the clock's
     p.scene = c.scene; p.prevScene = c.prevScene; p.mix = crossfade(c, c.clock);
-    if (c.prevScene < 0) this.outgoingEffects = null;
+    if (c.prevScene < 0) this.outgoingEffects = null;   // the crossfade has ended (crossfade() let prevScene go)
     // On the main screen effects belong to what is on screen, not to the scene: both pictures draw with
     // the screen's, except that a show scene taken here leaves the outgoing picture its own.
     p.effects = this.state.effects;
