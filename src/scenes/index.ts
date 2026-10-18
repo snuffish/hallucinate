@@ -11,6 +11,10 @@ import { SPECTRUM_RAYS } from './spectrum-rays';
 import { CONTOUR_LINES } from './contour-lines';
 import { POINT_STORM } from './point-storm';
 import { SCAN_TRACE } from './scan-trace';
+import { LISSAJOUS } from './lissajous';
+import { SCOPE_RING } from './scope-ring';
+import { CONSTELLATION } from './constellation';
+import { VORTEX } from './vortex';
 
 export { COMMON } from './header';
 export { TEMPLATE } from './template';
@@ -25,4 +29,8 @@ export const SCENES: readonly Scene[] = [
   CONTOUR_LINES, // 6
   POINT_STORM,   // 7
   SCAN_TRACE,    // 8
+  LISSAJOUS,     // 9
+  SCOPE_RING,    // 0
+  CONSTELLATION,
+  VORTEX,
 ];

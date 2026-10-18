@@ -42,11 +42,12 @@ Press **?** in the app for help and every shortcut.
 
 ## ✨ Scenes: a laser show
 
-The eight built-in scenes are a set built for one style, a laser show: thin luminous lines, beams and points on pure
-black ([ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md)). They come in four categories: **Beams** (Beam Fan,
-Light Sheet, Spectrum Rays), **Geometry** (Ring Run, Wire Solid, Point Storm), **Fields** (Contour Lines) and
-**Media** (Scan Trace, which redraws your video or camera). Each reacts to the kicks, the ticks of the tempo and the
-bands, and the number keys 1–8 play them in this order. Write your own scenes in the code editor or the visual
+The twelve built-in scenes are a set built for one style, a laser show: thin luminous lines, beams and points on pure
+black ([ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md)). They come in five categories: **Beams** (Beam Fan,
+Light Sheet, Spectrum Rays, Vortex), **Geometry** (Ring Run, Wire Solid, Point Storm, Constellation), **Fields**
+(Contour Lines), **Signals** (Lissajous and Scope Ring, drawn like an oscilloscope) and **Media** (Scan Trace, which
+redraws your video or camera). Each reacts to the kicks, the ticks of the tempo and the bands, and the number keys
+1–9 and 0 play the first ten in [this order](docs/scenes.md#scenes). Write your own scenes in the code editor or the visual
 maker, or ask the assistant for one.
 
 <table>
@@ -62,6 +63,12 @@ maker, or ask the assistant for one.
     <td align="center"><img src="docs/screenshots/point-storm.jpg" alt="Point Storm" width="100%"><br><sub><b>Point Storm</b> · Geometry · laser dots thrown by the kicks</sub></td>
     <td align="center"><img src="docs/screenshots/scan-trace.jpg" alt="Scan Trace" width="100%"><br><sub><b>Scan Trace</b> · Media · your video as laser scan lines</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/lissajous.jpg" alt="Lissajous" width="100%"><br><sub><b>Lissajous</b> · Signals · an oscilloscope drawing Lissajous figures</sub></td>
+    <td align="center"><img src="docs/screenshots/scope-ring.jpg" alt="Scope Ring" width="100%"><br><sub><b>Scope Ring</b> · Signals · the waveform wrapped round a circle</sub></td>
+    <td align="center"><img src="docs/screenshots/constellation.jpg" alt="Constellation" width="100%"><br><sub><b>Constellation</b> · Geometry · drifting stars linked on the beat</sub></td>
+    <td align="center"><img src="docs/screenshots/vortex.jpg" alt="Vortex" width="100%"><br><sub><b>Vortex</b> · Beams · spiral arms winding from the centre</sub></td>
+  </tr>
 </table>
 
 <sub>Stills from a software-rendered headless browser (`scripts/screenshots.mjs`); on a GPU the scenes run at full frame rate.</sub>
@@ -73,7 +80,7 @@ maker, or ask the assistant for one.
 | | Feature | |
 | --- | --- | --- |
 | 🎧 | **[Audio](docs/audio.md)** | Play a file, SoundCloud, the mic, a browser tab or the built-in demo beat. A full player with tempo, and *synesthesia* that colours the visuals by how the music sounds. |
-| 🎬 | **[Scenes](docs/scenes.md)** · L | Eight laser-show scenes in four categories (Beams, Geometry, Fields and Media). Your scenes crossfade on the beat, in a searchable library with favourites. |
+| 🎬 | **[Scenes](docs/scenes.md)** · L | Twelve laser-show scenes in five categories (Beams, Geometry, Fields, Signals and Media). Your scenes crossfade on the beat, in a searchable library with favourites. |
 | 🧑‍💻 | **[Code editor](docs/editor.md)** · E | Edit any scene's GLSL live, with errors shown as you type. Tag a value with `// @param` and it becomes a slider (P). |
 | 🧩 | **[Visual maker](docs/visual-maker.md)** · N | Build scenes by wiring blocks together, then send the result to code. |
 | 🖼️ | **[Media](docs/media.md)** | Drop an image or video, or pick one from YouTube: Scan Trace redraws it as laser scan lines, and any scene can sample it with `media(p)`. |

@@ -58,7 +58,7 @@ of a 4K projector, ranked slowest first. At laptop sizes most scenes sit at the 
 faster, so the ranking would be a tie. On an M2 MacBook (2026-10-16), the main thread used about 1 ms per frame
 everywhere, and these scenes fell below 60 fps at 3840×2160. This ranking predates the laser-show set: these were
 the old built-in scenes, all since replaced ([ADR 0001](docs/adr/0001-replace-all-built-in-scenes.md)), and the
-eight new scenes have not been ranked yet:
+laser-show scenes have not been ranked yet:
 
 | Scene | fps | at half resolution | gain |
 | --- | --- | --- | --- |

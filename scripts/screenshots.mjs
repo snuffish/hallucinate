@@ -45,6 +45,12 @@ await shot('params-groups');
 await page.addStyleTag({ content: '#widgets, #toast { display: none !important; }' });
 const gallery = [['1', 'beam-fan'], ['2', 'light-sheet'], ['3', 'ring-run'], ['4', 'wire-solid'], ['5', 'spectrum-rays'], ['6', 'contour-lines'], ['7', 'point-storm']];
 for (const [key, name] of gallery) { await press(key, 3500); await shot(name); }
+for (const [key, name] of [['9', 'lissajous'], ['0', 'scope-ring']]) { await press(key, 3500); await shot(name); }
+for (const [scene, name] of [['Constellation', 'constellation'], ['Vortex', 'vortex']]) {   // past the number keys: from the library
+  await press('l', 600); await press('/', 200);
+  await page.fill('#lib-search', scene); await settle(300); await press('Enter', 3500);
+  await shot(name);
+}
 const picture = await page.evaluate(() => {
   const c = document.createElement('canvas'); c.width = 640; c.height = 400;
   const g = c.getContext('2d');

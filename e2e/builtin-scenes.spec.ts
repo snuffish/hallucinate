@@ -52,7 +52,7 @@ async function openProfiler(page: Page): Promise<ListedScene[]> {
 }
 
 // Whether each one compiles is checked by its scene × Look tests below: a still renders it. Rendering
-// all eight here too took over a minute under software WebGL.
+// all of them here too took over a minute under software WebGL.
 test('every built-in scene is listed, has a tab and 3–8 parameters', async ({ page }) => {
   const builtins = await openProfiler(page);
   expect(builtins.map((s) => s.name), 'the app lists the scenes this spec checks').toEqual(SCENES.map((s) => s.name));
@@ -146,7 +146,7 @@ for (const effect of EFFECTS) for (const { name: sceneName } of SCENES) {
 // edge, the Wave bends them further out, the Glow spreads them): the Kaleidoscope's disc leaves the
 // corners black whatever the fade does, so only the second stack shows the fade itself at work. Only the
 // silent stills, two thirds of what a test above renders: the kick and the tick are each effect's own,
-// checked alone above. A test per scene, so they share the workers: one test rendering all eight scenes
+// checked alone above. A test per scene, so they share the workers: one test rendering all of the scenes
 // ran past four minutes on a loaded machine.
 const STACKS: { name: string; effects: EffectStack }[] = [
   { name: 'every effect', effects: EFFECTS.flatMap((e) => strongest(e.id)) },
