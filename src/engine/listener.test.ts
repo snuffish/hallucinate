@@ -177,6 +177,18 @@ describe('Listener', () => {
     expect(l.hearing.bpm).toBeLessThanOrEqual(141);
   });
 
+  it('starts clean on a new source: nothing heard from the music before carries over, even on a clock that starts over', () => {
+    // The replay tools hear each clip from 0 s; a Listener reset for the next clip must not wait for its old clock.
+    const l = new Listener();
+    listen(l, music({ bpm: 120 }), 30);
+    l.reset();
+    const { kicks, ticks } = listen(l, music({ bpm: 140 }), 15);
+    expect(l.hearing.bpm).toBeGreaterThanOrEqual(139);
+    expect(l.hearing.bpm).toBeLessThanOrEqual(141);
+    expect(kicks).toBeGreaterThan(25);   // 35 beats in 15 s, the first few teach it the tempo
+    expect(ticks).toBeGreaterThan(25);
+  });
+
   it('hears how far through the current tick the music is: rising from 0 to 1, back to 0 on each tick', () => {
     const l = new Listener();
     listen(l, music({ bpm: 120 }), 10);
