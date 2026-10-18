@@ -8,6 +8,7 @@ import { AppProvider, useApp, useUI } from './AppContext';
 import type { AppController } from './controller';
 import { Assistant, AssistantBubble } from '../components/Assistant';
 import { Editor } from '../components/Editor';
+import { FooterPlayerPrototype } from '../components/FooterPlayer.prototype';   // PROTOTYPE
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { SessionsProvider, useSessions } from './sessions';
 import { HelpLayer } from '../components/Help';
@@ -81,6 +82,7 @@ function Shell({ app }: { app: AppController }) {
         onOpenStudio={() => app.toggleOverlay('studio')}
       />
       <AssistantBubble />
+      <FooterPlayerPrototype onSource={onSource} />
       <Library onEdit={(i) => { app.setScene(i); app.setOverlay('editor'); }} />
       <Editor />
       <VisualMaker />
