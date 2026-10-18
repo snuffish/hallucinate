@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { parseReferenceList, type Clip, type Window } from './list.ts';
-import { kicksPerBeat, mean, tempoInRange, tempoSettles, tickGrid, type TickGrid } from './measure.ts';
+import { kicksPerBeat, mean, shareAbove, tempoInRange, tempoSettles, tickGrid, type TickGrid } from './measure.ts';
 import { loadRecording, replay, type Heard } from './replay.ts';
 
 // The right answers (docs/reference-clips.md, issue #57).
@@ -20,23 +20,28 @@ const KICKS_PER_BEAT = [0.9, 1.1] as const; // in the drop
 const TICK_TOLERANCE_MS = 40;               // a tick this close to the beat grid is on it ...
 const TICKS_ON_GRID = 0.9;                  // ... and this many of the drop's ticks are
 const CLEARLY_HIGHER = 0.1;                 // tone and mood, drop over breakdown (each 0..1)
+const AT_MAX = 0.98;                        // tone or mood this high is at its maximum ...
+const MAX_SHARE = 0.5;                      // ... and may sit there for at most this much of a drop
 const FORGET_SECONDS = 90;                  // the tempo is forgotten this long after the last kick
 const SETTLE_SECONDS = 5;                   // the tempo reaches a transition's new BPM this soon
 
-type Check = 'bpm' | 'kicks' | 'ticks' | 'tone' | 'mood' | 'forgotten' | 'transition';
+type Check = 'bpm' | 'kicks' | 'ticks' | 'tone' | 'mood' | 'headroom' | 'forgotten' | 'transition';
 
 // The ticket that turns each check on.
 // The tempo range and forgetting are in (#63); the tempo checks still left wait on the kicks they're heard from.
-const TICKET: Record<Check, string> = { bpm: '#62', kicks: '#62', ticks: '#62', tone: '#65', mood: '#65', forgotten: '#62', transition: '#62' };
+const TICKET: Record<Check, string> = { bpm: '#62', kicks: '#62', ticks: '#62', tone: '#65', mood: '#65', headroom: '#65', forgotten: '#62', transition: '#62' };
 
 // Which checks fail on today's Listener, per clip. A check listed here runs as `it.fails`: green while it
 // fails, red once it passes, which is the cue to delete it from here.
+// tone: in every breakdown on the list the spectral centroid is higher than in its drop (the kick and the bass
+// leave, the pads and risers stay), and so is every other brightness measure tried (#65): no tone range can turn
+// that round. Whether the right answer or the Tone should change is open on #65.
 const EXPECTED_TO_FAIL: Record<string, Check[]> = {
-  'lazy-new-moon-to-light-breakdown': ['bpm', 'kicks', 'ticks', 'tone', 'mood'],
+  'lazy-new-moon-to-light-breakdown': ['bpm', 'kicks', 'ticks', 'tone'],
   'lazy-light-to-ring-of-clouds-transition': ['bpm', 'kicks', 'ticks', 'transition'],
   'lazy-frozen-to-earthbound-ambient': ['forgotten'],
   'closer-to-heaven-breakdown': ['tone'],
-  'deep-jungle-walk-breakdown': ['tone', 'mood'],   // mood: the tempo now heard right holds through the breakdown (#65)
+  'deep-jungle-walk-breakdown': ['tone'],
   'says-ambient': ['forgotten'],
 };
 
@@ -49,6 +54,7 @@ interface Measured {
   ticks?: TickGrid;
   tone?: [drop: number, breakdown: number];
   mood?: [drop: number, breakdown: number];
+  atMax?: { tone: number; mood: number };   // the share of the drop each sits at its maximum
   lastKick: number | null;
   lastTick: number | null;
   settles?: number | null;
@@ -60,6 +66,7 @@ function measure(clip: Clip, heard: Heard): Measured {
     m.kicksPerBeat = kicksPerBeat(heard, clip.drop, clip.bpm);
     m.ticks = tickGrid(heard, clip.drop, tempoInRange(clip.bpm), TICK_TOLERANCE_MS);   // the ticks run at the tempo heard
   }
+  if (clip.drop) m.atMax = { tone: shareAbove(heard, clip.drop, 'bright', AT_MAX), mood: shareAbove(heard, clip.drop, 'mood', AT_MAX) };
   if (clip.drop && clip.breakdown) {
     m.tone = [mean(heard, clip.drop, 'bright'), mean(heard, clip.breakdown, 'bright')];
     m.mood = [mean(heard, clip.drop, 'mood'), mean(heard, clip.breakdown, 'mood')];
@@ -78,6 +85,7 @@ function report(clip: Clip, m: Measured): string {
   if (m.ticks) parts.push(`ticks on grid ${Math.round(m.ticks.onGrid * 100)}% (worst ${fmt(m.ticks.worstMs, 0)} ms, ${fmt(m.ticks.ticksPerBeat)}/beat)`);
   if (m.tone) parts.push(`tone drop ${fmt(m.tone[0])} / breakdown ${fmt(m.tone[1])}`);
   if (m.mood) parts.push(`mood drop ${fmt(m.mood[0])} / breakdown ${fmt(m.mood[1])}`);
+  if (m.atMax) parts.push(`at max in drop: tone ${Math.round(m.atMax.tone * 100)}%, mood ${Math.round(m.atMax.mood * 100)}%`);
   parts.push(`last kick ${fmt(m.lastKick, 1)} s, last tick ${fmt(m.lastTick, 1)} s`);
   if (m.settles !== undefined) parts.push(`settles ${m.settles === null ? 'never' : `${fmt(m.settles, 1)} s`} after ${clip.drop![0]} s`);
   return `${clip.name} (${clip.type}): ${parts.join(', ')}`;
@@ -111,6 +119,10 @@ function checksFor(clip: Clip): [Check, string, (m: Measured) => void][] {
       expect(m.mood![0] - m.mood![1]).toBeGreaterThanOrEqual(CLEARLY_HIGHER);
     }]);
   }
+  if (drop) checks.push(['headroom', `neither tone nor mood sits at its maximum through the drop (at most ${MAX_SHARE * 100}% of it)`, (m) => {
+    expect(m.atMax!.tone).toBeLessThanOrEqual(MAX_SHARE);
+    expect(m.atMax!.mood).toBeLessThanOrEqual(MAX_SHARE);
+  }]);
   if (clip.type === 'ambient') checks.push(['forgotten', `forgets the tempo and stops ticking within ${FORGET_SECONDS} s of the last kick`, (m) => {
     expect(m.bpm).toBeNull();
     if (m.lastTick !== null) expect(m.lastTick - (m.lastKick ?? 0)).toBeLessThanOrEqual(FORGET_SECONDS);

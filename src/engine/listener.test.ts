@@ -235,6 +235,16 @@ describe('Listener', () => {
     expect(l.hearing.centroid).toBeGreaterThan(5500);
   });
 
+  it('hears bright psytrance as bright, with room above it: the tone is not pinned at fully bright', () => {
+    // Centroids like Closer to Heaven's (≈ 4–5.5 kHz): mids and highs over the kick.
+    const l = new Listener();
+    listen(l, music({ bpm: 144, bed: (hz) => (hz < 2000 ? 200 : hz < 12000 ? 165 : 60) }), 15);
+    expect(l.hearing.centroid).toBeGreaterThan(4000);
+    expect(l.hearing.centroid).toBeLessThan(5500);
+    expect(toneWord(l.hearing.bright)).toBe('bright');
+    expect(l.hearing.bright).toBeLessThan(0.9);
+  });
+
   it('holds the tone through a quiet passage, and lets it go neutral once nothing plays', () => {
     const l = new Listener();
     listen(l, music({ bpm: 100, bed: dark }), 15);
@@ -248,7 +258,7 @@ describe('Listener', () => {
   it('hears fast loud music as energetic and slow quiet music as calm; with nothing playing, neither', () => {
     const fast = new Listener();
     listen(fast, music({ bpm: 160, bed: () => 210 }), 30);
-    expect(fast.hearing.energy).toBeGreaterThan(0.9);
+    expect(fast.hearing.energy).toBeGreaterThan(0.5);   // loud, though not as loud as a real psytrance drop
     expect(moodWord(fast.hearing.mood)).toBe('energetic');
     const slow = new Listener();
     listen(slow, music({ bpm: 90, bed: () => 25 }), 30);   // near the bottom of the tempo range (85–175)
@@ -256,6 +266,25 @@ describe('Listener', () => {
     expect(moodWord(slow.hearing.mood)).toBe('calm');
     listen(fast, null, 30, { start: 30, playing: false });
     expect(fast.hearing.mood).toBeCloseTo(0.5, 1);
+  });
+
+  it('hears a breakdown calmer than the drops around it, though the tempo holds', () => {
+    // A psytrance drop at 144 BPM, a breakdown of pads without the kick and the bass, and the drop again.
+    const drop = music({ bpm: 144, bed: () => 210 });
+    const breakdown = () => bins((hz) => (hz < 140 ? 60 : 190));
+    const l = new Listener();
+    const mood = (sound: (t: number) => Bins, seconds: number, start: number) => {
+      listen(l, sound, seconds - 5, { start });
+      const seen: number[] = [];
+      for (let t = start + seconds - 5; t < start + seconds; t += 1 / 60) seen.push(l.hear(sound(t), true, 1 / 60, t).mood);
+      return seen.reduce((a, b) => a + b, 0) / seen.length;   // over its last 5 s
+    };
+    const first = mood(drop, 30, 0);
+    const calm = mood(breakdown, 20, 30);
+    expect(l.hearing.bpm).toBe(144);   // the tempo holds through it
+    const again = mood(drop, 20, 50);
+    expect(first - calm).toBeGreaterThan(0.1);   // clearly calmer, as the real-music tests ask
+    expect(again - calm).toBeGreaterThan(0.1);
   });
 
   it('hears the same kicks and tempo whatever the Smoothing setting', () => {

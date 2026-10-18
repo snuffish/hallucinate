@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kicksPerBeat, mean, tempoInRange, tempoSettles, tickGrid } from './measure.ts';
+import { kicksPerBeat, mean, shareAbove, tempoInRange, tempoSettles, tickGrid } from './measure.ts';
 import type { Heard, HeardFrame } from './replay.ts';
 
 // A Hearing over `seconds` at 60 fps, with kicks and ticks at the given times and `at(t)` for the rest.
@@ -46,6 +46,12 @@ describe('measuring the Hearing of a clip', () => {
     const h = heard(60, { at: (t) => ({ mood: t < 30 ? 0.2 : 0.8 }) });
     expect(mean(h, [0, 30], 'mood')).toBeCloseTo(0.2);
     expect(mean(h, [30, 60], 'mood')).toBeCloseTo(0.8);
+  });
+
+  it('measures how much of a window a part of the Hearing sits at or above a level', () => {
+    const h = heard(60, { at: (t) => ({ bright: t < 15 ? 1 : 0.7 }) });
+    expect(shareAbove(h, [0, 60], 'bright', 0.98)).toBeCloseTo(0.25, 2);
+    expect(shareAbove(h, [30, 60], 'bright', 0.98)).toBe(0);
   });
 
   it('times how long after a moment the tempo settles on a BPM and stays there', () => {

@@ -45,6 +45,12 @@ export function mean(heard: Heard, window: Window, part: Part): number {
   return frames.reduce((s, f) => s + f[part], 0) / Math.max(1, frames.length);
 }
 
+/** The share (0..1) of the window's frames where a part of the Hearing is at or above `level`. */
+export function shareAbove(heard: Heard, window: Window, part: Part, level: number): number {
+  const frames = heard.frames.filter((f) => inWindow(window)(f.t));
+  return frames.filter((f) => f[part] >= level).length / Math.max(1, frames.length);
+}
+
 const near = (bpm: number) => (f: HeardFrame) => f.bpm !== null && Math.abs(f.bpm - bpm) <= 1;
 
 /** Seconds after `from` until the tempo is within ±1 of `bpm` and stays there to the end; null if it never does. */

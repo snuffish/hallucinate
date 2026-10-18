@@ -33,12 +33,19 @@ Volume is applied after the analyser, so the visuals react the same at any liste
 Based on crossmodal-correspondence research (people reliably pair loud ↔ bright, high/bright timbre ↔ light and
 warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm colours).
 
-- **Tone** – the spectral centroid (loudness-weighted average frequency) mapped from ~1.1 kHz (dark: piano,
-  ambient) to ~5.5 kHz (bright: hi-hat-heavy house, psytrance) and smoothed over a few seconds. Shown in the panel.
-- **Mood** – tempo (80 → 160 BPM) plus how loud the music is over the last few seconds, smoothed over ~4 s more.
-  The tempo is heard from the kicks and always reads 85–175 BPM (half-time at 72 reads 144); after 90 s of music
-  without kicks it is forgotten and counts as neutral until the kicks return. When nothing plays, mood and tone both
-  drift back to neutral.
+- **Tone** – the spectral centroid (loudness-weighted average frequency) mapped log-wise from ~1 kHz (dark: melodic
+  techno, piano) to ~8 kHz (bright) and smoothed over a few seconds. The range comes from the reference clips: even
+  the brightest psytrance (~4–5.5 kHz) sits around two thirds of the way up, so it keeps moving instead of sitting
+  at fully bright. Shown in the panel. In a breakdown the kick and the bass leave and the pads stay, so the tone
+  usually reads *brighter* there than in the drop.
+- **Energy** – how loud the music is over the last few seconds: 0 at the level of beatless ambient (~0.45 on the
+  bands) to 1 at the loudest psytrance drops (~0.8). Breakdowns measure about 0.3–0.65, drops 0.62–0.77.
+- **Mood** – the tempo sets where a track sits and the energy moves it from moment to moment: 55% tempo (80 → 160
+  BPM, followed over ~10 s, so a moment of misheard tempo barely shows) and 45% energy, smoothed over ~2 s. A
+  breakdown reads calmer than the drop around it, by about 0.13–0.28 on the reference clips, while a whole drop
+  stays short of the top. The tempo is heard from the kicks and always reads 85–175 BPM (half-time at 72 reads
+  144); after 90 s of music without kicks it is forgotten and counts as neutral until the kicks return. When
+  nothing plays, mood and tone both drift back to neutral.
 - **Synesthesia slider** – how strongly the tone and the mood grade every scene: dark sound → dimmer, cooler, hazier,
   longer trails; bright sound → lighter, warmer, crisper, more colour fringing; energetic mood → more saturated and
   warmer. At 0 it is off: the picture's colour is left untouched. Trails and fringing only grow or shrink from what you

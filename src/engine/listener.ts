@@ -15,11 +15,22 @@ const BAND_KEYS = ['bass', 'mid', 'high', 'level'] as const;
 const MIN_KICK_GAP = 0.28;     // seconds, caps detection at ~214 BPM
 const KICK_WINDOW = 12;        // the last kicks the tempo is estimated from
 const KICK_MIN = 5;            // ... and how many it takes
-const BRIGHT_LOW_HZ = 1100;    // spectral centroid that counts as fully "dark" (piano/ambient ≈ 1.3 kHz)
-const BRIGHT_HIGH_HZ = 5500;   // ... and fully "bright" (hi-hat heavy house ≈ 5.3 kHz, psytrance ≈ 4.1 kHz)
+// The tone range, set from the spectral centroids of the reference clips: the darkest music (melodic techno
+// ≈ 1.0 kHz, piano ≈ 1.4 kHz) sits at the dark end, and the brightest (Closer to Heaven ≈ 4.1–4.3 kHz, up to
+// ≈ 5.5 kHz) well short of the bright end, so bright psytrance keeps moving instead of pinning at fully bright.
+const BRIGHT_LOW_HZ = 1000;    // spectral centroid that counts as fully "dark"
+const BRIGHT_HIGH_HZ = 8000;   // ... and fully "bright": three octaves up
 const TONE_SECONDS = 2.5;      // the tone follows the character of the track, not single hits
-const MOOD_SECONDS = 4;        // the mood follows the stretch of the set; the tone relaxes at this pace too
+const MOOD_SECONDS = 2;        // the mood follows the energy of the moment (itself heard over a few seconds) ...
+const TRACK_SECONDS = 10;      // ... and the tempo of the track, which a brief misheard tempo hardly moves
+const NEUTRAL_SECONDS = 4;     // nothing plays: the mood and the tone relax to neutral at this pace
 const CALM_BPM = 80, ENERGETIC_BPM = 160;
+// The energy: the level of the bands over the last few seconds, from 0 at QUIET (beatless ambient, ≈ 0.42) to
+// 1 at LOUD (the loudest psytrance drop, ≈ 0.77–0.80). Breakdowns measured 0.29–0.65, drops 0.62–0.77.
+const QUIET_LEVEL = 0.45, LOUD_LEVEL = 0.8;
+// The mood: the tempo sets where a track sits, the energy moves it from moment to moment. Over half is the
+// tempo, so a forgotten tempo still lifts it halfway; the rest is enough to take a breakdown down by ~0.15.
+const MOOD_TEMPO = 0.55, MOOD_ENERGY = 1 - MOOD_TEMPO;
 const TEMPO_RANGE = [85, 175] as const;   // BPM: a half or double reading is folded into it
 const FORGET_SECONDS = 90;     // playing this long without a kick (longer than any breakdown) forgets the tempo
 
@@ -47,7 +58,7 @@ export interface Hearing {
   bright: number;    // the tone: 0 dark, muffled … 1 bright, crisp (log of the spectral centroid)
   centroid: number;  // Hz, smoothed like the tone
   energy: number;    // 0..1 how loud the music is, steadily (absolute, over seconds)
-  mood: number;      // 0 calm … 1 energetic: the tempo, and some energy
+  mood: number;      // 0 calm … 1 energetic: the tempo sets where a track sits, the energy moves it
 }
 
 type Bands = Record<(typeof BAND_KEYS)[number], number>;
@@ -65,6 +76,7 @@ export class Listener {
   private lastKick = -1e9;
   private kicks: number[] = [];
   private sinceKick = 0;   // seconds played since the last kick
+  private trackMood = 0.5; // the tempo's part of the mood, 0 calm … 1 energetic, eased over the track
   private amplitude = new Float32Array(256);   // byte -> linear amplitude, for the analyser's dB range
   private dbRange = '';
   private smoothing = 0.6;   // Settings → Audio (src/state/prefs.ts)
@@ -87,10 +99,15 @@ export class Listener {
     h.tick = playing && (this.tempo.advance(now) > 0 || ticked);
     if (playing) h.tickPhase = this.tempo.phase(now);
     if (h.tick) h.ticks++;
-    h.energy = clamp01((this.avg.level - 0.15) / 0.4);
-    const tempo = h.bpm ? clamp01((h.bpm - CALM_BPM) / (ENERGETIC_BPM - CALM_BPM)) : 0.5;
-    h.mood += ((playing ? tempo * 0.65 + h.energy * 0.35 : 0.5) - h.mood) * ease(dt, MOOD_SECONDS);
-    if (!playing) h.bright += (0.5 - h.bright) * ease(dt, MOOD_SECONDS);   // nothing plays: the grade goes neutral
+    h.energy = clamp01((this.avg.level - QUIET_LEVEL) / (LOUD_LEVEL - QUIET_LEVEL));
+    if (playing) {
+      const tempo = h.bpm ? clamp01((h.bpm - CALM_BPM) / (ENERGETIC_BPM - CALM_BPM)) : 0.5;
+      this.trackMood += (tempo - this.trackMood) * ease(dt, TRACK_SECONDS);
+      h.mood += (this.trackMood * MOOD_TEMPO + h.energy * MOOD_ENERGY - h.mood) * ease(dt, MOOD_SECONDS);
+    } else {   // nothing plays: the grade goes neutral
+      h.mood += (0.5 - h.mood) * ease(dt, NEUTRAL_SECONDS);
+      h.bright += (0.5 - h.bright) * ease(dt, NEUTRAL_SECONDS);
+    }
     return h;
   }
 

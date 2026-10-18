@@ -2,14 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { RECORDING_VERSION, type Recording } from './recording.ts';
 import { replay } from './replay.ts';
 
-// A recording as the analyser would make it of a kick drum at `bpm` over a bed of sound, `seconds` long.
+// A recording as the analyser would make it of a kick drum at `bpm` over a bed of sound loud enough to have some
+// energy, `seconds` long.
 function kickGrid(bpm: number, seconds: number, frameStep = 1 / 60): Recording {
   const binCount = 1024, binHz = 48000 / 2048, beat = 60 / bpm;
   const count = Math.floor(seconds / frameStep);
   const frames = new Uint8Array(count * binCount);
   for (let f = 0; f < count; f++) {
     const kick = 255 * Math.exp(-(((f + 1) * frameStep) % beat) / 0.1);
-    for (let i = 0; i < binCount; i++) frames[f * binCount + i] = Math.round(i * binHz < 140 ? Math.max(36, kick) : 120);
+    for (let i = 0; i < binCount; i++) frames[f * binCount + i] = Math.round(i * binHz < 140 ? Math.max(36, kick) : 200);
   }
   return { version: RECORDING_VERSION, audio: 'x', sampleRate: 48000, frameStep, fftSize: 2048, minDecibels: -100, maxDecibels: -30, binCount, frames };
 }

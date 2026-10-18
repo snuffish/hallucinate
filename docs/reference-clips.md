@@ -94,6 +94,7 @@ again is recorded again.
 | `kicks` | a drop window | 0.9–1.1 kicks per beat |
 | `ticks` | a drop window | 0.9–1.1 ticks per beat, 90% of them within 40 ms of a steady grid at the BPM in the tempo range |
 | `tone`, `mood` | a drop and a breakdown window | each at least 0.1 higher in the drop than in the breakdown |
+| `headroom` | a drop window | neither tone nor mood at its maximum (0.98 or more) for over half of the drop |
 | `forgotten` | an ambient clip | no tempo at the end, and no tick more than 90 s after the last kick |
 | `transition` | a transition clip | the tempo within ±1 of the BPM in the tempo range no more than 5 s after the drop starts, and staying there |
 
