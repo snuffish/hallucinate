@@ -50,7 +50,8 @@
     "test:e2e:desktop": "npm run build:desktop && playwright test --project desktop",
     "perf": "node perf/measure.mjs",
     "clips": "node tools/reference/fetch-clips.ts",
-    "clips:suggest": "node tools/reference/suggest-clips.ts"
+    "clips:suggest": "node tools/reference/suggest-clips.ts",
+    "clips:record": "node tools/reference/record-clips.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

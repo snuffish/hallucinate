@@ -8,6 +8,8 @@ rebuilt locally into `reference/clips/`, which git ignores (as it does `referenc
 
 ```sh
 npm run clips                      # fetch and cut every clip on the list into reference/clips/
+npm run clips:record               # record what the browser's analyser hears in each clip into reference/recordings/
+npx vitest run tools/reference/listener-music.test.ts --reporter=verbose   # replay them through the Listener
 npm run clips:suggest              # suggest clips from the Lazy Mix (prints Markdown)
 npm run clips:suggest -- <source>  # ... from another source on the list, or from an audio file
 ```
@@ -40,7 +42,8 @@ An example of the format (the clip and its numbers are made up):
   - `bpm`: the tempo, **given by ear**, never worked out by code. For a transition, the tempo after it. An ambient
     clip may have `null`.
   - `drop`, `breakdown`: the stretch of the clip that is the drop / the breakdown, as `[from, to]` from the clip's own
-    start, or `null`. A drop clip needs a drop; a breakdown clip needs both.
+    start, or `null`. A drop clip needs a drop; a breakdown clip needs both. In a transition clip, the drop is the new
+    track: where it starts is where the tempo has to follow it from.
 
 The list is checked when either command runs, and every problem is named at once.
 
@@ -64,3 +67,34 @@ below about 120 Hz second by second, and suggests up to three 60-second clips of
 Kicks count as "in" while the low band is close to the full mix's loudness, and as gone when it falls 12 dB or more
 below it. The suggestions are a starting point: listen to each, pick the clips, and give each one's BPM, drop and
 breakdown by ear.
+
+## Record
+
+`npm run clips:record` (needs Playwright's Chromium: `npx playwright install chromium`) renders each clip in
+`reference/clips/` through an `OfflineAudioContext` into an `AnalyserNode` set up like the app's (FFT size 2048, the
+default dB range, unsmoothed) at 48 kHz, and reads its bins every 1/60 s. Each clip becomes
+`reference/recordings/<name>.bins`: the bins of every frame, with the sample rate, the frame step, the analyser's
+settings and the sha256 of the audio. A recording made from the same audio by the same recorder is skipped; a clip cut
+again is recorded again.
+
+## The real-music tests
+
+`tools/reference/listener-music.test.ts` replays each recording through `Listener.hear` (playing, one call per
+1/60 s frame) and holds the Hearing against the clip's right answers:
+
+| Check | For | Right answer |
+| --- | --- | --- |
+| `bpm` | a clip with a BPM | the tempo at the end of the clip within ±1 |
+| `kicks` | a drop window | 0.9–1.1 kicks per beat |
+| `ticks` | a drop window | 0.9–1.1 ticks per beat, 90% of them within 40 ms of a steady grid at the BPM |
+| `tone`, `mood` | a drop and a breakdown window | each at least 0.1 higher in the drop than in the breakdown |
+| `forgotten` | an ambient clip | no tempo at the end, and no tick more than 90 s after the last kick |
+| `transition` | a transition clip | the tempo within ±1 of the BPM no more than 5 s after the drop starts, and staying there |
+
+The music's downbeat isn't on the list, so the beat grid is placed where the ticks fit it best. An ambient clip only
+shows the tempo being forgotten if it starts with kicks and runs past the forgetting time after them.
+
+Each clip logs what was measured (run with `--reporter=verbose` to see it). A clip without a recording is skipped, so
+CI and a fresh clone pass. Checks today's Listener fails are listed per clip in `EXPECTED_TO_FAIL` at the top of the
+test: they run as expected failures, green while they fail and red once they pass. Turn a check on by deleting it
+from that list; a check that fails without being listed says how to list it.

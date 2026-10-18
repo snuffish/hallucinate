@@ -37,7 +37,8 @@ node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json --gpu   # 
 The README screenshots are taken by `scripts/screenshots.mjs` (run it with the dev server up).
 
 The Listener's real-music clips are listed in `reference/clips.json` and rebuilt with `npm run clips` (needs yt-dlp
-and ffmpeg); the audio is never committed. See [Reference clips](reference-clips.md).
+and ffmpeg) and recorded with `npm run clips:record`; `npm test` then replays each recording through the Listener.
+The audio and recordings are never committed. See [Reference clips](reference-clips.md).
 
 ## 🏗️ How it works
 
