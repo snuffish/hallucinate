@@ -103,6 +103,31 @@ describe('Listener', () => {
     expect(l.hearing.bpm).toBeLessThanOrEqual(146);
   });
 
+  // The spec (#57): the tempo follows a DJ's tempo changes as quickly as it did before the kicks were heard on
+  // the pulse. Main's Listener (e2b5b73), on this same test, settled within ±1 of the new tempo in at most 1.63 s
+  // (140 → 145) and 2.45 s (128 → 145) over the grid phases below. Today's takes about 6 s and 7 s: a kick that
+  // drifts off the pulse is missed until the pulse is read again (~2 s of rises), and the tempo then needs most
+  // of its last 12 kicks at the new tempo. Shortening the pulse's hold (PULSE_SWITCH) changes neither; the ways
+  // tried that do get faster break real-music checks that pass now. Expected to fail until that is solved.
+  it.fails('follows a DJ\'s tempo change as quickly as before: 140 → 145 within 1.7 s, a jump 128 → 145 within 2.5 s [expected to fail]', () => {
+    const settles = (from: number, to: number, phase: number) => {
+      const l = new Listener(), change = 20;
+      let kickAt = -phase, settledAt: number | null = null;
+      for (let t = 0; t < change + 20; t += 1 / 60) {
+        const beat = 60 / (t < change ? from : to);
+        while (t >= kickAt + beat) kickAt += beat;   // the kick grid carries on from the last kick at the new tempo
+        const kick = 255 * Math.exp(-(t - kickAt) / 0.1);
+        const { bpm } = l.hear(bins((hz) => (hz < 140 ? Math.max(36, kick) : 120)), true, 1 / 60, t);
+        const there = bpm !== null && Math.abs(bpm - to) <= 1;
+        if (t >= change) settledAt = there ? settledAt ?? t - change : null;
+      }
+      return settledAt ?? Infinity;   // seconds after the change until the tempo reaches the new one and stays
+    };
+    const phases = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35];
+    for (const phase of phases) expect(settles(140, 145, phase), `140 → 145, phase ${phase} s`).toBeLessThanOrEqual(1.7);
+    for (const phase of phases) expect(settles(128, 145, phase), `128 → 145, phase ${phase} s`).toBeLessThanOrEqual(2.5);
+  });
+
   it('hears the tempo at a low frame rate too, since it listens on real time', () => {
     const l = new Listener();
     listen(l, music({ bpm: 124 }), 30, { fps: 8 });
