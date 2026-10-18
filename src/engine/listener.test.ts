@@ -34,6 +34,7 @@ function listen(l: Listener, sound: ((t: number) => Bins | null) | null, seconds
   return { ticks, kicks };
 }
 
+const BAND_NAMES = ['bass', 'mid', 'high', 'level'] as const;
 const dark = (hz: number) => (hz < 900 ? 220 : 40);
 const bright = (hz: number) => (hz < 2000 ? 60 : hz < 12000 ? 210 : 60);
 
@@ -155,6 +156,56 @@ describe('Listener', () => {
     expect(moodWord(slow.hearing.mood)).toBe('calm');
     listen(fast, null, 30, { start: 30, playing: false });
     expect(fast.hearing.mood).toBeCloseTo(0.5, 1);
+  });
+
+  it('hears the same kicks and tempo whatever the Smoothing setting', () => {
+    const heard = (smoothing: number) => {
+      const l = new Listener();
+      l.setSmoothing(smoothing);
+      const kickTimes: number[] = [];
+      for (let t = 0; t < 20; t += 1 / 60) if (l.hear(music({ bpm: 124 })(t), true, 1 / 60, t).kick) kickTimes.push(Math.round(t * 60));
+      return { kickTimes, bpm: l.hearing.bpm };
+    };
+    const calm = heard(0.95), twitchy = heard(0);
+    expect(twitchy.kickTimes.length).toBeGreaterThan(35);   // 41 beats in 20 s
+    expect(calm).toEqual(twitchy);
+  });
+
+  it('smooths the spectrum texture by the Smoothing setting, the way the analyser did', () => {
+    // A flat spectrum at byte 200 starts out of silence. The analyser averaged linear magnitudes:
+    // half of it is 6.02 dB down, 21.9 bytes on its -100..-30 dB scale, so byte 178; the texture's
+    // lowest texel weights it by 0.85.
+    const flat = () => bins(() => 200);
+    const half = new Listener();
+    half.setSmoothing(0.5);
+    half.hear(flat(), true, 1 / 60, 0);
+    expect(half.spectrum[0]).toBe(Math.floor(178 * 0.85));
+    listen(half, flat, 2, { start: 1 / 60 });
+    expect(half.spectrum[0]).toBe(Math.floor(200 * 0.85));   // settled on the sound
+    const none = new Listener();
+    none.setSmoothing(0);
+    none.hear(flat(), true, 1 / 60, 0);
+    expect(none.spectrum[0]).toBe(Math.floor(200 * 0.85));   // no smoothing: there at once
+  });
+
+  it('smooths the bands by the Smoothing setting: a calm setting steadies a flickering sound', () => {
+    const swing = (smoothing: number) => {
+      const l = new Listener();
+      l.setSmoothing(smoothing);
+      const flicker = (t: number) => bins(() => (Math.round(t * 60) % 2 ? 200 : 100));
+      listen(l, flicker, 5);
+      const seen = { bass: [] as number[], mid: [] as number[], high: [] as number[], level: [] as number[] };
+      for (let t = 5; t < 6; t += 1 / 60) {
+        const h = l.hear(flicker(t), true, 1 / 60, t);
+        for (const k of BAND_NAMES) seen[k].push(h[k]);
+      }
+      return Object.fromEntries(BAND_NAMES.map((k) => [k, Math.max(...seen[k]) - Math.min(...seen[k])]));
+    };
+    const calm = swing(0.95), twitchy = swing(0);
+    for (const k of BAND_NAMES) {
+      expect(twitchy[k]).toBeGreaterThan(0.1);
+      expect(calm[k]).toBeLessThan(twitchy[k]! / 2);
+    }
   });
 
   it('draws the spectrum texture from the bins, and a flat line without them', () => {

@@ -5,6 +5,7 @@
 //
 //   listener.hear(audio.read(), music.playing, dt, now)   once a frame, on real time (seconds)
 //   listener.reset()                                      a new source: the tempo starts over
+//   listener.setSmoothing(prefs.audioSmoothing)           how calm the bands and the spectrum texture look
 
 import { TempoClock } from '../state/tempo-clock';
 
@@ -63,6 +64,9 @@ export class Listener {
   private kicks: number[] = [];
   private amplitude = new Float32Array(256);   // byte -> linear amplitude, for the analyser's dB range
   private dbRange = '';
+  private smoothing = 0.6;   // Settings → Audio (src/state/prefs.ts)
+  private magnitude = new Float32Array(0);   // per bin, the smoothed linear magnitude
+  private smoothed = new Uint8Array(0);      // ... back on the byte scale
 
   hear(bins: Bins | null, playing: boolean, dt: number, now: number): Readonly<Hearing> {
     const h = this.hearing;
@@ -85,6 +89,12 @@ export class Listener {
     return h;
   }
 
+  // How much each spectrum frame is averaged with the previous ones, for the bands and the spectrum
+  // texture: higher is calmer, lower twitchier. Kicks are heard in the unsmoothed bins.
+  setSmoothing(value: number): void {
+    this.smoothing = value;
+  }
+
   reset(): void {
     this.kicks = [];
     this.hearing.bpm = null;
@@ -94,9 +104,10 @@ export class Listener {
   private listen(bins: Bins, dt: number, now: number): void {
     const h = this.hearing, raw = this.raw;
     const binHz = bins.sampleRate / (bins.freq.length * 2);
-    raw.bass = band(bins.freq, binHz, BANDS.bass);
-    raw.mid = band(bins.freq, binHz, BANDS.mid);
-    raw.high = band(bins.freq, binHz, BANDS.high);
+    const freq = this.smooth(bins);
+    raw.bass = band(freq, binHz, BANDS.bass);
+    raw.mid = band(freq, binHz, BANDS.mid);
+    raw.high = band(freq, binHz, BANDS.high);
     raw.level = raw.bass * 0.5 + raw.mid * 0.35 + raw.high * 0.15;
 
     // Adaptive normalisation: compare against a slow running average so quiet and loud
@@ -112,12 +123,15 @@ export class Listener {
       h[k] += (target - h[k]) * (target > h[k] ? attack : release);
     }
 
-    this.hearTone(bins, binHz, dt, raw.level);
+    // The tone and the kicks are heard in the unsmoothed bins: the Smoothing setting only shapes the look.
+    const bass = band(bins.freq, binHz, BANDS.bass);
+    const level = bass * 0.5 + band(bins.freq, binHz, BANDS.mid) * 0.35 + band(bins.freq, binHz, BANDS.high) * 0.15;
+    this.hearTone(bins, binHz, dt, level);
 
     // A kick: bass rising clearly above its ~1 s average, with hysteresis.
-    this.kickAvg += (raw.bass - this.kickAvg) * ease(dt, 1);
-    if (raw.bass < this.kickAvg) this.kickArmed = true;
-    if (this.kickArmed && raw.bass > this.kickAvg * 1.12 + 0.02 && raw.bass > 0.15 && now - this.lastKick > MIN_KICK_GAP) {
+    this.kickAvg += (bass - this.kickAvg) * ease(dt, 1);
+    if (bass < this.kickAvg) this.kickArmed = true;
+    if (this.kickArmed && bass > this.kickAvg * 1.12 + 0.02 && bass > 0.15 && now - this.lastKick > MIN_KICK_GAP) {
       this.kickArmed = false;
       this.lastKick = now;
       h.beat = 1;
@@ -125,7 +139,26 @@ export class Listener {
       this.hearTempo(now);
     }
 
-    this.fillSpectrum(bins, binHz);
+    this.fillSpectrum(freq, bins.time, binHz);
+  }
+
+  // The bins smoothed the way the analyser smooths them: each bin's linear magnitude averaged with the
+  // previous frames' by the Smoothing setting, then back to the analyser's dB byte scale. What the bands
+  // and the spectrum texture read.
+  private smooth(bins: Bins): Uint8Array {
+    const { freq, minDecibels: lo, maxDecibels: hi } = bins;
+    const amplitude = this.amplitudes(bins);
+    if (this.magnitude.length !== freq.length) {
+      this.magnitude = new Float32Array(freq.length);
+      this.smoothed = new Uint8Array(freq.length);
+    }
+    const m = this.magnitude, out = this.smoothed, k = this.smoothing, scale = 255 / (hi - lo);
+    for (let i = 0; i < freq.length; i++) {
+      m[i] = k * m[i]! + (1 - k) * amplitude[freq[i]!]!;
+      const db = m[i]! > 0 ? 20 * Math.log10(m[i]!) : -Infinity;
+      out[i] = Math.min(255, Math.max(0, Math.floor(scale * (db - lo) + 1e-6)));
+    }
+    return out;
   }
 
   // The tempo: the median gap between the last kicks, held once known (a breakdown keeps it).
@@ -173,8 +206,7 @@ export class Listener {
   }
 
   // Log-frequency spectrum (23 Hz .. 16 kHz) + downsampled waveform for the shaders.
-  private fillSpectrum(bins: Bins, binHz: number): void {
-    const { freq, time } = bins;
+  private fillSpectrum(freq: Uint8Array, time: Uint8Array, binHz: number): void {
     const minBin = 1;
     const maxBin = Math.min(freq.length - 2, Math.floor(16000 / binHz));
     const step = time.length / 256;

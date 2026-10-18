@@ -340,7 +340,7 @@ export class AppController {
   }
 
   // Pushes the preferences to whatever uses them: this renderer, the projectors, the studio's Preview
-  // monitor (its hook), the audio analysis, the badges and the idle timer. Resolution reaches the
+  // monitor (its hook), the Listener, the badges and the idle timer. Resolution reaches the
   // projectors with each frame.
   private applyPrefs(): void {
     const p = this.prefs.get();
@@ -349,7 +349,7 @@ export class AppController {
     applyRendererPrefs(this.renderer, outputPrefs(p));
     this.output.sendPrefs(outputPrefs(p));
     this.hooks.onPrefs?.(p);
-    this.audio.setSmoothing(p.audioSmoothing);
+    this.listener.setSmoothing(p.audioSmoothing);
     if (p.showKeyBadges) delete document.body.dataset.kbd; else document.body.dataset.kbd = 'off';
     this.wake();   // the idle delay may have changed
   }
