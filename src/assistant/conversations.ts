@@ -19,7 +19,7 @@ import { createToolRunner, UndoConflict, type ToolRunner } from './executor';
 import type { Backend } from './settings-wire';
 import { HISTORY_CAP, indexedDBTranscripts, prune, readIndex, storedTranscript, writeIndex, type ChatMeta, type StoredTranscript, type TranscriptBackend } from './history-store';
 import { createLock, serialized, type Lock } from './lock';
-import { codeHash, resumeNote, undoNote, withNotes, type ScreenNow } from './notes';
+import { codeHash, resumeNote, sceneNote, undoNote, withNotes, type ScreenNow } from './notes';
 import { previewOf, prepareForSend, titleFrom } from './transcript';
 import { UndoStack } from './undo';
 import { addUsage, NO_USAGE, type Usage } from './usage';
@@ -128,7 +128,10 @@ export class Conversation {
       return;
     }
     const [next, ...rest] = v.outbox;
-    const notes = [...v.notes, ...(this.restored ? [resumeNote(new Date(this.session.now()), this.session.meta(this.id)?.seen, this.session.screen())] : [])];
+    const seen = this.session.meta(this.id)?.seen, now = this.session.screen();
+    // A reopened conversation's note already says whether the scene changed; otherwise say so when it did.
+    const screenNote = this.restored ? resumeNote(new Date(this.session.now()), seen, now) : seen && now && now.scene !== seen.scene ? sceneNote(now.scene) : null;
+    const notes = [...v.notes, ...(screenNote ? [screenNote] : [])];
     this.restored = false;
     this.store.set({ outbox: rest, notes: [], status: 'running', error: null, runStartedAt: this.session.now(), runTools: 0 });
     this.session.started(this, next!.text);

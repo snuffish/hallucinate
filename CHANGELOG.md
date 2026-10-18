@@ -9,11 +9,20 @@
   Randomize uses (taken from `RANDOM_RANGES`, so they can't drift).
 - It knows effects reshape the picture and belong to show scenes, and that it can't set them yet, so it points to the
   Effects widget instead of faking a mirror in GLSL.
-- Plans: it sets each step's `maxSeconds` above the step's length, so a 256-beat step at 128 BPM is no longer cut at
-  the 90-second default.
+- Plans: while the tempo is known, `set_autopilot_plan` raises a step's `maxSeconds` to fit its beats (with a quarter
+  to spare) and says so, so a 256-beat step at 128 BPM is no longer cut at the 90-second default.
 - It names the scene it means once auto-switch may have moved the screen, and knows that while Live is pinned the
-  Look, scene and parameter tools change the main screen, not Live.
+  Look, scene and parameter tools change the main screen, not Live. When the scene on screen changed since its last
+  reply, the next message starts with a note saying which scene is on screen now.
+- `get_app_state` also reports the playing scene's description, auto-switch, Drift and drift speed, the main screen's
+  effects, whether Live is pinned and what the screen shows then, and the live levels while music plays; `get_show`
+  reports each show scene's effects.
 - Director cycles no longer ask for a FOLLOW-UPS line, and the prompt uses the glossary's *kick*, *tick* and *tone*.
+
+### Added
+
+- Two assistant tools: `find_scenes` searches the library by name, category or description, and `get_help` reads the
+  app's help topics with their shortcuts.
 
 ## Unreleased — effects (2026-10-17)
 
