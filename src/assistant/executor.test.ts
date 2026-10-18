@@ -3,7 +3,7 @@ import { fakeApp } from '../app/fake-app';
 import type { Compiler } from '../app/scene-library';
 import { StudioSession } from '../app/studio';
 import { parseParams } from '../engine/params';
-import { applyEdits, createToolRunner, resolveParam, UndoConflict } from './executor';
+import { applyEdits, createToolRunner, fitCeilings, resolveParam, UndoConflict } from './executor';
 import { UndoStack } from './undo';
 
 const { params } = parseParams(`
@@ -118,6 +118,29 @@ describe('tool runner', () => {
     expect([studio.plan?.steps.length, studio.autopilot.on]).toEqual([2, true]);
     undo.pop()!.undo();
     expect([studio.plan, studio.autopilot.on]).toEqual([null, false]);
+  });
+
+  it('raises a plan step\'s ceiling to fit its beats at the heard tempo, and says so', async () => {
+    const { run, studio } = setup();   // the fake hears 120 BPM
+    await run('add_show_scene', { scene: 'Alpha' });
+    await run('add_show_scene', { scene: 'Beta' });
+    const out = await run('set_autopilot_plan', { plan: { steps: [{ cue: 'Alpha', beats: 256 }, { cue: 'Beta', beats: 32, maxSeconds: 120 }] } }) as { note?: string };
+    expect(studio.plan!.steps.map((st) => st.maxSeconds)).toEqual([160, 120]);   // 256 beats = 128 s, plus a quarter
+    expect(out.note).toContain('Alpha');
+    expect(out.note).not.toContain('Beta');
+  });
+
+  it('leaves ceilings alone without a tempo, and never raises one past the schema\'s 600 s', () => {
+    const plan = { steps: [{ cue: 'a', beats: 512, maxSeconds: 90 }], note: '', loop: true };
+    expect(fitCeilings(plan, null)).toEqual({ plan, raised: [] });
+    expect(fitCeilings(plan, 40).plan.steps[0]!.maxSeconds).toBe(600);
+  });
+
+  it('shows each show scene\'s effects in get_show', async () => {
+    const { run, studio } = setup();
+    studio.add({ name: 'Mirrored', scene: 'Alpha', values: {}, look: {}, effects: [{ id: 'mirror', on: true, settings: { axis: 1 } }] });
+    const show = await run('get_show', {}) as { cues: { effects: unknown }[] };
+    expect(show.cues[0]!.effects).toEqual([{ id: 'mirror', on: true, settings: { axis: 1 } }]);
   });
 
   it('has nothing to do when what a change touched is already back as it was', async () => {
@@ -276,5 +299,37 @@ describe('scene code and parameter tools', () => {
       { name: 'uMirror', label: 'Mirror', type: 'bool', value: true },
     ]);
     expect(out.scenes).toEqual({ Fractal: 'Alpha (mine), Beta*', Mine: 'Maker (visual maker)' });
+  });
+
+  it('get_app_state reports the switches, the effects and, while music plays, the live levels', async () => {
+    const { run, app } = setup();
+    app.state.effects = [{ id: 'mirror', on: true, settings: { axis: 0 } }];
+    const out = await run('get_app_state', {}) as { look: Record<string, unknown>; effects: unknown; listening: unknown; livePinned?: unknown };
+    expect(out.look).toMatchObject({ autoSwitch: true, drift: false, driftSpeed: 1, randomizePicksScene: false });
+    expect(out.effects).toEqual([{ id: 'mirror', on: true, settings: { axis: 0 } }]);
+    expect(out.listening).toBeNull();   // nothing plays
+    expect(out.livePinned).toBeUndefined();
+    app.music.playing = true;
+    expect((await run('get_app_state', {}) as { listening: unknown }).listening).toEqual({ energy: 0.5, bass: 0.4, mid: 0.4, high: 0.4 });
+  });
+
+  it('find_scenes searches names, categories and descriptions, and skips removed scenes', async () => {
+    const { run, scenes } = setup();
+    scenes[1]!.desc = 'Rings of light that open with the bass';
+    const names = async (input: object) => ((await run('find_scenes', input)) as { scenes: { name: string }[] }).scenes.map((x) => x.name);
+    expect(await names({ query: 'rings' })).toEqual(['Beta']);
+    expect(await names({ category: 'fractal' })).toEqual(['Alpha', 'Beta']);
+    expect(await names({})).toEqual(['Alpha', 'Beta', 'Maker']);
+    expect(await names({ query: 'gone' })).toEqual([]);
+  });
+
+  it('get_help lists the topics, reads one with its shortcuts, and names the topics for an unknown id', async () => {
+    const { run } = setup();
+    const list = await run('get_help', {}) as { topics: { id: string }[] };
+    expect(list.topics.map((t) => t.id)).toContain('panel');
+    const panel = await run('get_help', { topic: 'panel' }) as { title: string; text: string };
+    expect(panel.title).toBe('Controls & layout');
+    expect(panel.text).toContain('Randomize (R)');
+    await expect(run('get_help', { topic: 'nope' })).rejects.toThrow(/no help topic "nope". Topics: panel/);
   });
 });

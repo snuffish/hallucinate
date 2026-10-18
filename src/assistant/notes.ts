@@ -1,11 +1,12 @@
 // Notes the app adds to the user's next message, for Claude only: "the user undid your change",
-// "this conversation was reopened later". They ride at the start of the message (one per line, in
+// "this conversation was reopened later", "the scene on screen changed". They ride at the start of the message (one per line, in
 // parentheses) rather than as messages of their own, so they cost no extra run and reach both
 // backends (the subscription backend sends only the latest user message). The panel shows them as
 // small notes, not as part of what the user typed.
 
 export const UNDO_PREFIX = '(The user pressed Undo and reverted your change: ';
 export const RESUME_PREFIX = '(This conversation was reopened on ';
+export const SCENE_PREFIX = '(The scene on screen changed since your last reply: ';
 
 export const undoNote = (label: string) => `${UNDO_PREFIX}${label}.)`;
 
@@ -26,6 +27,10 @@ export function resumeNote(date: Date, seen?: Screen | null, now?: ScreenNow | n
   return `${head}. On screen: ${JSON.stringify(now.scene)}, ${what}${params}. Call get_app_state only if you need more.)`;
 }
 
+// Auto-switch (or the user) moved the screen to another scene between replies: "make it brighter" now
+// means that scene, and Claude's scene tools default to it.
+export const sceneNote = (scene: string) => `${SCENE_PREFIX}now ${JSON.stringify(scene)}.)`;
+
 // A cheap fingerprint of a scene's code (FNV-1a), enough to tell "unchanged" from "changed".
 export function codeHash(code: string): string {
   let h = 0x811c9dc5;
@@ -33,7 +38,7 @@ export function codeHash(code: string): string {
   return `${code.length.toString(36)}-${(h >>> 0).toString(36)}`;
 }
 
-const NOTE_LINE = /^\((?:The user pressed Undo and reverted your change: |This conversation was reopened on )[^\n]*\)$/;
+const NOTE_LINE = /^\((?:The user pressed Undo and reverted your change: |This conversation was reopened on |The scene on screen changed since your last reply: )[^\n]*\)$/;
 
 export function withNotes(notes: readonly string[], text: string): string {
   return notes.length ? `${notes.join('\n')}\n\n${text}` : text;
@@ -53,5 +58,6 @@ export function splitNotes(message: string): { notes: string[]; text: string } {
 export function describeNote(note: string): string {
   if (note.startsWith(UNDO_PREFIX)) return `Undid: ${note.slice(UNDO_PREFIX.length, -2)}`;
   if (note.startsWith(RESUME_PREFIX)) return 'Reopened later: Claude was told the app may have changed.';
+  if (note.startsWith(SCENE_PREFIX)) return `Scene changed: ${note.slice(SCENE_PREFIX.length + 'now '.length, -2)}`;
   return note;
 }

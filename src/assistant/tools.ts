@@ -41,7 +41,7 @@ const lookKeys = ['hue', 'cycle', 'trails', 'speed', 'reactivity', 'aberration',
 export const TOOLS = [
   tool({
     name: 'get_app_state',
-    description: 'Get what is on screen now: the playing scene (name, kind, live parameters with their ranges and values), the look sliders, the audio source, BPM and mood, whether media is loaded, and every scene name by category (a mark after a name: * edited by the user, (mine), (visual maker); unmarked ones are built-in). Call this when you need to know the current situation or the exact scene names.',
+    description: 'Get what is on screen now: the playing scene (name, kind, description, live parameters with their ranges and values), the look sliders and switches (autoSwitch: whether the screen moves to another scene by itself; drift: whether the sliders wander), the main screen\'s effects (in the order they run), the audio source, BPM, mood and tone, the live levels while music plays (energy, bass, mid, high, 0-1), whether media is loaded, whether Live is pinned and what the screen shows then, and every scene name by category (a mark after a name: * edited by the user, (mine), (visual maker); unmarked ones are built-in). Call this when you need to know the current situation or the exact scene names.',
     inputSchema: z.object({}),
     outputSchema: record,
     running: () => 'Looking around',
@@ -116,6 +116,25 @@ export const TOOLS = [
     done: (i) => `Switched to ${(i.scene as string | undefined) ?? 'a scene'}`,
   }),
   tool({
+    name: 'find_scenes',
+    description: 'Search the scene library by name, category or description, the way the library\'s search box does. Returns each match\'s name, category, kind, description and number of live parameters. Omit both to list every scene with its description. Use it to pick a scene that fits a request ("something with rings", "a calm one").',
+    inputSchema: z.object({
+      query: z.string().optional().describe('Words to look for in the name, category or description (case-insensitive).'),
+      category: z.string().optional().describe('Only this category, e.g. "Beams".'),
+    }),
+    outputSchema: record,
+    running: (i) => (typeof i.query === 'string' ? `Searching for "${i.query}"` : 'Browsing the library'),
+    done: (i) => (typeof i.query === 'string' ? `Searched for "${i.query}"` : 'Browsed the library'),
+  }),
+  tool({
+    name: 'get_help',
+    description: 'Read the app\'s own help, the text its ? buttons show, with the keyboard shortcuts for that area. Omit the topic to list the topics. Use it when the user asks how something in the app works, rather than guessing.',
+    inputSchema: z.object({ topic: z.string().optional().describe('A topic id from the list (omit to get the list).') }),
+    outputSchema: record,
+    running: (i) => (typeof i.topic === 'string' ? `Reading the help on ${i.topic}` : 'Opening the help'),
+    done: (i) => (typeof i.topic === 'string' ? `Read the help on ${i.topic}` : 'Opened the help'),
+  }),
+  tool({
     name: 'look_at_scene',
     description: 'Render a still frame of a scene and see it as an image, to check your work. It uses the scene\'s current parameter values and stand-in audio (moderate bass/mid/high, a soft beat), so audio-driven detail shows. Use it after creating or changing a scene. Several times show motion.',
     inputSchema: z.object({
@@ -129,7 +148,7 @@ export const TOOLS = [
   // ---------- The Studio (show scenes, Take, autopilot) ----------
   tool({
     name: 'get_show',
-    description: 'Get the show in the studio: every show scene (id, name, which scene, category, whether its scene still exists), which one is in Preview and which is Live, the transition (cut/fade, seconds), the autopilot (on/off, beats per scene, beats gone and to go) and the current plan, plus whether the user changed the show by hand recently. Call this before editing the show or writing a plan.',
+    description: 'Get the show in the studio: every show scene (id, name, which scene, category, whether its scene still exists, its parameter values, look sliders and effects; you can read effects but not set them yet), which one is in Preview and which is Live, the transition (cut/fade, seconds), the autopilot (on/off, beats per scene, beats gone and to go) and the current plan, plus whether the user changed the show by hand recently. Call this before editing the show or writing a plan.',
     inputSchema: z.object({}),
     outputSchema: record,
     running: () => 'Reading the show',
@@ -203,7 +222,7 @@ export const TOOLS = [
   }),
   tool({
     name: 'set_autopilot_plan',
-    description: 'Replace the autopilot\'s plan: the ordered steps it plays next, each a show scene with how many beats it gets and optionally its own transition. The whole plan is replaced (never appended); if the first step is the show scene that is Live, that step is already playing and its beats count from now, otherwise the plan starts at the next take. The autopilot is turned on. Pass null to drop the plan and follow list order again. Steps whose show scene no longer exists are skipped.',
+    description: 'Replace the autopilot\'s plan: the ordered steps it plays next, each a show scene with how many beats it gets and optionally its own transition. The whole plan is replaced (never appended); if the first step is the show scene that is Live, that step is already playing and its beats count from now, otherwise the plan starts at the next take. The autopilot is turned on. Pass null to drop the plan and follow list order again. Steps whose show scene no longer exists are skipped. While the tempo is known, a step\'s maxSeconds is raised to fit its beats.',
     inputSchema: z.object({ plan: PlanSchema.nullable() }),
     outputSchema: record,
     running: () => 'Planning the show',

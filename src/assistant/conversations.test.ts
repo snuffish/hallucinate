@@ -296,6 +296,23 @@ describe('assistant conversations', () => {
     expect(await reopen()).toContain('its code changed since: read it before editing');
   });
 
+  it('tells the conversation when the scene on screen changed since its last reply, and only then', async () => {
+    const seen: Seen[] = [];
+    const { s, app } = session(seen);
+    const c = s.active;
+    await c.load();
+    c.send('hello');
+    await until(() => !c.running && c.view.messages.length === 2);
+    c.send('same scene');
+    await until(() => !c.running && c.view.messages.length === 4);
+    expect(seen.at(-1)!.text).toBe('same scene');
+    app.setScene(1);   // auto-switch moved on
+    c.send('brighter');
+    await until(() => !c.running && c.view.messages.length === 6);
+    expect(seen.at(-1)!.text).toBe('(The scene on screen changed since your last reply: now "Beta".)\n\nbrighter');
+    s.dispose();
+  });
+
   it('a session disposed before a stored transcript was read leaves that transcript alone (StrictMode mounts twice)', async () => {
     const id = '00000000-0000-4000-8000-000000000002';
     const messages: UIMessage[] = [{ id: 'u1', role: 'user', parts: [{ type: 'text', content: 'keep me' }] }];

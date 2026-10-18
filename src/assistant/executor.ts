@@ -11,8 +11,9 @@ import type { ParamSpec, ParamValue, ParamValues } from '../engine/params';
 import { stillUniforms } from '../engine/scene-inputs';
 import type { Scene } from '../scenes';
 import { soundNow } from '../engine/listener';
+import { HELP_TOPICS, shortcutRows, type HelpTopic } from '../help/topics';
 import { LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
-import { PlanSchema } from '../state/show-plan';
+import { MAX_PLAN_STEP_SECONDS, PlanSchema, type Plan } from '../state/show-plan';
 import type { z } from 'zod';
 import type { UndoStack } from './undo';
 import { TOOL_DEFINITIONS, type ContentParts, type ToolName } from './tools';
@@ -122,6 +123,32 @@ function nearMiss(code: string, find: string): string {
 
 // Parameter values as the model gets them back after a change: name → value, numbers rounded.
 const round = (v: ParamValue): ParamValue => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : Array.isArray(v) ? v.map((x) => Math.round(x * 1000) / 1000) : v);
+const round2 = (x: number) => Math.round(x * 100) / 100;
+
+// A plan's wall-clock ceilings, raised so each step can play all its beats at `bpm` (with a quarter
+// to spare, for a tempo that drifts): a ceiling under the step's own length cuts it short while the
+// ticks are still coming. Returns the steps it raised.
+export function fitCeilings(plan: Plan, bpm: number | null): { plan: Plan; raised: string[] } {
+  if (!bpm) return { plan, raised: [] };
+  const raised: string[] = [];
+  const steps = plan.steps.map((st) => {
+    const needed = Math.min(MAX_PLAN_STEP_SECONDS, Math.ceil((st.beats * 60 / bpm) * 1.25));
+    if (st.maxSeconds >= needed) return st;
+    raised.push(`${st.cue}: ${st.maxSeconds} → ${needed} s`);
+    return { ...st, maxSeconds: needed };
+  });
+  return { plan: { ...plan, steps }, raised };
+}
+
+// get_help's answer: the topic list, or one topic with its shortcuts.
+function helpTopic(id: string | undefined) {
+  const topics: HelpTopic[] = Object.values(HELP_TOPICS);
+  if (id === undefined) return { topics: topics.map((t) => ({ id: t.id, title: t.title })) };
+  const t = topics.find((x) => x.id === id);
+  if (!t) throw new Error(`There's no help topic "${id}". Topics: ${topics.map((x) => x.id).join(', ')}.`);
+  const shortcuts = shortcutRows(t.hotkeys).map((r) => ({ action: r.label, keys: r.keys.map((k) => k.keys).join(' or '), ...(r.note && { when: r.note }) }));
+  return { id: t.id, title: t.title, text: t.body.join('\n\n'), ...(shortcuts.length && { shortcuts }) };
+}
 
 // Every scene name, by category, in one string per category. A mark after a name says what a
 // reply needs to know about it: * edited by the user, (mine), (visual maker), (custom).
@@ -154,7 +181,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
   };
   const cueView = (s: StudioSession, c: Cue) => {
     const i = s.sceneIndex(c);
-    return { id: c.id, name: c.name, scene: c.scene, category: i >= 0 ? scenes()[i]!.cat || null : null, missing: i < 0, hue: c.look.hue ?? null, values: c.values, look: c.look };
+    return { id: c.id, name: c.name, scene: c.scene, category: i >= 0 ? scenes()[i]!.cat || null : null, missing: i < 0, hue: c.look.hue ?? null, values: c.values, look: c.look, effects: c.effects };
   };
   const showView = (s: StudioSession) => ({
     cues: s.cues.map((c) => cueView(s, c)),
@@ -254,12 +281,15 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
 
   const tools: Implementations = {
     get_app_state() {
-      const i = app.sceneIndex, s = app.currentScene;
+      const i = app.sceneIndex, s = app.currentScene, look = app.state.look, h = app.hearing, ui = app.ui.get();
       return {
-        playing: { name: s.name, kind: kindOf(s), category: s.cat || null, editedByUser: !!s.edited, parameters: paramSummary(i) },
-        look: Object.fromEntries([...LOOK_KEYS, 'synesthesia'].map((k) => [k, app.state.look[k as LookKey]])),
-        audio: soundNow(app.hearing, app.music.playing, app.state.activeSource),
+        playing: { name: s.name, kind: kindOf(s), category: s.cat || null, description: s.desc || null, editedByUser: !!s.edited, parameters: paramSummary(i) },
+        look: { ...Object.fromEntries([...LOOK_KEYS, 'synesthesia'].map((k) => [k, look[k as LookKey]])), autoSwitch: look.auto, drift: look.drift, driftSpeed: look.driftSpeed, randomizePicksScene: look.randomScene },
+        effects: app.state.effects,
+        audio: soundNow(h, app.music.playing, app.state.activeSource),
+        listening: app.music.playing ? { energy: round2(h.energy), bass: round2(h.bass), mid: round2(h.mid), high: round2(h.high) } : null,
         media: app.media.el ? { name: app.media.name, kind: app.media.kind } : null,
+        ...(ui.liveName && { livePinned: { live: ui.liveName, screenShows: ui.screenMode } }),
         codeEditorOpen: app.overlay === 'editor',
         scenes: sceneList(scenes()),
       };
@@ -322,6 +352,16 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
       app.setScene(i);
       return { nowPlaying: scenes()[i]!.name, kind: kindOf(scenes()[i]!), parameters: paramSummary(i) };
     },
+
+    find_scenes({ query, category }) {
+      const q = query?.trim().toLowerCase(), cat = category?.trim().toLowerCase();
+      const found = scenes().filter((x) => !x.removed
+        && (!cat || x.cat.toLowerCase() === cat)
+        && (!q || `${x.name} ${x.cat} ${x.desc}`.toLowerCase().includes(q)));
+      return { scenes: found.map((x) => ({ name: x.name, category: x.cat || null, kind: kindOf(x), description: x.desc || null, parameters: x.params.length })) };
+    },
+
+    get_help({ topic }) { return helpTopic(topic); },
 
     async look_at_scene({ scene, times }) {
       const i = findScene(scene);
@@ -422,14 +462,20 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
       if (!parsed.success) throw new Error(`The plan doesn't fit: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
       const unknown = parsed.data.steps.map((st) => st.cue).filter((ref) => !s.cueByRef(ref));
       if (unknown.length === parsed.data.steps.length) throw new Error(`None of the plan's show scenes exist: ${unknown.join(', ')}. Call get_show for the ids.`);
-      // Store ids, so renames don't break the plan.
-      const plan = { ...parsed.data, steps: parsed.data.steps.map((st) => ({ ...st, cue: s.cueByRef(st.cue)?.id ?? st.cue })) };
+      // Fit the ceilings while the steps still name their show scenes as the model did (for its note),
+      // then store ids, so renames don't break the plan.
+      const fitted = fitCeilings(parsed.data, app.hearing.bpm), raised = fitted.raised;
+      const plan = { ...fitted.plan, steps: fitted.plan.steps.map((st) => ({ ...st, cue: s.cueByRef(st.cue)?.id ?? st.cue })) };
       undoable(`Planned ${parsed.data.steps.length} steps`, planning(s), () => {
         s.setPlan(plan);
         if (!s.autopilot.on) s.setAutopilot(true);
       });
       const v = showView(s);
-      return { plan: v.plan, planStep: v.planStep, autopilot: v.autopilot, ...(unknown.length && { problems: unknown.map((ref) => `"${ref}" isn't a show scene; that step is skipped`) }) };
+      return {
+        plan: v.plan, planStep: v.planStep, autopilot: v.autopilot,
+        ...(unknown.length && { problems: unknown.map((ref) => `"${ref}" isn't a show scene; that step is skipped`) }),
+        ...(raised.length && { note: `Raised maxSeconds to fit each step's beats at ${app.hearing.bpm} BPM: ${raised.join(', ')}.` }),
+      };
     },
 
     take_show_scene({ cue: ref }) {

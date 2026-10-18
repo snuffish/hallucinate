@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { chat, convertMessagesToModelMessages, EventType, maxIterations, type AdapterYieldChunk, type DefaultMessageMetadataByModality, type TextOptions } from '@tanstack/ai';
 import { BaseTextAdapter, type StructuredOutputOptions } from '@tanstack/ai/adapters';
 import type { UIMessage } from '@tanstack/ai-client';
-import { codeHash, describeNote, resumeNote, splitNotes, undoNote, withNotes } from './notes';
+import { codeHash, describeNote, resumeNote, sceneNote, splitNotes, undoNote, withNotes } from './notes';
 import { TOOL_DEFINITIONS } from './tools';
 import { NOT_RUN, OMITTED, prepareForSend, previewOf, sealInterrupted, titleFrom, toMarkdown } from './transcript';
 
@@ -142,6 +142,13 @@ describe('app notes on a message', () => {
     expect(describeNote(notes[1]!)).toMatch(/^Reopened later/);
     expect(splitNotes('(just parentheses)')).toEqual({ notes: [], text: '(just parentheses)' });
     expect(splitNotes(undoNote('Old form'))).toEqual({ notes: [undoNote('Old form')], text: '' });
+  });
+
+  it('a scene-changed note names the new scene and is split off like the others', () => {
+    const note = sceneNote('Tunnel (v2)');
+    expect(note).toBe('(The scene on screen changed since your last reply: now "Tunnel (v2)".)');
+    expect(splitNotes(withNotes([note], 'brighter'))).toEqual({ notes: [note], text: 'brighter' });
+    expect(describeNote(note)).toBe('Scene changed: "Tunnel (v2)"');
   });
 
   it('a reopen note says what is on screen and whether the scene\'s code changed, on one line the panel still splits off', () => {
