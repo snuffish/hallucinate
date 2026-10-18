@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NO_BACKGROUND, type Background } from '../engine/background';
 import type { EffectStack } from '../engine/effects';
 import { parseParams } from '../engine/params';
 import { programState } from '../engine/look';
@@ -356,6 +357,56 @@ describe('StudioSession effects', () => {
     const s = session(app, { cues: [] });
     app.state.effects = MIRRORED;
     expect(s.add({ name: 'Beta', scene: 'Beta', values: {}, look: {} }).effects).toEqual([]);
+  });
+});
+
+describe('StudioSession background', () => {
+  const BLUE: Background = { ...NO_BACKGROUND, kind: 'colour', colour: '#0000ff' };
+  const SUNSET: Background = { ...NO_BACKGROUND, kind: 'gradient', colour: '#ff8000', colour2: '#400080' };
+  const withBg = (name: string, background: Background) => ({ ...cue(name), background });
+  const projector = (app: Fake) => app.live.route({ ...programState(), scene: app.state.clock.scene }, true, 0).projector!.program;
+
+  it("capturing and updating a show scene takes the main screen's background with it", () => {
+    const app = app3();
+    const s = session(app, { cues: [] });
+    app.state.background = BLUE;
+    s.addFromSelect('@live');
+    expect(s.cues[0]!.background).toEqual(BLUE);
+    flushAll();
+    expect(JSON.parse(storage.get(KEYS.show)!).cues[0].background).toEqual(BLUE);
+    app.state.background = SUNSET;
+    s.updateFromLive(s.cues[0]!);
+    expect(s.cues[0]!.background).toEqual(SUNSET);
+  });
+
+  it("taking a show scene with the studio open puts its background on the main screen, replacing the screen's", () => {
+    const app = app3();
+    const s = session(app, { cues: [withBg('Alpha', BLUE), cue('Beta')] });
+    app.state.background = SUNSET;
+    s.setOpen(true, null);
+    s.take(s.cues[0]!);
+    expect(app.state.background).toEqual(BLUE);
+    expect(app.ui.get().background, 'the Background widget shows it').toEqual(BLUE);
+    s.take(s.cues[1]!);
+    expect(app.state.background).toEqual(NO_BACKGROUND);
+  });
+
+  it('Live crossfades from the outgoing show scene\'s own background', () => {
+    const app = app3();
+    const s = session(app, { cues: [withBg('Alpha', BLUE), withBg('Beta', SUNSET)], mode: 'fade', seconds: 2 });
+    s.take(s.cues[0]!);
+    expect(projector(app)).toMatchObject({ scene: 0, background: BLUE });
+    s.take(s.cues[1]!);
+    app.state.clock.clock += 1;
+    expect(projector(app)).toMatchObject({ scene: 1, prevScene: 0, background: SUNSET, prevBackground: BLUE });
+  });
+
+  it('loads a show saved before backgrounds with none, cleans up a broken one, and adds show scenes without one', () => {
+    const app = app3();
+    const s = session(app, { cues: [cue('Alpha'), { ...cue('Beta'), background: { kind: 'laser', colour: 'red' } }, { ...cue('Gamma'), background: 5 }] });
+    expect(s.cues.map((c) => c.background)).toEqual([NO_BACKGROUND, NO_BACKGROUND, NO_BACKGROUND]);
+    app.state.background = BLUE;
+    expect(s.add({ name: 'Beta', scene: 'Beta', values: {}, look: {} }).background).toEqual(NO_BACKGROUND);
   });
 });
 

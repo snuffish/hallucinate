@@ -61,6 +61,11 @@ A built-in step that reshapes a scene's picture, such as a mirror or a glow, mov
 show scene keeps its effects in order, each switched on or off, and they shape the picture before the Look does.
 _Avoid_: filter (the library's category tabs), layer, FX, post-processing
 
+**Background**:
+What a show scene shows behind its lines instead of pure black: a colour, a gradient or your media. It stays dim,
+fades to black at the edges and never flashes on a kick, and it is drawn behind the trails and under the Look.
+_Avoid_: backdrop, layer, wallpaper
+
 **Look**:
 The sliders that shape how a scene reacts and colours: reactivity, speed, trails, hue, colour cycling, fringing,
 synesthesia.
@@ -93,7 +98,7 @@ it, or the softer rainbow.
 _Avoid_: rainbow (that is the softer one)
 
 **Show scene**:
-A scene with its parameter values, its effects and the look it keeps, as the studio plays it.
+A scene with its parameter values, its effects, its background and the look it keeps, as the studio plays it.
 _Avoid_: cue (the code's name for it), preset
 
 **Live**:

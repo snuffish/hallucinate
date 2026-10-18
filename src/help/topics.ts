@@ -68,6 +68,17 @@ export const HELP_TOPICS = {
     ],
     hotkeys: [],
   },
+  background: {
+    id: 'background',
+    title: 'Background',
+    body: [
+      'A background shows behind the lines instead of pure black: one colour, a gradient from one colour to another, or your media (the image or video you dropped or opened in the Media section). Pick None for black again.',
+      'It stays behind the lines: where a line is lit, the background gives way, so the lines keep their colour. The Look grades it with the picture, the trails never smear it, and effects reshape the lines, not the background.',
+      'Brightness sets how bright it is, up to a dim glow, so the lines always stand out. Breathe lets it move with the music: it dims in calm music and brightens as the mood picks up, and turns a gradient slowly. It never flashes on a kick.',
+      'Like the effects, it belongs to what is on screen: it stays when the scene changes and comes back after a reload, and a show scene in the studio keeps its own. Near the edges it fades to black, so the border stays as dark as the scene keeps it.',
+    ],
+    hotkeys: [],
+  },
   library: {
     id: 'library',
     title: 'Scene library',

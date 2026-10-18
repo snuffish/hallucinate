@@ -9,7 +9,7 @@ const VIEW = { width: 1280, height: 720 };
 
 describe('layout', () => {
   it('starts as today: controls stacked on the left, parameters top-right', () => {
-    expect(zoneWidgets(DEFAULT_LAYOUT, 'left')).toEqual(['hub', 'source', 'media', 'audio', 'scene', 'look', 'effects', 'actions', 'screen']);
+    expect(zoneWidgets(DEFAULT_LAYOUT, 'left')).toEqual(['hub', 'source', 'media', 'audio', 'scene', 'look', 'effects', 'background', 'actions', 'screen']);
     expect(DEFAULT_LAYOUT.widgets.params.place).toMatchObject({ kind: 'float', ax: 'r', ay: 't' });
     expect(DEFAULT_LAYOUT.bubble).toEqual({ kind: 'auto' });
   });
@@ -17,16 +17,16 @@ describe('layout', () => {
   it('docks a widget at a position and renumbers the dock it left and the one it joined', () => {
     let l = dock(resetLayout(), 'look', 'right', 0);
     expect(zoneWidgets(l, 'right')).toEqual(['look']);
-    expect(zoneWidgets(l, 'left')).toEqual(['hub', 'source', 'media', 'audio', 'scene', 'effects', 'actions', 'screen']);
+    expect(zoneWidgets(l, 'left')).toEqual(['hub', 'source', 'media', 'audio', 'scene', 'effects', 'background', 'actions', 'screen']);
     expect(WIDGET_IDS.filter((id) => l.widgets[id].place.kind === 'dock' && (l.widgets[id].place as DockPlace).zone === 'left')
-      .map((id) => (l.widgets[id].place as DockPlace).order).sort()).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+      .map((id) => (l.widgets[id].place as DockPlace).order).sort()).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
 
     l = dock(l, 'scene', 'right', 0);
     expect(zoneWidgets(l, 'right')).toEqual(['scene', 'look']);
     l = dock(l, 'scene', 'right', 99);
     expect(zoneWidgets(l, 'right')).toEqual(['look', 'scene']);
     l = dock(l, 'actions', 'left', 1);
-    expect(zoneWidgets(l, 'left')).toEqual(['hub', 'actions', 'source', 'media', 'audio', 'effects', 'screen']);
+    expect(zoneWidgets(l, 'left')).toEqual(['hub', 'actions', 'source', 'media', 'audio', 'effects', 'background', 'screen']);
   });
 
   it('anchors a float to its nearest corner', () => {
@@ -131,13 +131,13 @@ describe('layout storage', () => {
     expect(l.widgets.media).toEqual(DEFAULT_LAYOUT.widgets.media);
     expect(l.widgets.audio).toEqual(DEFAULT_LAYOUT.widgets.audio);
     expect(l.bubble).toEqual({ kind: 'auto' });
-    expect(zoneWidgets(l, 'left')).toEqual(['hub', 'source', 'media', 'audio', 'scene', 'effects', 'actions', 'screen']);
+    expect(zoneWidgets(l, 'left')).toEqual(['hub', 'source', 'media', 'audio', 'scene', 'effects', 'background', 'actions', 'screen']);
   });
 
   it('adds a widget newer than the stored layout at the end of its default dock', () => {
     const stored = JSON.parse(JSON.stringify(dock(resetLayout(), 'actions', 'left', 0))) as { widgets: Record<string, unknown> };
     delete stored.widgets.screen;   // saved before the Screen widget existed
-    expect(zoneWidgets(parseLayout(stored), 'left')).toEqual(['actions', 'hub', 'source', 'media', 'audio', 'scene', 'look', 'effects', 'screen']);
+    expect(zoneWidgets(parseLayout(stored), 'left')).toEqual(['actions', 'hub', 'source', 'media', 'audio', 'scene', 'look', 'effects', 'background', 'screen']);
   });
 
   it('keeps sizes and dock widths, and reads entries saved before sizes existed', () => {

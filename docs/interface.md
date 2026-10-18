@@ -6,7 +6,8 @@
 
 ## Widgets & layout
 
-The controls are separate widgets: Hallucinate, Source, Media, Audio, Scene, Look, Effects, Actions, Screen and
+The controls are separate widgets: Hallucinate, Source, Media, Audio, Scene, Look, Effects, Background, Actions,
+Screen and
 Parameters (Screen chooses what the main screen shows; see [Studio](studio.md)). Drag one by
 its title bar onto an edge of the screen to dock it there (a preview shows where it lands, and you can reorder a dock), or
 drop it anywhere else to float it. Floating widgets resize by their corner, docked ones by their bottom edge, and a
@@ -41,6 +42,21 @@ stays as dark as the scene keeps it.
 
 A show scene keeps its effects too ([Studio](studio.md)): *What's on Live now* and ⤓ *Update from Live* store the
 screen's effects in it, and taking it with the studio open puts its effects on the screen in place of yours.
+
+## Background
+
+The **Background** widget, under the Effects, puts something behind the lines instead of pure black: a **Colour**, a
+**Gradient** from one colour to another at an *Angle*, or your **Media** (the image or video you dropped or opened in
+the Media section; with a media background, loading one keeps the scene on screen instead of switching to Scan Trace).
+*None* is black again. *Brightness* sets how bright it is, up to a dim glow (30% of full), so the lines always stand
+out. *Breathe* lets it move with the music: it dims in calm music and brightens as the mood picks up, and turns a
+gradient slowly. It never flashes on a kick.
+
+The background sits behind the lines: where a line is lit, it gives way. It is drawn after the trails and before the
+Look, so the Look grades it with the picture, the trails never smear it, and effects reshape the lines, not the
+background. Like the effects, it belongs to what is on screen: it stays when the scene changes and comes back after a
+reload, Randomize and Drift leave it alone, and library previews show scenes without it. Near the edges it fades to
+black, so the border stays as dark as the scene keeps it. A show scene keeps its own background too.
 
 **⚙** (or **,**) opens [Settings](settings.md): how this computer renders and listens, how soon the controls hide, and
 whether buttons show their key badges.

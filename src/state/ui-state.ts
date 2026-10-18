@@ -1,6 +1,7 @@
 // What the React tree sees. Published by the render loop at ≤30 Hz and by actions immediately.
 // Everything here is a plain value, so selectors can compare with Object.is.
 
+import { NO_BACKGROUND, type Background } from '../engine/background';
 import { NO_EFFECTS, type EffectStack } from '../engine/effects';
 import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
@@ -57,6 +58,7 @@ export interface UIState {
   sceneVersion: number;     // bumps when the scene list changes (add/remove/edit), for lists
   look: Look;
   effects: EffectStack;     // the main screen's effects (the Effects widget)
+  background: Background;   // the main screen's background (the Background widget)
   meters: Meters;
   bpm: number | null;
   moodLabel: MoodLabel;
@@ -96,6 +98,7 @@ export const initialUIState = (look: Look): UIState => ({
   sceneVersion: 0,
   look,
   effects: NO_EFFECTS,
+  background: NO_BACKGROUND,
   meters: { bass: 0, mid: 0, high: 0, bright: 0.5, beat: 0 },
   bpm: null,
   moodLabel: '',

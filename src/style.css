@@ -251,6 +251,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .fx.dragging { opacity: 0.5; }
 .fx.drop-before { box-shadow: 0 -3px 0 var(--accent); }
 .fx.drop-after { box-shadow: 0 3px 0 var(--accent); }
+.bg-colours { display: flex; gap: 12px; }
+.bg-colours label { flex: 1; }
+.bg-colours input[type="color"] { width: 100%; height: 26px; padding: 0 2px; background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
 
 .actions button { flex: 1; }
 .actions .random-scene { flex-basis: 100%; font-size: 12px; }

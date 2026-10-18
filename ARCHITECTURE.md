@@ -73,7 +73,7 @@ browser                                              dev server (Vite middleware
   The panels only subscribe and render; the shortcuts and the tools reach the same objects. The sessions see
   the app through `AppPort` (`src/app/app-port.ts`), the part of the controller they use; the tests use one
   in-memory fake of it (`src/app/fake-app.ts`), so neither can drift from what the sessions need. A scene goes
-  on screen as a whole through `applyScene` / `captureScene` (scene, parameter values, look, effects), the way the
+  on screen as a whole through `applyScene` / `captureScene` (scene, parameter values, look, effects, background), the way the
   studio takes it. On the main screen both pictures of a crossfade draw with the screen's effects, except that a
   show scene put there by `applyScene` leaves the outgoing picture the stack it had until the fade ends. A scene's code, its `@params` and their stored values belong to the scene library
   (`src/app/scene-library.ts`, the controller's `library`): compiling into a scene, adding one of yours (one rule for
@@ -168,7 +168,8 @@ auto-switch, a tick is the studio's and the director's beat (both before the fra
 composed) → `composeFrame` fills one reused `ProgramState` for the main screen (on the clock's motion) →
 `LiveSlot.route` composes Live (on its own motion) and decides what the screen and the
 projectors draw → `Renderer.render` (scene pass → effects, one pass per switched-on effect of each picture's stack plus that effect's
-own `passes` (Glow's blur), none when none is on → feedback pass → display pass) → `OutputLink.sendFrame` when a
+own `passes` (Glow's blur), none when none is on → feedback pass → background pass, none when neither picture has a
+background → display pass) → `OutputLink.sendFrame` when a
 projector is connected → `hooks.onFrame` (studio preview and master
 fader) → every second frame: publish meters to the UI store. `FrameProfiler` (Shift+P, `?perf`) laps between these stages;
 while it is off each lap is one flag check.
@@ -220,6 +221,11 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
   sizes live beside the catalogue: the spec measures the border band `EDGE_BAND`, effects leave the scene's own
   picture alone out to `EDGE_CLEAR` (the band plus a margin for the Look's fringing) and run at full strength from
   `EDGE_FULL`.
+- **A background kind or setting:** `src/engine/background.ts` lists the kinds (`BACKGROUND_KINDS`) and the numbers
+  (`BACKGROUND_SETTINGS`); the widget, the clean-up of a stored background and the safety spec pick them up from
+  there. The background pass (`BACKGROUND_SHADER`) draws each picture's background behind the trails, fading it with
+  the effects' `EDGE_CLEAR` / `EDGE_FULL` and capping it at `BACKGROUND_MAX`. It may read only slow inputs (the mood,
+  the clock), never the bass or the kick: `background.test.ts` checks the shader for them.
 - **A visual-maker block:** add an entry to `NODE_TYPES` in `src/engine/nodes.ts` (and a helper to `LIBS` if it
   needs GLSL). The examples test compiles every example graph.
 - **An assistant tool:** add a `tool({ … })` entry to `TOOLS` in `src/assistant/tools.ts` (schema, description, its
