@@ -8,7 +8,7 @@ The built-in scenes are a **laser show**: thin luminous lines, beams and points 
 [ADR 0001](adr/0001-replace-all-built-in-scenes.md)). Every one reacts to the kicks, the ticks of the tempo and the
 bands, takes its colour from the hue slider and colour cycling, and keeps the background pure black. They are
 strobe-safe: no change from one frame to the next makes more than a quarter of the frame over twice as bright more than
-3 times a second, at any tempo. There are eight; the number keys play them in this order:
+3 times a second, at any tempo. There are twelve; the number keys 1–9 and 0 play the first ten in this order:
 
 | Key | Scene | Category | What it does |
 | --- | --- | --- | --- |
@@ -20,8 +20,12 @@ strobe-safe: no change from one frame to the next makes more than a quarter of t
 | 6 | **Contour Lines** | Fields | Glowing contour lines over a slowly drifting island of terrain. The bass lifts the land, the lines climb a step on each tick, and a kick lights every third one. |
 | 7 | **Point Storm** | Geometry | Hundreds of laser dots on three nested rings holding a polygon or star. A kick throws them outwards, they loosen between ticks and pull into a new shape on each tick; the bass, mids and treble each light a ring. |
 | 8 | **Scan Trace** | Media | Your video or camera redrawn as horizontal laser scan lines, each pushed up by the brightness beneath it. A scan beam runs down the lines on each tick and kicks flash every third line; with nothing loaded the lines lie flat. |
+| 9 | **Lissajous** | Signals | An oscilloscope in XY mode drawing a Lissajous figure. It flows into the next frequency ratio every 4 ticks, the phase drifts so it seems to turn in depth, and the waveform trembles along the trace. The scope's dot runs round once every 2 ticks with a bright tail; the trace swells with the bass and flares on kicks. |
+| 0 | **Scope Ring** | Signals | The waveform wrapped round a circle, with the spectrum as a closed outline inside it (bass at the top, treble at the bottom). An echo of the ring grows outwards and fades on each tick, and a kick flares the outer ring. |
+| – | **Constellation** | Geometry | Drifting laser stars linked by thin lines to their near neighbours. The bass stretches the links so more stars join up, the treble makes them twinkle, a kick flares half of them and each tick lights a new handful of links. It fades out before the edges. |
+| – | **Vortex** | Beams | Spiral arms of light winding out from the centre. The bass winds them tighter, their brightness follows the spectrum from the core outwards, a pulse runs out along every arm on each tick and a kick flares every other arm. |
 
-They come in four categories: **Beams · Geometry · Fields · Media**; the library shows a category only while it has
+They come in five categories: **Beams · Geometry · Fields · Signals · Media**; the library shows a category only while it has
 scenes. You can also play the [Node Scene](visual-maker.md), **My Shader** and your own saved scenes (*Mine*).
 
 A show you saved that uses a removed scene keeps that show scene, marked *missing scene* in the [Studio](studio.md):

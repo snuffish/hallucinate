@@ -24,7 +24,7 @@ export interface Scene {
 export interface SceneExtra { kind?: SceneKind; trails?: number }
 
 // The library's category tabs, in order. A tab shows only when it has scenes.
-export const CATEGORIES: readonly string[] = ['Beams', 'Geometry', 'Fields', 'Media'];
+export const CATEGORIES: readonly string[] = ['Beams', 'Geometry', 'Fields', 'Signals', 'Media'];
 
 // The id of one of your saved scenes (also its `paramKey`, so stored values and the last-scene mark use it).
 export const userSceneId = (name: string): string => `user:${name}`;

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — new scenes (2026-10-18)
+
+### Added
+
+- Four new built-in laser-show scenes, of kinds the set didn't have yet: **Lissajous** (key 9) and **Scope Ring**
+  (key 0) in a new **Signals** category, drawn like an oscilloscope from the music's waveform and spectrum;
+  **Constellation** (Geometry), drifting stars linked to their neighbours; and **Vortex** (Beams), spiral arms
+  winding out from the centre. Each passes the laser-show checklist (ADR 0001): black edges in silence and a
+  strobe-safe kick and tick, at the default and the strongest Look.
+
 ## Unreleased — effects (2026-10-17)
 
 ### Added
