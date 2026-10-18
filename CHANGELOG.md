@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — the assistant's prompt catches up (2026-10-18)
+
+### Changed
+
+- The assistant is told the built-in set is a laser show and how to keep what it makes strobe-safe: black edges in
+  silence, no kick or tick that brightens more than about a quarter of the frame, and the Look inside the ranges
+  Randomize uses (taken from `RANDOM_RANGES`, so they can't drift).
+- It knows effects reshape the picture and belong to show scenes, and that it can't set them yet, so it points to the
+  Effects widget instead of faking a mirror in GLSL.
+- Plans: it sets each step's `maxSeconds` above the step's length, so a 256-beat step at 128 BPM is no longer cut at
+  the 90-second default.
+- It names the scene it means once auto-switch may have moved the screen, and knows that while Live is pinned the
+  Look, scene and parameter tools change the main screen, not Live.
+- Director cycles no longer ask for a FOLLOW-UPS line, and the prompt uses the glossary's *kick*, *tick* and *tone*.
+
 ## Unreleased — effects (2026-10-17)
 
 ### Added
