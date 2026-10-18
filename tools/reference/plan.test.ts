@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Clip, ReferenceList } from './list.ts';
 import { clipFile, planFetch } from './plan.ts';
 
-const clip = (name: string, source: string): Clip => ({ name, source, start: 0, length: 60, type: 'ambient', bpm: null, drop: null, breakdown: null });
+const clip = (name: string, source: string): Clip => ({ name, source, start: 0, length: 60, type: 'ambient', bpm: null, bpmBefore: null, bpmSource: [], confirmed: false, note: null, drop: null, breakdown: null });
 
 const LIST: ReferenceList = {
   sources: {

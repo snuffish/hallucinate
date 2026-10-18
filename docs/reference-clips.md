@@ -27,7 +27,8 @@ An example of the format (the clip and its numbers are made up):
   },
   "clips": [
     { "name": "example-breakdown", "source": "lazy-mix", "start": "12:34", "length": 60, "type": "breakdown",
-      "bpm": 140, "drop": ["0:35", 60], "breakdown": [0, "0:35"] }
+      "bpm": 140, "bpmSource": "https://www.beatport.com/track/example/123", "confirmed": false,
+      "note": "Some Artist – Some Track", "drop": ["0:35", 60], "breakdown": [0, "0:35"] }
   ]
 }
 ```
@@ -39,8 +40,13 @@ An example of the format (the clip and its numbers are made up):
   - `start`: where the clip starts in the source; `length`: how long it is. Seconds, `m:ss` or `h:mm:ss`.
   - `type`: `drop` (a full section with kicks), `breakdown` (a breakdown with a drop next to it), `ambient` (a
     passage without kicks) or `transition` (from one track into the next).
-  - `bpm`: the tempo, **given by ear**, never worked out by code. For a transition, the tempo after it. An ambient
-    clip may have `null`.
+  - `bpm`: the tempo, **given by ear or taken from where it was published** (the track's release page), never worked
+    out by code. For a transition, the tempo after it. An ambient clip may have `null`.
+  - `bpmBefore` (optional, a transition only): the tempo before it.
+  - `bpmSource` (optional): a link, or a list of links, to where the BPM(s) were published.
+  - `confirmed` (optional, `false` if left out): `true` once the maintainer has listened to the clip and checked its
+    BPM and windows by ear. An entry drafted from published BPMs stays `false` until then.
+  - `note` (optional): what plays in the clip, and anything else worth knowing.
   - `drop`, `breakdown`: the stretch of the clip that is the drop / the breakdown, as `[from, to]` from the clip's own
     start, or `null`. A drop clip needs a drop; a breakdown clip needs both. In a transition clip, the drop is the new
     track: where it starts is where the tempo has to follow it from.

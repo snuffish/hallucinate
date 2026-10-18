@@ -1,6 +1,7 @@
 // The reference list (reference/clips.json): the real music the Listener is tested against. Each source
 // is a link yt-dlp can fetch; each clip is a cut from one source with its right answers, which the
-// maintainer gives by ear. See docs/reference-clips.md for the format.
+// maintainer confirms by ear (a drafted entry takes its BPM from a published source and stays unconfirmed
+// until then). See docs/reference-clips.md for the format.
 
 export const CLIP_TYPES = ['drop', 'breakdown', 'ambient', 'transition'] as const;
 export type ClipType = (typeof CLIP_TYPES)[number];
@@ -16,7 +17,11 @@ export interface Clip {
   start: number;              // seconds into the source
   length: number;             // seconds
   type: ClipType;
-  bpm: number | null;         // by ear, never from code; for a transition, the BPM after it
+  bpm: number | null;         // by ear or published, never from code; for a transition, the BPM after it
+  bpmBefore: number | null;   // a transition's BPM before it, if known
+  bpmSource: string[];        // where the BPM(s) were published (release pages), if not by ear
+  confirmed: boolean;         // the maintainer has heard the clip and checked its BPM and windows
+  note: string | null;        // what plays in the clip, and anything else worth knowing
   drop: Window | null;
   breakdown: Window | null;
 }
@@ -98,6 +103,22 @@ export function parseReferenceList(raw: unknown): ReferenceList {
       const bpmOk = (typeof c.bpm === 'number' && Number.isFinite(c.bpm) && c.bpm > 0) || (c.bpm === null && type === 'ambient');
       if (!bpmOk && typeOk) problem('bpm', 'must be a positive number, given by ear (or null for an ambient clip)');
 
+      let bpmBefore: number | null = null;
+      if (c.bpmBefore != null) {
+        if (type !== 'transition') problem('bpmBefore', 'only a transition has a BPM before it');
+        else if (typeof c.bpmBefore !== 'number' || !Number.isFinite(c.bpmBefore) || c.bpmBefore <= 0) problem('bpmBefore', 'must be a positive number');
+        else bpmBefore = c.bpmBefore;
+      }
+
+      const sourcesOfBpm = c.bpmSource == null ? [] : Array.isArray(c.bpmSource) ? c.bpmSource : [c.bpmSource];
+      const bpmSource = sourcesOfBpm.filter((u): u is string => typeof u === 'string' && /^https?:\/\/\S+$/.test(u));
+      if (bpmSource.length !== sourcesOfBpm.length) problem('bpmSource', 'must be a link, or a list of links');
+
+      if (c.confirmed !== undefined && typeof c.confirmed !== 'boolean') problem('confirmed', 'must be true or false');
+      const confirmed = c.confirmed === true;
+      if (c.note !== undefined && typeof c.note !== 'string') problem('note', 'must be text');
+      const note = typeof c.note === 'string' ? c.note : null;
+
       const window = (field: 'drop' | 'breakdown'): Window | null => {
         const w = c[field];
         if (w === null || w === undefined) return null;
@@ -114,7 +135,7 @@ export function parseReferenceList(raw: unknown): ReferenceList {
       if ((type === 'drop' || type === 'breakdown') && !hadDrop) problem('drop', `a ${type} clip needs a drop window`);
       if (type === 'breakdown' && !hadBreakdown) problem('breakdown', 'a breakdown clip needs a breakdown window');
 
-      clips.push({ name, source, start: start ?? 0, length: length ?? 0, type, bpm: (c.bpm as number | null) ?? null, drop, breakdown });
+      clips.push({ name, source, start: start ?? 0, length: length ?? 0, type, bpm: (c.bpm as number | null) ?? null, bpmBefore, bpmSource, confirmed, note, drop, breakdown });
     });
   }
 

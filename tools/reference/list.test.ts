@@ -23,7 +23,40 @@ describe('the reference list', () => {
       sources: { 'lazy-mix': LAZY },
       clips: [{ name: 'lazy-drop', source: 'lazy-mix', start: '1:02:03', length: 60, type: 'breakdown', bpm: 145, drop: ['0:40', 58], breakdown: [5, '0:30.5'] }],
     });
-    expect(list.clips).toEqual([{ name: 'lazy-drop', source: 'lazy-mix', start: 3723, length: 60, type: 'breakdown', bpm: 145, drop: [40, 58], breakdown: [5, 30.5] }]);
+    expect(list.clips).toEqual([{
+      name: 'lazy-drop', source: 'lazy-mix', start: 3723, length: 60, type: 'breakdown', bpm: 145,
+      bpmBefore: null, bpmSource: [], confirmed: false, note: null, drop: [40, 58], breakdown: [5, 30.5],
+    }]);
+  });
+
+  it('reads where a BPM was published, a transition\'s BPM before it, a note, and whether the maintainer confirmed it', () => {
+    const list = parseReferenceList({
+      sources: { 'lazy-mix': LAZY },
+      clips: [
+        { name: 't', source: 'lazy-mix', start: 0, length: 90, type: 'transition', bpm: 82, bpmBefore: 96,
+          bpmSource: ['https://www.beatport.com/track/a/1', 'https://www.beatport.com/track/b/2'], note: 'A into B', drop: [60, 90], breakdown: null },
+        { name: 'd', source: 'lazy-mix', start: 0, length: 60, type: 'drop', bpm: 90, bpmSource: 'https://www.beatport.com/track/c/3',
+          confirmed: true, drop: [0, 60], breakdown: null },
+      ],
+    });
+    expect(list.clips[0]).toMatchObject({ bpm: 82, bpmBefore: 96, bpmSource: ['https://www.beatport.com/track/a/1', 'https://www.beatport.com/track/b/2'], confirmed: false, note: 'A into B' });
+    expect(list.clips[1]).toMatchObject({ bpmBefore: null, bpmSource: ['https://www.beatport.com/track/c/3'], confirmed: true, note: null });
+  });
+
+  it('names a bad BPM source, a BPM before on a clip that is no transition, and a bad confirmed or note', () => {
+    expect(problemsOf({
+      sources: { s: LAZY },
+      clips: [
+        { name: 'a', source: 's', start: 0, length: 60, type: 'drop', bpm: 90, bpmBefore: 80, bpmSource: ['not a link'], confirmed: 'yes', note: 3, drop: [0, 60], breakdown: null },
+        { name: 'b', source: 's', start: 0, length: 60, type: 'transition', bpm: 90, bpmBefore: -1, drop: [30, 60], breakdown: null },
+      ],
+    })).toEqual([
+      'clips[0].bpmBefore: only a transition has a BPM before it',
+      'clips[0].bpmSource: must be a link, or a list of links',
+      'clips[0].confirmed: must be true or false',
+      'clips[0].note: must be text',
+      'clips[1].bpmBefore: must be a positive number',
+    ]);
   });
 
   it('lets an ambient clip go without a BPM, a drop or a breakdown', () => {
