@@ -79,7 +79,7 @@ describe('Listener', () => {
       }
       expect(l.hearing.bpm, `kicks at ${bpm} BPM`).not.toBeNull();
     }
-  });
+  }, 30_000); // 35 tempos × 15 s of music: a few seconds alone, more on a busy machine
 
   it('hears one kick per beat under a rolling bassline that fills the gaps between them', () => {
     // Psytrance: a kick on every beat and a strong bass note on each of the three sixteenths after it, in
