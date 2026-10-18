@@ -3,7 +3,128 @@
     "lazy-mix": {
       "title": "Unknown Reality – Lazy Mix",
       "url": "https://soundcloud.com/brainalien/unknown-reality-lazy-mix"
+    },
+    "closer-to-heaven": {
+      "title": "Astrix feat. Michele Adamson – Closer to Heaven",
+      "url": "https://www.youtube.com/watch?v=bqMmJUsgwVM"
+    },
+    "deep-jungle-walk": {
+      "title": "Astrix – Deep Jungle Walk",
+      "url": "https://www.youtube.com/watch?v=lIuEuJvKos4"
+    },
+    "singularity": {
+      "title": "Stephan Bodzin – Singularity",
+      "url": "https://www.youtube.com/watch?v=AaxFuXpcQmE"
+    },
+    "says": {
+      "title": "Nils Frahm – Says",
+      "url": "https://www.youtube.com/watch?v=hs1yXpaDgiE"
     }
   },
-  "clips": []
+  "clips": [
+    {
+      "name": "lazy-which-way-drop",
+      "source": "lazy-mix",
+      "start": "17:00",
+      "length": 60,
+      "type": "drop",
+      "bpm": 90,
+      "bpmSource": "https://www.beatport.com/track/which-way/18243728",
+      "confirmed": false,
+      "note": "Unknown Reality – Which Way (track 4; in the mix about 13:28–18:53), kicks all the way through.",
+      "drop": [0, 60],
+      "breakdown": null
+    },
+    {
+      "name": "lazy-new-moon-to-light-breakdown",
+      "source": "lazy-mix",
+      "start": "47:20",
+      "length": 60,
+      "type": "breakdown",
+      "bpm": 96,
+      "bpmSource": "https://www.beatport.com/track/light/12280883",
+      "confirmed": false,
+      "note": "The end of New Moon (track 9, no published BPM) fades into Unknown Reality – Light (track 10, from about 47:08 in the mix); Light's kicks start at about 47:51.",
+      "drop": [32, 60],
+      "breakdown": [0, 30]
+    },
+    {
+      "name": "lazy-light-to-ring-of-clouds-transition",
+      "source": "lazy-mix",
+      "start": "53:40",
+      "length": 100,
+      "type": "transition",
+      "bpm": 82,
+      "bpmBefore": 96,
+      "bpmSource": ["https://www.beatport.com/track/ring-of-clouds/12280880", "https://www.beatport.com/track/light/12280883"],
+      "confirmed": false,
+      "note": "Unknown Reality – Light (96) into Ring of Clouds (82, from about 54:07 in the mix). Light's kicks end at about 53:54; Ring of Clouds' kicks start at about 54:49 (69 s into the clip).",
+      "drop": [69, 100],
+      "breakdown": null
+    },
+    {
+      "name": "lazy-frozen-to-earthbound-ambient",
+      "source": "lazy-mix",
+      "start": "1:14:48",
+      "length": 106,
+      "type": "ambient",
+      "bpm": null,
+      "bpmSource": "https://www.beatport.com/track/frozen/12280884",
+      "confirmed": false,
+      "note": "The kicks of Driftsetters – Frozen (Unknown Reality Remix), 98 BPM, end at about 1:14:58 (10 s in); Earthbound starts beatless at about 1:15:25 and its kicks come back at about 1:16:35, just after the clip ends, so about 96 s pass without kicks.",
+      "drop": null,
+      "breakdown": null
+    },
+    {
+      "name": "closer-to-heaven-breakdown",
+      "source": "closer-to-heaven",
+      "start": "4:50",
+      "length": 70,
+      "type": "breakdown",
+      "bpm": 144,
+      "bpmSource": "https://www.beatport.com/track/closer-to-heaven-feat-michele-adamson/11825155",
+      "confirmed": false,
+      "note": "Full-on psytrance. The breakdown runs from about 4:41 to 5:32 (a lone kick at about 4:53); the kicks come back at about 5:33.",
+      "drop": [43, 70],
+      "breakdown": [5, 42]
+    },
+    {
+      "name": "deep-jungle-walk-breakdown",
+      "source": "deep-jungle-walk",
+      "start": "3:12",
+      "length": 60,
+      "type": "breakdown",
+      "bpm": 138,
+      "bpmSource": "https://www.beatport.com/track/deep-jungle-walk/11825267",
+      "confirmed": false,
+      "note": "Darker, progressive psytrance. The kicks thin out from about 3:16, stop at about 3:25 and come back at about 3:37.",
+      "drop": [26, 60],
+      "breakdown": [13, 24]
+    },
+    {
+      "name": "singularity-drop",
+      "source": "singularity",
+      "start": "2:25",
+      "length": 60,
+      "type": "drop",
+      "bpm": 121,
+      "bpmSource": "https://www.beatport.com/track/singularity/6619286",
+      "confirmed": false,
+      "note": "Melodic techno, kicks all the way through.",
+      "drop": [0, 60],
+      "breakdown": null
+    },
+    {
+      "name": "says-ambient",
+      "source": "says",
+      "start": "1:00",
+      "length": 120,
+      "type": "ambient",
+      "bpm": null,
+      "confirmed": false,
+      "note": "Synth arpeggio and piano without kicks or bass (the bass comes in at about 3:58). Beatport lists Says at 150, 116 and 112 BPM on different releases, so no BPM is given.",
+      "drop": null,
+      "breakdown": null
+    }
+  ]
 }
