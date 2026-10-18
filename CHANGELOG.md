@@ -4,11 +4,12 @@
 
 ### Changed
 
-- The audio player moved out of the Source widget into a **bar along the bottom of the screen**, VLC style: the seek
-  bar on a row of its own, then play/pause, previous / stop / next, ±10 s and loop on the left, what's playing and the
-  scene in the middle, and tempo, *Pitch* (was *Pitch follows tempo*), mute and a volume wedge on the right. It shows
-  while there is something to control, hides with the controls (H, idle), and the bottom dock, floating widgets, the
-  assistant, toasts and drop previews keep above it. On a phone it keeps play, seek and volume.
+- The audio player moved out of the Source widget into a **bar along the bottom of the screen**, Media Player style:
+  a thin seek line along its top edge, what's playing on the left, a round play button in the middle between loop,
+  stop, ±10 s and previous / next, and the time, mute and volume on the right. Tempo and *Pitch follows tempo* moved
+  into a popover off the tempo chip. It shows while there is something to control, hides with the controls (H, idle),
+  and the bottom dock, floating widgets, the assistant, toasts and drop previews keep above it. On a phone it keeps
+  play, previous / next, seek, tempo and volume.
 
 ### Added
 

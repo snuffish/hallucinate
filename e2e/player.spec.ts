@@ -32,6 +32,7 @@ test('player bar: runs along the bottom, and the demo beat shows whether it play
   expect(b.width).toBe(view.width);
   expect(b.y + b.height).toBe(view.height);
   await expect(page.locator('#tp-seek')).toBeHidden();      // the demo beat can't seek
+  await expect(page.locator('#tp-cur')).toBeHidden();
   await expect(page.locator('#w-source #transport')).toHaveCount(0);
 
   const play = page.locator('#tp-play');
@@ -45,9 +46,13 @@ test('player bar: runs along the bottom, and the demo beat shows whether it play
   expect(overlaps(await box(page.locator('.ai-bubble')), await box(bar))).toBe(false);
 });
 
-test('player bar: a file seeks, stops, loops and takes its volume from the wedge', async ({ page }) => {
+test('player bar: a file seeks, stops, loops, sets the volume, and keeps tempo and pitch in a popover', async ({ page }) => {
   await playFile(page);
   await expect(page.locator('#tp-title')).toContainText('quiet');
+  // The seek line runs along the bar's top edge, edge to edge.
+  const seek = await box(page.locator('#tp-seek')), bar = await box(page.locator('#transport'));
+  expect(seek.y).toBeLessThanOrEqual(bar.y + 1);
+  expect(seek.width).toBe(bar.width);
   await page.locator('#tp-fwd').click();
   await expect(page.locator('#tp-cur')).toHaveText(/^0:1\d$/);
   await page.locator('#tp-stop').click();
@@ -55,17 +60,19 @@ test('player bar: a file seeks, stops, loops and takes its volume from the wedge
   await expect(page.locator('#tp-play')).toHaveAttribute('title', /^Play/);
   await page.locator('#tp-loop').click();
   await expect(page.locator('#tp-loop')).toHaveClass(/active/);
+  await page.locator('#tp-volume').fill('0.5');
+  await expect(page.locator('#tp-volume')).toHaveAttribute('title', /Volume 50%/);
 
-  const wedge = page.locator('#tp-volume');
-  const w = await box(wedge);
-  await page.mouse.click(w.x + w.width * 0.5, w.y + w.height - 2);
-  await expect(wedge).toHaveAttribute('aria-valuenow', '50');
-  // ← / → on the focused wedge change the volume, not the scene.
-  const scene = await page.locator('#scene-name').textContent();
-  await wedge.focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(wedge).toHaveAttribute('aria-valuenow', '55');
-  await expect(page.locator('#scene-name')).toHaveText(scene ?? '');
+  await expect(page.locator('#tp-tempo')).toBeHidden();
+  await page.locator('#tp-rate-val').click();
+  await expect(page.locator('#tp-tempo')).toBeVisible();
+  await page.locator('#tp-rate').fill('1.5');
+  await expect(page.locator('#tp-rate-val')).toHaveText('1.50×');
+  await page.locator('#tp-pitch').check();
+  await page.locator('#tp-rate-reset').click();
+  await expect(page.locator('#tp-rate-val')).toHaveText('1.00×');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#tp-tempo')).toBeHidden();
 });
 
 test('player bar: hides with the controls, and a widget docked at the bottom sits on top of it', async ({ page }) => {
