@@ -32,13 +32,11 @@ const TICKET: Record<Check, string> = { bpm: '#62', kicks: '#62', ticks: '#62', 
 // Which checks fail on today's Listener, per clip. A check listed here runs as `it.fails`: green while it
 // fails, red once it passes, which is the cue to delete it from here.
 const EXPECTED_TO_FAIL: Record<string, Check[]> = {
-  'lazy-which-way-drop': ['bpm', 'kicks', 'ticks'],
   'lazy-new-moon-to-light-breakdown': ['bpm', 'kicks', 'ticks', 'tone', 'mood'],
   'lazy-light-to-ring-of-clouds-transition': ['bpm', 'kicks', 'ticks', 'transition'],
   'lazy-frozen-to-earthbound-ambient': ['forgotten'],
-  'closer-to-heaven-breakdown': ['bpm', 'kicks', 'ticks', 'tone', 'mood'],
-  'deep-jungle-walk-breakdown': ['bpm', 'kicks', 'ticks', 'tone'],
-  'singularity-drop': ['bpm', 'kicks', 'ticks'],
+  'closer-to-heaven-breakdown': ['tone'],
+  'deep-jungle-walk-breakdown': ['tone', 'mood'],   // mood: the tempo now heard right holds through the breakdown (#65)
   'says-ambient': ['forgotten'],
 };
 

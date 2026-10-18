@@ -81,6 +81,28 @@ describe('Listener', () => {
     }
   });
 
+  it('hears one kick per beat under a rolling bassline that fills the gaps between them', () => {
+    // Psytrance: a kick on every beat and a strong bass note on each of the three sixteenths after it, in
+    // the same low band, so the bass never falls back between the kicks.
+    const bpm = 145, beat = 60 / bpm, sixteenth = beat / 4;
+    const rolling = (t: number) => {
+      const sinceKick = t % beat;
+      const kick = 255 * Math.exp(-sinceKick / 0.1);
+      const sinceNote = sinceKick % sixteenth;
+      const note = sinceKick < sixteenth ? 0 : 230 * Math.exp(-sinceNote / 0.04);
+      return bins((hz) => (hz < 140 ? Math.max(40, kick, hz > 45 ? note : 0) : 120));
+    };
+    const l = new Listener();
+    listen(l, rolling, 10);
+    const { kicks, ticks } = listen(l, rolling, 20, { start: 10 });
+    expect(kicks).toBeGreaterThanOrEqual(46);   // 48 beats in 20 s
+    expect(kicks).toBeLessThanOrEqual(50);
+    expect(ticks).toBeGreaterThanOrEqual(46);
+    expect(ticks).toBeLessThanOrEqual(50);
+    expect(l.hearing.bpm).toBeGreaterThanOrEqual(144);
+    expect(l.hearing.bpm).toBeLessThanOrEqual(146);
+  });
+
   it('hears the tempo at a low frame rate too, since it listens on real time', () => {
     const l = new Listener();
     listen(l, music({ bpm: 124 }), 30, { fps: 8 });

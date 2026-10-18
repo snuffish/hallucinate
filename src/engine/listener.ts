@@ -61,8 +61,7 @@ export class Listener {
   private readonly tempo = new TempoClock();
   private readonly avg: Bands = { bass: 0.3, mid: 0.3, high: 0.3, level: 0.3 };
   private readonly raw: Bands = { bass: 0, mid: 0, high: 0, level: 0 };   // reused every frame
-  private kickAvg = 0.3;
-  private kickArmed = true;
+  private readonly kickHearer = new KickHearer();
   private lastKick = -1e9;
   private kicks: number[] = [];
   private sinceKick = 0;   // seconds played since the last kick
@@ -104,6 +103,7 @@ export class Listener {
   // Forgets the tempo: the ticks stop and the mood lets it go, until enough kicks come to hear it again.
   reset(): void {
     this.kicks = [];
+    this.kickHearer.reset();
     this.sinceKick = 0;
     this.hearing.bpm = null;
     this.tempo.reset();
@@ -136,11 +136,8 @@ export class Listener {
     const level = bass * 0.5 + band(bins.freq, binHz, BANDS.mid) * 0.35 + band(bins.freq, binHz, BANDS.high) * 0.15;
     this.hearTone(bins, binHz, dt, level);
 
-    // A kick: bass rising clearly above its ~1 s average, with hysteresis.
-    this.kickAvg += (bass - this.kickAvg) * ease(dt, 1);
-    if (bass < this.kickAvg) this.kickArmed = true;
-    if (this.kickArmed && bass > this.kickAvg * 1.12 + 0.02 && bass > 0.15 && now - this.lastKick > MIN_KICK_GAP) {
-      this.kickArmed = false;
+    // A kick: a sudden rise in the low end that lands on the beat (see KickHearer).
+    if (this.kickHearer.hear(bins.freq, binHz, now) && now - this.lastKick > MIN_KICK_GAP) {
       this.lastKick = now;
       h.beat = 1;
       h.kick = true;
@@ -230,6 +227,213 @@ export class Listener {
       this.spectrum[i * 2] = Math.min(255, v);
       this.spectrum[i * 2 + 1] = time[Math.floor(i * step)]!;
     }
+  }
+}
+
+// Kicks: the sudden rises in the low end that land on the beat. A rise (positive spectral flux over the
+// kick's bins) can't tell a kick from the rolling bassline between kicks, which rises in the same bins,
+// often as strongly, nor from a kick the analyser has clipped at the top of its range. What sets the kick
+// apart is that it comes back on every beat. So the rises of the last few seconds are kept as an onset
+// envelope; the beat is the period it repeats at most strongly (its autocorrelation, at the beat and its
+// multiples), placed where the strongest rises fall (a comb); and a kick is a clear rise where the next
+// beat is due, one a beat at most. Rises off the beat (bass notes, hats) are not kicks.
+const KICK_HZ = [20, 280] as const;   // the kick's body and its top, which still rises when the sub is clipped
+const KICK_STRENGTH = 0.15;           // a kick rises at least this much of the rise usually heard on the beat
+const ONSET_CELL = 0.01;              // seconds: the onset envelope's resolution, whatever the frame rate
+const ONSET_HISTORY = 6;              // seconds of it the beat is read from ...
+const ONSET_RECENT = 4;               // ... the last few seconds counting most (an exponential fade)
+const ONSET_WARMUP = 1;               // seconds of it before the first reading
+const BEAT_EVERY = 0.25;              // seconds between readings of the beat
+const BEAT_RANGE = [60 / 200, 60 / 40] as const;   // seconds: the beat periods considered
+const BEAT_MULTIPLES = 3;             // a beat's multiples (two beats, three) count toward it; a pattern off the beat's don't
+const BEAT_PRIOR_BPM = 120, BEAT_PRIOR_OCTAVES = 0.9;   // where beats usually sit: a beat is preferred over its half and double
+const BEAT_LOST = 2;                  // seconds without a beat in the rises before it's gone
+const BEAT_DOUBLE = 0.9;              // how strongly the rises must repeat at half the beat to hear that as the beat
+const BEAT_CLEAR = 0.1;               // how periodic the rises must be to hear a beat (autocorrelation at the beat, of 1)
+const BEAT_WINDOW = 0.06;             // a kick lands within this part of a beat of where the beat is due
+const BEAT_WINDOW_MIN = 0.025;        // seconds, at least: a frame and a half at 60 fps
+const BEAT_PULL = 0.1;                // how far a kick moves the beat toward itself: one early rise can't drag it
+const BEAT_STEADY = 4;                // kicks in a row a beat apart settle the beat ...
+const BEAT_SWITCH = 8;                // ... and a settled beat changes only when another is heard this many readings in a row
+const BEAT_PARTED = 3;                // an unsettled beat moves where the comb places it, this many readings in a row ...
+const BEAT_PARTED_BY = 1.2;           // ... collecting this much more rise there than where the beat is kept
+
+class KickHearer {
+  private readonly cells = Math.round(ONSET_HISTORY / ONSET_CELL);
+  private readonly onsets = new Float32Array(this.cells);   // a ring: the rise heard in each cell
+  private readonly recency = Float32Array.from({ length: this.cells }, (_, k) => Math.exp((-k * ONSET_CELL) / ONSET_RECENT));
+  private readonly centred = new Float64Array(this.cells);      // scratch for readBeat
+  private readonly weighted = new Float64Array(this.cells);
+  private readonly cumulative = new Float64Array(this.cells + 1);
+  private cell = -1;           // the absolute index of the last cell written
+  private filled = 0;          // cells written since the start (or a gap)
+  private frameGap = 0;        // seconds since the frame before: at a low frame rate a kick is heard that late
+  private older = new Float32Array(0);   // the kick's bins two frames ago ...
+  private last = new Float32Array(0);    // ... and one
+  private nextRead = 0;
+  private period = 0;          // seconds a beat; 0 = no beat heard
+  private beatRise = 0;        // the rise usually heard on the beat
+  private due = 0;             // when the next beat is due
+  private lastKick = -1e9;
+  private kicked = -1e9;       // where the window of the last kick opened, its rise, and when its beat was due
+  private kickedRise = 0;
+  private kickedDue = 0;
+  private peakTime = 0;        // the frame before: when, its rise, and the gap before it
+  private peakRise = Infinity;
+  private peakGap = 0;
+  private steady = 0;          // kicks in a row a beat apart
+  private challenger = 0;      // a beat heard other than the one kept ...
+  private challenges = 0;      // ... in how many readings in a row
+  private parted = 0;          // readings in a row the comb placed the beat elsewhere
+  private clear = -1e9;        // when a beat was last heard in the rises
+
+  reset(): void {
+    this.cell = -1;
+    this.filled = 0;
+    this.period = 0;
+    this.lastKick = this.clear = -1e9;
+    this.steady = this.challenges = this.parted = 0;
+  }
+
+  hear(freq: Uint8Array, binHz: number, now: number): boolean {
+    const rise = this.rise(freq, binHz);
+    this.record(rise, now);
+    if (now >= this.nextRead && this.filled * ONSET_CELL >= ONSET_WARMUP) {
+      this.nextRead = now + BEAT_EVERY;
+      this.readBeat(now);
+    }
+    // A kick is the peak of a rise: the frame before is judged once this one shows the rise has turned.
+    const [t, peak, gap] = [this.peakTime, this.peakRise, this.peakGap];
+    [this.peakTime, this.peakRise, this.peakGap] = [now, rise, this.frameGap];
+    if (!(this.period > 0) || rise > peak) return false;
+    const p = this.period, window = Math.max(p * BEAT_WINDOW, BEAT_WINDOW_MIN);
+    // A stronger peak later in the window the kick was heard in: that was the kick, so the beat follows it
+    // (the kick itself has been heard already).
+    if (t <= this.kicked + window * 2 + gap && peak > this.kickedRise) {
+      this.kickedRise = peak;
+      this.due = this.kickedDue + p + (t - this.kickedDue) * BEAT_PULL;
+      return false;
+    }
+    while (t > this.due + p / 2) this.due += p;   // a beat went by without a kick: the next one
+    if (t < this.due - window || t > this.due + window + gap) return false;
+    if (peak < this.beatRise * KICK_STRENGTH || peak < 8) return false;
+    this.steady = Math.abs(t - this.lastKick - p) <= p * 0.1 ? this.steady + 1 : 0;
+    this.lastKick = t;
+    [this.kicked, this.kickedRise, this.kickedDue] = [this.due - window, peak, this.due];
+    this.due += p + (t - this.due) * BEAT_PULL;
+    return true;
+  }
+
+  // No beat in the rises: after a while of that, the beat is gone (until the rises repeat again).
+  private lose(now: number): void {
+    if (now - this.clear > BEAT_LOST) this.period = 0;
+  }
+
+  // The rise in the kick's bins since two frames ago (a kick's attack spans a frame or two), on the byte scale.
+  private rise(freq: Uint8Array, binHz: number): number {
+    const a = Math.max(1, Math.floor(KICK_HZ[0] / binHz)), b = Math.min(freq.length - 1, Math.ceil(KICK_HZ[1] / binHz));
+    const current = Float32Array.from(freq.subarray(a, b + 1));
+    const older = this.older.length === current.length ? this.older : current;
+    let sum = 0;
+    for (let i = 0; i < current.length; i++) sum += Math.max(0, current[i]! - older[i]!);
+    this.older = this.last.length === current.length ? this.last : current;
+    this.last = current;
+    return sum;
+  }
+
+  // Writes the rise into the cells since the last frame, so the envelope is the same at any frame rate.
+  private record(rise: number, now: number): void {
+    const cell = Math.floor(now / ONSET_CELL);
+    if (this.cell < 0 || cell <= this.cell - this.cells || cell - this.cell > this.cells) {   // a start, or a gap
+      this.onsets.fill(0);
+      this.filled = 0;
+      this.cell = cell - 1;
+      this.frameGap = 0;
+    } else this.frameGap = Math.max(0, cell - this.cell) * ONSET_CELL;
+    for (let c = this.cell + 1; c <= cell; c++) { this.onsets[c % this.cells] = rise; this.filled++; }
+    this.cell = Math.max(this.cell, cell);
+  }
+
+  // The beat in the envelope: its period (where the autocorrelation peaks, at the beat and its multiples,
+  // weighted toward the usual pulse) and where it falls (the phase whose beats collect the most rise).
+  private readBeat(now: number): void {
+    const n = Math.min(this.filled, this.cells), end = this.cell, w = this.recency;
+    const at = (k: number) => this.onsets[(((end - k) % this.cells) + this.cells) % this.cells]!;   // k cells ago
+    let mean = 0, total = 0, energy = 0;
+    for (let k = 0; k < n; k++) { mean += at(k) * w[k]!; total += w[k]!; }
+    mean /= total;
+    const z = this.centred, wz = this.weighted, cw = this.cumulative;   // the envelope, newest first, about its mean
+    for (let k = 0; k < n; k++) {
+      z[k] = at(k) - mean;
+      wz[k] = z[k]! * w[k]!;
+      cw[k + 1] = cw[k]! + w[k]!;
+      energy += z[k]! * wz[k]!;
+    }
+    energy /= total;
+    if (energy <= 0) { this.lose(now); return; }
+    const lo = Math.round(BEAT_RANGE[0] / ONSET_CELL), hi = Math.min(Math.round(BEAT_RANGE[1] / ONSET_CELL), Math.floor(n / 2));
+    const reach = Math.max(hi + 1, Math.min(n - Math.round(1 / ONSET_CELL), BEAT_MULTIPLES * (hi + 1)));   // a second of overlap
+    const acf = new Float64Array(reach + 2);
+    for (let lag = lo - 1; lag <= reach; lag++) {
+      let s = 0;
+      for (let k = 0; k + lag < n; k++) s += wz[k]! * z[k + lag]!;
+      acf[lag] = n > lag ? s / cw[n - lag]! : 0;
+    }
+    let best = -Infinity, bestLag = 0;
+    for (let lag = lo; lag <= hi; lag++) {
+      let sum = 0, terms = 0;
+      for (let m = 1; m <= BEAT_MULTIPLES && m * lag <= reach; m++) { sum += acf[m * lag]! / m; terms += 1 / m; }
+      const prior = Math.exp(-0.5 * (Math.log2(60 / (lag * ONSET_CELL) / BEAT_PRIOR_BPM) / BEAT_PRIOR_OCTAVES) ** 2);
+      if (acf[lag]! > 0 && (sum / terms) * prior > best) { best = (sum / terms) * prior; bestLag = lag; }
+    }
+    // A grid of kicks repeats at twice its beat as strongly as at its beat: the multiples can't tell 174 from
+    // 87. Where the rises repeat as strongly at half the lag, the beat is that.
+    const half = Math.round(bestLag / 2);
+    if (half >= lo && acf[half]! >= acf[bestLag]! * BEAT_DOUBLE) bestLag = half;
+    if (!bestLag || acf[bestLag]! / energy < BEAT_CLEAR) { this.lose(now); return; }
+    this.clear = now;
+    // The period to a fraction of a cell: from the peak at the furthest multiple in reach, divided back.
+    let m = BEAT_MULTIPLES;
+    while (m > 1 && m * bestLag + m + 1 > reach) m--;
+    let peak = m * bestLag;
+    for (let lag = m * bestLag - m; lag <= m * bestLag + m; lag++) if (acf[lag]! > acf[peak]!) peak = lag;
+    const [l, c, r] = [acf[peak - 1]!, acf[peak]!, acf[peak + 1]!];
+    const between = l - 2 * c + r < 0 ? Math.min(0.5, Math.max(-0.5, (0.5 * (l - r)) / (l - 2 * c + r))) : 0;
+    const heard = ((peak + between) / m) * ONSET_CELL;
+
+    // A settled beat holds until another is heard for a while: a bar of offbeat bass or a fill doesn't move it.
+    const near = (a: number, b: number) => Math.abs(a - b) <= b * 0.04;
+    if (!this.period || near(heard, this.period)) this.challenges = 0;
+    else this.challenges = near(heard, this.challenger) ? this.challenges + 1 : 1;
+    this.challenger = heard;
+    const settled = this.steady >= BEAT_STEADY && now - this.lastKick < this.period * 4;
+    const period = !settled || this.challenges === 0 || this.challenges >= BEAT_SWITCH ? heard : this.period;
+    if (period === heard) this.challenges = 0;
+
+    // Where the beat falls: the phase whose beats collect the most rise, the recent beats counting most.
+    const lag = period / ONSET_CELL;
+    const comb = (phase: number) => {
+      let s = 0, weight = 1, beats = 0, plain = 0;
+      for (let k = phase; k < n; k += lag) {
+        const i = Math.round(k), v = Math.max(at(i), i > 0 ? at(i - 1) : 0, i + 1 < n ? at(i + 1) : 0);
+        s += v * weight; plain += v; beats++; weight *= 0.9;
+      }
+      return { s, rise: plain / Math.max(1, beats) };
+    };
+    let phase = 0, top = -1;
+    for (let k = 0; k < lag; k++) {
+      const { s, rise } = comb(k);
+      if (s > top) { top = s; phase = k; this.beatRise = rise; }
+    }
+    // The comb's beat against the one kept: while the kicks don't hold it in place, the comb's wins when it
+    // clearly hears the beat elsewhere for a while.
+    const last = now - phase * ONSET_CELL;
+    const due = now - last < period * BEAT_WINDOW ? last : last + period;
+    const keptPhase = Math.round(((((now - this.due + period) / ONSET_CELL) % lag) + lag) % lag) % Math.max(1, Math.round(lag));
+    const apart = Math.abs(((((due - this.due + period / 2) % period) + period) % period) - period / 2) > period * BEAT_WINDOW;
+    this.parted = this.period && !settled && apart && top > comb(keptPhase).s * BEAT_PARTED_BY ? this.parted + 1 : 0;
+    if (!this.period || this.parted >= BEAT_PARTED) { this.due = due; this.parted = 0; }
+    this.period = period;
   }
 }
 

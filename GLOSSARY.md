@@ -24,7 +24,7 @@ What the music sounds like right now: its bands, kicks, ticks, tempo, tone, ener
 _Avoid_: features, audio state
 
 **Kick**:
-A clear bass hit heard in the music. Kicks jump the hue, as far as colour cycling allows, and count towards auto-switch.
+A clear bass hit heard in the music, on the beat: the bass notes of a rolling bassline between the kicks are not kicks. Kicks jump the hue, as far as colour cycling allows, and count towards auto-switch.
 _Avoid_: beat, onset
 
 **Tick**:
