@@ -1,0 +1,71 @@
+/* PROTOTYPE — throwaway (branch prototype/player-styles). Styles for PlayerStyles.prototype.tsx. */
+
+.ps-btn { padding: 6px; border: 1px solid transparent; border-radius: 50%; background: none; color: var(--text); display: grid; place-items: center; }
+.ps-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+.ps-btn:disabled { opacity: 0.3; cursor: default; }
+.ps-btn.on { color: var(--accent2); }
+.ps-chip { padding: 2px 8px; font-size: 11px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.ps-range { -webkit-appearance: none; appearance: none; height: 4px; margin: 0; border-radius: 2px; cursor: pointer;
+  background: linear-gradient(90deg, var(--accent), var(--accent2)) 0 / var(--p, 0%) 100% no-repeat, rgba(255, 255, 255, 0.15); }
+.ps-range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; }
+
+/* Media Player */
+.transport.ps-wmp { padding: 0 20px 10px; gap: 0; background: linear-gradient(180deg, rgba(30, 24, 48, 0.92), rgba(8, 6, 14, 0.96)); border-top: 0; }
+#transport input.ps-wmp-seek { width: calc(100% + 40px); margin: 0 -20px 8px; height: 3px; border-radius: 0; }
+#transport input.ps-wmp-seek::-webkit-slider-thumb { opacity: 0; transition: opacity 0.15s; }
+#transport.ps-wmp:hover input.ps-wmp-seek::-webkit-slider-thumb { opacity: 1; }
+#transport.ps-wmp:hover input.ps-wmp-seek { height: 5px; }
+.ps-wmp-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 20px; }
+.ps-wmp-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ps-wmp-info > div:last-child { display: flex; flex-direction: column; min-width: 0; }
+.ps-wmp-info b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-wmp-info small { color: var(--muted); font-size: 11.5px; }
+.ps-wmp-art { flex: none; width: 46px; height: 46px; border-radius: 8px;
+  background: radial-gradient(circle at 50% 60%, rgba(255, 216, 79, calc(0.3 + var(--bass, 0) * 0.7)), transparent 60%), linear-gradient(135deg, var(--accent), #5b2bd6 60%, var(--accent2));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); }
+.ps-wmp-center { display: flex; align-items: center; gap: 8px; }
+.ps-wmp-play { width: 50px; height: 50px; padding: 0; border-radius: 50%; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, 0.35);
+  background: radial-gradient(circle at 35% 30%, #fff, #d9d2ee 60%, #a99fc4); color: #160b20; box-shadow: 0 0 20px rgba(255, 255, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.5); }
+.ps-wmp-play svg { width: 24px; height: 24px; }
+.ps-wmp-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.ps-wmp-right time { white-space: nowrap; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; margin-right: 8px; }
+#transport input.ps-wmp-vol { width: 100px; }
+
+/* Winamp: black LCD with green type, chunky grey buttons. */
+.transport.ps-amp { flex-direction: row; align-items: stretch; gap: 10px; padding: 6px 10px; border-top: 1px solid #5a5a6e;
+  background: linear-gradient(180deg, #3a3a4c, #23232f 55%, #1b1b25); font-family: ui-monospace, 'DejaVu Sans Mono', monospace; }
+.ps-amp-display { display: grid; grid-template-columns: auto auto 140px minmax(0, 1fr); grid-template-rows: 1fr; align-items: center; gap: 12px; flex: 0 1 620px; min-width: 0;
+  padding: 4px 12px; background: #000; border: 2px inset #555; border-radius: 3px; color: #00e676; cursor: pointer; text-shadow: 0 0 6px rgba(0, 230, 118, 0.6); }
+.ps-amp-state { font-size: 14px; }
+.ps-amp-time { font-size: 30px; font-weight: 700; letter-spacing: 2px; font-variant-numeric: tabular-nums; min-width: 4.4ch; text-align: right; }
+.ps-amp-spec { height: 40px; display: flex; align-items: flex-end; gap: 2px; }
+.ps-amp-spec i { flex: 1; background: linear-gradient(0deg, #00e676 0 50%, #ffea00 75%, #ff1744); background-size: 100% 40px; background-position: bottom; }
+.ps-amp-text { min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.ps-amp-marquee { overflow: hidden; white-space: pre; display: flex; }
+.ps-amp-marquee span { flex: none; animation: ps-marquee 14s linear infinite; }
+@keyframes ps-marquee { to { transform: translateX(-100%); } }
+.ps-amp-info { font-size: 10.5px; color: #00a152; text-shadow: none; display: flex; gap: 6px; align-items: baseline; }
+.ps-amp-info b { color: #00e676; font-size: 12px; }
+.ps-amp-info span { color: #1b5e20; }
+.ps-amp-info span.lit { color: #00e676; }
+.ps-amp-controls { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+.ps-amp-buttons { display: flex; align-items: center; gap: 3px; }
+.ps-amp-buttons button { width: 30px; height: 24px; padding: 0; display: grid; place-items: center; border-radius: 2px; color: #222;
+  border: 1px solid; border-color: #eee #666 #555 #ddd; background: linear-gradient(180deg, #d8d8e0, #9a9aa8); }
+.ps-amp-buttons button:active { border-color: #555 #ddd #eee #666; background: linear-gradient(180deg, #9a9aa8, #c8c8d0); }
+.ps-amp-buttons button:disabled { color: #777; }
+.ps-amp-buttons button.on { color: #00a152; }
+.ps-amp-buttons svg { width: 14px; height: 14px; fill: currentColor; }
+.ps-amp-gap { flex: 1; }
+.ps-amp-buttons label { display: flex; align-items: center; gap: 6px; color: #b8b8c8; font-size: 10px; margin-left: 10px; }
+#transport input.ps-amp-slider { -webkit-appearance: none; appearance: none; height: 8px; margin: 0; cursor: pointer; border: 1px solid; border-color: #111 #666 #777 #111; background: #0c0c12; }
+#transport .ps-amp-buttons input.ps-amp-slider { width: 90px; }
+#transport input.ps-amp-seek { width: 100%; }
+#transport input.ps-amp-slider::-webkit-slider-thumb { -webkit-appearance: none; box-shadow: none; width: 22px; height: 12px; border-radius: 1px; border: 1px solid; border-color: #eee #555 #444 #ddd; background: linear-gradient(180deg, #e0e0e8, #9a9aa8); }
+@media (max-width: 760px) { .ps-amp-spec, .ps-amp-text { display: none; } .ps-amp-display { grid-template-columns: auto auto; flex: none; } .ps-amp-buttons label { display: none; } }
+
+/* The prototype switcher, top-centre: the bottom is what's being judged. */
+.ps-switcher { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px;
+  max-width: calc(100vw - 32px); padding: 6px 10px; border-radius: 12px; background: #fff; color: #111; font: 12px system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6); opacity: 1 !important; pointer-events: auto !important; }
+.ps-switcher button { padding: 0 8px; border: 0; background: #eee; color: #111; font-size: 16px; border-radius: 6px; }
+.ps-switcher code { flex-basis: 100%; text-align: center; font-size: 10.5px; color: #555; }

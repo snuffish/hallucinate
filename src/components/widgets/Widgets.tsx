@@ -12,7 +12,7 @@ import { NO_INSETS, WIDGET_IDS, ZONES, effective, zoneWidgets, type WidgetId, ty
 import type { Overlay } from '../../state/ui-state';
 import { HelpButton } from '../Help';
 import { ParamsWidget } from '../ParamOverlay';
-import { PlayerBar } from '../Transport';
+import { PlayerStylesPrototype } from '../PlayerStyles.prototype';   // PROTOTYPE
 import { dockInsets, dropStore, playerBar, playerBarHeight, zoneEls } from './drop';
 import { EffectsBody } from './EffectsBody';
 import { ActionsBody, AudioBody, LookBody, MediaBody, SceneBody, ScreenBody, SourceBody, type PanelActions } from './sections';
@@ -44,7 +44,7 @@ export function Widgets(actions: PanelActions) {
         </div>
       ))}
       {WIDGET_IDS.filter((id) => shown.widgets[id].open && shown.widgets[id].place.kind === 'float').map(render)}
-      <PlayerBar />
+      <PlayerStylesPrototype />
       <DropPreview />
       <DockMetrics />
     </div>
