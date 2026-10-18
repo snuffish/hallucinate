@@ -48,6 +48,39 @@ describe('Listener', () => {
     expect(ticks).toBeGreaterThan(35);
   });
 
+  it('hears a half-time kick grid at 72 BPM as 144, inside the tempo range', () => {
+    const l = new Listener();
+    const { ticks } = listen(l, music({ bpm: 72 }), 30);
+    expect(l.hearing.bpm).toBeGreaterThanOrEqual(143);   // kicks land on 1/60 s frames
+    expect(l.hearing.bpm).toBeLessThanOrEqual(145);
+    expect(ticks).toBeGreaterThan(55);   // the clock runs at 144: two ticks to every kick
+  });
+
+  it('folds a doubled reading back into the tempo range: kicks at 190 read 95', () => {
+    const l = new Listener();
+    listen(l, music({ bpm: 190 }), 20);
+    expect(l.hearing.bpm).toBeGreaterThanOrEqual(94);   // kicks land on 1/60 s frames
+    expect(l.hearing.bpm).toBeLessThanOrEqual(96);
+  });
+
+  it('hears drum and bass at 174 BPM as 174, at the top of the range', () => {
+    const l = new Listener();
+    listen(l, music({ bpm: 174 }), 20);
+    expect(l.hearing.bpm).toBe(174);
+  });
+
+  it('never hears a tempo outside 85–175 BPM, whatever the kicks', () => {
+    for (let bpm = 40; bpm <= 210; bpm += 5) {
+      const l = new Listener();
+      for (let t = 0; t < 15; t += 1 / 60) {
+        const { bpm: heard } = l.hear(music({ bpm })(t), true, 1 / 60, t);
+        if (heard !== null) expect(heard, `kicks at ${bpm} BPM`).toBeGreaterThanOrEqual(85);
+        if (heard !== null) expect(heard, `kicks at ${bpm} BPM`).toBeLessThanOrEqual(175);
+      }
+      expect(l.hearing.bpm, `kicks at ${bpm} BPM`).not.toBeNull();
+    }
+  });
+
   it('hears the tempo at a low frame rate too, since it listens on real time', () => {
     const l = new Listener();
     listen(l, music({ bpm: 124 }), 30, { fps: 8 });
@@ -63,6 +96,51 @@ describe('Listener', () => {
     expect(kicks).toBe(0);
     expect(ticks).toBeGreaterThanOrEqual(15);   // 16 beats in 8 s at 120 BPM
     expect(l.hearing.bpm).toBe(120);
+  });
+
+  it('forgets the tempo after a long passage without kicks: the ticks stop and the mood lets the tempo go', () => {
+    const l = new Listener();
+    listen(l, music({ bpm: 170 }), 15);
+    const ambient = () => bins(() => 30);
+    listen(l, ambient, 60, { start: 15 });
+    expect(l.hearing.bpm).toBe(170);   // a minute without kicks is still a breakdown
+    const moodWithTempo = l.hearing.mood;
+    listen(l, ambient, 60, { start: 75 });
+    expect(l.hearing.bpm).toBeNull();
+    expect(listen(l, ambient, 20, { start: 135 }).ticks).toBe(0);
+    expect(l.hearing.mood).toBeLessThan(moodWithTempo - 0.2);   // fast music's tempo no longer lifts it
+    expect(l.hearing.mood).toBeGreaterThan(0.25);               // ... a neutral tempo still does, halfway
+  });
+
+  it('hears a new tempo once the kicks come back after it was forgotten, and ticks again', () => {
+    const l = new Listener();
+    listen(l, music({ bpm: 170 }), 15);
+    listen(l, () => bins(() => 30), 120, { start: 15 });
+    expect(l.hearing.bpm).toBeNull();
+    const { ticks } = listen(l, music({ bpm: 140 }), 20, { start: 135 });
+    expect(l.hearing.bpm).toBeGreaterThanOrEqual(139);   // not a mix with the 170 heard before
+    expect(l.hearing.bpm).toBeLessThanOrEqual(141);
+    expect(ticks).toBeGreaterThan(35);   // 46 beats in 20 s, the first few teach it the tempo
+  });
+
+  it('holds the tempo and keeps ticking through breakdowns of 30 to 60 s', () => {
+    for (const seconds of [30, 45, 60]) {
+      const l = new Listener();
+      listen(l, music({ bpm: 120 }), 15);
+      const { ticks, kicks } = listen(l, () => bins(() => 30), seconds, { start: 15 });
+      expect(kicks).toBe(0);
+      expect(ticks, `a ${seconds} s breakdown`).toBeGreaterThanOrEqual(seconds * 2 - 1);   // 120 BPM: 2 a second
+      expect(l.hearing.bpm, `a ${seconds} s breakdown`).toBe(120);
+    }
+  });
+
+  it('does not count a pause as a passage without kicks', () => {
+    const l = new Listener();
+    listen(l, music({ bpm: 120 }), 15);
+    listen(l, () => bins(() => 30), 60, { start: 15 });
+    listen(l, null, 300, { start: 75, playing: false });
+    listen(l, () => bins(() => 30), 20, { start: 375 });
+    expect(l.hearing.bpm).toBe(120);   // 80 s played without kicks, a breakdown still
   });
 
   it('does not tick while the music is not playing, and starts over on a new source', () => {
@@ -151,7 +229,7 @@ describe('Listener', () => {
     expect(fast.hearing.energy).toBeGreaterThan(0.9);
     expect(moodWord(fast.hearing.mood)).toBe('energetic');
     const slow = new Listener();
-    listen(slow, music({ bpm: 80, bed: () => 25 }), 30);
+    listen(slow, music({ bpm: 90, bed: () => 25 }), 30);   // near the bottom of the tempo range (85–175)
     expect(slow.hearing.energy).toBeLessThan(0.1);
     expect(moodWord(slow.hearing.mood)).toBe('calm');
     listen(fast, null, 30, { start: 30, playing: false });

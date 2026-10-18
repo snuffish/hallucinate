@@ -90,12 +90,17 @@ again is recorded again.
 
 | Check | For | Right answer |
 | --- | --- | --- |
-| `bpm` | a clip with a BPM | the tempo at the end of the clip within ±1 |
+| `bpm` | a clip with a BPM | the tempo at the end of the clip within ±1 of the BPM in the tempo range (see below) |
 | `kicks` | a drop window | 0.9–1.1 kicks per beat |
-| `ticks` | a drop window | 0.9–1.1 ticks per beat, 90% of them within 40 ms of a steady grid at the BPM |
+| `ticks` | a drop window | 0.9–1.1 ticks per beat, 90% of them within 40 ms of a steady grid at the BPM in the tempo range |
 | `tone`, `mood` | a drop and a breakdown window | each at least 0.1 higher in the drop than in the breakdown |
 | `forgotten` | an ambient clip | no tempo at the end, and no tick more than 90 s after the last kick |
-| `transition` | a transition clip | the tempo within ±1 of the BPM no more than 5 s after the drop starts, and staying there |
+| `transition` | a transition clip | the tempo within ±1 of the BPM in the tempo range no more than 5 s after the drop starts, and staying there |
+
+The Listener always hears the tempo between 85 and 175 BPM, halving or doubling what the kicks say (issue #57), so the
+list keeps the published BPM and the checks fold it into that range the same way: the 82 BPM of *Ring of Clouds* is
+expected as 164, a 70 BPM half-time track as 140. Kicks per beat are still counted at the published BPM. The log shows
+both (`by ear 82, in range 164`).
 
 The music's downbeat isn't on the list, so the beat grid is placed where the ticks fit it best. An ambient clip only
 shows the tempo being forgotten if it starts with kicks and runs past the forgetting time after them.

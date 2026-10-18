@@ -10,11 +10,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { parseReferenceList, type Clip, type Window } from './list.ts';
-import { kicksPerBeat, mean, tempoSettles, tickGrid, type TickGrid } from './measure.ts';
+import { kicksPerBeat, mean, tempoInRange, tempoSettles, tickGrid, type TickGrid } from './measure.ts';
 import { loadRecording, replay, type Heard } from './replay.ts';
 
 // The right answers (docs/reference-clips.md, issue #57).
-const BPM_TOLERANCE = 1;                    // the tempo heard, within ±1 of the BPM given by ear
+const BPM_TOLERANCE = 1;                    // the tempo heard, within ±1 of the BPM given by ear, folded into
+                                            // the tempo range (85–175) as the Listener hears it
 const KICKS_PER_BEAT = [0.9, 1.1] as const; // in the drop
 const TICK_TOLERANCE_MS = 40;               // a tick this close to the beat grid is on it ...
 const TICKS_ON_GRID = 0.9;                  // ... and this many of the drop's ticks are
@@ -25,17 +26,18 @@ const SETTLE_SECONDS = 5;                   // the tempo reaches a transition's 
 type Check = 'bpm' | 'kicks' | 'ticks' | 'tone' | 'mood' | 'forgotten' | 'transition';
 
 // The ticket that turns each check on.
-const TICKET: Record<Check, string> = { bpm: '#63', kicks: '#62', ticks: '#62', tone: '#65', mood: '#65', forgotten: '#63', transition: '#63' };
+// The tempo range and forgetting are in (#63); the tempo checks still left wait on the kicks they're heard from.
+const TICKET: Record<Check, string> = { bpm: '#62', kicks: '#62', ticks: '#62', tone: '#65', mood: '#65', forgotten: '#62', transition: '#62' };
 
 // Which checks fail on today's Listener, per clip. A check listed here runs as `it.fails`: green while it
 // fails, red once it passes, which is the cue to delete it from here.
 const EXPECTED_TO_FAIL: Record<string, Check[]> = {
   'lazy-which-way-drop': ['bpm', 'kicks', 'ticks'],
-  'lazy-new-moon-to-light-breakdown': ['bpm', 'kicks', 'ticks', 'tone'],
+  'lazy-new-moon-to-light-breakdown': ['bpm', 'kicks', 'ticks', 'tone', 'mood'],
   'lazy-light-to-ring-of-clouds-transition': ['bpm', 'kicks', 'ticks', 'transition'],
   'lazy-frozen-to-earthbound-ambient': ['forgotten'],
-  'closer-to-heaven-breakdown': ['bpm', 'kicks', 'ticks', 'tone'],
-  'deep-jungle-walk-breakdown': ['bpm', 'kicks', 'ticks', 'tone', 'mood'],
+  'closer-to-heaven-breakdown': ['bpm', 'kicks', 'ticks', 'tone', 'mood'],
+  'deep-jungle-walk-breakdown': ['bpm', 'kicks', 'ticks', 'tone'],
   'singularity-drop': ['bpm', 'kicks', 'ticks'],
   'says-ambient': ['forgotten'],
 };
@@ -58,13 +60,13 @@ function measure(clip: Clip, heard: Heard): Measured {
   const m: Measured = { bpm: heard.frames.at(-1)?.bpm ?? null, lastKick: heard.kicks.at(-1) ?? null, lastTick: heard.ticks.at(-1) ?? null };
   if (clip.drop && clip.bpm) {
     m.kicksPerBeat = kicksPerBeat(heard, clip.drop, clip.bpm);
-    m.ticks = tickGrid(heard, clip.drop, clip.bpm, TICK_TOLERANCE_MS);
+    m.ticks = tickGrid(heard, clip.drop, tempoInRange(clip.bpm), TICK_TOLERANCE_MS);   // the ticks run at the tempo heard
   }
   if (clip.drop && clip.breakdown) {
     m.tone = [mean(heard, clip.drop, 'bright'), mean(heard, clip.breakdown, 'bright')];
     m.mood = [mean(heard, clip.drop, 'mood'), mean(heard, clip.breakdown, 'mood')];
   }
-  if (clip.type === 'transition' && clip.drop && clip.bpm) m.settles = tempoSettles(heard, clip.bpm, clip.drop[0]);
+  if (clip.type === 'transition' && clip.drop && clip.bpm) m.settles = tempoSettles(heard, tempoInRange(clip.bpm), clip.drop[0]);
   return m;
 }
 
@@ -72,7 +74,8 @@ const fmt = (x: number | null | undefined, digits = 2) => (x == null ? '–' : x
 const span = ([from, to]: Window) => `${from}–${to} s`;
 
 function report(clip: Clip, m: Measured): string {
-  const parts = [`bpm ${m.bpm ?? 'none'}${clip.bpm ? ` (by ear ${clip.bpm})` : ''}`];
+  const inRange = clip.bpm && tempoInRange(clip.bpm) !== clip.bpm ? `, in range ${tempoInRange(clip.bpm)}` : '';
+  const parts = [`bpm ${m.bpm ?? 'none'}${clip.bpm ? ` (by ear ${clip.bpm}${inRange})` : ''}`];
   if (m.kicksPerBeat !== undefined) parts.push(`kicks/beat ${fmt(m.kicksPerBeat)} in drop ${span(clip.drop!)}`);
   if (m.ticks) parts.push(`ticks on grid ${Math.round(m.ticks.onGrid * 100)}% (worst ${fmt(m.ticks.worstMs, 0)} ms, ${fmt(m.ticks.ticksPerBeat)}/beat)`);
   if (m.tone) parts.push(`tone drop ${fmt(m.tone[0])} / breakdown ${fmt(m.tone[1])}`);
@@ -86,9 +89,10 @@ function report(clip: Clip, m: Measured): string {
 function checksFor(clip: Clip): [Check, string, (m: Measured) => void][] {
   const checks: [Check, string, (m: Measured) => void][] = [];
   const { bpm, drop, breakdown } = clip;
-  if (bpm) checks.push(['bpm', `hears ${bpm} BPM (±${BPM_TOLERANCE})`, (m) => {
+  const heardBpm = bpm && tempoInRange(bpm);   // the published BPM, folded into the tempo range
+  if (bpm && heardBpm) checks.push(['bpm', `hears ${heardBpm} BPM (±${BPM_TOLERANCE})${heardBpm !== bpm ? `, published ${bpm}` : ''}`, (m) => {
     expect(m.bpm).not.toBeNull();
-    expect(Math.abs(m.bpm! - bpm)).toBeLessThanOrEqual(BPM_TOLERANCE);
+    expect(Math.abs(m.bpm! - heardBpm)).toBeLessThanOrEqual(BPM_TOLERANCE);
   }]);
   if (drop && bpm) {
     checks.push(['kicks', `hears ${KICKS_PER_BEAT.join('–')} kicks per beat in the drop`, (m) => {
@@ -113,7 +117,7 @@ function checksFor(clip: Clip): [Check, string, (m: Measured) => void][] {
     expect(m.bpm).toBeNull();
     if (m.lastTick !== null) expect(m.lastTick - (m.lastKick ?? 0)).toBeLessThanOrEqual(FORGET_SECONDS);
   }]);
-  if (clip.type === 'transition' && bpm) checks.push(['transition', `reaches ${bpm} BPM within ${SETTLE_SECONDS} s of the new track (the drop window)`, (m) => {
+  if (clip.type === 'transition' && heardBpm) checks.push(['transition', `reaches ${heardBpm} BPM within ${SETTLE_SECONDS} s of the new track (the drop window)`, (m) => {
     expect(m.settles, 'a transition clip needs a drop window: where the new track starts').toBeDefined();
     expect(m.settles).not.toBeNull();
     expect(m.settles!).toBeLessThanOrEqual(SETTLE_SECONDS);

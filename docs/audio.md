@@ -36,7 +36,9 @@ warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm col
 - **Tone** – the spectral centroid (loudness-weighted average frequency) mapped from ~1.1 kHz (dark: piano,
   ambient) to ~5.5 kHz (bright: hi-hat-heavy house, psytrance) and smoothed over a few seconds. Shown in the panel.
 - **Mood** – tempo (80 → 160 BPM) plus how loud the music is over the last few seconds, smoothed over ~4 s more.
-  When nothing plays, mood and tone both drift back to neutral.
+  The tempo is heard from the kicks and always reads 85–175 BPM (half-time at 72 reads 144); after 90 s of music
+  without kicks it is forgotten and counts as neutral until the kicks return. When nothing plays, mood and tone both
+  drift back to neutral.
 - **Synesthesia slider** – how strongly the tone and the mood grade every scene: dark sound → dimmer, cooler, hazier,
   longer trails; bright sound → lighter, warmer, crisper, more colour fringing; energetic mood → more saturated and
   warmer. At 0 it is off: the picture's colour is left untouched. Trails and fringing only grow or shrink from what you

@@ -55,3 +55,13 @@ export function tempoSettles(heard: Heard, bpm: number, from: number): number | 
   if (i === frames.length) return null;
   return Math.max(0, frames[i]!.t - from);
 }
+
+/**
+ * A published BPM as the Listener hears it: halved or doubled into the tempo range, 85–175 (issue #57). The
+ * list keeps the published BPM; a half-time track at 82 is heard, and checked, as 164.
+ */
+export function tempoInRange(bpm: number): number {
+  while (bpm > 175) bpm = Math.round(bpm / 2);
+  while (bpm < 85) bpm *= 2;
+  return bpm;
+}

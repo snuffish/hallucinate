@@ -5,6 +5,7 @@
 //
 //   listener.hear(audio.read(), music.playing, dt, now)   once a frame, on real time (seconds)
 //   listener.reset()                                      a new source: the tempo starts over
+//                                                         (as it does by itself after ~90 s without kicks)
 //   listener.setSmoothing(prefs.audioSmoothing)           how calm the bands and the spectrum texture look
 
 import { TempoClock } from '../state/tempo-clock';
@@ -19,6 +20,8 @@ const BRIGHT_HIGH_HZ = 5500;   // ... and fully "bright" (hi-hat heavy house ≈
 const TONE_SECONDS = 2.5;      // the tone follows the character of the track, not single hits
 const MOOD_SECONDS = 4;        // the mood follows the stretch of the set; the tone relaxes at this pace too
 const CALM_BPM = 80, ENERGETIC_BPM = 160;
+const TEMPO_RANGE = [85, 175] as const;   // BPM: a half or double reading is folded into it
+const FORGET_SECONDS = 90;     // playing this long without a kick (longer than any breakdown) forgets the tempo
 
 // One frame of the analyser (AudioEngine.read): the dB-scaled byte spectrum and the byte waveform.
 export interface Bins {
@@ -62,6 +65,7 @@ export class Listener {
   private kickArmed = true;
   private lastKick = -1e9;
   private kicks: number[] = [];
+  private sinceKick = 0;   // seconds played since the last kick
   private amplitude = new Float32Array(256);   // byte -> linear amplitude, for the analyser's dB range
   private dbRange = '';
   private smoothing = 0.6;   // Settings → Audio (src/state/prefs.ts)
@@ -78,6 +82,8 @@ export class Listener {
       this.spectrum.fill(0);
       for (let i = 0; i < 256; i++) this.spectrum[i * 2 + 1] = 128;
     }
+    this.sinceKick = h.kick ? 0 : this.sinceKick + (playing ? dt : 0);
+    if (this.sinceKick > FORGET_SECONDS && h.bpm !== null) this.reset();   // a long passage without kicks
     const ticked = h.kick && playing && this.tempo.onDetectedBeat(now);
     h.tick = playing && (this.tempo.advance(now) > 0 || ticked);
     if (playing) h.tickPhase = this.tempo.phase(now);
@@ -95,8 +101,10 @@ export class Listener {
     this.smoothing = value;
   }
 
+  // Forgets the tempo: the ticks stop and the mood lets it go, until enough kicks come to hear it again.
   reset(): void {
     this.kicks = [];
+    this.sinceKick = 0;
     this.hearing.bpm = null;
     this.tempo.reset();
   }
@@ -161,14 +169,18 @@ export class Listener {
     return out;
   }
 
-  // The tempo: the median gap between the last kicks, held once known (a breakdown keeps it).
+  // The tempo: the median gap between the last kicks (averaged with the gaps close to it), folded into the
+  // tempo range, held once known (a breakdown keeps it).
   private hearTempo(now: number): void {
     const kicks = this.kicks;
     kicks.push(now);
     if (kicks.length > KICK_WINDOW) kicks.shift();
     if (kicks.length < KICK_MIN) return;
     const gaps = kicks.slice(1).map((t, i) => t - kicks[i]!).sort((a, b) => a - b);
-    const bpm = Math.round(60 / gaps[Math.floor(gaps.length / 2)]!);
+    const median = gaps[Math.floor(gaps.length / 2)]!;
+    const agreeing = gaps.filter((g) => Math.abs(g - median) <= median * 0.1);   // a missed or extra kick is left out
+    const gap = agreeing.reduce((sum, g) => sum + g, 0) / agreeing.length;     // ... and frame timing averages out
+    const bpm = foldTempo(Math.round(60 / gap));
     this.hearing.bpm = bpm;
     this.tempo.setBpm(bpm);
   }
@@ -219,6 +231,14 @@ export class Listener {
       this.spectrum[i * 2 + 1] = time[Math.floor(i * step)]!;
     }
   }
+}
+
+// A tempo halved or doubled until it lies in the tempo range: 72 (half-time) reads 144, 180 reads 90.
+function foldTempo(bpm: number): number {
+  const [lo, hi] = TEMPO_RANGE;
+  while (bpm > hi) bpm = Math.round(bpm / 2);
+  while (bpm < lo) bpm *= 2;
+  return bpm;
 }
 
 // A band's mean byte level, 0..1.
