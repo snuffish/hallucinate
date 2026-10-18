@@ -15,6 +15,10 @@ The music is sounding now. A paused, stopped or finished file is still the music
 playing while connected, even in a quiet room.
 _Avoid_: active, on, kind
 
+**Speed**:
+How fast a file plays, as a multiple of its own pace. Changing it changes the tempo heard, not the other way round.
+_Avoid_: tempo, rate, playback rate
+
 **Listener**:
 What hears the music and says what it sounds like, once a frame.
 _Avoid_: analyser, audio engine
@@ -28,15 +32,31 @@ A clear bass hit heard in the music, on the beat: the bass notes of a rolling ba
 _Avoid_: beat, onset
 
 **Tick**:
-One beat of the steady tempo clock: it runs at the tempo, re-anchors on each kick and keeps going through breakdowns,
-but not through long passages without kicks. Ticks drive the studio's autopilot and the director, and only come while
+One beat of the steady tempo clock: it runs at the tempo, re-anchors on kicks that land near it and keeps going
+through breakdowns, but not through long passages without kicks unless the tempo is locked. A kick between ticks does
+not move them. Ticks drive the studio's autopilot and the director, and only come while
 the music is playing.
 _Avoid_: beat, tempo beat
 
 **Tempo**:
-The music's beats per minute, heard from the gaps between kicks: held through breakdowns, and forgotten when the next
-music starts or the music has gone a long while without kicks.
+The music's beats per minute, heard from the gaps between kicks or set by hand: held through breakdowns, and
+forgotten when the next music starts or, unless locked, when the music has gone a long while without kicks. A locked
+tempo is one the listener no longer replaces; only a hand changes it. A tempo is steady (the kicks agree, or it is
+locked), unsure (they scatter) or none yet.
 _Avoid_: BPM estimate
+
+**Tap**:
+Pressing a key along with the music: a run of taps sets the tempo and the downbeat, a single tap moves only the
+downbeat.
+_Avoid_: tap tempo (it sets more than the tempo)
+
+**Bar**:
+Four ticks, counted from the downbeat.
+_Avoid_: measure, phrase (a phrase is several bars)
+
+**Downbeat**:
+The first tick of a bar, set by tapping along. Until it is set, bars count from when the tempo was first heard.
+_Avoid_: the one, bar start
 
 **Tone**:
 How bright the music sounds, from dark and muffled to bright and crisp; follows the track over seconds, not single
@@ -108,10 +128,11 @@ The show scene that would go Live at the next take, shown exactly as it will loo
 _Avoid_: next, cue
 
 **Scene input**:
-A value every scene's shader reads each frame: the music's clock, the bands, the kick pulse, the hue, the tone and
-the mood.
+A value every scene's shader reads each frame: the music's clock, the ticks and bars, the bands, the kick pulse, the
+hue, the tone and the mood.
 _Avoid_: shared uniform, audio uniform
 
 **Take**:
-Putting the Preview on Live, as a cut or a crossfade.
+Putting the Preview on Live, as a cut or a crossfade. With a steady tempo it waits for the next downbeat, unless
+taken again at once.
 _Avoid_: go, switch
