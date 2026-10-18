@@ -113,6 +113,18 @@ describe('the projector link', () => {
     expect(p.frames.at(-1)).toMatchObject({ scene: 1, prevScene: 0, effects, prevEffects });
   });
 
+  it('carries the background of the incoming and the outgoing picture in each frame', () => {
+    const { connect, clock, link } = setup();
+    const p = projector(connect(), clock);
+    p.view.start();
+    p.view.report(false);
+    const background = { kind: 'gradient' as const, colour: '#ff0000', colour2: '#0000ff', angle: 30, brightness: 1, breathe: 0 };
+    const prevBackground = { ...background, kind: 'colour' as const };
+    link.sendFrame({ ...programState(), scene: 1, prevScene: 0, mix: 0.5, background, prevBackground }, {}, 1);
+    p.view.draw();
+    expect(p.frames.at(-1)).toMatchObject({ background, prevBackground });
+  });
+
   it('a projector says it is waiting when no frame came for a while, and reports the frames it drew', () => {
     const { connect, clock, link } = setup();
     const p = projector(connect(), clock);

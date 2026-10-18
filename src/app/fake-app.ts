@@ -2,6 +2,7 @@
 // UI store, parameter values, scene code, the pinned Live slot (the real one) and hooks behave like the
 // controller's; what needs a GPU, a window or real media (snapshots, projector windows) is a stub.
 
+import { NO_BACKGROUND } from '../engine/background';
 import { NO_EFFECTS } from '../engine/effects';
 import type { Hearing } from '../engine/listener';
 import type { MediaLayer } from '../engine/media';
@@ -35,7 +36,7 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
   const scene = (s: Partial<Scene> & { name: string }, i: number): Scene => ({ id: `s${i}`, cat: '', desc: '', body: '', frag: '', params: opts.params?.[i] ?? [], ...s });
   const scenes: Scene[] = (opts.scenes ?? [{ name: 'Alpha', cat: 'Fractal' }, { name: 'Beta', cat: 'Space' }]).map(scene);
   const look = defaultLook();
-  const state = { scenes, customIndex: -1, nodesIndex: -1, keyedScenes: [], look, effects: NO_EFFECTS, clock: defaultClock(), activeSource: null };
+  const state = { scenes, customIndex: -1, nodesIndex: -1, keyedScenes: [], look, effects: NO_EFFECTS, background: NO_BACKGROUND, clock: defaultClock(), activeSource: null };
   const hooks: Partial<ControllerHooks> = {};
   const toasts: string[] = [];
   const ui = new Store(initialUIState(look));
@@ -76,12 +77,13 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
     setScene: (i, fade = 0) => { hooks.onManualSceneChange?.(); show(i, fade); },
     sceneByName: (name) => library.byName(name),
     setLook,
-    captureScene: (i = state.clock.scene) => ({ scene: i, values: library.values(i), look: Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), effects: state.effects }),
+    captureScene: (i = state.clock.scene) => ({ scene: i, values: library.values(i), look: Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), effects: state.effects, background: state.background }),
     applyScene: (snap, fade) => {
       if (!scenes[snap.scene] || scenes[snap.scene]!.removed) return;
       for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) setLook(k, snap.look[k]!);
       library.replaceValues(snap.scene, snap.values);
       if (snap.effects !== state.effects) { state.effects = snap.effects; ui.set({ effects: snap.effects }); }   // as the controller's setEffects
+      if (snap.background !== state.background) { state.background = snap.background; ui.set({ background: snap.background }); }   // and setBackground
       show(snap.scene, fade);
     },
   };

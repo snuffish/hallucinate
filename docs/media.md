@@ -8,6 +8,9 @@ as laser scan lines, each pushed up by the brightness beneath it, and the app sw
 while a scene that doesn't use media is playing. Every scene can also sample it with `media(p)` (a test pattern
 stands in until you drop one).
 
+Or show it behind any scene's lines: pick *Media* in the [Background](interface.md#background) widget. With a media
+background, loading media keeps the scene on screen.
+
 ## YouTube
 
 *YouTube* in the Media section searches YouTube (or paste a video, playlist or Shorts link) and remembers the videos

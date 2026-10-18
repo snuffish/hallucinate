@@ -8,7 +8,8 @@ import { BUNDLE_VERSION, MAX_BUNDLE_BYTES, SECTIONS, applyWrites, buildBundle, p
 // A stand-in built-in, so the tests don't depend on which ones the app ships.
 const BUILTIN = scene('Alpha', 'Beams', 'Stand-in', 'void main() { fragColor = vec4(1.); }');
 const MIRRORED = [{ id: 'mirror', on: true, settings: { axis: 2 } }];
-const SHOW = { cues: [{ id: 'c1', name: 'Opener', scene: 'Mine', values: {}, look: {}, effects: MIRRORED }], mode: 'cut', seconds: 2, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120 };
+const SUNSET = { kind: 'gradient', colour: '#ff8000', colour2: '#400080', angle: 45, brightness: 0.7, breathe: 0.3 };
+const SHOW = { cues: [{ id: 'c1', name: 'Opener', scene: 'Mine', values: {}, look: {}, effects: MIRRORED, background: SUNSET }], mode: 'cut', seconds: 2, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120 };
 
 describe('settings bundle', () => {
   let store: Map<string, string>;
@@ -77,6 +78,14 @@ describe('settings bundle', () => {
     if (!parsed.ok) throw new Error(parsed.error);
     const show = JSON.parse(Object.fromEntries(parsed.bundle.writes)[KEYS.show]!);
     expect(show.cues.map((c: { effects: unknown }) => c.effects)).toEqual([[], [{ id: 'mirror', on: true, settings: { axis: 2 } }]]);
+  });
+
+  it('imports a show from before backgrounds with none, and cleans up a broken one', () => {
+    const cue = (id: string, background?: unknown) => ({ id, name: id, scene: 'Mine', values: {}, look: {}, ...(background !== undefined && { background }) });
+    const parsed = parseBundle(file({ show: { cues: [cue('old'), cue('broken', { kind: 'colour', colour: 'nope', brightness: 4 })] } }));
+    if (!parsed.ok) throw new Error(parsed.error);
+    const show = JSON.parse(Object.fromEntries(parsed.bundle.writes)[KEYS.show]!);
+    expect(show.cues.map((c: { background: { kind: string; brightness: number } }) => [c.background.kind, c.background.brightness])).toEqual([['none', 0.5], ['colour', 1]]);
   });
 
   it('carries exactly the keys that hold setup; everything else stays on this computer', () => {

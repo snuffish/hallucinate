@@ -6,7 +6,9 @@
 //   3. feedback pass    -> the previous frame, faded in place by the trails amount, and the scene:
 //                          the brighter of the two wins per channel (ping-pong). That is the
 //                          trails' afterglow, where each line was drawn
-//   4. display pass     -> tonemap, chromatic aberration, vignette, grain (not on black) -> canvas
+//   4. background pass  -> each picture's background behind the lines (background.ts), crossfading
+//                          with the scenes, faded to black at the edges; no pass when neither has one
+//   5. display pass     -> tonemap, chromatic aberration, vignette, grain (not on black) -> canvas
 //
 // Programs compile in the background (KHR_parallel_shader_compile) so typing in the editor never
 // stalls the show; the previous program keeps running until the new one is ready. Media uploads go
@@ -14,6 +16,7 @@
 // asynchronously through a pixel buffer and a fence, so thumbnails don't stall the GPU.
 
 import { COMMON } from '../scenes';
+import { BACKGROUND_SHADER, backgroundUniforms, hasBackground, type Background, type BackgroundUniforms } from './background';
 import { EFFECTS, PASS_SCALES, effectShader, passShader, passesOf, type EffectDef, type EffectStack } from './effects';
 import type { MediaLayer } from './media';
 import type { UniformValue } from './params';
@@ -84,6 +87,8 @@ export interface ProgramState {
   prevScene: number;
   effects: EffectStack;       // the effects `scene` is drawn with
   prevEffects: EffectStack;   // and `prevScene`, while it crossfades out
+  background: Background;     // what shows behind `scene`'s lines
+  prevBackground: Background; // and behind `prevScene`'s, while it crossfades out
   mix: number;
   time: number;
   turn: number;               // the effects' turn (uTurn): only ever runs on, see composeFrame
@@ -114,8 +119,9 @@ interface Target { tex: WebGLTexture; fbo: WebGLFramebuffer; w: number; h: numbe
 // so none writes over it.
 // An effect's own passes (Glow's blur) ping-pong between two targets per size they render at (`passes`,
 // by scale, one pair per scale in PASS_SCALES); the pictures take turns, so both share them.
-interface Targets { sceneA: Target; sceneB: Target; read: Target; write: Target; effectA1: Target; effectA2: Target; effectB1: Target; effectB2: Target; passes: Map<number, [Target, Target]> }
-const targetList = (t: Targets): Target[] => [t.sceneA, t.sceneB, t.read, t.write, t.effectA1, t.effectA2, t.effectB1, t.effectB2, ...[...t.passes.values()].flat()];
+// The background pass writes `bg`, so the trails in `read` stay lines alone.
+interface Targets { sceneA: Target; sceneB: Target; read: Target; write: Target; effectA1: Target; effectA2: Target; effectB1: Target; effectB2: Target; bg: Target; passes: Map<number, [Target, Target]> }
+const targetList = (t: Targets): Target[] => [t.sceneA, t.sceneB, t.read, t.write, t.effectA1, t.effectA2, t.effectB1, t.effectB2, t.bg, ...[...t.passes.values()].flat()];
 type Locations = Map<string, WebGLUniformLocation | null>;
 interface Pending { prog: WebGLProgram; fs: WebGLShader; name: string; promise: Promise<string | null>; resolve: (error: string | null) => void; settled: boolean }
 
@@ -140,6 +146,7 @@ export class Renderer {
   private readonly inUse: (string | undefined)[] = [];             // per scene index: the source currently compiled for it
   private feedbackProgram!: WebGLProgram;
   private displayProgram!: WebGLProgram;
+  private backgroundProgram!: WebGLProgram;
   private readonly effectPrograms = new Map<string, { prog: WebGLProgram; def: EffectDef; passes: { prog: WebGLProgram; scale: number }[] }>();   // effect id -> its picture step and passes
 
   private media: MediaLayer | null = null;
@@ -169,6 +176,9 @@ export class Renderer {
   private readonly feedbackUniforms: SceneUniforms = {};
   private readonly effectUniforms: SceneUniforms = {};
   private readonly displayUniforms: SceneUniforms = {};
+  private readonly backgroundUniforms: SceneUniforms = {};
+  private readonly bgA: BackgroundUniforms = { params: [0, 0, 0, 0], colour: [0, 0, 0], colour2: [0, 0, 0] };
+  private readonly bgB: BackgroundUniforms = { params: [0, 0, 0, 0], colour: [0, 0, 0], colour2: [0, 0, 0] };
   private lost = false;
   private disposed = false;
   private readonly onLost = (e: Event) => { e.preventDefault(); this.lost = true; };
@@ -203,6 +213,7 @@ export class Renderer {
     gl.compileShader(this.vert);
     this.feedbackProgram = this.compileSync(FEEDBACK, 'feedback');
     this.displayProgram = this.compileSync(DISPLAY, 'display');
+    this.backgroundProgram = this.compileSync(BACKGROUND_SHADER, 'background');
     this.effectPrograms.clear();
     for (const def of EFFECTS) {   // each compiled once
       const passes = passesOf(def).map((pass, i) => ({ prog: this.compileSync(passShader(def, pass), `${def.label} pass ${i + 1}`), scale: pass.scale }));
@@ -383,12 +394,13 @@ export class Renderer {
   }
 
   // Uploads the media when it changed and once per new video frame, but only while a scene on
-  // screen samples it. Returns the media uniforms (one reused object).
-  private mediaUniforms(indexA: number, indexB: number): SceneUniforms {
+  // screen samples it or a background on screen shows it (`background`). Returns the media uniforms
+  // (one reused object).
+  private mediaUniforms(indexA: number, indexB: number, background = false): SceneUniforms {
     const m = this.media;
     const u = this.mediaUniformValues;
     const ready = !!m?.ready;
-    if (m && ready && ((indexA >= 0 && this.usesMedia(indexA)) || (indexB >= 0 && this.usesMedia(indexB)))) {
+    if (m && ready && (background || (indexA >= 0 && this.usesMedia(indexA)) || (indexB >= 0 && this.usesMedia(indexB)))) {
       const video = m.video;
       if (m.version !== this.mediaVersion) { this.watchVideo(video); this.upload(m); }
       else if (video && !video.paused && this.videoFrameReady(video)) this.upload(m);
@@ -644,7 +656,7 @@ export class Renderer {
   private createTargets(w: number, h: number): Targets {
     const t = (scale = 1) => this.createTarget(Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
     const passes = new Map(PASS_SCALES.map((scale): [number, [Target, Target]] => [scale, [t(scale), t(scale)]]));
-    return { sceneA: t(), sceneB: t(), read: t(), write: t(), effectA1: t(), effectA2: t(), effectB1: t(), effectB2: t(), passes };
+    return { sceneA: t(), sceneB: t(), read: t(), write: t(), effectA1: t(), effectA2: t(), effectB1: t(), effectB2: t(), bg: t(), passes };
   }
 
   // The share of the canvas the scenes render at. A rescale restarts the trails, so the same scale
@@ -743,9 +755,11 @@ export class Renderer {
     u.uRes = [t.sceneA.w, t.sceneA.h];
     writeInputs(u, s);
     u.uSpec = this.specTex;
-    const media = this.mediaUniforms(s.scene, s.prevScene);
-    this.drawScene(s.scene, t.sceneA, u, media);
     const crossfading = s.prevScene >= 0 && s.mix < 1;
+    const prevBackground = crossfading ? s.prevBackground : s.background;
+    const backed = hasBackground(s.background) || hasBackground(prevBackground);
+    const media = this.mediaUniforms(s.scene, s.prevScene, s.background.kind === 'media' || prevBackground.kind === 'media');
+    this.drawScene(s.scene, t.sceneA, u, media);
     if (crossfading) this.drawScene(s.prevScene, t.sceneB, u, media);
     this.effectUniforms.uTurn = s.turn;
     const a = this.runEffects(s.effects, t.sceneA, t.effectA1, t.effectA2, t.passes, u);
@@ -758,9 +772,21 @@ export class Renderer {
     this.draw(t.write);
     [t.read, t.write] = [t.write, t.read];
 
+    let picture = t.read;
+    if (backed) {
+      const bg = this.backgroundUniforms;
+      const a = backgroundUniforms(s.background, this.bgA), b = backgroundUniforms(prevBackground, this.bgB);
+      bg.uTex = t.read.tex; bg.uRes = [t.bg.w, t.bg.h]; bg.uMix = crossfading ? s.mix : 1; bg.uTime = s.time; bg.uMood = s.mood;
+      bg.uBgA = a.params; bg.uColA = a.colour; bg.uColA2 = a.colour2;
+      bg.uBgB = b.params; bg.uColB = b.colour; bg.uColB2 = b.colour2;
+      this.use(this.backgroundProgram, media, bg);
+      this.draw(t.bg);
+      picture = t.bg;
+    }
+
     const g = s.grade;
     const d = this.displayUniforms;
-    d.uTex = t.read.tex; d.uAberr = s.aberration; d.uTime = s.time;
+    d.uTex = picture.tex; d.uAberr = s.aberration; d.uTime = s.time;
     d.uExposure = g.exposure; d.uContrast = g.contrast; d.uSat = g.saturation; d.uTint = g.tint; d.uMaster = s.master ?? 1;
     this.use(this.displayProgram, d);
     this.draw(out);
@@ -810,6 +836,7 @@ export class Renderer {
     this.programs.clear();
     gl.deleteProgram(this.feedbackProgram);
     gl.deleteProgram(this.displayProgram);
+    gl.deleteProgram(this.backgroundProgram);
     for (const effect of this.effectPrograms.values()) for (const prog of [effect.prog, ...effect.passes.map((p) => p.prog)]) gl.deleteProgram(prog);
     gl.deleteShader(this.vert);
     if (this.targets) for (const t of targetList(this.targets)) this.deleteTarget(t);

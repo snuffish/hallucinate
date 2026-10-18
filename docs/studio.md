@@ -9,9 +9,10 @@ Run a show like OBS's Studio Mode and put it on a projector. The two monitors ar
 ## 1. Build the show
 
 *+ Add scene…* adds any library scene, or *What's on Live now* (the current scene, its live parameter values, the
-look sliders and the [effects](interface.md#effects)). Rename, reorder (▲▼), duplicate, and use ⤓ *Update from Live*
-to store a look or effects you've just tweaked live. The same scene can be in the show twice with different effects.
-Show scenes the assistant or the director add have no effects.
+look sliders, the [effects](interface.md#effects) and the [background](interface.md#background)). Rename, reorder (▲▼),
+duplicate, and use ⤓ *Update from Live* to store a look, effects or a background you've just tweaked live. The same
+scene can be in the show twice with different effects or backgrounds. Show scenes the assistant or the director add
+have no effects and no background.
 
 ## 2. Preview → Live
 
@@ -22,6 +23,8 @@ keep pressing T.
 Preview, Live and every projector show a show scene with its effects. Through a fade each picture keeps its own
 effects; a cut switches them at the same instant as the scene. Two show scenes of the same scene switch at once, even
 with a fade. With the studio open, a take also puts the show scene's effects in the Effects widget, ready to tweak.
+Backgrounds work the same way: each picture keeps its own through a fade, and a take with the studio open puts the
+show scene's background in the Background widget.
 
 The Preview monitor renders at the same *Resolution* as Live ([Settings → Display & performance](settings.md#display--performance)),
 so a show scene looks in Preview exactly as it will Live.

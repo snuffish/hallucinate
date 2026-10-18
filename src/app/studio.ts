@@ -8,6 +8,7 @@
 // latest values. The assistant's tools and the director are handed this session.
 
 import { z } from 'zod';
+import { BackgroundSchema, NO_BACKGROUND } from '../engine/background';
 import { EffectStackSchema, NO_EFFECTS } from '../engine/effects';
 import { type ParamSpec, type ParamValue, ParamValueSchema, type ParamValues } from '../engine/params';
 import { Renderer, type ProgramState } from '../engine/renderer';
@@ -29,6 +30,8 @@ const CueSchema = z.object({
   // Cleaned up through the effect catalogue: a show saved before effects reads as none, and a broken
   // entry is dropped instead of failing the whole show. An older app strips the field.
   effects: EffectStackSchema,
+  // Likewise through the background's clean-up: missing or damaged reads as none.
+  background: BackgroundSchema,
 });
 // A stored number, clamped to the range its control allows (an imported or hand-edited show can't, say,
 // run the autopilot every frame); a missing or non-number value falls back to the default.
@@ -224,12 +227,13 @@ export class StudioSession {
     return listedScenes(this.app.state.scenes).filter(({ s }) => !s.kind);
   }
 
-  // A show scene = a scene, its parameter values, the look sliders and the effects, as they are on Live now.
+  // A show scene = a scene, its parameter values, the look sliders, the effects and the background, as they
+  // are on Live now.
   capture(): Omit<Cue, 'id'> {
     const app = this.app;
-    const { scene, values, look, effects } = app.captureScene();
+    const { scene, values, look, effects, background } = app.captureScene();
     const { name } = app.state.scenes[scene]!;
-    return { name, scene: name, values, look: { ...look }, effects };
+    return { name, scene: name, values, look: { ...look }, effects, background };
   }
 
   addFromSelect(value: string): void {
@@ -239,9 +243,9 @@ export class StudioSession {
     this.add(value === '@live' ? base : { ...base, scene: value, name: value, values: {} });
   }
 
-  // A show scene written without effects (the director's and the assistant's) has none.
-  add(cue: Omit<Cue, 'id' | 'effects'> & Partial<Pick<Cue, 'effects'>>): Cue {
-    const full: Cue = { ...cue, effects: cue.effects ?? NO_EFFECTS, id: crypto.randomUUID() };
+  // A show scene written without effects or a background (the director's and the assistant's) has none.
+  add(cue: Omit<Cue, 'id' | 'effects' | 'background'> & Partial<Pick<Cue, 'effects' | 'background'>>): Cue {
+    const full: Cue = { ...cue, effects: cue.effects ?? NO_EFFECTS, background: cue.background ?? NO_BACKGROUND, id: crypto.randomUUID() };
     this.cues = [...this.cues, full];
     this.previewId = full.id;
     this.changed();
@@ -280,9 +284,9 @@ export class StudioSession {
   }
 
   updateFromLive(cue: Cue): void {
-    const { scene, values, look, effects } = this.capture();
+    const { scene, values, look, effects, background } = this.capture();
     this.touched();
-    this.replace(cue, { ...cue, scene, values, look, effects });
+    this.replace(cue, { ...cue, scene, values, look, effects, background });
     this.app.toast(`"${cue.name}" now holds what's on Live`);
   }
 
@@ -488,7 +492,7 @@ export class StudioSession {
   private shot(cue: Cue, index: number): Shot {
     const hit = this.shots.get(cue);
     if (hit && hit.scene === index) return hit;
-    const shot = { scene: index, values: cue.values, look: cue.look, effects: cue.effects };
+    const shot = { scene: index, values: cue.values, look: cue.look, effects: cue.effects, background: cue.background };
     this.shots.set(cue, shot);
     return shot;
   }

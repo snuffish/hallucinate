@@ -3,6 +3,7 @@
 // AppContext. Panels that need deeper hooks (editor, studio, assistant) register them here.
 
 import { AudioEngine } from '../engine/audio';
+import * as Bg from '../engine/background';
 import * as Effects from '../engine/effects';
 import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
 import { composeFrame, composeStill, crossfade, programState } from '../engine/look';
@@ -21,6 +22,7 @@ import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, 
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
 import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
 import { takeRenameReport } from '../state/scene-renames';
+import { loadScreenBackground, screenBackgroundWriter } from '../state/screen-background';
 import { loadScreenEffects, screenEffectsWriter } from '../state/screen-effects';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
@@ -114,6 +116,9 @@ export class AppController {
   // While a show scene crossfades in on the main screen, the stack the outgoing picture keeps; null once the
   // crossfade ends (or on a manual scene change), when the outgoing picture draws with the screen's own.
   private outgoingEffects: Effects.EffectStack | null = null;
+  private readonly backgroundWriter = screenBackgroundWriter(() => this.state.background);
+  // Likewise the background the outgoing picture keeps.
+  private outgoingBackground: Bg.Background | null = null;
   private readonly program: ProgramState;
   private readonly paramStore: ParamStore;   // likewise
   private readonly profilerApi: ProfilerApi = {
@@ -122,21 +127,21 @@ export class AppController {
     reset: () => this.profiler.reset(),
     scenes: () => this.state.scenes.flatMap((s, index) => (s.removed ? [] : [{ index, name: s.name, cat: s.cat, params: s.params.length, builtin: isBuiltin(s) }])),
     setScene: (index) => this.setScene(index),
-    still: async (index, { inputs = {}, silent = false, look, effects } = {}) => {
+    still: async (index, { inputs = {}, silent = false, look, effects, background } = {}) => {
       const s = this.state.scenes[index];
       const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
       if (error) return { error, image: null };
       const spectrum = silent ? silentSpectrum() : undefined;
-      const shaped = effects?.some((e) => e.on) ?? false;   // a stack with nothing switched on is no effects
+      const shaped = (effects?.some((e) => e.on) ?? false) || (!!background && Bg.hasBackground(background));   // a stack with nothing switched on is no effects
       if (!look && !shaped) return { error: null, image: await this.renderer.snapshotAsync(index, stillUniforms(inputs), 1280, 720, spectrum) };
-      const frames = composeStill(index, stillUniforms(inputs), look ?? defaultLook(), s!.trails ?? 1, spectrum ?? stillSpectrum(), undefined, effects);
+      const frames = composeStill(index, stillUniforms(inputs), look ?? defaultLook(), s!.trails ?? 1, spectrum ?? stillSpectrum(), undefined, effects, background);
       return { error: null, image: await this.renderer.stillAsync(frames, 1280, 720) };
     },
-    stillChange: async (index, { from, to, look, effects }) => {
+    stillChange: async (index, { from, to, look, effects, background }) => {
       const s = this.state.scenes[index];
       const error = s ? this.renderer.check(s.frag, s.name) : `No scene at ${index}`;
       if (error) return { error, images: null };
-      const frames = composeStill(index, stillUniforms(from), look, s!.trails ?? 1, stillSpectrum(), stillUniforms(to), effects);
+      const frames = composeStill(index, stillUniforms(from), look, s!.trails ?? 1, stillSpectrum(), stillUniforms(to), effects, background);
       return { error: null, images: await this.renderer.stillPairAsync(frames, 1280, 720) };
     },
     effectsCost: async (effects, { size = this.renderer.size, frames = 30, rounds = 5 } = {}) => {
@@ -184,10 +189,10 @@ export class AppController {
     this.paramStore = new ParamStore();
     this.state = {
       scenes: list.scenes, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
-      look: defaultLook(), effects: loadScreenEffects(), clock: defaultClock(), activeSource: null,
+      look: defaultLook(), effects: loadScreenEffects(), background: loadScreenBackground(), clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
-    this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, effects: this.state.effects });
+    this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, effects: this.state.effects, background: this.state.background });
     this.renderer.setMedia(this.media);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
     this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what));
@@ -257,6 +262,7 @@ export class AppController {
     this.layoutWriter.dispose();
     this.prefsWriter.dispose();
     this.effectsWriter.dispose();
+    this.backgroundWriter.dispose();
     this.transport.dispose();
     this.output.dispose();
     this.paramStore.dispose();
@@ -473,6 +479,7 @@ export class AppController {
     c.prevScene = c.scene;
     c.scene = i;
     this.outgoingEffects = null;
+    this.outgoingBackground = null;
     writeString(KEYS.lastScene, paramKey(scene));
     c.transitionStart = c.clock;
     c.sceneStart = c.clock;
@@ -532,27 +539,28 @@ export class AppController {
 
   // ---------- A scene as a whole: which one, its parameter values, the look ----------
 
-  // A scene as a show scene keeps it: its parameter values, the look sliders and the screen's effects, as
-  // they are now.
+  // A scene as a show scene keeps it: its parameter values, the look sliders and the screen's effects and
+  // background, as they are now.
   captureScene(i = this.state.clock.scene): Shot {
     const look: Record<string, number> = {};
     for (const k of LOOK_KEYS) look[k] = this.state.look[k];
-    return { scene: i, values: this.library.values(i), look, effects: this.state.effects };
+    return { scene: i, values: this.library.values(i), look, effects: this.state.effects, background: this.state.background };
   }
 
   // Puts a scene on screen in one step, as the studio takes it: the look sliders it has, its values, its
-  // effects (replacing the screen's), then the scene, crossfading for `fade` seconds. Not a manual scene
-  // change. The outgoing picture keeps the effects it had through the crossfade; a show scene of the
-  // scene already on screen takes over at once.
+  // effects and background (replacing the screen's), then the scene, crossfading for `fade` seconds. Not a
+  // manual scene change. The outgoing picture keeps the effects and background it had through the
+  // crossfade; a show scene of the scene already on screen takes over at once.
   applyScene(snap: Shot, fade: number): void {
     const scene = this.state.scenes[snap.scene];
     if (!scene || scene.removed) return;
     for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) this.setLook(k, snap.look[k]!);
     this.library.replaceValues(snap.scene, snap.values);
-    const outgoing = this.state.effects, before = this.state.clock.scene;
+    const outgoing = this.state.effects, outgoingBackground = this.state.background, before = this.state.clock.scene;
     this.setEffects(snap.effects);
+    this.setBackground(snap.background);
     this.showScene(snap.scene, fade);
-    if (this.state.clock.scene !== before) this.outgoingEffects = outgoing;
+    if (this.state.clock.scene !== before) { this.outgoingEffects = outgoing; this.outgoingBackground = outgoingBackground; }
   }
 
   // ---------- Live parameters ----------
@@ -620,6 +628,21 @@ export class AppController {
     this.state.effects = stack;
     this.ui.set({ effects: stack });
     this.effectsWriter.schedule();
+  }
+
+  // ---------- Background (the main screen's, like its effects) ----------
+
+  setBackgroundKind(kind: Bg.BackgroundKind): void { this.setBackground(Bg.setBackgroundKind(this.state.background, kind)); }
+  setBackgroundColour(which: 'colour' | 'colour2', value: string): void { this.setBackground(Bg.setBackgroundColour(this.state.background, which, value)); }
+  setBackgroundSetting(key: Bg.BackgroundSettingKey, value: number): void { this.setBackground(Bg.setBackgroundSetting(this.state.background, key, value)); }
+
+  // A new background (never edited in place): drawn from the next frame, published to the widget and kept
+  // for the next start.
+  private setBackground(background: Bg.Background): void {
+    if (background === this.state.background) return;
+    this.state.background = background;
+    this.ui.set({ background });
+    this.backgroundWriter.schedule();
   }
 
   toggleAuto(): boolean {
@@ -716,9 +739,11 @@ export class AppController {
     this.mediaChanged();
     if (this.mediaSound && this.media.kind === 'video') await this.linkMediaSound();
     else if (this.state.activeSource === 'media') this.player.pause();
+    const what = this.media.kind === 'video' ? 'Video' : 'Image';
+    // A media background already shows it: the scene on screen stays.
+    if (this.state.background.kind === 'media') return this.toast(`${what} loaded — it shows behind the lines (Background).`, 5000);
     const mediaScene = this.state.scenes.findIndex((s) => s.cat === 'Media' && !s.removed);
     if (!this.renderer.usesMedia(this.state.clock.scene)) this.setScene(mediaScene);
-    const what = this.media.kind === 'video' ? 'Video' : 'Image';
     this.toast(mediaScene >= 0
       ? `${what} loaded — ${this.state.scenes[mediaScene]!.name} draws it (library → Media). In code, sample it with media(p).`
       : `${what} loaded. In a scene's code, sample it with media(p).`, 5000);
@@ -926,11 +951,13 @@ export class AppController {
     const p = this.program;
     composeFrame(p, c, f, look, this.currentScene.trails ?? 1, dt);   // the main screen's motion is the clock's
     p.scene = c.scene; p.prevScene = c.prevScene; p.mix = crossfade(c, c.clock);
-    if (c.prevScene < 0) this.outgoingEffects = null;   // the crossfade has ended (crossfade() let prevScene go)
+    if (c.prevScene < 0) this.outgoingEffects = this.outgoingBackground = null;   // the crossfade has ended (crossfade() let prevScene go)
     // On the main screen effects belong to what is on screen, not to the scene: both pictures draw with
     // the screen's, except that a show scene taken here leaves the outgoing picture its own.
     p.effects = this.state.effects;
     p.prevEffects = this.outgoingEffects ?? this.state.effects;
+    p.background = this.state.background;
+    p.prevBackground = this.outgoingBackground ?? this.state.background;
     p.master = this.hooks.master?.() ?? 1;
     p.mediaTime = this.media.time; p.mediaPaused = this.media.video?.paused ?? true; p.mediaRate = this.media.video?.playbackRate ?? 1;
     this.profiler.lap(Stage.logic);

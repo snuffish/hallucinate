@@ -1,5 +1,6 @@
 import { expect, seedScenes, test, type Page } from './fixtures';
 import type { ListedScene, ProfilerApi } from '../src/engine/profiler';
+import { brightest, NO_BACKGROUND, type Background } from '../src/engine/background';
 import { EDGE_BAND, EDGE_FULL, EFFECTS, strongest, type EffectStack } from '../src/engine/effects';
 import { composeFrame, programState, type FrameLook } from '../src/engine/look';
 import { stillHearing, stillUniforms } from '../src/engine/scene-inputs';
@@ -18,7 +19,8 @@ import { STRONGEST_LOOK } from '../src/state/look-drift';
 // Every effect in the catalogue (src/engine/effects.ts) joins the same way: alone, at its strongest, on
 // every scene at the strongest Look (ADR 0003), and all of them stacked keep the edges black. The edges
 // these rules measure are the border band the effects' edge fade leaves to the scene alone, defined
-// once in the catalogue (EDGE_BAND).
+// once in the catalogue (EDGE_BAND). A background (ADR 0004) joins the same way: each kind at its
+// brightest, on every scene at the strongest Look.
 
 interface Verdict { error: string | null; edgeBlack: number; kick: number; tick: number }
 type Hook = { __profiler?: Pick<ProfilerApi, 'scenes' | 'still' | 'stillChange'> };
@@ -86,13 +88,13 @@ const EDGE_BLACK = `({ width: w, height: h, data }, band) => {
 }`;
 type EdgeBlack = (image: ImageData, band: number) => number;
 
-// The safety rules for one scene with `look` (and `effects`): the share of the border band that is pure
+// The safety rules for one scene with `look` (and `effects`, and `background`): the share of the border band that is pure
 // black in silence, and the share of the frame a kick and a tick make more than twice as bright.
-async function verdict(page: Page, index: number, look: FrameLook, effects: EffectStack = []): Promise<Verdict> {
-  return page.evaluate(async ({ index, look, effects, band, source, SILENCE, CALM, KICK, TICK_END, TICK_START }) => {
+async function verdict(page: Page, index: number, look: FrameLook, effects: EffectStack = [], background: Background = NO_BACKGROUND): Promise<Verdict> {
+  return page.evaluate(async ({ index, look, effects, background, band, source, SILENCE, CALM, KICK, TICK_END, TICK_START }) => {
     const { still, stillChange } = (window as Hook).__profiler!;
     const lum = (d: Uint8ClampedArray, i: number) => (0.299 * d[i]! + 0.587 * d[i + 1]! + 0.114 * d[i + 2]!) / 255;
-    const silent = await still(index, { inputs: SILENCE, silent: true, look, effects });
+    const silent = await still(index, { inputs: SILENCE, silent: true, look, effects, background });
     if (!silent.image) return { error: silent.error, edgeBlack: 0, kick: 1, tick: 1 };
     const edgeBlack = ((0, eval)(source) as EdgeBlack)(silent.image, band);
     // The strobe rule: the share of pixels a change from one frame to the next makes more than twice
@@ -100,7 +102,7 @@ async function verdict(page: Page, index: number, look: FrameLook, effects: Effe
     // so near-black halos don't count. The two frames are the end of one burst: `from`'s sound
     // settled, then the next frame with `to`'s.
     const doubled = async (from: Record<string, number>, to: Record<string, number>) => {
-      const [a, b] = (await stillChange(index, { from, to, look, effects })).images!.map((image) => image.data);
+      const [a, b] = (await stillChange(index, { from, to, look, effects, background })).images!.map((image) => image.data);
       let n = 0;
       for (let i = 0; i < a!.length; i += 4) {
         const la = lum(a!, i), lb = lum(b!, i);
@@ -109,7 +111,7 @@ async function verdict(page: Page, index: number, look: FrameLook, effects: Effe
       return n / (a!.length / 4);
     };
     return { error: null, edgeBlack, kick: await doubled(CALM, KICK), tick: await doubled(TICK_END, TICK_START) };
-  }, { index, look, effects, band: EDGE_BAND, source: EDGE_BLACK, SILENCE, CALM, KICK, TICK_END, TICK_START }) as Promise<Verdict>;
+  }, { index, look, effects, background, band: EDGE_BAND, source: EDGE_BLACK, SILENCE, CALM, KICK, TICK_END, TICK_START }) as Promise<Verdict>;
 }
 
 const pct = (x: number): string => `${(x * 100).toFixed(1)}%`;
@@ -137,6 +139,17 @@ for (const effect of EFFECTS) for (const { name: sceneName } of SCENES) {
     test.setTimeout(4 * 60_000);
     const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
     judge(await verdict(page, scene.index, STRONGEST_LOOK, strongest(effect.id)), `${sceneName} with ${effect.label} at the strongest Look`);
+  });
+}
+
+// Each background kind at its brightest (white, full Brightness): it lifts the black between the lines,
+// but fades to black before the border band, and holds still on a kick and a tick. Media isn't checked
+// here: without media it draws nothing, and with it the same cap and fade apply as for a colour.
+for (const kind of ['colour', 'gradient'] as const) for (const { name: sceneName } of SCENES) {
+  test(`${sceneName} with a ${kind} background at its brightest, at the strongest Look: black edges in silence, and a strobe-safe kick and tick`, async ({ page }) => {
+    test.setTimeout(4 * 60_000);
+    const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
+    judge(await verdict(page, scene.index, STRONGEST_LOOK, [], brightest(kind)), `${sceneName} with a ${kind} background at the strongest Look`);
   });
 }
 
@@ -218,6 +231,22 @@ test('a still with no effect switched on is the still without effects', async ({
   }, { source: DIFFERS });
   expect(changed.empty, 'an empty stack').toBe(0);
   expect(changed.off, 'a stack switched off').toBe(0);
+});
+
+// A background does something: at its brightest it lifts most of the black between the lines, so the
+// safety checks above see it.
+test('a still with a background at its brightest differs from the still without it', async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await openProfiler(page);
+  const changed = await page.evaluate(async ({ background, look, source, inner }) => {
+    const p = (window as Hook).__profiler!;
+    const differs = (0, eval)(source) as Differs;
+    const index = p.scenes().find((s) => s.builtin)!.index;
+    const plain = (await p.still(index, { look })).image!;
+    const backed = (await p.still(index, { look, background })).image!;
+    return differs(plain.data, backed.data, plain.width, plain.height, inner, 2);
+  }, { background: brightest('colour'), look: defaultLook(), source: DIFFERS, inner: EDGE_FULL });
+  expect(changed).toBeGreaterThan(0.5);
 });
 
 // Each effect does something: at its strongest the picture differs from the same still without it.

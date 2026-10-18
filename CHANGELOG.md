@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — backgrounds (2026-10-18)
+
+### Added
+
+- A **Background** widget, docked under the Effects: put a colour, a gradient (two colours and an angle) or your media
+  behind the scene's lines instead of pure black. *Brightness* sets how bright it is, up to a dim 30% of full, so the
+  lines always stand out; *Breathe* dims it in calm music and turns a gradient slowly with the music's clock. It never
+  reacts to the bass or the kicks, so it can't flash. See
+  [ADR 0004](docs/adr/0004-the-background-belongs-to-the-show-scene.md).
+- The background sits behind the lines: where a line is lit, it gives way. It is drawn after the trails and before the
+  Look, so the Look grades it with the picture, and it fades to black before the border band, like the effects.
+- Show scenes keep their background, as they keep their effects: *What's on Live now* and *Update from Live* store
+  the screen's, a take with the studio open brings it back to the screen, and through a fade each picture keeps its
+  own. Shows saved before backgrounds load with none, a damaged one is cleaned up, and the main screen's comes back
+  after a reload. Show scenes the director and the assistant write have none.
+- With a media background, loading an image or video keeps the scene on screen instead of switching to Scan Trace.
+
+### Changed
+
+- The built-in scenes spec checks a colour and a gradient background at their brightest on every scene, at the
+  strongest Look.
+
 ## Unreleased — effects (2026-10-17)
 
 ### Added
