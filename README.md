@@ -63,6 +63,12 @@ maker, or ask the assistant for one.
     <td align="center"><img src="docs/screenshots/point-storm.jpg" alt="Point Storm" width="100%"><br><sub><b>Point Storm</b> · Geometry · laser dots thrown by the kicks</sub></td>
     <td align="center"><img src="docs/screenshots/scan-trace.jpg" alt="Scan Trace" width="100%"><br><sub><b>Scan Trace</b> · Media · your video as laser scan lines</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/lissajous.jpg" alt="Lissajous" width="100%"><br><sub><b>Lissajous</b> · Signals · an oscilloscope drawing Lissajous figures</sub></td>
+    <td align="center"><img src="docs/screenshots/scope-ring.jpg" alt="Scope Ring" width="100%"><br><sub><b>Scope Ring</b> · Signals · the waveform wrapped round a circle</sub></td>
+    <td align="center"><img src="docs/screenshots/constellation.jpg" alt="Constellation" width="100%"><br><sub><b>Constellation</b> · Geometry · drifting stars linked on the beat</sub></td>
+    <td align="center"><img src="docs/screenshots/vortex.jpg" alt="Vortex" width="100%"><br><sub><b>Vortex</b> · Beams · spiral arms winding from the centre</sub></td>
+  </tr>
 </table>
 
 <sub>Stills from a software-rendered headless browser (`scripts/screenshots.mjs`); on a GPU the scenes run at full frame rate.</sub>

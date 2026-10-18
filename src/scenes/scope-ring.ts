@@ -21,11 +21,15 @@ const float E = TAU / 512.;
 
 // m: 0 at the top … 1 at the bottom, either way round, so both curves close.
 float outerAt(float a, float R) { float m = abs(fract(a / TAU) * 2. - 1.); return R + AMP * wave(m); }
-float innerAt(float a, float R) { float m = abs(fract(a / TAU) * 2. - 1.); return R * .5 + R * .45 * spec(.03 + .6 * m); }
+float innerAt(float a, float R) {
+  float m = abs(fract(a / TAU) * 2. - 1.), x = .03 + .6 * m;
+  return R * .5 + R * .45 * (spec(x - .006) + spec(x) + spec(x + .006)) / 3.;   // smoothed a little
+}
 
+// The slope's stretch is capped: where the curve jumps, an uncapped one would draw a streak to the centre.
 float ringDist(float r, float f, float f1, float f0) {
-  float slope = (f1 - f0) / (2. * E);
-  return (r - f) / sqrt(1. + slope * slope / max(r * r, 1e-4));
+  float s = min(abs(f1 - f0) / (2. * E) / max(r, 1e-2), 4.);
+  return (r - f) / sqrt(1. + s * s);
 }
 
 void main() {
