@@ -21,15 +21,16 @@ function music(o: { refuse?: Error } = {}) {
   const player = { src: '', paused: true, async play() { if (player.src.includes('broken')) throw new Error('unsupported'); player.paused = false; }, pause() { player.paused = true; } };
   const state = { activeSource: null as SourceButton | null };
   const modes: TransportMode[] = [];
+  const paused: boolean[] = [];
   const shown: string[] = [];
   const started: SourceButton[] = [];
   const m = new MusicSource({
     audio, player: player as unknown as HTMLMediaElement, state,
-    transport: { setMode: (mode) => { modes.push(mode); } },
+    transport: { setMode: (mode, o) => { modes.push(mode); paused.push(!!o?.paused); } },
     publish: (v) => { shown.push(v.nowText); },
     started: (s) => { started.push(s); },
   });
-  return { m, audio, player, state, modes, shown, started };
+  return { m, audio, player, state, modes, paused, shown, started };
 }
 
 describe('MusicSource', () => {
@@ -45,14 +46,16 @@ describe('MusicSource', () => {
   });
 
   it('pauses the demo beat and starts it again', async () => {
-    const { m, audio, state, shown, started } = music();
+    const { m, audio, state, shown, started, modes, paused } = music();
     await m.start('demo');
     await m.toggle();
     expect(audio.kind).toBeNull();
     expect(state.activeSource).toBe('demo');   // still the music, paused
     expect(shown.at(-1)).toBe('❚❚ Demo beat paused');
+    expect([modes.at(-1), paused.at(-1)]).toEqual(['demo', true]);   // the player shows ▶ again
     await m.toggle();
     expect(audio.kind).toBe('demo');
+    expect([modes.at(-1), paused.at(-1)]).toEqual(['demo', false]);
     expect(started).toEqual(['demo', 'demo']);
   });
 

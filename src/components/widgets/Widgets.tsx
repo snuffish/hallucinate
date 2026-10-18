@@ -1,7 +1,8 @@
 // Every control widget, laid out from the layout store: four edge docks (stacked in order) and the
-// floating widgets. Also publishes the layout to the rest of the page: `--dock-left/right/top/bottom`
-// (how far each dock reaches into the screen) and `body[data-widgets]` (whether the open overlay
-// shows widgets at all). Overlays position themselves from those only, never from a widget.
+// floating widgets, and the player bar along the bottom. Also publishes the layout to the rest of the
+// page: `--dock-left/right/top/bottom` (how far each dock reaches into the screen; the bottom one counts
+// the player bar), `--player-bar` (its height) and `body[data-widgets]` (whether the open overlay shows
+// widgets at all). Overlays position themselves from those only, never from a widget.
 
 import { useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { useApp, useLayout, useUI } from '../../app/AppContext';
@@ -11,7 +12,8 @@ import { NO_INSETS, WIDGET_IDS, ZONES, effective, zoneWidgets, type WidgetId, ty
 import type { Overlay } from '../../state/ui-state';
 import { HelpButton } from '../Help';
 import { ParamsWidget } from '../ParamOverlay';
-import { dockInsets, dropStore, zoneEls } from './drop';
+import { PlayerBar } from '../Transport';
+import { dockInsets, dropStore, playerBar, playerBarHeight, zoneEls } from './drop';
 import { EffectsBody } from './EffectsBody';
 import { ActionsBody, AudioBody, LookBody, MediaBody, SceneBody, ScreenBody, SourceBody, type PanelActions } from './sections';
 import { Widget, useNarrow } from './Widget';
@@ -42,6 +44,7 @@ export function Widgets(actions: PanelActions) {
         </div>
       ))}
       {WIDGET_IDS.filter((id) => shown.widgets[id].open && shown.widgets[id].place.kind === 'float').map(render)}
+      <PlayerBar />
       <DropPreview />
       <DockMetrics />
     </div>
@@ -140,6 +143,7 @@ function DockMetrics() {
   const overlay = useUI((ui) => ui.overlay);
   const hidden = useUI((ui) => ui.widgetsHidden);
   const started = useUI((ui) => ui.started);
+  const playerShown = useUI((ui) => ui.started && ui.transport.mode !== null);
   const layout = useLayout((l) => l);
   useLayoutEffect(() => {
     const body = document.body;
@@ -149,8 +153,10 @@ function DockMetrics() {
     const measure = () => {
       const vw = window.innerWidth, vh = window.innerHeight;
       const insets = { ...NO_INSETS };
+      const bar = hidden || hideAll ? 0 : playerBarHeight();
+      body.style.setProperty('--player-bar', `${bar}px`);
       for (const [zone, el] of zones) {
-        let reach = 0;
+        let reach = zone === 'bottom' ? bar : 0;
         if (el && started && !hidden && !hideAll && el.childElementCount > 0) {
           const r = el.getBoundingClientRect();
           if (r.width > 0 && r.height > 0) reach = ({ left: r.right, right: vw - r.left, top: r.bottom, bottom: vh - r.top } satisfies Record<Zone, number>)[zone];
@@ -167,8 +173,9 @@ function DockMetrics() {
     const later = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
     const ro = new ResizeObserver(later);
     for (const [, el] of zones) if (el) ro.observe(el);
+    if (playerBar.el) ro.observe(playerBar.el);
     window.addEventListener('resize', later);
     return () => { cancelAnimationFrame(frame); ro.disconnect(); window.removeEventListener('resize', later); };
-  }, [app, overlay, hidden, started, layout]);
+  }, [app, overlay, hidden, started, playerShown, layout]);
   return null;
 }

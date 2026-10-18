@@ -34,6 +34,7 @@ export const DOCK_WIDTH = 290;
 export const CHAT_MIN_W = 300;
 export const CHAT_MIN_H = 260;
 const AUTO: WidgetSize = { w: null, h: null };
+const AUTO_BUBBLE: BubblePlace = { kind: 'auto' };
 const clampTo = (v: number, lo: number, hi: number) => Math.round(Math.min(Math.max(v, lo), Math.max(lo, hi)));
 export const clampW = (w: number, viewport?: Size) => clampTo(w, MIN_W, (viewport?.width ?? Infinity) - 32);
 export const clampH = (h: number, viewport?: Size) => clampTo(h, MIN_H, (viewport?.height ?? Infinity) - 32);
@@ -185,7 +186,8 @@ export function effective(layout: Layout, narrow: boolean): Layout {
   if (!narrow) return layout;
   const widgets = { ...layout.widgets };
   WIDGET_IDS.forEach((id, order) => { widgets[id] = { ...widgets[id], place: dockAt('left', order), size: AUTO }; });
-  return { ...layout, widgets, bubble: { kind: 'auto' }, dockWidth: DEFAULT_LAYOUT.dockWidth, chatSize: AUTO };
+  // The same bubble object every call: the assistant selects it from the store, and a new one each time re-renders forever.
+  return { ...layout, widgets, bubble: AUTO_BUBBLE, dockWidth: DEFAULT_LAYOUT.dockWidth, chatSize: AUTO };
 }
 
 // Where the chat window opens next to a moved bubble: toward the side with more room, above or
