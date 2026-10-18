@@ -10,12 +10,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { parseReferenceList, type Clip, type Window } from './list.ts';
-import { kicksPerBeat, mean, shareAbove, tempoInRange, tempoSettles, tickGrid, type TickGrid } from './measure.ts';
+import { foldTempo, TEMPO_RANGE } from '../../src/engine/listener.ts';
+import { kicksPerBeat, mean, shareAbove, tempoSettles, tickGrid, type TickGrid } from './measure.ts';
 import { loadRecording, replay, type Heard } from './replay.ts';
 
 // The right answers (docs/reference-clips.md, issue #57).
-const BPM_TOLERANCE = 1;                    // the tempo heard, within ±1 of the BPM given by ear, folded into
-                                            // the tempo range (85–175) as the Listener hears it
+// Every check that counts beats counts them at the clip's BPM folded into the tempo range (85–175), as the
+// Listener hears it: a half-time track published at 82 is heard, and checked, as 164, its kicks and ticks too.
+const BPM_TOLERANCE = 1;                    // the tempo heard, within ±1 of the BPM given by ear
 const KICKS_PER_BEAT = [0.9, 1.1] as const; // in the drop
 const TICK_TOLERANCE_MS = 40;               // a tick this close to the beat grid is on it ...
 const TICKS_ON_GRID = 0.9;                  // ... and this many of the drop's ticks are
@@ -27,23 +29,29 @@ const SETTLE_SECONDS = 5;                   // the tempo reaches a transition's 
 
 type Check = 'bpm' | 'kicks' | 'ticks' | 'tone' | 'mood' | 'headroom' | 'forgotten' | 'transition';
 
-// The ticket that turns each check on.
-// The tempo range and forgetting are in (#63); the tempo checks still left wait on the kicks they're heard from.
-const TICKET: Record<Check, string> = { bpm: '#62', kicks: '#62', ticks: '#62', tone: '#65', mood: '#65', headroom: '#65', forgotten: '#62', transition: '#62' };
-
-// Which checks fail on today's Listener, per clip. A check listed here runs as `it.fails`: green while it
-// fails, red once it passes, which is the cue to delete it from here.
+// Which checks fail on today's Listener, per clip, and why. A check listed here runs as `it.fails`: green
+// while it fails, red once it passes, which is the cue to delete it from here. The kicks (#62), the tempo range
+// and forgetting (#63) and the Tone range (#65) have all landed; these are what they leave.
+//
 // tone: in every breakdown on the list the spectral centroid is higher than in its drop (the kick and the bass
 // leave, the pads and risers stay), and so is every other brightness measure tried (#65): no tone range can turn
 // that round. Whether the right answer or the Tone should change is open on #65.
-const EXPECTED_TO_FAIL: Record<string, Check[]> = {
-  'lazy-new-moon-to-light-breakdown': ['bpm', 'kicks', 'ticks', 'tone'],
-  'lazy-light-to-ring-of-clouds-transition': ['bpm', 'kicks', 'ticks', 'transition'],
-  'lazy-frozen-to-earthbound-ambient': ['forgotten'],
-  'closer-to-heaven-breakdown': ['tone'],
-  'deep-jungle-walk-breakdown': ['tone'],
-  'says-ambient': ['forgotten'],
+const TONE = 'the breakdown sounds brighter than the drop (#65)';
+// Light and Ring of Clouds: no kick steady enough in the drop window for the Listener to lock on; whether the
+// window and the BPM by ear are right waits on an ear check (#60).
+const NO_STEADY_KICK = 'no steady kick in the drop window, needs an ear check (#60)';
+// The ambient clips: periodic piano and arpeggio notes rise in the kick's band and are heard as kicks, so the
+// tempo is never forgotten.
+const FALSE_KICKS = 'periodic piano or arpeggio heard as kicks';
+const EXPECTED_TO_FAIL: Record<string, { checks: Check[]; why: string }[]> = {
+  'lazy-new-moon-to-light-breakdown': [{ checks: ['bpm', 'kicks', 'ticks'], why: NO_STEADY_KICK }, { checks: ['tone'], why: TONE }],
+  'lazy-light-to-ring-of-clouds-transition': [{ checks: ['bpm', 'kicks', 'ticks', 'transition'], why: NO_STEADY_KICK }],
+  'lazy-frozen-to-earthbound-ambient': [{ checks: ['forgotten'], why: FALSE_KICKS }],
+  'closer-to-heaven-breakdown': [{ checks: ['tone'], why: TONE }],
+  'deep-jungle-walk-breakdown': [{ checks: ['tone'], why: TONE }],
+  'says-ambient': [{ checks: ['forgotten'], why: FALSE_KICKS }],
 };
+const expectedFailure = (clip: string, check: Check) => EXPECTED_TO_FAIL[clip]?.find((e) => e.checks.includes(check))?.why;
 
 const list = parseReferenceList(JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'reference', 'clips.json'), 'utf8')));
 
@@ -60,18 +68,22 @@ interface Measured {
   settles?: number | null;
 }
 
+// A published BPM as the Listener hears it, folded into the tempo range.
+const inRange = foldTempo;
+
 function measure(clip: Clip, heard: Heard): Measured {
   const m: Measured = { bpm: heard.frames.at(-1)?.bpm ?? null, lastKick: heard.kicks.at(-1) ?? null, lastTick: heard.ticks.at(-1) ?? null };
-  if (clip.drop && clip.bpm) {
-    m.kicksPerBeat = kicksPerBeat(heard, clip.drop, clip.bpm);
-    m.ticks = tickGrid(heard, clip.drop, tempoInRange(clip.bpm), TICK_TOLERANCE_MS);   // the ticks run at the tempo heard
+  const bpm = clip.bpm && inRange(clip.bpm);
+  if (clip.drop && bpm) {
+    m.kicksPerBeat = kicksPerBeat(heard, clip.drop, bpm);
+    m.ticks = tickGrid(heard, clip.drop, bpm, TICK_TOLERANCE_MS);
   }
   if (clip.drop) m.atMax = { tone: shareAbove(heard, clip.drop, 'bright', AT_MAX), mood: shareAbove(heard, clip.drop, 'mood', AT_MAX) };
   if (clip.drop && clip.breakdown) {
     m.tone = [mean(heard, clip.drop, 'bright'), mean(heard, clip.breakdown, 'bright')];
     m.mood = [mean(heard, clip.drop, 'mood'), mean(heard, clip.breakdown, 'mood')];
   }
-  if (clip.type === 'transition' && clip.drop && clip.bpm) m.settles = tempoSettles(heard, tempoInRange(clip.bpm), clip.drop[0]);
+  if (clip.type === 'transition' && clip.drop && bpm) m.settles = tempoSettles(heard, bpm, clip.drop[0]);
   return m;
 }
 
@@ -79,8 +91,8 @@ const fmt = (x: number | null | undefined, digits = 2) => (x == null ? '–' : x
 const span = ([from, to]: Window) => `${from}–${to} s`;
 
 function report(clip: Clip, m: Measured): string {
-  const inRange = clip.bpm && tempoInRange(clip.bpm) !== clip.bpm ? `, in range ${tempoInRange(clip.bpm)}` : '';
-  const parts = [`bpm ${m.bpm ?? 'none'}${clip.bpm ? ` (by ear ${clip.bpm}${inRange})` : ''}`];
+  const folded = clip.bpm && inRange(clip.bpm) !== clip.bpm ? `, in range ${inRange(clip.bpm)}` : '';
+  const parts = [`bpm ${m.bpm ?? 'none'}${clip.bpm ? ` (by ear ${clip.bpm}${folded})` : ''}`];
   if (m.kicksPerBeat !== undefined) parts.push(`kicks/beat ${fmt(m.kicksPerBeat)} in drop ${span(clip.drop!)}`);
   if (m.ticks) parts.push(`ticks on grid ${Math.round(m.ticks.onGrid * 100)}% (worst ${fmt(m.ticks.worstMs, 0)} ms, ${fmt(m.ticks.ticksPerBeat)}/beat)`);
   if (m.tone) parts.push(`tone drop ${fmt(m.tone[0])} / breakdown ${fmt(m.tone[1])}`);
@@ -95,13 +107,13 @@ function report(clip: Clip, m: Measured): string {
 function checksFor(clip: Clip): [Check, string, (m: Measured) => void][] {
   const checks: [Check, string, (m: Measured) => void][] = [];
   const { bpm, drop, breakdown } = clip;
-  const heardBpm = bpm && tempoInRange(bpm);   // the published BPM, folded into the tempo range
-  if (bpm && heardBpm) checks.push(['bpm', `hears ${heardBpm} BPM (±${BPM_TOLERANCE})${heardBpm !== bpm ? `, published ${bpm}` : ''}`, (m) => {
+  const heardBpm = bpm && inRange(bpm);   // the published BPM, folded into the tempo range
+  if (bpm && heardBpm) checks.push(['bpm', `hears ${heardBpm} BPM (±${BPM_TOLERANCE}, in ${TEMPO_RANGE.join('–')})${heardBpm !== bpm ? `, published ${bpm}` : ''}`, (m) => {
     expect(m.bpm).not.toBeNull();
     expect(Math.abs(m.bpm! - heardBpm)).toBeLessThanOrEqual(BPM_TOLERANCE);
   }]);
   if (drop && bpm) {
-    checks.push(['kicks', `hears ${KICKS_PER_BEAT.join('–')} kicks per beat in the drop`, (m) => {
+    checks.push(['kicks', `hears ${KICKS_PER_BEAT.join('–')} kicks per beat at ${heardBpm} BPM in the drop`, (m) => {
       expect(m.kicksPerBeat).toBeGreaterThanOrEqual(KICKS_PER_BEAT[0]);
       expect(m.kicksPerBeat).toBeLessThanOrEqual(KICKS_PER_BEAT[1]);
     }]);
@@ -139,11 +151,11 @@ describe('the Listener on real music', () => {
   if (!list.clips.length) it.skip('has no clips on the reference list yet', () => {});
 
   it('expects failures only of clips on the list and checks they have', () => {
-    for (const [name, checks] of Object.entries(EXPECTED_TO_FAIL)) {
+    for (const [name, entries] of Object.entries(EXPECTED_TO_FAIL)) {
       const clip = list.clips.find((c) => c.name === name);
       expect(clip, `EXPECTED_TO_FAIL names "${name}", which is not on the reference list`).toBeDefined();
       const has = checksFor(clip!).map(([check]) => check);
-      for (const check of checks) expect(has, `"${name}" has no "${check}" check`).toContain(check);
+      for (const check of entries.flatMap((e) => e.checks)) expect(has, `"${name}" has no "${check}" check`).toContain(check);
     }
   });
 
@@ -158,12 +170,12 @@ describe('the Listener on real music', () => {
       });
 
       for (const [check, title, assert] of checksFor(clip)) {
-        const expectedToFail = EXPECTED_TO_FAIL[clip.name]?.includes(check);
+        const why = expectedFailure(clip.name, check), expectedToFail = why !== undefined;
         const test = !recording ? it.skip : expectedToFail ? it.fails : it;
-        test(`${title}${expectedToFail ? ` [expected to fail until ${TICKET[check]}]` : ''}${recording ? '' : ' [no recording]'}`, () => {
+        test(`${title}${expectedToFail ? ` [expected to fail: ${why}]` : ''}${recording ? '' : ' [no recording]'}`, () => {
           try { assert(measured); }
           catch (e) {
-            if (!expectedToFail) (e as Error).message += `\n(If today's Listener is known to fail this, add '${check}' to EXPECTED_TO_FAIL['${clip.name}'].)`;
+            if (!expectedToFail) (e as Error).message += `\n(If today's Listener is known to fail this, list '${check}' in EXPECTED_TO_FAIL['${clip.name}'], with why.)`;
             throw e;
           }
         });

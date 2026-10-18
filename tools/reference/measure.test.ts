@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kicksPerBeat, mean, shareAbove, tempoInRange, tempoSettles, tickGrid } from './measure.ts';
+import { kicksPerBeat, mean, shareAbove, tempoSettles, tickGrid } from './measure.ts';
 import type { Heard, HeardFrame } from './replay.ts';
 
 // A Hearing over `seconds` at 60 fps, with kicks and ticks at the given times and `at(t)` for the rest.
@@ -60,9 +60,5 @@ describe('measuring the Hearing of a clip', () => {
     expect(tempoSettles(h, 146, 0)).toBeCloseTo(23, 1);   // within ±1
     expect(tempoSettles(h, 140, 0)).toBeNull();           // it was there, but didn't stay
     expect(tempoSettles(heard(10), 140, 0)).toBeNull();   // no tempo at all
-  });
-
-  it('expects a published BPM folded into the tempo range (85–175), the way the Listener hears it', () => {
-    expect([82, 70, 40, 85, 96, 144, 174, 175, 180, 200, 360].map(tempoInRange)).toEqual([164, 140, 160, 85, 96, 144, 174, 175, 90, 100, 90]);
   });
 });

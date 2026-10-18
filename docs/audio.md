@@ -8,7 +8,7 @@
 - **SoundCloud** – search SoundCloud, or paste a track / playlist / artist link, and click a result.
   The picker opens on your *recently played* tracks (last 25; *Recent* brings the list back, *Clear history*
   forgets it), so you can replay one without searching again. Results play in order like a queue. Needs
-  [yt-dlp](https://github.com/yt-dlp/yt-dlp) installed (`sudo pacman -S yt-dlp` or `pip install yt-dlp`): the local
+  [yt-dlp](https://github.com/yt-dlp/yt-dlp) installed (from your package manager or `pip install yt-dlp`): the local
   server fetches the track into a temp cache (`$TMPDIR/hallucinate-soundcloud`) so the browser can analyse it, which
   SoundCloud's own embedded player doesn't allow. Some tracks (SoundCloud Go+ / region-locked) can't be fetched.
   For personal use; respect artists' rights.
