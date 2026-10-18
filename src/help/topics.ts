@@ -38,6 +38,7 @@ export const HELP_TOPICS = {
         ? 'Open an audio file (or drop one anywhere), use the microphone, share a tab\'s audio, or play the built-in demo beat.'
         : 'Open an audio file (or drop one anywhere), use the microphone, search SoundCloud, share a tab\'s audio, or play the built-in demo beat.',
       '"Tab / system audio" works for Spotify, YouTube or anything playing in another tab: tick "Share audio" when the browser asks.',
+      'The player is the bar along the bottom: seek, play, stop, ±10 s, loop, tempo and the volume wedge.',
       'The visuals react the same at any volume, even when muted.',
     ],
     hotkeys: ['playPause', 'seekBack', 'seekFwd', 'volumeUp', 'volumeDown', 'tempoDown', 'tempoUp', 'mute'],

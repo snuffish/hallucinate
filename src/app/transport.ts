@@ -1,4 +1,4 @@
-// The music player's logic, without its buttons: play/pause, seek, ±10 s, previous/next track,
+// The music player's logic, without its buttons: play/pause, stop, seek, ±10 s, previous/next track,
 // loop, volume and tempo over the <audio> element (tempo = playbackRate); the demo beat gets
 // play/pause, volume and tempo (its BPM). Volume and pitch mode are remembered.
 
@@ -19,6 +19,7 @@ export class Transport {
   pitchFollows: boolean;
   rate = 1;
   private hasQueue = false;
+  private demoPaused = false;   // the demo beat has no <audio> element to ask
   private readonly unlisten: (() => void)[] = [];
 
   constructor(
@@ -38,9 +39,11 @@ export class Transport {
   }
 
   // hasQueue: SoundCloud results can be stepped through; a single local file can't.
-  setMode(mode: TransportMode, { hasQueue = false } = {}): void {
+  // paused: the demo beat is stopped (the <audio> element says so for everything else).
+  setMode(mode: TransportMode, { hasQueue = false, paused = false } = {}): void {
     this.mode = mode;
     this.hasQueue = hasQueue;
+    this.demoPaused = paused;
     this.applyRate();
     this.emit();
   }
@@ -50,6 +53,12 @@ export class Transport {
   }
 
   next(): void { this.hooks.onNext(); }
+
+  stop(): void {
+    this.el.pause();
+    this.el.currentTime = 0;
+    this.emit();
+  }
 
   skip(seconds: number): void {
     if (this.mode !== 'element' || !isFinite(this.el.duration)) return;
@@ -114,7 +123,7 @@ export class Transport {
     this.publish({
       mode: this.mode,
       hasQueue: this.hasQueue,
-      playing: !el.paused,
+      playing: this.mode === 'demo' ? !this.demoPaused : !el.paused,
       currentTime: el.currentTime,
       duration: isFinite(el.duration) ? el.duration : 0,
       loop: el.loop,

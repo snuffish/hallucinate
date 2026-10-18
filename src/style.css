@@ -23,6 +23,7 @@
   --dock-right: 0px;
   --dock-top: 0px;
   --dock-bottom: 0px;
+  --player-bar: 0px;   /* the player bar's height (0 while it is hidden); the bottom dock sits on it */
 }
 
 * { box-sizing: border-box; }
@@ -94,12 +95,12 @@ body.idle { cursor: none; }
 
 .dock-zone { position: fixed; z-index: var(--z-dock); display: flex; gap: 10px; scrollbar-width: thin; }
 .dock-zone:empty { display: none; }
-.dock-zone.left, .dock-zone.right { top: 16px; flex-direction: column; width: 290px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow-y: auto; }
+.dock-zone.left, .dock-zone.right { top: 16px; flex-direction: column; width: 290px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px - var(--player-bar)); overflow-y: auto; }
 .dock-zone.left { left: 16px; }
 .dock-zone.right { right: 16px; }
 .dock-zone.top, .dock-zone.bottom { left: calc(var(--dock-left) + 16px); right: calc(var(--dock-right) + 16px); flex-direction: row; align-items: flex-start; overflow-x: auto; }
 .dock-zone.top { top: 16px; }
-.dock-zone.bottom { bottom: 16px; align-items: flex-end; }
+.dock-zone.bottom { bottom: calc(var(--player-bar) + 16px); align-items: flex-end; }
 .dock-zone.top > .widget, .dock-zone.bottom > .widget { flex: none; width: 260px; max-height: 40vh; }
 @media (max-width: 600px) { .dock-zone.left { right: 16px; width: auto; } }
 
@@ -169,45 +170,69 @@ body.idle { cursor: none; }
 .compact button { padding: 5px 9px; }
 .now { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Audio player */
-.transport { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.28); border: 1px solid var(--line); }
+/* The player bar: full width along the bottom, the seek bar on its own row (VLC style). A child of
+   #widgets, so it hides and fades with them. The docks above it keep out via --player-bar. */
+.transport {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-dock);
+  display: flex; flex-direction: column; gap: 4px; padding: 6px 14px 8px;
+  background: rgba(10, 7, 18, 0.88); backdrop-filter: blur(14px); border-top: 1px solid var(--line);
+}
 .transport[hidden] { display: none; }
 .transport.demo .tp-seek, .transport.demo .tp-file { display: none; }
 .transport svg { width: 18px; height: 18px; fill: currentColor; display: block; }
-.tp-seek { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
-.tp-seek time, .transport output { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 34px; }
-.tp-seek time:last-child, .transport output { text-align: right; }
-.tp-buttons { display: flex; align-items: center; justify-content: space-between; }
-.tp-buttons button { padding: 6px; border-radius: 50%; border-color: transparent; background: none; color: var(--text); }
-.tp-buttons button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+.tp-seek { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+.tp-seek time { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 34px; }
+.tp-seek time:last-child { text-align: right; }
+.tp-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 16px; }
+.tp-buttons, .tp-controls { display: flex; align-items: center; gap: 2px; }
+.tp-buttons button, .tp-icon { padding: 6px; border-radius: 8px; border-color: transparent; background: none; color: var(--text); }
+.tp-buttons button:hover:not(:disabled), .tp-icon:hover { background: rgba(255, 255, 255, 0.12); }
 .tp-buttons button:disabled { opacity: 0.3; cursor: default; }
-.tp-buttons .tp-small { width: 30px; }
-.tp-buttons .tp-small svg { width: 15px; height: 15px; }
 #tp-loop { color: var(--muted); }
 #tp-loop.active { color: var(--accent2); background: rgba(79, 227, 255, 0.15); }
 .tp-buttons .tp-play {
-  padding: 10px;
+  padding: 9px;
+  border-radius: 50%;
   color: #160b20;
   background: linear-gradient(135deg, var(--accent), #ffd84f);
   box-shadow: 0 0 18px rgba(255, 79, 216, 0.45);
 }
 .tp-buttons .tp-play:hover { background: linear-gradient(135deg, #ff7ae2, #ffe27a); }
-.tp-buttons .tp-play svg { width: 22px; height: 22px; }
-.transport.demo .tp-buttons { justify-content: center; }
-.tp-row { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
-.tp-icon { padding: 4px; justify-self: start; border-color: transparent; background: none; color: var(--muted); }
-.tp-icon:hover { color: var(--text); }
+.tp-buttons .tp-play svg { width: 20px; height: 20px; }
+.tp-sep { width: 1px; height: 20px; margin: 0 6px; background: var(--line); }
+.tp-title { min-width: 0; text-align: center; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-title small { margin-left: 8px; color: var(--muted); font-size: 11px; }
+.tp-controls { gap: 6px; }
 .tp-label { color: var(--muted); font-size: 11px; }
-.tp-rate-val { padding: 2px 4px; font-size: 11px; font-variant-numeric: tabular-nums; border-color: transparent; background: none; color: var(--text); }
-.tp-pitch { font-size: 12px; flex-wrap: wrap; column-gap: 8px; }
-.tp-pitch small { flex-basis: 100%; padding-left: 21px; color: var(--muted); font-size: 10.5px; }
-.tp-pitch:has(input:disabled) { opacity: 0.4; }
+#tp-rate { width: 90px; }
+.tp-rate-val { padding: 2px 6px; font-size: 11px; font-variant-numeric: tabular-nums; border-radius: 999px; }
+.tp-pitch { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; cursor: pointer; }
+.tp-pitch:has(input:checked) { color: var(--text); }
+
+/* VLC's volume wedge: fills from the left as far as --p. */
+.tp-wedge {
+  position: relative; width: 84px; height: 22px; cursor: pointer; touch-action: none;
+  clip-path: polygon(0 100%, 100% 0, 100% 100%);
+  background: linear-gradient(90deg, var(--accent), var(--accent2)) 0 / var(--p, 0%) 100% no-repeat, rgba(255, 255, 255, 0.18);
+}
+.tp-wedge:focus-visible { outline: none; filter: drop-shadow(0 0 4px var(--accent2)); }
+.tp-wedge output { position: absolute; right: 2px; bottom: 1px; font-size: 10px; font-variant-numeric: tabular-nums; color: #fff; mix-blend-mode: difference; }
+
+/* Narrow: the title goes first, then tempo and pitch; play, seek and volume stay. */
+@media (max-width: 760px) {
+  .transport { padding: 6px 10px 8px; }
+  .tp-main { grid-template-columns: 1fr auto; gap: 8px; }
+  .tp-title, .tp-label, #tp-rate, .tp-pitch, .tp-controls > .tp-sep { display: none; }
+}
+@media (max-width: 420px) { #tp-back, #tp-fwd, #tp-loop, #tp-stop, .tp-buttons .tp-sep { display: none; } }
 
 /* Filled range tracks for the player (the fill follows --p) */
 .transport input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
+  width: 100%;
   height: 4px;
+  margin: 0;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--accent), var(--accent2)) 0 / var(--p, 0%) 100% no-repeat, rgba(255, 255, 255, 0.15);
   cursor: pointer;
@@ -258,7 +283,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .toast {
   z-index: var(--z-toast);
   position: fixed;
-  bottom: 24px;
+  bottom: calc(var(--dock-bottom) + 24px);
   left: 50%;
   transform: translate(-50%, 20px);
   max-width: calc(100vw - 32px);
@@ -1142,7 +1167,7 @@ body.idle .ai-bubble:not(.open):not(.unread):not(.busy) { opacity: 0; pointer-ev
 body:not(.started) .ai { left: 18px; }
 .ai-bubble.moved { bottom: auto; }
 .ai-bubble.dragging { cursor: grabbing; transition: none; transform: scale(1.06); }
-@media (max-width: 600px) { .ai { left: 8px; bottom: 76px; width: calc(100vw - 16px); height: calc(100vh - 92px); } .ai-bubble { left: 10px; bottom: 10px; } }
+@media (max-width: 600px) { .ai { left: 8px; bottom: calc(var(--dock-bottom) + 76px); width: calc(100vw - 16px); height: calc(100vh - var(--dock-bottom) - 92px); } .ai-bubble { left: 10px; bottom: calc(var(--dock-bottom) + 10px); } }
 
 /* Studio: autopilot beat indicator */
 .st-beats { position: relative; height: 18px; margin-top: 6px; border-radius: 9px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }

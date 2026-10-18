@@ -1,4 +1,4 @@
-// The bodies of the control widgets: sources and player, media, meters, scene, look sliders,
+// The bodies of the control widgets: sources, media, meters, scene, look sliders,
 // actions. Each reads its own slice of the store; the widget frame (title, drag, dock) is `Widget`.
 
 import type { CSSProperties } from 'react';
@@ -8,7 +8,6 @@ import { HOTKEYS } from '../../hotkeys/registry';
 import { Kbd } from '../../hotkeys/Kbd';
 import { LOOK_RANGES, type LookKey, type SourceButton } from '../../state/app-state';
 import { SOURCES } from '../StartScreen';
-import { TransportPanel } from '../Transport';
 
 export interface PanelActions {
   onSource: (kind: SourceButton) => void;
@@ -48,7 +47,6 @@ export function SourceBody({ onSource }: { onSource: (kind: SourceButton) => voi
         {SOURCES.map((s) => <button key={s.kind} data-source={s.kind} className={active === s.kind ? 'active' : undefined} onClick={() => onSource(s.kind)}>{s.short}</button>)}
       </div>
       <div id="now" className="now">{now}</div>
-      <TransportPanel />
     </>
   );
 }
