@@ -27,7 +27,7 @@ what holds it back.
 
 | Setting | What it does | Default |
 | --- | --- | --- |
-| Smoothing | How much the analysis averages the sound over time: higher is calmer, lower follows every transient. Live. | 0.60 |
+| Smoothing | How much the bands and the spectrum average the sound over time: higher is calmer, lower follows every transient. Kicks and the tempo are heard the same at any setting. Live. | 0.60 |
 | Echo cancellation, Noise suppression, Automatic gain | The browser's voice processing for the microphone / line-in. Off, because it ducks and gates music; turn them on for a laptop mic in a noisy room. They apply when the microphone starts: with the mic on, *Restart the microphone* applies them now. | Off |
 | Use the video's sound as the music | The same switch as in the YouTube picker. | Off |
 
