@@ -24,16 +24,18 @@ What the music sounds like right now: its bands, kicks, ticks, tempo, tone, ener
 _Avoid_: features, audio state
 
 **Kick**:
-A clear bass hit heard in the music. Kicks jump the hue, as far as colour cycling allows, and count towards auto-switch.
+A clear bass hit heard in the music, on the beat: the bass notes of a rolling bassline between the kicks are not kicks. Kicks jump the hue, as far as colour cycling allows, and count towards auto-switch.
 _Avoid_: beat, onset
 
 **Tick**:
-One beat of the steady tempo clock: it runs at the tempo, re-anchors on each kick and keeps going through breakdowns.
-Ticks drive the studio's autopilot and the director, and only come while the music is playing.
+One beat of the steady tempo clock: it runs at the tempo, re-anchors on each kick and keeps going through breakdowns,
+but not through long passages without kicks. Ticks drive the studio's autopilot and the director, and only come while
+the music is playing.
 _Avoid_: beat, tempo beat
 
 **Tempo**:
-The music's beats per minute, heard from the gaps between kicks and held until the next music starts.
+The music's beats per minute, heard from the gaps between kicks: held through breakdowns, and forgotten when the next
+music starts or the music has gone a long while without kicks.
 _Avoid_: BPM estimate
 
 **Tone**:
@@ -46,7 +48,8 @@ How loud the music is, steadily, over the last few seconds.
 _Avoid_: level, loudness, volume
 
 **Mood**:
-How energetic the music feels, from calm to energetic: mostly its tempo, partly its energy.
+How energetic the music feels, from calm to energetic: its tempo sets where a track sits, its energy moves it from
+moment to moment.
 _Avoid_: vibe
 
 ## The picture

@@ -5,19 +5,35 @@
 //
 //   listener.hear(audio.read(), music.playing, dt, now)   once a frame, on real time (seconds)
 //   listener.reset()                                      a new source: the tempo starts over
+//                                                         (as it does by itself after ~90 s without kicks)
+//   listener.setSmoothing(prefs.audioSmoothing)           how calm the bands and the spectrum texture look
 
 import { TempoClock } from '../state/tempo-clock';
+import { KickHearer } from './kick-hearer';
 
 const BANDS = { bass: [25, 140], mid: [140, 2000], high: [2000, 12000] } as const;
 const BAND_KEYS = ['bass', 'mid', 'high', 'level'] as const;
-const MIN_KICK_GAP = 0.28;     // seconds, caps detection at ~214 BPM
 const KICK_WINDOW = 12;        // the last kicks the tempo is estimated from
 const KICK_MIN = 5;            // ... and how many it takes
-const BRIGHT_LOW_HZ = 1100;    // spectral centroid that counts as fully "dark" (piano/ambient ≈ 1.3 kHz)
-const BRIGHT_HIGH_HZ = 5500;   // ... and fully "bright" (hi-hat heavy house ≈ 5.3 kHz, psytrance ≈ 4.1 kHz)
+const TEMPO_AGREE = 0.1;       // the gaps within this part of the median gap make the tempo
+// The tone range, set from the spectral centroids of the reference clips: the darkest music (melodic techno
+// ≈ 1.0 kHz, piano ≈ 1.4 kHz) sits at the dark end, and the brightest (Closer to Heaven ≈ 4.1–4.3 kHz, up to
+// ≈ 5.5 kHz) well short of the bright end, so bright psytrance keeps moving instead of pinning at fully bright.
+const BRIGHT_LOW_HZ = 1000;    // spectral centroid that counts as fully "dark"
+const BRIGHT_HIGH_HZ = 8000;   // ... and fully "bright": three octaves up
 const TONE_SECONDS = 2.5;      // the tone follows the character of the track, not single hits
-const MOOD_SECONDS = 4;        // the mood follows the stretch of the set; the tone relaxes at this pace too
+const MOOD_SECONDS = 2;        // the mood follows the energy of the moment (itself heard over a few seconds) ...
+const TRACK_SECONDS = 10;      // ... and the tempo of the track, which a brief misheard tempo hardly moves
+const NEUTRAL_SECONDS = 4;     // nothing plays: the mood and the tone relax to neutral at this pace
 const CALM_BPM = 80, ENERGETIC_BPM = 160;
+// The energy: the level of the bands over the last few seconds, from 0 at QUIET (ambient without kicks, ≈ 0.42) to
+// 1 at LOUD (the loudest psytrance drop, ≈ 0.77–0.80). Breakdowns measured 0.29–0.65, drops 0.62–0.77.
+const QUIET_LEVEL = 0.45, LOUD_LEVEL = 0.8;
+// The mood: the tempo sets where a track sits, the energy moves it from moment to moment. Over half is the
+// tempo, so a forgotten tempo still lifts it halfway; the rest is enough to take a breakdown down by ~0.15.
+const MOOD_TEMPO = 0.55, MOOD_ENERGY = 1 - MOOD_TEMPO;
+export const TEMPO_RANGE = [85, 175] as const;   // BPM: a half or double reading is folded into it
+const FORGET_SECONDS = 90;     // playing this long without a kick (longer than any breakdown) forgets the tempo
 
 // One frame of the analyser (AudioEngine.read): the dB-scaled byte spectrum and the byte waveform.
 export interface Bins {
@@ -43,7 +59,7 @@ export interface Hearing {
   bright: number;    // the tone: 0 dark, muffled … 1 bright, crisp (log of the spectral centroid)
   centroid: number;  // Hz, smoothed like the tone
   energy: number;    // 0..1 how loud the music is, steadily (absolute, over seconds)
-  mood: number;      // 0 calm … 1 energetic: the tempo, and some energy
+  mood: number;      // 0 calm … 1 energetic: the tempo sets where a track sits, the energy moves it
 }
 
 type Bands = Record<(typeof BAND_KEYS)[number], number>;
@@ -57,12 +73,17 @@ export class Listener {
   private readonly tempo = new TempoClock();
   private readonly avg: Bands = { bass: 0.3, mid: 0.3, high: 0.3, level: 0.3 };
   private readonly raw: Bands = { bass: 0, mid: 0, high: 0, level: 0 };   // reused every frame
-  private kickAvg = 0.3;
-  private kickArmed = true;
-  private lastKick = -1e9;
-  private kicks: number[] = [];
+  private readonly kickHearer = new KickHearer();
+  private readonly kicks = new Float64Array(KICK_WINDOW);   // when the last kicks were heard, oldest first ...
+  private kickCount = 0;                                     // ... and how many there are
+  private readonly gaps = new Float64Array(KICK_WINDOW - 1); // scratch for hearTempo
+  private sinceKick = 0;   // seconds played since the last kick
+  private trackMood = 0.5; // the tempo's part of the mood, 0 calm … 1 energetic, eased over the track
   private amplitude = new Float32Array(256);   // byte -> linear amplitude, for the analyser's dB range
   private dbRange = '';
+  private smoothing = 0.6;   // Settings → Audio (src/state/prefs.ts)
+  private magnitude = new Float32Array(0);   // per bin, the smoothed linear magnitude
+  private smoothed = new Uint8Array(0);      // ... back on the byte scale
 
   hear(bins: Bins | null, playing: boolean, dt: number, now: number): Readonly<Hearing> {
     const h = this.hearing;
@@ -74,19 +95,35 @@ export class Listener {
       this.spectrum.fill(0);
       for (let i = 0; i < 256; i++) this.spectrum[i * 2 + 1] = 128;
     }
+    this.sinceKick = h.kick ? 0 : this.sinceKick + (playing ? dt : 0);
+    if (this.sinceKick > FORGET_SECONDS && h.bpm !== null) this.reset();   // a long passage without kicks
     const ticked = h.kick && playing && this.tempo.onDetectedBeat(now);
     h.tick = playing && (this.tempo.advance(now) > 0 || ticked);
     if (playing) h.tickPhase = this.tempo.phase(now);
     if (h.tick) h.ticks++;
-    h.energy = clamp01((this.avg.level - 0.15) / 0.4);
-    const tempo = h.bpm ? clamp01((h.bpm - CALM_BPM) / (ENERGETIC_BPM - CALM_BPM)) : 0.5;
-    h.mood += ((playing ? tempo * 0.65 + h.energy * 0.35 : 0.5) - h.mood) * ease(dt, MOOD_SECONDS);
-    if (!playing) h.bright += (0.5 - h.bright) * ease(dt, MOOD_SECONDS);   // nothing plays: the grade goes neutral
+    h.energy = clamp01((this.avg.level - QUIET_LEVEL) / (LOUD_LEVEL - QUIET_LEVEL));
+    if (playing) {
+      const tempo = h.bpm ? clamp01((h.bpm - CALM_BPM) / (ENERGETIC_BPM - CALM_BPM)) : 0.5;
+      this.trackMood += (tempo - this.trackMood) * ease(dt, TRACK_SECONDS);
+      h.mood += (this.trackMood * MOOD_TEMPO + h.energy * MOOD_ENERGY - h.mood) * ease(dt, MOOD_SECONDS);
+    } else {   // nothing plays: the grade goes neutral
+      h.mood += (0.5 - h.mood) * ease(dt, NEUTRAL_SECONDS);
+      h.bright += (0.5 - h.bright) * ease(dt, NEUTRAL_SECONDS);
+    }
     return h;
   }
 
+  // How much each spectrum frame is averaged with the previous ones, for the bands and the spectrum
+  // texture: higher is calmer, lower twitchier. Kicks are heard in the unsmoothed bins.
+  setSmoothing(value: number): void {
+    this.smoothing = value;
+  }
+
+  // Forgets the tempo: the ticks stop and the mood lets it go, until enough kicks come to hear it again.
   reset(): void {
-    this.kicks = [];
+    this.kickCount = 0;
+    this.kickHearer.reset();
+    this.sinceKick = 0;
     this.hearing.bpm = null;
     this.tempo.reset();
   }
@@ -94,10 +131,11 @@ export class Listener {
   private listen(bins: Bins, dt: number, now: number): void {
     const h = this.hearing, raw = this.raw;
     const binHz = bins.sampleRate / (bins.freq.length * 2);
-    raw.bass = band(bins.freq, binHz, BANDS.bass);
-    raw.mid = band(bins.freq, binHz, BANDS.mid);
-    raw.high = band(bins.freq, binHz, BANDS.high);
-    raw.level = raw.bass * 0.5 + raw.mid * 0.35 + raw.high * 0.15;
+    const freq = this.smooth(bins);
+    raw.bass = band(freq, binHz, BANDS.bass);
+    raw.mid = band(freq, binHz, BANDS.mid);
+    raw.high = band(freq, binHz, BANDS.high);
+    raw.level = levelOf(raw.bass, raw.mid, raw.high);
 
     // Adaptive normalisation: compare against a slow running average so quiet and loud
     // tracks both drive the visuals, while keeping some absolute loudness in the mix.
@@ -112,30 +150,61 @@ export class Listener {
       h[k] += (target - h[k]) * (target > h[k] ? attack : release);
     }
 
-    this.hearTone(bins, binHz, dt, raw.level);
+    // The tone and the kicks are heard in the unsmoothed bins: the Smoothing setting only shapes the look.
+    const level = levelOf(band(bins.freq, binHz, BANDS.bass), band(bins.freq, binHz, BANDS.mid), band(bins.freq, binHz, BANDS.high));
+    this.hearTone(bins, binHz, dt, level);
 
-    // A kick: bass rising clearly above its ~1 s average, with hysteresis.
-    this.kickAvg += (raw.bass - this.kickAvg) * ease(dt, 1);
-    if (raw.bass < this.kickAvg) this.kickArmed = true;
-    if (this.kickArmed && raw.bass > this.kickAvg * 1.12 + 0.02 && raw.bass > 0.15 && now - this.lastKick > MIN_KICK_GAP) {
-      this.kickArmed = false;
-      this.lastKick = now;
+    // A kick: a sudden rise in the low end, landing where the kicks before it say the next is due (see KickHearer).
+    if (this.kickHearer.hear(bins.freq, binHz, now)) {
       h.beat = 1;
       h.kick = true;
       this.hearTempo(now);
     }
 
-    this.fillSpectrum(bins, binHz);
+    this.fillSpectrum(freq, bins.time, binHz);
   }
 
-  // The tempo: the median gap between the last kicks, held once known (a breakdown keeps it).
+  // The bins smoothed the way the analyser smooths them: each bin's linear magnitude averaged with the
+  // previous frames' by the Smoothing setting, then back to the analyser's dB byte scale. What the bands
+  // and the spectrum texture read.
+  private smooth(bins: Bins): Uint8Array {
+    const { freq, minDecibels: lo, maxDecibels: hi } = bins;
+    const amplitude = this.amplitudes(bins);
+    if (this.magnitude.length !== freq.length) {
+      this.magnitude = new Float32Array(freq.length);
+      this.smoothed = new Uint8Array(freq.length);
+    }
+    const m = this.magnitude, out = this.smoothed, k = this.smoothing, scale = 255 / (hi - lo);
+    for (let i = 0; i < freq.length; i++) {
+      m[i] = k * m[i]! + (1 - k) * amplitude[freq[i]!]!;
+      const db = m[i]! > 0 ? 20 * Math.log10(m[i]!) : -Infinity;
+      out[i] = Math.min(255, Math.max(0, Math.floor(scale * (db - lo) + 1e-6)));
+    }
+    return out;
+  }
+
+  // The tempo: the median gap between the last kicks (averaged with the gaps close to it), folded into the
+  // tempo range, held once known (a breakdown keeps it).
   private hearTempo(now: number): void {
     const kicks = this.kicks;
-    kicks.push(now);
-    if (kicks.length > KICK_WINDOW) kicks.shift();
-    if (kicks.length < KICK_MIN) return;
-    const gaps = kicks.slice(1).map((t, i) => t - kicks[i]!).sort((a, b) => a - b);
-    const bpm = Math.round(60 / gaps[Math.floor(gaps.length / 2)]!);
+    if (this.kickCount === KICK_WINDOW) kicks.copyWithin(0, 1);
+    else this.kickCount++;
+    kicks[this.kickCount - 1] = now;
+    if (this.kickCount < KICK_MIN) return;
+    const gaps = this.gaps, count = this.kickCount - 1;
+    for (let i = 0; i < count; i++) {   // the gaps between them, sorted as they go in
+      const g = kicks[i + 1]! - kicks[i]!;
+      let j = i;
+      for (; j > 0 && gaps[j - 1]! > g; j--) gaps[j] = gaps[j - 1]!;
+      gaps[j] = g;
+    }
+    const median = gaps[Math.floor(count / 2)]!;
+    let sum = 0, agreeing = 0;
+    for (let i = 0; i < count; i++) {   // a missed or extra kick is left out
+      if (Math.abs(gaps[i]! - median) <= median * TEMPO_AGREE) { sum += gaps[i]!; agreeing++; }
+    }
+    const gap = sum / agreeing;   // ... and frame timing averages out
+    const bpm = foldTempo(Math.round(60 / gap));
     this.hearing.bpm = bpm;
     this.tempo.setBpm(bpm);
   }
@@ -173,8 +242,7 @@ export class Listener {
   }
 
   // Log-frequency spectrum (23 Hz .. 16 kHz) + downsampled waveform for the shaders.
-  private fillSpectrum(bins: Bins, binHz: number): void {
-    const { freq, time } = bins;
+  private fillSpectrum(freq: Uint8Array, time: Uint8Array, binHz: number): void {
     const minBin = 1;
     const maxBin = Math.min(freq.length - 2, Math.floor(16000 / binHz));
     const step = time.length / 256;
@@ -188,6 +256,17 @@ export class Listener {
     }
   }
 }
+
+// A tempo halved or doubled until it lies in the tempo range: 72 (half-time) reads 144, 180 reads 90.
+export function foldTempo(bpm: number): number {
+  const [lo, hi] = TEMPO_RANGE;
+  while (bpm > hi) bpm = Math.round(bpm / 2);
+  while (bpm < lo) bpm *= 2;
+  return bpm;
+}
+
+// The three bands together, the bass counting most.
+const levelOf = (bass: number, mid: number, high: number) => bass * 0.5 + mid * 0.35 + high * 0.15;
 
 // A band's mean byte level, 0..1.
 function band(freq: Uint8Array, binHz: number, [lo, hi]: readonly [number, number]): number {

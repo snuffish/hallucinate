@@ -20,7 +20,6 @@ export class AudioEngine {
   private output: GainNode | null = null;
   private volume = 1;
   private demoRate = 1;
-  private smoothing = 0.6;   // Settings → Audio (src/state/prefs.ts)
   private bins: (Bins & { freq: Uint8Array<ArrayBuffer>; time: Uint8Array<ArrayBuffer> }) | null = null;
 
   init(): void {
@@ -29,7 +28,7 @@ export class AudioEngine {
     this.ctx = ctx;
     this.analyser = ctx.createAnalyser();
     this.analyser.fftSize = 2048;
-    this.analyser.smoothingTimeConstant = this.smoothing;
+    this.analyser.smoothingTimeConstant = 0;   // unsmoothed: the Listener smooths what it shows (Settings → Audio)
     const { frequencyBinCount, fftSize, minDecibels, maxDecibels } = this.analyser;
     this.bins = { freq: new Uint8Array(frequencyBinCount), time: new Uint8Array(fftSize), sampleRate: ctx.sampleRate, minDecibels, maxDecibels };
     this.recordDest = ctx.createMediaStreamDestination();
@@ -42,14 +41,6 @@ export class AudioEngine {
   setVolume(v: number): void {
     this.volume = v;
     if (this.output && this.ctx) this.output.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02);
-  }
-
-  // How much each spectrum frame is averaged with the previous ones: higher is calmer, lower twitchier.
-  // The Listener hears kicks in the same bins, so a calmer setting also blunts them (known; a second,
-  // unsmoothed analyser for kicks would change how they are detected and needs tuning by ear).
-  setSmoothing(value: number): void {
-    this.smoothing = value;
-    if (this.analyser) this.analyser.smoothingTimeConstant = value;
   }
 
   // Tempo of the demo loop (files use playbackRate instead).
