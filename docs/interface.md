@@ -9,7 +9,8 @@
 The controls are separate widgets: Hallucinate, Source, Media, Audio, Scene, Look, Effects, Actions, Screen and
 Parameters (Screen chooses what the main screen shows; see [Studio](studio.md)). Drag one by
 its title bar onto an edge of the screen to dock it there (a preview shows where it lands, and you can reorder a dock), or
-drop it anywhere else to float it. Floating widgets resize by their corner, docked ones by their bottom edge, and a
+drop it anywhere else to float it. The [audio player](audio.md#-audio-player) runs along the bottom of the screen
+and the bottom dock sits on top of it. Floating widgets resize by their corner, docked ones by their bottom edge, and a
 dock's inner edge sets its width. Double-click a title bar to put that widget back where it started. The assistant
 bubble can be dragged anywhere too, and the chat opens beside it.
 

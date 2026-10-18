@@ -20,11 +20,16 @@
 
 ## ⏯ Audio player
 
-Files and SoundCloud tracks get a player in the panel: seek bar, play/pause, ±10 s, previous / next track
-(SoundCloud results act as the queue; ⏮ restarts the track after 3 s), loop, volume and mute, and **tempo**
-from 0.5× to 2× (click the value or double-click the slider to reset). By default tempo keeps the pitch;
-tick *Pitch follows tempo* for a vinyl / nightcore effect. The demo beat gets play/pause, volume and tempo (its BPM).
-Volume is applied after the analyser, so the visuals react the same at any listening volume, even when muted.
+The player is a bar along the bottom of the screen, like Media Player's: a thin seek line runs along its top edge,
+what's playing is on the left, and in the middle a round play button sits between loop, stop, −10 s and previous
+track on one side and next track and +10 s on the other (SoundCloud results act as the queue; ⏮ restarts the track
+after 3 s). The time, mute and volume are on the right. The **tempo** chip (1.00×) opens tempo from 0.5× to 2×
+(click the value or double-click the slider to reset) and *Pitch follows tempo*: by default tempo keeps the pitch,
+and ticking it makes the pitch follow for a vinyl / nightcore effect. The demo beat gets play/pause, volume and tempo
+(its BPM). The bar shows while there is something to control
+(not for the mic or tab audio), hides with the other controls (H, or after a few seconds idle), and docked widgets,
+the assistant and toasts keep above it. Volume is applied after the analyser, so the visuals react the same at any
+listening volume, even when muted.
 
 ## 🌈 Synesthesia (sound ↔ light mapping)
 

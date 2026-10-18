@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — the player bar (2026-10-18)
+
+### Changed
+
+- The audio player moved out of the Source widget into a **bar along the bottom of the screen**, Media Player style:
+  a thin seek line along its top edge, what's playing on the left, a round play button in the middle between loop,
+  stop, ±10 s and previous / next, and the time, mute and volume on the right. Tempo and *Pitch follows tempo* moved
+  into a popover off the tempo chip. It shows while there is something to control, hides with the controls (H, idle),
+  and the bottom dock, floating widgets, the assistant, toasts and drop previews keep above it. On a phone it keeps
+  play, previous / next, seek, tempo and volume.
+
+### Added
+
+- A **Stop** button in the player: pauses and goes back to the start.
+
+### Fixed
+
+- The demo beat's play button showed ▶ while it played; it now shows ❚❚ and turns back to ▶ when paused.
+- The controls crashed ("Maximum update depth exceeded") on windows 600 px wide or narrower.
+
 ## Unreleased — effects (2026-10-17)
 
 ### Added
