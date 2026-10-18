@@ -43,8 +43,10 @@ projector.
 The autopilot steps through the show every 16 / 32 / 64 / 128 beats (random auto-switch pauses while it's on). A bar
 under it counts the beats gone and left until the next take.
 
-These beats come from a tempo clock: it takes its speed from the BPM detected on the kick drum, re-anchors on every
-real kick, and keeps counting through breakdowns and silence, so the show moves on even when the bass stops.
+These beats come from a tempo clock: it takes its speed from the BPM detected on the kick drum (always 85–175),
+re-anchors on every real kick, and keeps counting through breakdowns and silence, so the show moves on even when the
+bass stops. After 90 s of music without kicks (an ambient passage, longer than any breakdown) the tempo is forgotten
+and the beats stop until the kicks come back.
 (Everything else that reacts "on the beat", the `uBeat` uniform and auto-switch, follows the detected kicks
 themselves.)
 

@@ -10,6 +10,50 @@
   winding out from the centre. Each passes the laser-show checklist (ADR 0001): black edges in silence and a
   strobe-safe kick and tick, at the default and the strongest Look.
 
+## Unreleased — the assistant's prompt catches up (2026-10-18)
+
+### Changed
+
+- The assistant is told the built-in set is a laser show and how to keep what it makes strobe-safe: black edges in
+  silence, no kick or tick that brightens more than about a quarter of the frame, and the Look inside the ranges
+  Randomize uses (taken from `RANDOM_RANGES`, so they can't drift).
+- It knows effects reshape the picture and belong to show scenes, and that it can't set them yet, so it points to the
+  Effects widget instead of faking a mirror in GLSL.
+- Plans: while the tempo is known, `set_autopilot_plan` raises a step's `maxSeconds` to fit its beats (with a quarter
+  to spare) and says so, so a 256-beat step at 128 BPM is no longer cut at the 90-second default.
+- It names the scene it means once auto-switch may have moved the screen, and knows that while Live is pinned the
+  Look, scene and parameter tools change the main screen, not Live. When the scene on screen changed since its last
+  reply, the next message starts with a note saying which scene is on screen now.
+- `get_app_state` also reports the playing scene's description, auto-switch, Drift and drift speed, the main screen's
+  effects, whether Live is pinned and what the screen shows then, and the live levels while music plays; `get_show`
+  reports each show scene's effects.
+- Director cycles no longer ask for a FOLLOW-UPS line, and the prompt uses the glossary's *kick*, *tick* and *tone*.
+
+### Added
+
+- Two assistant tools: `find_scenes` searches the library by name, category or description, and `get_help` reads the
+  app's help topics with their shortcuts.
+
+## Unreleased — the player bar (2026-10-18)
+
+### Changed
+
+- The audio player moved out of the Source widget into a **bar along the bottom of the screen**, Media Player style:
+  a thin seek line along its top edge, what's playing on the left, a round play button in the middle between loop,
+  stop, ±10 s and previous / next, and the time, mute and volume on the right. Tempo and *Pitch follows tempo* moved
+  into a popover off the tempo chip. It shows while there is something to control, hides with the controls (H, idle),
+  and the bottom dock, floating widgets, the assistant, toasts and drop previews keep above it. On a phone it keeps
+  play, previous / next, seek, tempo and volume.
+
+### Added
+
+- A **Stop** button in the player: pauses and goes back to the start.
+
+### Fixed
+
+- The demo beat's play button showed ▶ while it played; it now shows ❚❚ and turns back to ▶ when paused.
+- The controls crashed ("Maximum update depth exceeded") on windows 600 px wide or narrower.
+
 ## Unreleased — effects (2026-10-17)
 
 ### Added

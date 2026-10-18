@@ -24,6 +24,10 @@ export function setDropTarget(target: DropTarget | null): void {
 
 // The mounted dock zone elements (registered by their ref callbacks in Widgets).
 export const zoneEls: Partial<Record<Zone, HTMLElement>> = {};
+
+// The player bar along the bottom (registered by its ref): the docks and drops stay above it.
+export const playerBar: { el: HTMLElement | null } = { el: null };
+export const playerBarHeight = (): number => playerBar.el?.offsetHeight ?? 0;
 const zoneEl = (zone: Zone) => zoneEls[zone] ?? null;
 
 // Live resizing of a side dock (the committed width comes back through the layout store).
@@ -49,7 +53,7 @@ function snapshot(dragged: WidgetId): Record<Zone, DockView> {
 }
 
 export function dropTargetAt(x: number, y: number, dragged: WidgetId, widths: Record<SideZone, number>): DropTarget {
-  return dropTarget(x, y, snapshot(dragged), { width: window.innerWidth, height: window.innerHeight }, widths);
+  return dropTarget(x, y, snapshot(dragged), { width: window.innerWidth, height: window.innerHeight - playerBarHeight() }, widths);
 }
 
 export function rectOf(el: HTMLElement): Rect {

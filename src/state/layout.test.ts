@@ -97,6 +97,7 @@ describe('layout', () => {
     const narrow = effective(l, true);
     expect(zoneWidgets(narrow, 'left')).toEqual([...WIDGET_IDS]);
     expect(narrow.bubble).toEqual({ kind: 'auto' });
+    expect(effective(l, true).bubble).toBe(narrow.bubble);   // selected from the store: a new object each time loops
     expect(effective(l, false)).toBe(l);
   });
 

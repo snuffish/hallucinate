@@ -122,6 +122,16 @@ of `effectsCost` calls on one page without rests drifted the same way at every s
 several-fold within minutes, so compare numbers from a rested run only. Under SwiftShader the four at their strongest add
 about 80 ms a frame to 31 ms at 640×360.
 
+## What hearing the kicks costs
+
+The kicks are heard against the pulse of the low end's rises over the last 6 s (600 cells of 10 ms), read four
+times a second: an autocorrelation at every lag from 0.3 s out to three pulses (about 450 lags over up to 600 cells,
+~170 000 multiply-adds), then a comb over every phase of the pulse. Replaying three reference clips (230 s at
+60 fps, `Listener.hear` on Node 22, Ryzen 7 3700X, 2026-10-18), a reading took 0.19 ms (median; p95 0.34 ms,
+the first few up to 6 ms before the JIT warms up), about 0.9 ms a second, a quarter of all the Listener's time;
+a frame's `hear` took 0.05 ms (median; p95 0.24 ms, a frame with a reading). Well inside a frame on a desktop;
+on a slow machine the readings are the spikes to look at first (fewer lags, or a coarser cell, would cut them).
+
 ## Before → after
 
 | Scenario | Metric | Before (vanilla JS) | After (React port) |
@@ -155,7 +165,10 @@ Raw results: `perf/results/baseline.json` (old app) and `perf/results/after-port
 - **Coalesced persistence** (`src/state/persistence.ts`, `debouncedWriter`): parameter and graph writes are
   batched and flushed on `visibilitychange` / `pagehide`.
 - **No per-frame allocation in the pipeline**: the frame state, uniform sets and the media uniforms are reused
-  objects.
+  objects. The Listener too: its kick hearing (`src/engine/kick-hearer.ts`) keeps the kick's bins of the last
+  frames, the rises, the autocorrelation and its scratch in buffers made once (again only if the analyser's size
+  changes), and the last kick and the frame being judged in reused records; the tempo sorts the kick gaps in a
+  reused array.
 - **Studio monitors reuse their state** (2026-10-15): the Preview monitor and the pinned Live slot refill reused
   frame states through the same `applyLook` as the main output, and cache each show scene's uniforms, so they no
   longer allocate every frame. Slider drags on a show scene are coalesced like the other parameter writes.

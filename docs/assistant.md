@@ -10,12 +10,15 @@ right in the app, while everything else stays where it is. It:
 - reads a scene's code, edits it in place or rewrites it (and sees its own compile errors), and creates new scenes in
   your library;
 - sets live parameters and the look sliders, switches scenes, and looks at a rendered frame to check its work;
+- searches the library by description to pick a scene that fits ("a calm one with rings"), reads the app's own help to
+  answer how something works, and sees the main screen's effects, the Look's switches and the live levels of the music;
 - runs the [studio](studio.md): it adds, changes, reorders and removes show scenes, sets the transition and the
   autopilot, writes a plan for the autopilot and takes show scenes live ("build a show from the Space scenes and plan an
   hour", "swap the next two scenes", "longer fades").
 
 Every change shows up live. **Undo** in the panel reverts the assistant's newest change (edits, new scenes, parameters,
-look, show), and Claude is told with your next message; built-in scenes can also be reverted to their original in the
+look, show), and Claude is told with your next message, as it is when the scene on screen changed since its last
+reply (auto-switch, or you); built-in scenes can also be reverted to their original in the
 [code editor](editor.md). **Stop** interrupts it. After each reply the assistant suggests three things you could ask
 next, as buttons under the reply, like the examples on an empty chat.
 
@@ -56,7 +59,7 @@ In the [desktop app](desktop.md) you can also paste the key into **Settings → 
 with your system's keychain, kept in the app's profile and never shown again.
 
 On the subscription backend Claude Code runs with **no built-in tools, none of your settings and a throw-away working
-directory**: it can only use this app's tools (nine for scenes, nine for the studio).
+directory**: it can only use this app's tools (eleven for scenes and the app, nine for the studio).
 
 ## Settings and environment variables
 

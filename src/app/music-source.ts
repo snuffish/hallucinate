@@ -87,7 +87,7 @@ export class MusicSource {
       audio.detach();
       this.demoPaused = true;
       this.d.publish({ nowText: '❚❚ Demo beat paused', activeSource: this.active });
-      this.d.transport.setMode('demo');
+      this.d.transport.setMode('demo', { paused: true });
     } else if (!audio.kind && this.demoPaused) {
       await this.start('demo');
     }

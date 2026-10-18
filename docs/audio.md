@@ -8,7 +8,7 @@
 - **SoundCloud** – search SoundCloud, or paste a track / playlist / artist link, and click a result.
   The picker opens on your *recently played* tracks (last 25; *Recent* brings the list back, *Clear history*
   forgets it), so you can replay one without searching again. Results play in order like a queue. Needs
-  [yt-dlp](https://github.com/yt-dlp/yt-dlp) installed (`sudo pacman -S yt-dlp` or `pip install yt-dlp`): the local
+  [yt-dlp](https://github.com/yt-dlp/yt-dlp) installed (from your package manager or `pip install yt-dlp`): the local
   server fetches the track into a temp cache (`$TMPDIR/hallucinate-soundcloud`) so the browser can analyse it, which
   SoundCloud's own embedded player doesn't allow. Some tracks (SoundCloud Go+ / region-locked) can't be fetched.
   For personal use; respect artists' rights.
@@ -20,11 +20,16 @@
 
 ## ⏯ Audio player
 
-Files and SoundCloud tracks get a player in the panel: seek bar, play/pause, ±10 s, previous / next track
-(SoundCloud results act as the queue; ⏮ restarts the track after 3 s), loop, volume and mute, and **tempo**
-from 0.5× to 2× (click the value or double-click the slider to reset). By default tempo keeps the pitch;
-tick *Pitch follows tempo* for a vinyl / nightcore effect. The demo beat gets play/pause, volume and tempo (its BPM).
-Volume is applied after the analyser, so the visuals react the same at any listening volume, even when muted.
+The player is a bar along the bottom of the screen, like Media Player's: a thin seek line runs along its top edge,
+what's playing is on the left, and in the middle a round play button sits between loop, stop, −10 s and previous
+track on one side and next track and +10 s on the other (SoundCloud results act as the queue; ⏮ restarts the track
+after 3 s). The time, mute and volume are on the right. The **tempo** chip (1.00×) opens tempo from 0.5× to 2×
+(click the value or double-click the slider to reset) and *Pitch follows tempo*: by default tempo keeps the pitch,
+and ticking it makes the pitch follow for a vinyl / nightcore effect. The demo beat gets play/pause, volume and tempo
+(its BPM). The bar shows while there is something to control
+(not for the mic or tab audio), hides with the other controls (H, or after a few seconds idle), and docked widgets,
+the assistant and toasts keep above it. Volume is applied after the analyser, so the visuals react the same at any
+listening volume, even when muted.
 
 ## 🌈 Synesthesia (sound ↔ light mapping)
 
@@ -33,10 +38,19 @@ Volume is applied after the analyser, so the visuals react the same at any liste
 Based on crossmodal-correspondence research (people reliably pair loud ↔ bright, high/bright timbre ↔ light and
 warm, low/muffled ↔ dark and cool, fast/energetic music ↔ saturated warm colours).
 
-- **Tone** – the spectral centroid (loudness-weighted average frequency) mapped from ~1.1 kHz (dark: piano,
-  ambient) to ~5.5 kHz (bright: hi-hat-heavy house, psytrance) and smoothed over a few seconds. Shown in the panel.
-- **Mood** – tempo (80 → 160 BPM) plus how loud the music is over the last few seconds, smoothed over ~4 s more.
-  When nothing plays, mood and tone both drift back to neutral.
+- **Tone** – the spectral centroid (loudness-weighted average frequency) mapped log-wise from ~1 kHz (dark: melodic
+  techno, piano) to ~8 kHz (bright) and smoothed over a few seconds. The range comes from the reference clips: even
+  the brightest psytrance (~4–5.5 kHz) sits around two thirds of the way up, so it keeps moving instead of sitting
+  at fully bright. Shown in the panel. In a breakdown the kick and the bass leave and the pads stay, so the tone
+  usually reads *brighter* there than in the drop.
+- **Energy** – how loud the music is over the last few seconds: 0 at the level of beatless ambient (~0.45 on the
+  bands) to 1 at the loudest psytrance drops (~0.8). Breakdowns measure about 0.3–0.65, drops 0.62–0.77.
+- **Mood** – the tempo sets where a track sits and the energy moves it from moment to moment: 55% tempo (80 → 160
+  BPM, followed over ~10 s, so a moment of misheard tempo barely shows) and 45% energy, smoothed over ~2 s. A
+  breakdown reads calmer than the drop around it, by about 0.13–0.28 on the reference clips, while a whole drop
+  stays short of the top. The tempo is heard from the kicks and always reads 85–175 BPM (half-time at 72 reads
+  144); after 90 s of music without kicks it is forgotten and counts as neutral until the kicks return. When
+  nothing plays, mood and tone both drift back to neutral.
 - **Synesthesia slider** – how strongly the tone and the mood grade every scene: dark sound → dimmer, cooler, hazier,
   longer trails; bright sound → lighter, warmer, crisper, more colour fringing; energetic mood → more saturated and
   warmer. At 0 it is off: the picture's colour is left untouched. Trails and fringing only grow or shrink from what you
