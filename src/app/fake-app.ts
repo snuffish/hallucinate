@@ -82,6 +82,7 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
     sceneByName: (name) => library.byName(name),
     setLook,
     setIntensity,
+    setRoute: (t, r) => { const routes = { ...look.routes }; if (r) routes[t] = { ...r }; else delete routes[t]; look.routes = routes; },
     setPalette: (p) => { look.palette = { hues: p.hues.length >= 2 ? p.hues.slice(0, 5) : [], steps: p.steps }; },
     captureScene: (i = state.clock.scene) => ({ scene: i, values: library.values(i), look: Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), palette: look.palette, effects: state.effects }),
     applyScene: (snap, fade) => {

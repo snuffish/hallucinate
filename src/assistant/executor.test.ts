@@ -82,6 +82,18 @@ describe('tool runner', () => {
     expect(app.state.look.palette).toEqual({ hues: [], steps: false });
   });
 
+  it('set_look makes sliders follow the music and stop, and undoes it', async () => {
+    const { run, app, undo } = setup();
+    const kick = { source: 'kick' as const, depth: 0.8, attack: 0.1, release: 0.5 };
+    await run('set_look', { routes: { trails: kick, speed: { ...kick, source: 'bass' } } });
+    expect(app.state.look.routes).toEqual({ trails: kick, speed: { ...kick, source: 'bass' } });
+    await run('set_look', { routes: { speed: null } });
+    expect(app.state.look.routes).toEqual({ trails: kick });
+    await expect(run('set_look', { routes: { reactivity: kick } })).rejects.toThrow();   // Reactivity can't follow
+    undo.pop()!.undo();
+    expect(app.state.look.routes).toEqual({ trails: kick, speed: { ...kick, source: 'bass' } });
+  });
+
   it('undoes a show change, but not once something else changed the show after it', async () => {
     const { run, studio, undo } = setup();
     await run('add_show_scene', { scene: 'Alpha' });

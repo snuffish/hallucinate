@@ -14,7 +14,7 @@ import type { MusicSource } from './music-source';
 
 export type AppPort = Pick<AppController,
   | 'state' | 'ui' | 'live' | 'library' | 'sceneIndex' | 'currentScene' | 'overlay'
-  | 'toast' | 'setHooks' | 'showParams' | 'setScene' | 'sceneByName' | 'setLook' | 'setIntensity' | 'setPalette'
+  | 'toast' | 'setHooks' | 'showParams' | 'setScene' | 'sceneByName' | 'setLook' | 'setIntensity' | 'setPalette' | 'setRoute'
   | 'captureScene' | 'applyScene' | 'hearing'
 > & {
   readonly music: Pick<MusicSource, 'playing'>;

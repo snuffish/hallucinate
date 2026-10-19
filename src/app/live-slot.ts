@@ -171,6 +171,7 @@ export class LiveSlot {
   private frameLook({ look, palette }: Shot): FrameLook {
     const app = this.deps.state.look, l = this.look;
     l.palette = palette ?? app.palette;
+    l.routes = app.routes;   // the screen's: show scenes don't keep routes yet
     l.reactivity = look.reactivity ?? app.reactivity;
     l.speed = look.speed ?? app.speed;
     l.cycle = look.cycle ?? app.cycle;

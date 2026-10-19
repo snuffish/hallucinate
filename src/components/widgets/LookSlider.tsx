@@ -25,6 +25,7 @@ const THUMB = 8;           // half a range input's thumb, in px: where its track
 
 export const clampTo = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v));
 const snap = (v: number, step: number): number => Math.round(v / step) * step;
+const fract = (x: number): number => x - Math.floor(x);
 
 // Wheel steps: ten a notch, Shift one (macOS turns Shift+wheel sideways, so either axis counts). Only while
 // `active` says so, so scrolling the panel doesn't catch on a slider passing under the pointer.
@@ -79,15 +80,16 @@ export function NumberField({ d, value, onSet }: { d: Display; value: number; on
 
 // A range input with fine tuning. A press on the track jumps there (on the thumb it doesn't); from
 // then on the drag is relative.
-export function FineRange({ id, label, value, r, onSet, onReset, hue }: {
-  id: string; label: string; value: number; r: Range; onSet: (v: number) => void; onReset?: () => void; hue?: boolean;
+// `ghost`: where the value sits now while it follows the music (ADR 0005), shown as a mark on the track.
+export function FineRange({ id, label, value, r, onSet, onReset, hue, ghost }: {
+  id: string; label: string; value: number; r: Range; onSet: (v: number) => void; onReset?: () => void; hue?: boolean; ghost?: number;
 }) {
   const span = r.max - r.min;
   const drag = useRef<{ x: number; v: number } | null>(null);
   const set = (v: number) => onSet(snap(clampTo(v, r.min, r.max), r.step));
   const wheel = useWheelStep<HTMLInputElement>((by) => set(value + by * r.step), (el) => document.activeElement === el);
   const at = (b: DOMRect, x: number) => r.min + clampTo((x - b.left - THUMB) / (b.width - 2 * THUMB), 0, 1) * span;
-  return (
+  const input = (
     <input ref={wheel} type="range" id={id} className={hue ? 'look-hue-track' : undefined} min={r.min} max={r.max} step={r.step} value={value}
       aria-label={label} title={`${onReset ? 'Double-click to reset · ' : ''}Shift-drag: finer · wheel steps once it has focus`}
       style={{ '--p': `${((value - r.min) / span) * 100}%`, ...(hue && { background: LASER_GRADIENT('90deg') }) } as CSSProperties}
@@ -116,6 +118,14 @@ export function FineRange({ id, label, value, r, onSet, onReset, hue }: {
       onPointerCancel={() => { drag.current = null; }}
       onChange={(e) => { if (!drag.current) onSet(Number(e.target.value)); }}   // the arrow keys
       onDoubleClick={onReset} />
+  );
+  if (ghost === undefined) return input;
+  const pos = clampTo(((hue ? fract(ghost) : ghost) - r.min) / span, 0, 1);   // Colour wraps round the wheel
+  return (
+    <span className="look-range">
+      {input}
+      <i className="look-ghost" style={{ left: `calc(${THUMB}px + ${pos} * (100% - ${2 * THUMB}px))` }} title="Where it sits now, following the music" />
+    </span>
   );
 }
 
@@ -146,15 +156,16 @@ export function LiveSwatch() {
 
 // A row. `lock` is whether it is locked (undefined: it can't be, like Drift speed); `tag` names the XY pad
 // axis it is also on.
-export function LookSlider({ k, value, lock, tag }: { k: LookKey; value: number; lock?: boolean; tag?: ReactNode }) {
+// `follow` is the row's ♪ button and `ghost` where it sits while it follows the music (ADR 0005).
+export function LookSlider({ k, value, lock, tag, follow, ghost }: { k: LookKey; value: number; lock?: boolean; tag?: ReactNode; follow?: ReactNode; ghost?: number }) {
   const app = useApp();
   const d = LOOK_DISPLAY[k];
   const set = (v: number) => app.setLook(k, v);
   return (
     <div className={`look-row${lock ? ' locked' : ''}`}>
       {lock === undefined ? <span /> : <LookLock k={k as SliderKey} locked={lock} />}
-      <label htmlFor={k} title={d.hint}>{k === 'hue' && <LiveSwatch />}{d.label}{tag}</label>
-      <FineRange id={k} label={d.label} value={value} r={LOOK_RANGES[k]} onSet={set} onReset={() => set(defaultLook()[k])} hue={k === 'hue'} />
+      <label htmlFor={k} title={d.hint}>{k === 'hue' && <LiveSwatch />}{d.label}{tag}{follow}</label>
+      <FineRange id={k} label={d.label} value={value} r={LOOK_RANGES[k]} onSet={set} onReset={() => set(defaultLook()[k])} hue={k === 'hue'} ghost={ghost} />
       <NumberField d={d} value={value} onSet={set} />
     </div>
   );

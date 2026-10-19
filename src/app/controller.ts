@@ -24,8 +24,9 @@ import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, ty
 import { SceneHistory } from '../state/scene-history';
 import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
 import { takeRenameReport } from '../state/scene-renames';
+import { ROUTE_TARGETS, followed, type Route, type RouteTarget } from '../engine/look-routes';
 import { loadLook, lookWriter } from '../state/look-store';
-import { INTENSITY_KEYS, LookGlide, SLOT_NAMES, intensityValue, loadLookSlots, lookSlotsWriter, slotOf, type LookSlots } from '../state/look-slots';
+import { INTENSITY_KEYS, LookGlide, SLOT_NAMES, intensityValue, loadLookSlots, lookSlotsWriter, slotOf, slotWithRoutes, type LookSlots } from '../state/look-slots';
 import { loadScreenEffects, screenEffectsWriter } from '../state/screen-effects';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HearingView, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
@@ -39,7 +40,8 @@ import { Transport } from './transport';
 
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
 const LOOK_PUBLISH_FRAMES = 6;
-const fract = (x: number): number => x - Math.floor(x);   // the Look widget follows Drift and the hue on screen at ~10 Hz
+const fract = (x: number): number => x - Math.floor(x);
+const NOT_FOLLOWED = {};   // no slider follows the music   // the Look widget follows Drift and the hue on screen at ~10 Hz
 const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second, however slow the frames
 const HEARING_PUBLISH_FRAMES = 4;   // the Hearing monitor follows at ~15 Hz: its lights and traces move
 
@@ -649,6 +651,23 @@ export class AppController {
     this.publishLook();
   }
 
+  // Makes a slider follow the music (ADR 0005), or stop (null).
+  setRoute(target: RouteTarget, route: Readonly<Route> | null): void {
+    const routes = { ...this.state.look.routes };
+    if (route) routes[target] = { ...route }; else delete routes[target];
+    this.state.look.routes = routes;
+    this.publishLook();
+  }
+
+  // Where each slider that follows the music sits on the main screen now, for the widget's marks.
+  private followedNow(): Partial<Record<RouteTarget, number>> {
+    const { routes } = this.state.look, env = this.state.clock.routeEnv;
+    if (!env || !Object.keys(routes).length) return NOT_FOLLOWED;
+    const out: Partial<Record<RouteTarget, number>> = {};
+    ROUTE_TARGETS.forEach((t, i) => { const r = routes[t]; if (r) out[t] = followed(t, this.state.look[t], r, env[i]!); });
+    return out;
+  }
+
   // What XY pad `i` moves across and up.
   setXYAxes(i: number, axes: XYAxes): void {
     if (!this.state.look.xy[i] || axes.x === axes.y) return;
@@ -668,7 +687,7 @@ export class AppController {
   // Stores the look now in slot `i` (A–D).
   saveLookSlot(i: number): void {
     if (i < 0 || i >= SLOT_NAMES.length) return;
-    this.lookSlots = this.lookSlots.map((s, j) => (j === i ? slotOf(this.state.look) : s));
+    this.lookSlots = this.lookSlots.map((s, j) => (j === i ? slotWithRoutes(this.state.look) : s));
     this.ui.set({ lookSlots: this.lookSlots });
     this.lookSlotsWriter.schedule();
     this.toast(`Look stored in slot ${SLOT_NAMES[i]}`, 1200);
@@ -679,6 +698,7 @@ export class AppController {
     const slot = this.lookSlots[i];
     if (!slot) { if (SLOT_NAMES[i]) this.toast(`Slot ${SLOT_NAMES[i]} is empty: Shift+click it to store the look`, 1800); return; }
     this.rememberForBack();
+    if (slot.routes) { this.state.look.routes = structuredClone(slot.routes); this.publishLook(); }   // the routes switch at once; the sliders glide
     this.glide.start(slotOf(this.state.look), slot);
   }
 
@@ -1055,8 +1075,9 @@ export class AppController {
     this.glide.step(look, dt);
     if (++this.lookFrames % LOOK_PUBLISH_FRAMES === 0 || (gliding && !this.glide.active)) {
       const liveHue = fract(look.hue + c.huePhase);
-      if (look.drift || gliding) { this.ui.set({ look: { ...look }, liveHue }); this.lookWriter.schedule(); }
-      else if (liveHue !== this.ui.get().liveHue) this.ui.set({ liveHue });
+      const followed = this.followedNow();
+      if (look.drift || gliding) { this.ui.set({ look: { ...look }, liveHue, followed }); this.lookWriter.schedule(); }
+      else if (liveHue !== this.ui.get().liveHue || followed !== this.ui.get().followed) this.ui.set({ liveHue, followed });
     }
     if (this.state.activeSource === 'media') this.media.follow(this.player);
 

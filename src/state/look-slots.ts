@@ -1,27 +1,33 @@
-// The Look slots A–D: four looks kept to come back to, the Look's seven sliders each. Stored under
+// The Look slots A–D: four looks kept to come back to, the Look's seven sliders each and the ones that
+// follow the music. Stored under
 // KEYS.lookSlots and exported with the setup. A recall glides there over a second, the hue the short way
 // round the wheel, so the picture never jumps; it moves locked sliders too (a lock only keeps Randomize
 // and Drift off). Intensity is here too: one control that moves Reactivity, Trails and Fringing together,
 // inside the ranges Randomize uses, so it never reaches a look the safety rules haven't checked.
 
 import { z } from 'zod';
+import type { Routes } from '../engine/look-routes';
 import { SLIDER_KEYS, type Look, type SliderKey } from './app-state';
 import { RANDOM_RANGES } from './look-drift';
-import { slider } from './look-store';
+import { RoutesSchema, slider } from './look-store';
 import { KEYS, debouncedWriter, readJSON, type DebouncedWriter } from './persistence';
 
 export const SLOT_NAMES = ['A', 'B', 'C', 'D'] as const;
 export type SlotLook = Record<SliderKey, number>;
-export type LookSlots = readonly (SlotLook | null)[];   // null: empty
+// A slot: the sliders, and the ones following the music (ADR 0005); routes absent in a slot stored before them.
+export type Slot = SlotLook & { routes?: Routes };
+export type LookSlots = readonly (Slot | null)[];   // null: empty
 
 const EMPTY: LookSlots = SLOT_NAMES.map(() => null);
-const SlotSchema = z.object(Object.fromEntries(SLIDER_KEYS.map((k) => [k, slider(k)]))) as unknown as z.ZodType<SlotLook>;
+const SlotSchema = z.object({ ...Object.fromEntries(SLIDER_KEYS.map((k) => [k, slider(k)])), routes: RoutesSchema.optional() }) as unknown as z.ZodType<Slot>;
 export const LookSlotsSchema = z.array(SlotSchema.nullable().catch(null)).length(SLOT_NAMES.length).catch(EMPTY.slice());
 
 export const loadLookSlots = (): LookSlots => readJSON(KEYS.lookSlots, LookSlotsSchema, EMPTY);
 export const lookSlotsWriter = (read: () => LookSlots): DebouncedWriter => debouncedWriter(KEYS.lookSlots, read, 300);
 
 export const slotOf = (look: Readonly<Look>): SlotLook => Object.fromEntries(SLIDER_KEYS.map((k) => [k, look[k]])) as SlotLook;
+// What a slot stores: the sliders and the routes, copied.
+export const slotWithRoutes = (look: Readonly<Look>): Slot => ({ ...slotOf(look), routes: structuredClone(look.routes) });
 
 const RECALL_SECONDS = 1;
 const ease = (x: number) => x * x * (3 - 2 * x);

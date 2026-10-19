@@ -20,6 +20,12 @@
   wheel, blending or in steps (each step eases, so cycling never switches the colour in one frame). Show scenes keep
   it; `set_look` takes `palette` and `get_app_state` reports it. Scenes of your own follow it through `laser()`;
   `laserWheel()` is the whole wheel ([ADR 0004](docs/adr/0004-palettes-are-hues-on-the-laser-wheel.md)).
+- Sliders that **follow the music**: the ♪ beside Speed, Trails, Colour, Synesthesia or Fringing makes it move with
+  the bass, mids, highs, level, kick, tone or mood, by a depth either way, with an attack and a release. It never goes
+  above the higher of where you set it and the top of the Randomize range, rises no faster than 50 ms (Colour 150 ms,
+  ±0.1 of the wheel), and a mark shows where it sits now. The Look slots keep it; show scenes don't yet. `set_look`
+  takes `routes`. The built-in scenes' strobe check gains a third Look: every slider following the kick
+  ([ADR 0005](docs/adr/0005-look-sliders-follow-the-music-within-a-checked-ceiling.md)).
 - **Intensity**: one control that moves Reactivity, Trails and Fringing together, from the gentlest to the strongest
   look Randomize can reach. `set_look` takes `intensity`; `get_app_state` reports it and the filled slots.
 

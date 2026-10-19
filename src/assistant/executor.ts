@@ -12,6 +12,7 @@ import { stillUniforms } from '../engine/scene-inputs';
 import type { Scene } from '../scenes';
 import { soundNow } from '../engine/listener';
 import { HELP_TOPICS, shortcutRows, type HelpTopic } from '../help/topics';
+import { ROUTE_TARGETS, type Route, type RouteTarget, type Routes } from '../engine/look-routes';
 import { LOOK_KEYS, LOOK_RANGES, type LookKey, type Palette } from '../state/app-state';
 import { INTENSITY_KEYS, SLOT_NAMES } from '../state/look-slots';
 import { MAX_PLAN_STEP_SECONDS, PlanSchema, type Plan } from '../state/show-plan';
@@ -260,14 +261,20 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
   });
   // The sliders `keys`, and Intensity's position and the palette too when asked: undone in that order, so
   // the sliders end exactly where they were.
-  const look = (keys: readonly LookKey[], intensity = false, palette = false): Touched<Partial<Record<LookKey | 'intensity', number>> & { palette?: Palette }> => ({
+  const look = (keys: readonly LookKey[], intensity = false, palette = false, routes = false): Touched<Partial<Record<LookKey | 'intensity', number>> & { palette?: Palette; routes?: Routes }> => ({
     kind: 'look',
     read: () => ({
       ...Object.fromEntries(keys.map((k) => [k, app.state.look[k]])),
       ...(intensity && { intensity: app.state.look.intensity }),
       ...(palette && { palette: { hues: [...app.state.look.palette.hues], steps: app.state.look.palette.steps } }),
+      ...(routes && { routes: structuredClone(app.state.look.routes) }),
     }),
-    write: (b) => { if (palette) app.setPalette(b.palette!); if (intensity) app.setIntensity(b.intensity!); for (const k of keys) app.setLook(k, b[k]!); },
+    write: (b) => {
+      if (routes) for (const t of ROUTE_TARGETS) app.setRoute(t, b.routes![t] ?? null);
+      if (palette) app.setPalette(b.palette!);
+      if (intensity) app.setIntensity(b.intensity!);
+      for (const k of keys) app.setLook(k, b[k]!);
+    },
   });
 
   const paramSummary = (i: number) => {
@@ -311,7 +318,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
       const i = app.sceneIndex, s = app.currentScene, look = app.state.look, h = app.hearing, ui = app.ui.get();
       return {
         playing: { name: s.name, kind: kindOf(s), category: s.cat || null, description: s.desc || null, editedByUser: !!s.edited, parameters: paramSummary(i) },
-        look: { ...Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), autoSwitch: look.auto, drift: look.drift, driftSpeed: look.driftSpeed, randomizePicksScene: look.randomScene, locked: look.locked, intensity: look.intensity, palette: look.palette, slots: SLOT_NAMES.filter((_, i) => ui.lookSlots[i]) },
+        look: { ...Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), autoSwitch: look.auto, drift: look.drift, driftSpeed: look.driftSpeed, randomizePicksScene: look.randomScene, locked: look.locked, intensity: look.intensity, palette: look.palette, followsTheMusic: look.routes, slots: SLOT_NAMES.filter((_, i) => ui.lookSlots[i]) },
         effects: app.state.effects,
         audio: soundNow(h, app.music.playing, app.state.activeSource),
         listening: app.music.playing ? { energy: round2(h.energy), bass: round2(h.bass), mid: round2(h.mid), high: round2(h.high) } : null,
@@ -371,10 +378,12 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
       const keys = Object.entries(values).filter(([k, v]) => k in LOOK_RANGES && Number.isFinite(v)).map(([k]) => k as LookKey);
       const intensity = Number.isFinite(values.intensity) ? Number(values.intensity) : null;
       const palette = values.palette ? { hues: values.palette.hues, steps: values.palette.steps ?? app.state.look.palette.steps } : null;
-      if (!keys.length && intensity === null && !palette) throw new Error('No look values given.');
+      const routes = values.routes ? Object.entries(values.routes).filter(([t]) => (ROUTE_TARGETS as readonly string[]).includes(t)) as [RouteTarget, Route | null][] : [];
+      if (!keys.length && intensity === null && !palette && !routes.length) throw new Error('No look values given.');
       // Intensity first, so a slider given alongside it wins.
-      const touched = look([...new Set([...(intensity === null ? [] : INTENSITY_KEYS), ...keys])], intensity !== null, palette !== null);
+      const touched = look([...new Set([...(intensity === null ? [] : INTENSITY_KEYS), ...keys])], intensity !== null, palette !== null, routes.length > 0);
       undoable('Adjusted the look', touched, () => {
+        for (const [t, r] of routes) app.setRoute(t, r);
         if (palette) app.setPalette(palette);
         if (intensity !== null) app.setIntensity(intensity);
         for (const k of keys) app.setLook(k, Number(values[k as keyof typeof values]));

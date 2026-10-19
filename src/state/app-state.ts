@@ -2,6 +2,7 @@
 // (through store.ts, which publishes immutable snapshots at UI rate). Nothing here allocates per frame.
 
 import type { EffectStack } from '../engine/effects';
+import type { Routes } from '../engine/look-routes';
 import type { Scene } from '../scenes';
 
 export const BEATS_PER_SCENE = 32;
@@ -22,6 +23,7 @@ export interface Look {
   driftSpeed: number;
   intensity: number;              // the Intensity control, 0–1 (src/state/look-slots.ts)
   palette: Palette;               // the colours every scene draws through laser() (ADR 0004)
+  routes: Routes;                 // sliders that follow the music (ADR 0005)
   locked: readonly SliderKey[];   // Randomize and Drift leave these alone
   xyOpen: boolean;                // the Look widget shows its XY pads
   xy: readonly XYAxes[];          // what each XY pad moves, across and up
@@ -56,7 +58,7 @@ export const DEFAULT_XY: readonly XYAxes[] = [{ x: 'speed', y: 'reactivity' }, {
 export const defaultLook = (): Look => ({
   reactivity: 1, speed: 1, trails: 0.35, hue: 0, cycle: 0.2, aberration: 0,
   synesthesia: 0.3, auto: true, randomScene: false, drift: false, driftSpeed: 1,
-  intensity: 0.5, palette: WHEEL, locked: [], xyOpen: true, xy: DEFAULT_XY,
+  intensity: 0.5, palette: WHEEL, routes: {}, locked: [], xyOpen: true, xy: DEFAULT_XY,
 });
 
 export interface Clock {
@@ -65,6 +67,7 @@ export interface Clock {
   timeRate: number;
   huePhase: number;
   hueKick: number;   // hue the kicks still move it by (src/engine/look.ts)
+  routeEnv?: Float32Array;   // the envelopes of the sliders that follow the music (src/engine/look-routes.ts)
   turn: number;
   scene: number;
   prevScene: number;

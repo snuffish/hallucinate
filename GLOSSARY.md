@@ -117,6 +117,11 @@ A Look slider that Randomize, Shift+R, Drift and Intensity leave alone. A take, 
 hand still move it.
 _Avoid_: pin (that is Live's), freeze, hold
 
+**Follow (the music)**:
+A Look slider moving with one part of the music (a band, the kick, the tone or the mood) by a depth, through an attack
+and a release, never above the higher of its own value and the top of its Randomize range.
+_Avoid_: route (the code's name for it), modulation, LFO, sidechain
+
 **Intensity**:
 One Look control that moves Reactivity, Trails and Fringing together, inside the ranges Randomize uses.
 _Avoid_: master, macro, energy

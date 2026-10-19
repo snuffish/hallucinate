@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { DEFAULT_XY, LOOK_RANGES, PALETTE_MAX, SLIDER_KEYS, WHEEL, defaultLook, type Look, type LookKey, type Palette, type SliderKey } from './app-state';
+import { ROUTE_SECONDS, ROUTE_SOURCES, ROUTE_TARGETS, type Routes } from '../engine/look-routes';
 import { KEYS, debouncedWriter, readWithDefaults, type DebouncedWriter } from './persistence';
 
 const DEFAULTS = defaultLook();
@@ -20,6 +21,20 @@ export const PaletteSchema = z.object({
   hues: z.array(z.number().transform((h) => h - Math.floor(h))).catch([]).transform((h) => (h.length >= 2 ? h.slice(0, PALETTE_MAX) : [])),
   steps: z.boolean().catch(false),
 }).catch(() => ({ hues: [], steps: WHEEL.steps })) satisfies z.ZodType<Palette>;
+
+// Sliders that follow the music (ADR 0005): a route per slider that can follow, each field checked; a broken
+// route is dropped, not the rest.
+const RouteSchema = z.object({
+  source: z.enum(ROUTE_SOURCES),
+  depth: z.number().min(-1).max(1),
+  attack: z.number().min(ROUTE_SECONDS.min).max(ROUTE_SECONDS.max),
+  release: z.number().min(ROUTE_SECONDS.min).max(ROUTE_SECONDS.max),
+});
+export const RoutesSchema = z.record(z.string(), z.unknown()).catch({}).transform((raw) => {
+  const routes: Routes = {};
+  for (const t of ROUTE_TARGETS) { const r = RouteSchema.safeParse(raw[t]); if (r.success) routes[t] = r.data; }
+  return routes;
+});
 
 const sliderKey = z.custom<SliderKey>((v) => SLIDER_KEYS.includes(v as SliderKey));
 const xyAxes = z.object({ x: sliderKey, y: sliderKey }).refine((a) => a.x !== a.y);
@@ -38,6 +53,7 @@ export const LookSchema = z.object({
   driftSpeed: slider('driftSpeed'),
   intensity: z.number().min(0).max(1).catch(DEFAULTS.intensity),
   palette: PaletteSchema,
+  routes: RoutesSchema,
   locked: z.array(z.unknown()).catch([]).transform((keys) => SLIDER_KEYS.filter((k) => keys.includes(k))),
   xyOpen: z.boolean().catch(DEFAULTS.xyOpen),
   xy: z.array(xyAxes).length(DEFAULT_XY.length).catch(DEFAULT_XY.map((a) => ({ ...a }))),

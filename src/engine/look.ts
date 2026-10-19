@@ -7,6 +7,7 @@
 import { WHEEL, type Palette } from '../state/app-state';
 import { NO_EFFECTS, type EffectStack } from './effects';
 import { PALETTE_FLOATS, packPalette } from './laser-colour';
+import { ROUTE_TARGETS, followMusic, type Routes } from './look-routes';
 import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
 import { stillHearing, type SnapshotUniforms } from './scene-inputs';
@@ -17,14 +18,19 @@ export interface FrameLook {
   reactivity: number; speed: number; cycle: number;
   hue: number; trails: number; aberration: number; synesthesia: number;
   palette?: Readonly<Palette>;   // none: the whole laser wheel
+  routes?: Readonly<Routes>;     // sliders that follow the music (ADR 0005)
 }
 
 // Where an output's picture is in its own time: the clock the shaders see, how fast it runs (it eases
-// with the music), how far the hue has walked (and how much further the kicks still move it) and how far
-// the effects have turned. Each output keeps one.
-export interface Motion { time: number; timeRate: number; huePhase: number; hueKick: number; turn: number }
+// with the music), how far the hue has walked (and how much further the kicks still move it), how far
+// the effects have turned, and where the envelopes of the sliders that follow the music are (made on the
+// first frame that has one). Each output keeps one.
+export interface Motion { time: number; timeRate: number; huePhase: number; hueKick: number; turn: number; routeEnv?: Float32Array }
 
-export const copyMotion = (to: Motion, from: Readonly<Motion>): void => { to.time = from.time; to.timeRate = from.timeRate; to.huePhase = from.huePhase; to.hueKick = from.hueKick; to.turn = from.turn; };
+export const copyMotion = (to: Motion, from: Readonly<Motion>): void => {
+  to.time = from.time; to.timeRate = from.timeRate; to.huePhase = from.huePhase; to.hueKick = from.hueKick; to.turn = from.turn;
+  if (from.routeEnv) (to.routeEnv ??= new Float32Array(from.routeEnv.length)).set(from.routeEnv);
+};
 
 // The effects' turn (uTurn, radians at an effect's full spin): it only ever runs on, at a steady pace
 // plus the bass, plus the beat, so each kick leaves it a step further on (the beat fades out within half
@@ -42,7 +48,11 @@ const WARM = [1.3, 1.05, 0.7];
 
 // Moves `motion` on by `dt` (the show's seconds) and writes this frame's sound, grade and look into `p`.
 // Leaves the scene, the crossfade, the master and the media to the caller.
-export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearing>, look: Readonly<FrameLook>, sceneTrails: number, dt: number): void {
+// The Look with its sliders following the music, this frame (reused: composeFrame never runs twice at once).
+const followedLook: FrameLook = { reactivity: 1, speed: 1, cycle: 0, hue: 0, trails: 0, aberration: 0, synesthesia: 0 };
+
+export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearing>, given: Readonly<FrameLook>, sceneTrails: number, dt: number): void {
+  const look = given.routes ? followMusic(followedLook, given, motion.routeEnv ??= new Float32Array(ROUTE_TARGETS.length), h, dt) : given;
   const R = look.reactivity;
   const bass = Math.min(1.5, h.bass * R);
   const mid = Math.min(1.5, h.mid * R);

@@ -43,6 +43,12 @@ describe('the Look, kept for the next start', () => {
     expect(loadLook().palette).toEqual({ hues: [], steps: false });
   });
 
+  it('loads the sliders that follow the music, dropping a broken route and an unknown slider', () => {
+    const good = { source: 'kick', depth: -0.5, attack: 0.1, release: 1 };
+    map.set(KEYS.look, JSON.stringify({ routes: { trails: good, hue: { ...good, source: 'snare' }, reactivity: good, speed: { ...good, attack: 9 } } }));
+    expect(loadLook().routes).toEqual({ trails: good });
+  });
+
   it('loads as the laser look when what is stored is not a look', () => {
     map.set(KEYS.look, '{broken');
     expect(loadLook()).toEqual(defaultLook());

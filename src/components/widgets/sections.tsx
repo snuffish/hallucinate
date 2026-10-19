@@ -1,7 +1,7 @@
 // The bodies of the control widgets: sources, media, meters, scene, look sliders,
 // actions. Each reads its own slice of the store; the widget frame (title, drag, dock) is `Widget`.
 
-import { Fragment, type CSSProperties } from 'react';
+import { Fragment, useState, type CSSProperties } from 'react';
 import { useApp, useUI } from '../../app/AppContext';
 import { STATIC_DEMO } from '../../app/static-demo';
 import { HOTKEYS } from '../../hotkeys/registry';
@@ -12,6 +12,8 @@ import { laserCss } from '../../engine/laser-colour';
 import { SLOT_NAMES } from '../../state/look-slots';
 import { FineRange, LookSlider, NumberField } from './LookSlider';
 import { PaletteStrip } from './PaletteStrip';
+import { FollowButton, FollowEditor } from './FollowMusic';
+import { ROUTE_TARGETS, type RouteTarget } from '../../engine/look-routes';
 import { XYPad } from './XYPad';
 
 export interface PanelActions {
@@ -145,6 +147,8 @@ export function ScreenBody() {
   );
 }
 
+const isTarget = (k: SliderKey): k is RouteTarget => (ROUTE_TARGETS as readonly string[]).includes(k);
+
 const SLOT_HOTKEYS = [HOTKEYS.lookSlotA, HOTKEYS.lookSlotB, HOTKEYS.lookSlotC, HOTKEYS.lookSlotD];
 const INTENSITY = { label: 'Intensity', scale: 100, unit: '%', digits: 0 };
 
@@ -184,6 +188,8 @@ function LookSlotsAndIntensity() {
 export function LookBody() {
   const app = useApp();
   const look = useUI((ui) => ui.look);
+  const followed = useUI((ui) => ui.followed);
+  const [following, setFollowing] = useState<RouteTarget | null>(null);   // whose ♪ row is open
   // The XY pad axis each slider is also on: "1↔" is pad 1 across.
   const tags = new Map<SliderKey, string[]>();
   if (look.xyOpen) look.xy.forEach((a, i) => { for (const [k, arrow] of [[a.x, '↔'], [a.y, '↕']] as const) tags.set(k, [...(tags.get(k) ?? []), `${i + 1}${arrow}`]); });
@@ -195,8 +201,10 @@ export function LookBody() {
       {look.xyOpen && <div className="look-xy">{look.xy.map((axes, i) => <XYPad key={i} index={i} axes={axes} />)}</div>}
       {SLIDER_KEYS.map((k) => (
         <Fragment key={k}>
-          <LookSlider k={k} value={look[k]} lock={look.locked.includes(k)}
-            tag={tags.has(k) && <em className="look-tag" title="Also on this XY pad axis">{tags.get(k)!.join(' ')}</em>} />
+          <LookSlider k={k} value={look[k]} lock={look.locked.includes(k)} ghost={isTarget(k) ? followed[k] : undefined}
+            tag={tags.has(k) && <em className="look-tag" title="Also on this XY pad axis">{tags.get(k)!.join(' ')}</em>}
+            follow={isTarget(k) && <FollowButton target={k} route={look.routes[k]} open={following === k} onToggle={() => setFollowing(following === k ? null : k)} />} />
+          {isTarget(k) && following === k && <FollowEditor target={k} route={look.routes[k]} />}
           {k === 'hue' && <PaletteStrip />}
         </Fragment>
       ))}

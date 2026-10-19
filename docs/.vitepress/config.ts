@@ -78,6 +78,7 @@ export default defineConfig({
           { text: '0002 · The Look serves the laser set', link: '/adr/0002-the-look-serves-the-laser-set' },
           { text: '0003 · Effects belong to the show scene', link: '/adr/0003-effects-belong-to-the-show-scene' },
           { text: '0004 · Palettes are hues on the laser wheel', link: '/adr/0004-palettes-are-hues-on-the-laser-wheel' },
+          { text: '0005 · Look sliders follow the music within a checked ceiling', link: '/adr/0005-look-sliders-follow-the-music-within-a-checked-ceiling' },
         ],
       },
     ],
