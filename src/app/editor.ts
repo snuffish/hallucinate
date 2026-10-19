@@ -6,6 +6,7 @@
 import { TEMPLATE, type Scene } from '../scenes';
 import type { AppState } from '../state/app-state';
 import { KEYS, readString, writeString } from '../state/persistence';
+import type { Origin } from '../state/scene-history';
 import type { CompileResult, SceneLibrary } from './scene-library';
 
 export type EditorKind = 'custom' | 'builtin' | 'user' | 'nodes';
@@ -45,15 +46,16 @@ export class EditorCore {
   }
 
   // Compiles `source` into the target scene (SceneLibrary.compile); "My Shader"'s code is kept here.
-  async compileInto(target: EditorTarget, source: string): Promise<CompileResult> {
-    const result = await this.app.library.compile(target.index, source);
+  // `origin`: who made the change, for the scene's history (your typing by default).
+  async compileInto(target: EditorTarget, source: string, origin?: Origin): Promise<CompileResult> {
+    const result = await this.app.library.compile(target.index, source, origin);
     if (result === null && target.kind === 'custom') { this.customCode = source; writeString(KEYS.customShader, source); }
     return result;
   }
 
   // Load code into "My Shader" (Send to code, Edit a copy), whether or not it's the scene on screen.
   setCustomCode(code: string): Promise<CompileResult> {
-    return this.compileInto(this.customTarget(), code);
+    return this.compileInto(this.customTarget(), code, { by: 'copy' });
   }
 
   // "Save to library": the current editor code as a (new or overwritten) library scene, keeping the

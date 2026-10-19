@@ -14,6 +14,7 @@ import type { AppPort } from '../app/app-port';
 import type { StudioSession } from '../app/studio';
 import { KEYS } from '../state/persistence';
 import { Store } from '../state/store';
+import { ChangeLog, type ChangeDraft } from './change-log';
 import { Chat, forgetThread } from './chat';
 import { createToolRunner, UndoConflict, type ToolRunner } from './executor';
 import type { Backend } from './settings-wire';
@@ -21,7 +22,7 @@ import { HISTORY_CAP, indexedDBTranscripts, prune, readIndex, storedTranscript, 
 import { createLock, serialized, type Lock } from './lock';
 import { codeHash, resumeNote, sceneNote, undoNote, withNotes, type ScreenNow } from './notes';
 import { previewOf, prepareForSend, titleFrom } from './transcript';
-import { UndoStack } from './undo';
+import { UndoStack, type UndoEntry } from './undo';
 import { addUsage, NO_USAGE, type Usage } from './usage';
 
 export const MAX_RUNNING_CLI = 3;     // subscription backend: one `claude -p` per running conversation
@@ -66,6 +67,7 @@ export interface SessionOptions {
   now?: () => number;
   lock?: Lock;                              // shared with the director (sessions.ts); one of its own otherwise
   studio?: () => StudioSession | null;      // the show the studio tools act on
+  changes?: ChangeLog;                      // what the tools changed (sessions.ts); one of its own otherwise
 }
 
 const newId = () => crypto.randomUUID();
@@ -219,6 +221,7 @@ export class AssistantSession {
   readonly connection: ConnectionAdapter;
   readonly now: () => number;
   private readonly lockTools: Lock;
+  readonly changes: ChangeLog;
   private readonly chats = new Map<string, Conversation>();
   private readonly runners = new Map<string, ToolRunner>();
   private readonly locks: LockManagerLike | null;
@@ -230,6 +233,7 @@ export class AssistantSession {
   constructor(private readonly app: AppPort, private readonly opts: SessionOptions = {}) {
     this.now = opts.now ?? Date.now;
     this.lockTools = opts.lock ?? createLock();
+    this.changes = opts.changes ?? new ChangeLog();
     this.transcripts = opts.transcripts ?? indexedDBTranscripts();
     const base: ConnectConnectionAdapter = opts.connection ?? fetchServerSentEvents('/api/assistant');
     // Not resumable on purpose (no joinRun): a run is never rejoined, only sealed. Old screenshots stay home.
@@ -322,6 +326,7 @@ export class AssistantSession {
     const removed = c ? c.delete() : storedTranscript(this.transcripts, id).destroy();
     this.chats.delete(id);
     this.runners.delete(id);
+    this.changes.dropChat(id);
     const { [id]: _gone, ...live } = this.view.live;
     const chats = this.view.chats.filter((m) => m.id !== id);
     this.store.set({ chats, live });
@@ -363,7 +368,8 @@ export class AssistantSession {
   runnerFor(chatId: string): ToolRunner {
     let r = this.runners.get(chatId);
     if (!r) {
-      r = serialized(createToolRunner(this.app, { push: (entry) => this.undo.push({ ...entry, chatId }) }, this.opts.studio), this.lockTools);
+      const sink = { chatId, push: (entry: UndoEntry) => this.undo.push({ ...entry, chatId }), change: (draft: ChangeDraft) => { this.changes.add(chatId, draft); } };
+      r = serialized(createToolRunner(this.app, sink, this.opts.studio), this.lockTools);
       this.runners.set(chatId, r);
     }
     return r;

@@ -71,6 +71,16 @@ A picture that moves with the music, with its own parameters and a category. Bui
 your own are saved from the editor. Any scene may also show your video or images.
 _Avoid_: visual, shader, preset
 
+**Version**:
+One saved state of a scene's code, with when it was made and who made it: you, the assistant, a template, Revert or a
+restore. A scene's versions are its history; restoring one makes a new version.
+_Avoid_: revision, snapshot, commit
+
+**Change**:
+What one of the assistant's or the director's tools did: what it touched before and after, kept with the tool call that
+made it.
+_Avoid_: diff (that is how a code change is shown), edit, action
+
 **Effect**:
 A built-in step that reshapes a scene's picture, such as a mirror or a glow, moving with the music in its own way. A
 show scene keeps its effects in order, each switched on or off, and they shape the picture before the Look does.

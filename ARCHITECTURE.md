@@ -80,6 +80,9 @@ browser                                              dev server (Vite middleware
   "Save to library" and the assistant's `create_scene`), removing it and setting values all go through it, and it
   tells the controller what changed, which keeps the renderer, the projector and the Parameters panel current. It
   compiles through a `Compiler` (the renderer), so the tests' fake app runs the real library on a fake one.
+  Every code change it makes is noted in the scenes' history (`src/state/scene-history.ts`, the controller's
+  `history`) with who made it (`Origin`: you, the assistant and its conversation, a template, Revert, a restore),
+  after the code it replaced; versions live in IndexedDB on this computer, never in an export.
   `EditorCore` keeps the editors' own text ("My Shader", the visual maker's code) and asks before a save; the visual
   maker's `GraphSession` belongs to its panel. The
   controller's `ControllerHooks` are only what a session plugs into the frame loop, plus `escape` (a panel's
@@ -135,7 +138,10 @@ bundles the main process and the server code into `dist-desktop/main.js`; `elect
    without one doesn't compile. Errors are thrown and become error tool results. Every tool call, from any
    conversation or the director, waits on one lock. Every change is one undo step under one rule
    (`undoable` / `record` in `executor.ts`): the undo puts back what the change touched only while that is still
-   what the change left, and refuses (`UndoConflict`) once anything else changed it since.
+   what the change left, and refuses (`UndoConflict`) once anything else changed it since. `record` also reports
+   each change, with what it touched before and after and the tool call that made it, to the change log
+   (`src/assistant/change-log.ts`, one for the conversations and the director), which the chat's tool chips and
+   the studio show; a conversation's records are deleted with it.
 7. **Overlays lay out around the widgets through one contract.** They read `--dock-*` and `body[data-widgets]`
    only, never a widget's selector, and stack with the `--z-*` scale; the studio's pinned Live canvas (`--z-live`)
    stays above every floating widget.
@@ -248,7 +254,8 @@ CLI no longer has is retried as a new one that starts from a transcript. Usage c
 - **An assistant tool:** add a `tool({ … })` entry to `TOOLS` in `src/assistant/tools.ts` (schema, description, its
   `running` / `done` labels, `director: true` if the director may use it), then implement it in
   `src/assistant/executor.ts`, where the compiler points until you do. A change goes through `undoable` with what it
-  touches (`show(s)`, `params(i, specs)`, …), never a hand-pushed undo. The browser wrapper (`client-tools.ts`) is
+  touches (`show(s)`, `params(i, specs)`, …, each with the `kind` of change it records), never a hand-pushed undo.
+  A new kind of change also needs its view in `src/components/assistant/AiChange.tsx`. The browser wrapper (`client-tools.ts`) is
   generated from the definitions.
 - **A shortcut:** add it to `HOTKEYS` with a `when` condition (and an `owner` if a panel handles it), give it its
   action in that owner's map (`App.tsx`, or the panel's `useHotkeyActions`; the compiler points there), and put

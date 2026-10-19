@@ -21,10 +21,10 @@ export { TEMPLATE } from './template';
 export { CATEGORIES, scene, userSceneId, type Scene, type SceneExtra, type SceneKind } from './scene';
 
 export const SCENES: readonly Scene[] = [
-  BEAM_FAN,      // 1
-  LIGHT_SHEET,   // 2
-  RING_RUN,      // 3
-  WIRE_SOLID,    // 4
+  WIRE_SOLID,    // 1
+  BEAM_FAN,      // 2
+  LIGHT_SHEET,   // 3
+  RING_RUN,      // 4
   SPECTRUM_RAYS, // 5
   CONTOUR_LINES, // 6
   POINT_STORM,   // 7

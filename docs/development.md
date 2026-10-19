@@ -34,6 +34,11 @@ node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json   # perfor
 node perf/measure.mjs http://localhost:5173/ perf/results/<name>.json --gpu   # same on the real GPU (opens a window), plus a GPU test of every scene
 ```
 
+The guides in `docs/` are also published as a website, built with VitePress, at
+[snuffish.github.io/hallucinate/docs](https://snuffish.github.io/hallucinate/docs/). The Pages workflow builds the site
+next to the web demo. Run `npm run docs:dev` to preview it, or run `npm run docs:build` to build it into `dist/docs/`.
+The site leaves out `docs/agents/` and `docs/research/`.
+
 The README screenshots are taken by `scripts/screenshots.mjs` (run it with the dev server up).
 
 The Listener's real-music clips are listed in `reference/clips.json` and rebuilt with `npm run clips` (needs yt-dlp

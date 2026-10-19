@@ -8,6 +8,7 @@ import { fetchServerSentEvents, type ConnectionAdapter } from '@tanstack/ai-clie
 import type { AppPort } from '../app/app-port';
 import type { StudioSession } from '../app/studio';
 import { Chat, forgetThread } from '../assistant/chat';
+import { DIRECTOR_CHAT, type ChangeDraft, type ChangeLog } from '../assistant/change-log';
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
 import { createLock, serialized, type Lock } from '../assistant/lock';
 import type { Usage } from '../assistant/usage';
@@ -44,6 +45,7 @@ export interface DirectorOptions {
   connection?: ConnectionAdapter;   // tests hand in a fake one
   forgetThread?: (threadId: string) => void;
   lock?: Lock;                      // the assistant panel's tool lock (sessions.ts): their tools never interleave
+  changes?: ChangeLog;              // where what its tools changed is recorded (sessions.ts)
 }
 
 export class Director {
@@ -57,8 +59,11 @@ export class Director {
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly app: AppPort, private readonly studio: StudioSession, private readonly opts: DirectorOptions = {}) {
-    // The director's changes aren't undone from the panel: nothing keeps their undo steps.
-    this.runner = serialized(createToolRunner(app, { push: () => {} }, () => studio), opts.lock ?? createLock());
+    // The director's changes aren't undone from the panel: nothing keeps their undo steps. What they
+    // changed is recorded, for the studio to show.
+    const changes = opts.changes;
+    const sink = { chatId: DIRECTOR_CHAT, push: () => {}, ...(changes && { change: (draft: ChangeDraft) => { changes.add(DIRECTOR_CHAT, draft); } }) };
+    this.runner = serialized(createToolRunner(app, sink, () => studio), opts.lock ?? createLock());
   }
 
   get view(): DirectorView { return this.store.get(); }

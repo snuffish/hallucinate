@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ParamStore, parseParams } from '../engine/params';
 import { COMMON, type Scene } from '../scenes';
+import { memoryStore } from '../state/history-db';
 import { KEYS, flushAll } from '../state/persistence';
+import { SceneHistory, type Version } from '../state/scene-history';
 import { userScene, type ParkedScenes } from '../state/scene-list';
 import { SceneLibrary, SUPERSEDED, type Compiler, type SceneChange } from './scene-library';
 
@@ -30,8 +32,9 @@ function library(o: { broken?: (frag: string) => boolean; compileAsync?: Compile
   };
   const changes: [number, SceneChange][] = [];
   const parked = o.parked ?? { userScenes: [], sceneEdits: {} };
-  const lib = new SceneLibrary(scenes, parked, compiler, new ParamStore(), (i, what) => { changes.push([i, what]); });
-  return { lib, scenes, changes, released, parked };
+  const history = new SceneHistory(memoryStore<Version>());
+  const lib = new SceneLibrary(scenes, parked, compiler, new ParamStore(), (i, what) => { changes.push([i, what]); }, history);
+  return { lib, scenes, changes, released, parked, history };
 }
 
 describe('SceneLibrary code', () => {
@@ -135,5 +138,45 @@ describe('SceneLibrary values', () => {
     lib.resetValues(2);
     expect(lib.values(2)).toEqual({ uGlow: 0 });
     expect(changes.every(([i, what]) => i === 2 && what === 'values')).toBe(true);
+  });
+});
+
+describe('SceneLibrary history', () => {
+  const versions = (h: SceneHistory, key: string) => h.list(key).map((v) => `${v.by}:${v.body}`);
+
+  it('notes each compiled change with who made it, after the code it replaced', async () => {
+    const { lib, history } = library();
+    await history.ready;
+    await lib.compile(0, code('.7'));
+    await lib.compile(0, code('.8'), { by: 'assistant', chatId: 'c1', label: 'Edited Tunnel' });
+    expect(versions(history, 'scene:Tunnel')).toEqual([`assistant:${code('.8')}`, `you:${code('.7')}`, `earlier:${code('1.')}`]);
+    expect(history.list('scene:Tunnel')[0]).toMatchObject({ chatId: 'c1', label: 'Edited Tunnel' });
+  });
+
+  it('notes nothing for code that does not compile, or was superseded', async () => {
+    let release: (v: string | null) => void = () => {};
+    const { lib, history } = library({ broken: (f) => f.includes('vec4(k)') });
+    await history.ready;
+    await lib.compile(2, code('k'));
+    expect(history.list('user:Neon')).toEqual([]);
+    const slow = library({ compileAsync: () => new Promise((r) => { release = r; }) });
+    await slow.history.ready;
+    const first = slow.lib.compile(2, code('.1'));
+    const firstRelease = release;
+    const second = slow.lib.compile(2, code('.2'));
+    firstRelease(null);
+    expect(await first).toBe(SUPERSEDED);
+    release(null);
+    await second;
+    expect(versions(slow.history, 'user:Neon')).toEqual([`you:${code('.2')}`, `earlier:${code('.5')}`]);
+  });
+
+  it('keeps the code a library save overwrote', async () => {
+    const { lib, history } = library();
+    await history.ready;
+    lib.add('Neon', code('.9'), { replace: true });
+    lib.add('Fresh', code('.4'));
+    expect(versions(history, 'user:Neon')).toEqual([`library:${code('.9')}`, `earlier:${code('.5')}`]);
+    expect(versions(history, 'user:Fresh')).toEqual([`library:${code('.4')}`]);
   });
 });

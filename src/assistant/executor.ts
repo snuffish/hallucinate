@@ -16,10 +16,21 @@ import { LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
 import { MAX_PLAN_STEP_SECONDS, PlanSchema, type Plan } from '../state/show-plan';
 import type { z } from 'zod';
 import type { UndoStack } from './undo';
+import type { ChangeDraft, ChangeKind } from './change-log';
 import { TOOL_DEFINITIONS, type ContentParts, type ToolName } from './tools';
 
 export interface AssistantContext { run: ToolRunner }
-export type ToolRunner = (name: string, input: unknown) => Promise<unknown>;
+// `call`: which of the model's tool calls this is, so what it changed can be shown under it.
+export interface ToolCall { toolCallId?: string }
+export type ToolRunner = (name: string, input: unknown, call?: ToolCall) => Promise<unknown>;
+
+// Where a runner's changes go: each one's undo (the panel's stack; the director keeps none) and, when
+// given, its record of what changed (change-log.ts). `chatId`: whose changes they are, for the scenes'
+// history.
+export interface ToolSink extends Pick<UndoStack, 'push'> {
+  change?(draft: ChangeDraft): void;
+  chatId?: string;
+}
 
 type Definition = (typeof TOOL_DEFINITIONS)[number];
 type InputOf<K extends ToolName> = z.output<NonNullable<Extract<Definition, { name: K }>['inputSchema']>>;
@@ -32,8 +43,9 @@ export class UndoConflict extends Error {
   constructor(label: string) { super(`Something changed after "${label}", so it can't be undone without undoing that too.`); this.name = 'UndoConflict'; }
 }
 
-// What a change touches, for its undo: `read` captures it, `write` puts a captured value back.
-interface Touched<S> { read: () => S; write: (before: S) => void }
+// What a change touches, for its undo: `read` captures it, `write` puts a captured value back. `kind`
+// and `scene` say what it is, for the record of what changed.
+interface Touched<S> { read: () => S; write: (before: S) => void; kind: ChangeKind; scene?: string }
 
 const kindOf = (s: Scene) => (s.kind === 'custom' ? 'custom' : s.kind === 'nodes' ? 'visual maker' : s.user ? 'mine' : 'built-in');
 
@@ -163,7 +175,8 @@ function sceneList(list: readonly Scene[]): Record<string, string> {
 }
 
 // `studio` is the show the studio tools act on (null where there is none, e.g. in tests).
-export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, getStudio: () => StudioSession | null = () => null): ToolRunner {
+export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => StudioSession | null = () => null): ToolRunner {
+  let current: { tool: string; toolCallId?: string } = { tool: '' };   // the call running (calls run one at a time)
   const scenes = () => app.state.scenes;
   const findScene = (name: unknown): number => (name == null ? app.sceneIndex : app.sceneByName(String(name)));
   const noScene = (name: unknown) => new Error(`There's no scene called "${String(name)}". Call get_app_state for the exact names.`);
@@ -197,9 +210,10 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
   // Every change a tool makes is one undo step, under one rule: the undo puts back what the change
   // touched only while that is still what the change left. If anything changed it since, the undo
   // refuses (UndoConflict) rather than silently undo that too; if it is already as it was, there is
-  // nothing to do.
+  // nothing to do. Each change is also reported, with what it touched before and after.
   const record = <S>(label: string, touched: Touched<S>, before: S): void => {
     const was = JSON.stringify(before), left = JSON.stringify(touched.read());
+    undo.change?.({ tool: current.tool, toolCallId: current.toolCallId, label, kind: touched.kind, scene: touched.scene, before: JSON.parse(was ?? 'null') as unknown, after: JSON.parse(left ?? 'null') as unknown });
     undo.push({ label, undo: () => {
       const now = JSON.stringify(touched.read());
       if (now === was) return;
@@ -216,29 +230,35 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
   };
 
   // What the tools touch.
-  const show = (s: StudioSession): Touched<ShowSnapshot> => ({ read: () => s.snapshot(), write: (b) => s.restore(b) });
+  const show = (s: StudioSession): Touched<ShowSnapshot> => ({ kind: 'show', read: () => s.snapshot(), write: (b) => s.restore(b) });
   const transition = (s: StudioSession): Touched<{ mode: 'cut' | 'fade'; seconds: number }> => ({
+    kind: 'transition',
     read: () => ({ mode: s.mode, seconds: s.seconds }),
     write: (b) => { s.setMode(b.mode); s.setSeconds(b.seconds); },
   });
   const autopilot = (s: StudioSession): Touched<StudioSession['autopilot']> => ({
+    kind: 'autopilot',
     read: () => ({ ...s.autopilot }),
     write: (b) => { s.setAutoBeats(b.beats); s.setAutoSeconds(b.seconds); s.setAutoUnit(b.unit); s.setAutopilot(b.on); },
   });
   // A plan comes with the autopilot switched on: one step, so undoing it switches it back off.
   const planning = (s: StudioSession): Touched<{ show: ShowSnapshot; on: boolean }> => ({
+    kind: 'plan',
     read: () => ({ show: s.snapshot(), on: s.autopilot.on }),
     write: (b) => { s.restore(b.show); if (s.autopilot.on !== b.on) s.setAutopilot(b.on); },
   });
   const code = (i: number): Touched<string> => ({
+    kind: 'code', scene: scenes()[i]?.name,
     read: () => app.editor.target(i).body,
-    write: (b) => { void app.editor.compileInto(app.editor.target(i), b); app.setScene(i); },
+    write: (b) => { void app.editor.compileInto(app.editor.target(i), b, { by: 'undo' }); app.setScene(i); },
   });
   const params = (i: number, specs: readonly ParamSpec[]): Touched<ParamValues> => ({
+    kind: 'values', scene: scenes()[i]?.name,
     read: () => { const v = app.library.values(i); return Object.fromEntries(specs.map((s) => [s.name, structuredClone(v[s.name]!)])); },
     write: (b) => app.library.setValues(i, b),
   });
   const look = (keys: readonly LookKey[]): Touched<Partial<Record<LookKey, number>>> => ({
+    kind: 'look',
     read: () => Object.fromEntries(keys.map((k) => [k, app.state.look[k]])),
     write: (b) => { for (const k of keys) app.setLook(k, b[k]!); },
   });
@@ -262,7 +282,7 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
   const compile = async ({ i, t }: ReturnType<typeof editable>, source: string, lines: string) => {
     const before = t.body;
     app.setScene(i);
-    const error = await app.editor.compileInto(t, source);
+    const error = await app.editor.compileInto(t, source, { by: 'assistant', label: `Edited ${t.name}`, chatId: undo.chatId, toolCallId: current.toolCallId });
     if (error === SUPERSEDED) throw new Error('Another edit to this scene replaced your code before it compiled. Read the scene\'s code again before changing it.');
     if (error) throw new Error(`It didn't compile; the previous version is still running. Errors (line numbers count from ${lines}):\n${error}`);
     record(`Edited ${t.name}`, code(i), before);
@@ -316,11 +336,12 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
 
     create_scene({ name, code }) {
       const n = String(name).trim().slice(0, 60);
-      const out = app.library.add(n, String(code));
+      const out = app.library.add(n, String(code), { origin: { by: 'assistant', label: `Created "${n}"`, chatId: undo.chatId, toolCallId: current.toolCallId } });
       if ('error' in out) throw new Error(out.error.includes('exists') ? `${out.error} Pick another name, or edit it with write_scene_code.` : `It didn't compile, so nothing was created:\n${out.error}`);
       app.setScene(out.index);
       // Undo removes it again, unless the user has edited it since. (Deleted already: nothing to do.)
       const created: Touched<string | null> = {
+        kind: 'created', scene: n,
         read: () => { const x = scenes()[out.index]; return x && !x.removed ? x.body : null; },
         write: () => app.library.remove(out.index),
       };
@@ -488,12 +509,13 @@ export function createToolRunner(app: AppPort, undo: Pick<UndoStack, 'push'>, ge
     },
   };
 
-  return async (name, input) => {
+  return async (name, input, call) => {
     const definition = DEFINITIONS.get(name);
     if (!definition) throw new Error(`Unknown tool "${name}".`);
     const parsed = (definition.inputSchema as z.ZodType).safeParse(input ?? {});
     if (!parsed.success) throw new Error(`The input doesn't fit ${name}: ${parsed.error.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ')}`);
     const tool = tools[name as ToolName] as (input: unknown) => Promise<unknown> | unknown;
+    current = { tool: name, toolCallId: call?.toolCallId };
     try {
       return await tool(parsed.data);
     } catch (err) {

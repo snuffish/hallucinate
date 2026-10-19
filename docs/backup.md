@@ -9,7 +9,8 @@ edits to built-in scenes, *My Shader*, the visual maker graph, live parameter va
 their effects, plan, autopilot and director settings), favourites and the auto-switch rotation, volume and *pitch follows speed*, the
 widget layout and *Use the video's sound*.
 
-It doesn't include recently played tracks, the loaded media, the assistant's conversations
+It doesn't include recently played tracks, the loaded media, your scenes' [History](editor.md#history) and what the
+assistant changed (both stay on this computer), the assistant's conversations
 (export one as Markdown from the conversation list instead), the Look sliders, which aren't saved between sessions
 anyway, or the device [settings](settings.md) (render quality, microphone processing, when the controls hide), which
 belong to the computer rather than the setup. Files over 5 MB aren't imported.
