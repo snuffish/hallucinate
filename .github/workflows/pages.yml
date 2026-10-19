@@ -30,6 +30,9 @@ jobs:
         env:
           VITE_STATIC_DEMO: '1'
           BASE_PATH: /hallucinate/
+      - run: npm run docs:build   # docs/ as a site, under dist/docs (after the app build, which empties dist/)
+        env:
+          BASE_PATH: /hallucinate/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
