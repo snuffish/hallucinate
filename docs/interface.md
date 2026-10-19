@@ -51,3 +51,35 @@ whether buttons show their key badges.
 Every button with a shortcut shows its key as a small badge, and the badge lights up while you hold a modifier.
 Press **?** for a sheet with every shortcut, or click the **?** next to any panel's close button for a short help
 popover about that panel and the shortcuts that work there. The full list is also in [Keys](keys.md).
+
+## System log
+
+**Shift+S** opens the System log over the main window: everything the app has said since the page loaded, as it
+happens. It records from the first line, so it has the lines from before you opened it; while it is closed, a red
+badge in the monitors' corner counts the errors you haven't seen, and a click on it opens the log.
+
+- **Where the lines come from** – *Console*: the page's `console` and the errors nothing caught (an uncaught error,
+  a promise nobody handled, a shader that doesn't compile, the GPU losing its context). *App*: what the app did:
+  the scene on screen, the music starting or failing to, the tempo locking and letting go, projectors opening and
+  closing, media loading, export and import, a recording saved. *Server*: the local server's lines, each `/api`
+  request with its status and time, and the assistant's traffic with the Claude CLI. They come only while the log
+  is open, only from the app's own server (`npm run dev`, `npm run preview`, the desktop app) and only on the
+  computer it runs on: a device reaching an app started with `HOST=0.0.0.0` is refused them. *Desktop app*: in the
+  [desktop app](desktop.md), its main process: its console and uncaught errors, windows crashing or hanging, the GPU
+  process going away, permissions refused. *Commands*: what you typed and the answers.
+- **Showing what you need** – the level buttons switch errors, warnings, info and debug on and off, each with its
+  count; the menu picks one source; the search box keeps the lines containing your text (in a line's detail too).
+  **Pause** holds the lines still while new ones keep coming behind it. A line with more to it (a stack, a whole
+  object) opens with a click. The same line again right after counts up (×2, ×3…) instead of repeating. It keeps
+  the last 2000 lines and draws the newest 500.
+- **Copy / Export** – the lines that match, every one of them, one per line with the time, level and source:
+  to the clipboard, or saved as a `.log` file.
+- **Commands** – the field at the bottom. `help` lists them and `help <name>` says what one takes; `level warn`,
+  `source server` and `filter <text>` set what is shown; `clear`, `copy` and `export` do what their buttons do.
+  Every [assistant tool](assistant.md) runs here by name, exactly as the assistant runs it, with its input as
+  `key=value` pairs or JSON: `state` (what is on screen), `switch_scene scene="Ring Run"`, `set_look {"hue": 0.3}`.
+  A change one makes goes on the assistant's undo stack: `undo` (or the assistant's Undo) takes it back. ↑ and ↓
+  step through the commands you typed before, even after a reload; Tab completes a name.
+
+It sits under the other monitors (Shift+P, Shift+L) and moves like the Hearing monitor: drag it by any part but its
+buttons, fields and lines, and it opens there next time; a double-click puts it back in the corner.

@@ -327,7 +327,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .crash-actions button { flex: 1; }
 
 
-/* The monitors: the performance overlay (Shift+P) and the Hearing monitor (Shift+L), stacked in one corner.
+/* The monitors: the performance overlay (Shift+P), the Hearing monitor (Shift+L) and the System log (Shift+S), stacked in one corner.
    Inset by the docks like the other overlays; only their buttons take clicks. */
 .monitors {
   z-index: var(--z-perf);
@@ -344,7 +344,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 .perf { width: min(380px, 100%); box-sizing: border-box; }
 .hearing { width: 100%; box-sizing: border-box; }
-.perf, .hearing {
+.perf, .hearing, .syslog {
   background: var(--glass);
   backdrop-filter: blur(12px);
   border: 1px solid var(--line);
@@ -354,7 +354,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
-.perf[hidden], .hearing[hidden] { display: none; }
+.perf[hidden], .hearing[hidden], .syslog[hidden] { display: none; }
 .perf-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
 .perf-head b { font-size: 16px; }
 .perf-head span { color: var(--muted); }
@@ -385,6 +385,46 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .hearing.moved { position: fixed; width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - var(--player-bar) - 32px); }
 .hearing.dragging { box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
 .hearing.dragging, .hearing.dragging * { cursor: grabbing; }
+.syslog { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; max-height: min(460px, 100%); pointer-events: auto; }
+.syslog[data-draggable] { cursor: grab; touch-action: none; }
+.syslog.moved { position: fixed; width: min(620px, calc(100vw - 32px)); max-height: min(460px, calc(100vh - var(--player-bar) - 32px)); }
+.syslog.dragging { box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.syslog.dragging, .syslog.dragging * { cursor: grabbing; }
+.syslog-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.syslog-head b { font-size: 14px; }
+.syslog-head .help-btn { margin-left: auto; }
+.syslog button, .syslog select, .syslog input { font: inherit; color: inherit; cursor: pointer; }
+.syslog-levels { display: flex; gap: 4px; flex-wrap: wrap; }
+.syslog-level { --lvl: var(--muted); display: inline-flex; gap: 5px; align-items: baseline; padding: 1px 8px; border: 1px solid color-mix(in srgb, var(--lvl) 40%, transparent); border-radius: 999px; background: none; color: var(--muted); opacity: 0.65; }
+.syslog-level[aria-pressed="true"] { border-color: var(--lvl); background: color-mix(in srgb, var(--lvl) 18%, transparent); color: var(--text); opacity: 1; }
+.syslog-level output { font-size: 10px; color: var(--muted); }
+.syslog .error { --lvl: #ff4f7b; }
+.syslog .warn { --lvl: #ffd84f; }
+.syslog .info { --lvl: #4fc3ff; }
+.syslog .debug { --lvl: #9a8fb0; }
+.syslog-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0 6px; }
+.syslog-tools input[type="search"] { flex: 1 1 120px; min-width: 0; cursor: text; }
+.syslog-tools button, .syslog-tools select, .syslog-tools input { padding: 2px 9px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 255, 255, 0.04); }
+.syslog-pause[aria-pressed="true"] { border-color: #ffd84f; color: #ffd84f; }
+/* The lines are text you can select and copy, so they never start a drag. */
+.syslog-lines { flex: 1 1 auto; min-height: 80px; margin: 0; padding: 4px 0; list-style: none; overflow: auto; overscroll-behavior: contain; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); cursor: text; user-select: text; }
+.syslog-line { display: grid; grid-template-columns: auto 4.5em 1fr; gap: 8px; padding: 1px 4px; border-left: 2px solid var(--lvl); }
+.syslog-line.error { background: rgba(255, 79, 123, 0.08); }
+.syslog-line.warn { background: rgba(255, 216, 79, 0.06); }
+.syslog-line time, .syslog-src { color: var(--muted); }
+.syslog-line.debug .syslog-text { color: var(--muted); }
+.syslog-text { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.syslog-expand { padding: 0; border: 0; background: none; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.syslog-text pre { margin: 2px 0 4px; padding: 4px 6px; max-height: 220px; overflow: auto; border-radius: 4px; background: rgba(0, 0, 0, 0.3); font: inherit; font-size: 11px; white-space: pre-wrap; }
+.syslog-repeat { margin-left: 6px; padding: 0 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); font-size: 10px; }
+.syslog-more, .syslog-empty { padding: 2px 4px; color: var(--muted); font-family: system-ui, sans-serif; }
+.syslog-command { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.syslog-command span { color: var(--accent2); }
+.syslog-command input { flex: 1; min-width: 0; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: rgba(0, 0, 0, 0.25); cursor: text; }
+.syslog-hint { margin-top: 6px; color: var(--muted); font-family: system-ui, sans-serif; }
+.syslog-hint code { font-family: inherit; color: var(--text); }
+.log-badge { pointer-events: auto; display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px; border: 1px solid #ff4f7b; border-radius: 999px; background: color-mix(in srgb, #ff4f7b 25%, var(--glass)); color: var(--text); font: 12px system-ui, sans-serif; cursor: pointer; }
+.log-badge[hidden] { display: none; }
 .hearing-light { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .hearing-light.kick { background: #ff4fd8; }
 .hearing-light.tick { background: #4fffa0; }

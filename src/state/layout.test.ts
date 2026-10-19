@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KEYS } from './persistence';
 import {
-  DEFAULT_LAYOUT, DROP_EDGE, WIDGET_IDS, chatPlacement, dock, dropTarget, type DockView, effective, float, floatToPx, loadLayout, moveBubble, moveHearing, parseLayout,
-  CHAT_MIN_H, CHAT_MIN_W, DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetHearing, resetLayout, resetWidget, resize, resizeChat, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
+  DEFAULT_LAYOUT, DROP_EDGE, WIDGET_IDS, chatPlacement, dock, dropTarget, type DockView, effective, float, floatToPx, loadLayout, moveBubble, moveHearing, moveMonitor, parseLayout,
+  CHAT_MIN_H, CHAT_MIN_W, DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetHearing, resetLayout, resetMonitor, resetWidget, resize, resizeChat, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
 } from './layout';
 
 const VIEW = { width: 1280, height: 720 };
@@ -109,6 +109,17 @@ describe('layout', () => {
     expect(effective(l, true).hearing).toBe(effective(l, true).hearing);   // selected from the store: a new object each time loops
     expect(resetHearing(l).hearing).toEqual({ kind: 'auto' });
     expect(resetLayout().hearing).toEqual({ kind: 'auto' });
+  });
+
+  it('keeps each monitor where it was dropped, apart', () => {
+    expect(DEFAULT_LAYOUT.log).toEqual({ kind: 'auto' });
+    const l = moveMonitor(resetLayout(), 'log', { left: 40, top: 400, width: 620, height: 300 }, VIEW);
+    expect(l.log).toEqual({ kind: 'float', ax: 'l', ay: 'b', dx: 40, dy: 720 - 400 - 300 });
+    expect(l.hearing).toEqual({ kind: 'auto' });
+    expect(effective(l, true).log).toBe(effective(l, true).hearing);
+    expect(resetMonitor(l, 'log').log).toEqual({ kind: 'auto' });
+    expect(parseLayout(JSON.parse(JSON.stringify(l))).log).toEqual(l.log);
+    expect(parseLayout({ ...JSON.parse(JSON.stringify(l)), log: { kind: 'float' } }).log).toEqual({ kind: 'auto' });
   });
 
   it('opens the chat toward the room from a bubble in each corner', () => {

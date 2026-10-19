@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased — System log (2026-10-19)
+
+### Added
+
+- A **System log** (Shift+S): everything the app has said since the page loaded, as it happens. The page's console
+  and the errors nothing caught (an uncaught error, an unhandled rejection, a shader that doesn't compile, the GPU
+  losing its context); the app's own events (the scene on screen, the music starting or failing, the tempo locking
+  and letting go, projectors, media, export and import, recordings); and, while it is open, the local server's lines:
+  each `/api` request with its status and time, and the assistant's traffic with the Claude CLI (on the computer the
+  server runs on only). Filter by level (each with its count), source and text; pause; clear; open a line's stack
+  with a click; repeated lines count up instead of repeating. **Copy** and **Export** (a `.log` file) take every line
+  that matches.
+- While the System log is closed, a red **badge** in the monitors' corner counts the errors you haven't seen; a click
+  opens the log.
+- The System log's **command line** runs every assistant tool by name, as the assistant runs it, with its input as
+  `key=value` pairs or JSON (`switch_scene scene="Ring Run"`, `set_look {"hue": 0.3}`, `state`), plus its own
+  commands (`help`, `level`, `source`, `filter`, `clear`, `copy`, `export`, `undo`). A tool's change goes on the
+  assistant's undo stack. ↑ / ↓ bring back earlier commands, even after a reload; Tab completes a name.
+- In the desktop app the System log also shows the **main process** (source *Desktop app*): its console, errors
+  nothing caught and Node's warnings, the version and address it serves on, a window's page crashing or not
+  responding, a helper process such as the GPU going away, a page failing to load, and permissions refused. They
+  travel with the server's lines, since the server runs in the main process (not with `npm run desktop`, whose
+  window loads the Vite dev server).
+- The local server streams its lines at `GET /api/log` (server-sent events: the last 500, then each new one).
+
+### Changed
+
+- The Hearing monitor and the System log share one way of being dragged and put back (`useMonitorDrag`), and the
+  layout keeps each monitor's place apart.
+
 ## Unreleased — scene history and what the assistant changed (2026-10-19)
 
 ### Added
