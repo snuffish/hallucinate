@@ -18,6 +18,11 @@
   `key=value` pairs or JSON (`switch_scene scene="Ring Run"`, `set_look {"hue": 0.3}`, `state`), plus its own
   commands (`help`, `level`, `source`, `filter`, `clear`, `copy`, `export`, `undo`). A tool's change goes on the
   assistant's undo stack. ↑ / ↓ bring back earlier commands, even after a reload; Tab completes a name.
+- In the desktop app the System log also shows the **main process** (source *Desktop app*): its console, errors
+  nothing caught and Node's warnings, the version and address it serves on, a window's page crashing or not
+  responding, a helper process such as the GPU going away, a page failing to load, and permissions refused. They
+  travel with the server's lines, since the server runs in the main process (not with `npm run desktop`, whose
+  window loads the Vite dev server).
 - The local server streams its lines at `GET /api/log` (server-sent events: the last 500, then each new one).
 
 ### Changed

@@ -38,6 +38,12 @@ tab keeps them as run artifacts.
   system audio; use the microphone / line-in or a loopback device instead.
 - **Projectors** work as in Chrome: *Detect displays* lists the screens without asking, and projector windows are
   ordinary app windows.
+- **The [System log](interface.md#system-log)** (Shift+S) also shows the app's main process, under *Desktop app*: its
+  console, errors nothing caught and Node's warnings, the version and address it serves on, and what Electron reports:
+  a window's page crashing or not responding, a helper process (the GPU, audio, the network service) going away, a
+  page failing to load, a permission refused (the microphone on macOS too). They reach the window the way the server's
+  lines do, since the server runs in the main process. With `npm run desktop` the window loads the Vite dev server
+  instead, so there they stay in the terminal.
 
 ## 🌐 Web demo
 

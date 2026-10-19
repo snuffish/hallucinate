@@ -64,8 +64,9 @@ badge in the monitors' corner counts the errors you haven't seen, and a click on
   closing, media loading, export and import, a recording saved. *Server*: the local server's lines, each `/api`
   request with its status and time, and the assistant's traffic with the Claude CLI. They come only while the log
   is open, only from the app's own server (`npm run dev`, `npm run preview`, the desktop app) and only on the
-  computer it runs on: a device reaching an app started with `HOST=0.0.0.0` is refused them. *Commands*: what you
-  typed and the answers.
+  computer it runs on: a device reaching an app started with `HOST=0.0.0.0` is refused them. *Desktop app*: in the
+  [desktop app](desktop.md), its main process: its console and uncaught errors, windows crashing or hanging, the GPU
+  process going away, permissions refused. *Commands*: what you typed and the answers.
 - **Showing what you need** – the level buttons switch errors, warnings, info and debug on and off, each with its
   count; the menu picks one source; the search box keeps the lines containing your text (in a line's detail too).
   **Pause** holds the lines still while new ones keep coming behind it. A line with more to it (a stack, a whole

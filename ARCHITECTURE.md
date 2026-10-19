@@ -188,7 +188,11 @@ at the controller's choke points (`showScene`, `sourceStarted`, the failure path
 its own ring (`server/log.ts`: the assistant's `debug()` lines and one line per `/api` request, written by `logged()`
 around every route) and streams it at `GET /api/log`, loopback hosts only; the panel follows it with an
 `EventSource` (`src/log/server-stream.ts`) only while open. The server does not capture its process's console: the
-Vite dev server prints the page's console errors there, which the log already has. Commands
+Vite dev server prints the page's console errors there, which the log already has. The desktop app's main process
+does (`desktop/main-log.ts`, installed by `main.ts`'s first import): its console, `uncaughtExceptionMonitor` (which
+watches without changing how Electron handles the error) and Node's `warning` events, plus Electron's
+`render-process-gone`, `child-process-gone`, `unresponsive` and `did-fail-load`, written into the same ring with
+`origin: 'desktop'`. The server runs in that process, so they reach the window over `/api/log` with no IPC or preload. Commands
 (`src/log/commands.ts`) parse to a built-in or an assistant tool by name; tools run through `Sessions.commands`, the
 same `createToolRunner` on the same lock as the assistant and the director, its undo on the assistant's stack.
 

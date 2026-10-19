@@ -7,7 +7,7 @@
 //   level warn · source server · filter kick · clear · copy · export · undo · help [name]
 
 import { TOOL_DEFINITIONS } from '../assistant/tools';
-import { LEVELS, SOURCES, type LogLevel, type LogSource } from './system-log';
+import { LEVELS, SOURCES, type LogLevel, type LogSource, type SourcePick } from './system-log';
 
 export const BUILTINS = {
   help: 'help [command or tool]: what you can type, or what one command or tool takes',
@@ -26,7 +26,7 @@ export type Command =
   | { kind: 'builtin'; name: 'help'; topic: string | null }
   | { kind: 'builtin'; name: 'clear' | 'copy' | 'export' | 'undo' }
   | { kind: 'builtin'; name: 'level'; levels: LogLevel[] }
-  | { kind: 'builtin'; name: 'source'; sources: LogSource[] }
+  | { kind: 'builtin'; name: 'source'; source: SourcePick }
   | { kind: 'builtin'; name: 'filter'; query: string }
   | { kind: 'tool'; name: string; input: Record<string, unknown> }
   | { kind: 'error'; message: string };
@@ -104,10 +104,9 @@ export function parseCommand(line: string): Command | null {
       return { kind: 'builtin', name: 'level', levels: LEVELS.slice(0, at + 1) };
     }
     case 'source': {
-      if (arg === 'all' || !arg) return { kind: 'builtin', name: 'source', sources: [...SOURCES] };
+      if (arg === 'all' || !arg) return { kind: 'builtin', name: 'source', source: 'all' };
       if (!SOURCES.includes(arg as LogSource)) return { kind: 'error', message: `source takes ${SOURCES.join(', ')} or all.` };
-      // A command's answer is always shown: you just asked for it.
-      return { kind: 'builtin', name: 'source', sources: arg === 'command' ? ['command'] : [arg as LogSource, 'command'] };
+      return { kind: 'builtin', name: 'source', source: arg as LogSource };
     }
     case 'filter': return { kind: 'builtin', name: 'filter', query: rest };
     case 'state': return { kind: 'tool', name: 'get_app_state', input: {} };

@@ -7,7 +7,7 @@ import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { complete, helpText, parseCommand, type Command } from '../log/commands';
 import { followServer } from '../log/server-stream';
-import { LEVELS, SOURCES, counts, filterEntries, toText, type LogEntry, type LogFilter, type LogLevel, type LogSource } from '../log/system-log';
+import { LEVELS, SOURCES, counts, filterEntries, sourcesFor, toText, type LogEntry, type LogLevel, type SourcePick } from '../log/system-log';
 import { KEYS, readJSON, readWithDefaults, writeJSON } from '../state/persistence';
 import { useStore } from '../state/store';
 import { HelpButton } from './Help';
@@ -19,13 +19,13 @@ const STICK_PX = 24;          // this close to the bottom, new lines keep it scr
 
 const ViewSchema = z.object({
   levels: z.array(z.enum(LEVELS)).default([...LEVELS]),
-  sources: z.array(z.enum(SOURCES)).default([...SOURCES]),
+  source: z.enum(['all', ...SOURCES]).catch('all'),   // one place, so a source added later shows under "all"
   query: z.string().default(''),
 });
 const HistorySchema = z.array(z.string());
 
 const LEVEL_LABEL: Record<LogLevel, string> = { error: 'Errors', warn: 'Warnings', info: 'Info', debug: 'Debug' };
-const SOURCE_LABEL: Record<LogSource | 'all', string> = { all: 'Everywhere', console: 'Console', server: 'Server', app: 'App', command: 'Commands' };
+const SOURCE_LABEL: Record<SourcePick, string> = { all: 'Everywhere', console: 'Console', server: 'Server', desktop: 'Desktop app', app: 'App', command: 'Commands' };
 
 const pad = (n: number, w = 2) => String(n).padStart(w, '0');
 const clock = (t: number) => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`; };
@@ -58,9 +58,10 @@ export function LogBadge() {
   );
 }
 
-function useView(): [LogFilter, (patch: Partial<LogFilter>) => void] {
-  const [view, setView] = useState<LogFilter>(() => readWithDefaults(KEYS.systemLogView, ViewSchema));
-  const patch = (p: Partial<LogFilter>) => setView((v) => { const next = { ...v, ...p }; writeJSON(KEYS.systemLogView, next); return next; });
+type View = z.infer<typeof ViewSchema>;
+function useView(): [View, (patch: Partial<View>) => void] {
+  const [view, setView] = useState<View>(() => readWithDefaults(KEYS.systemLogView, ViewSchema));
+  const patch = (p: Partial<View>) => setView((v) => { const next = { ...v, ...p }; writeJSON(KEYS.systemLogView, next); return next; });
   return [view, patch];
 }
 
@@ -77,9 +78,10 @@ function LogPanel() {
   useEffect(() => followServer(log), [log]);
 
   const all = paused ?? log.entries();
-  const matching = filterEntries(all, view);
+  const filter = { levels: view.levels, sources: sourcesFor(view.source), query: view.query };
+  const matching = filterEntries(all, filter);
   const shown = matching.slice(-SHOWN);
-  const n = counts(filterEntries(all, { ...view, levels: LEVELS }));
+  const n = counts(filterEntries(all, { ...filter, levels: LEVELS }));
 
   const list = useRef<HTMLOListElement>(null);
   const stick = useRef(true);
@@ -93,8 +95,6 @@ function LogPanel() {
   };
 
   const toggleLevel = (level: LogLevel) => setView({ levels: view.levels.includes(level) ? view.levels.filter((l) => l !== level) : LEVELS.filter((l) => l === level || view.levels.includes(l)) });
-  const source = view.sources.length === SOURCES.length ? 'all' : view.sources.find((s) => s !== 'command') ?? 'command';
-  const setSource = (s: LogSource | 'all') => setView({ sources: s === 'all' ? [...SOURCES] : s === 'command' ? ['command'] : [s, 'command'] });
   const toggleOpen = (id: number) => setOpen((o) => { const next = new Set(o); if (!next.delete(id)) next.add(id); return next; });
 
   const say = (level: LogLevel, text: string, detail?: string) => log.push({ level, source: 'command', text, detail });
@@ -129,7 +129,7 @@ function LogPanel() {
         <HelpButton topic="log" />
       </div>
       <div className="syslog-tools">
-        <select aria-label="Source" value={source} onChange={(e) => setSource(e.target.value as LogSource | 'all')}>
+        <select aria-label="Source" value={view.source} onChange={(e) => setView({ source: e.target.value as SourcePick })}>
           {(['all', ...SOURCES] as const).map((s) => <option key={s} value={s}>{SOURCE_LABEL[s]}</option>)}
         </select>
         <input type="search" aria-label="Search the log" placeholder="Search…" value={view.query} onChange={(e) => setView({ query: e.target.value })} />
@@ -166,7 +166,7 @@ function LogPanel() {
             case 'copy': return copy();
             case 'export': return save();
             case 'level': return setView({ levels: cmd.levels });
-            case 'source': return setView({ sources: cmd.sources });
+            case 'source': return setView({ source: cmd.source });
             case 'filter': return setView({ query: cmd.query });
             case 'undo': return undo();
           }

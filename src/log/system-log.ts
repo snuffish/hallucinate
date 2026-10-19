@@ -6,10 +6,15 @@ import { Store } from '../state/store';
 
 export const LEVELS = ['error', 'warn', 'info', 'debug'] as const;
 export type LogLevel = (typeof LEVELS)[number];
-// Where a line came from: the page's console (and its uncaught errors), the local server, the app's own
-// events (scenes, music, tempo, the GPU), or a command typed into the log and its answer.
-export const SOURCES = ['console', 'server', 'app', 'command'] as const;
+// Where a line came from: the page's console (and its uncaught errors), the local server, the desktop app's
+// main process (Electron), the app's own events (scenes, music, tempo, the GPU), or a command typed into the
+// log and its answer.
+export const SOURCES = ['console', 'server', 'desktop', 'app', 'command'] as const;
 export type LogSource = (typeof SOURCES)[number];
+// What the source menu (and `source`) picks: one place, or all of them. A command's answer always shows: you
+// just asked for it.
+export type SourcePick = LogSource | 'all';
+export const sourcesFor = (pick: SourcePick): LogSource[] => (pick === 'all' ? [...SOURCES] : pick === 'command' ? ['command'] : [pick, 'command']);
 
 export interface LogEntry {
   id: number;

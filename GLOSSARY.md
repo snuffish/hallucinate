@@ -132,7 +132,7 @@ _Avoid_: go, switch
 
 **System log**:
 An overlay that shows what the app has said since the page loaded: the page's console and the errors nothing caught,
-the local server's lines, and the app's own events (the scene, the music, the tempo, projectors, the GPU). It filters
+the local server's and the desktop app's main process's lines, and the app's own events (the scene, the music, the tempo, projectors, the GPU). It filters
 by level, source and text, copies or exports what it shows, counts unseen errors in a badge while closed, and takes
 commands that run the assistant's tools by name.
 _Avoid_: console, devtools, debug panel, log viewer

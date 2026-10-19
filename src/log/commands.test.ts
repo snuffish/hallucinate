@@ -9,8 +9,9 @@ describe('parseCommand', () => {
     expect(parseCommand('CLEAR')).toEqual({ kind: 'builtin', name: 'clear' });
     expect(parseCommand('level warn')).toEqual({ kind: 'builtin', name: 'level', levels: ['error', 'warn'] });
     expect(parseCommand('level loud')).toMatchObject({ kind: 'error' });
-    expect(parseCommand('source server')).toEqual({ kind: 'builtin', name: 'source', sources: ['server', 'command'] });
-    expect(parseCommand('source all')).toMatchObject({ sources: ['console', 'server', 'app', 'command'] });
+    expect(parseCommand('source server')).toEqual({ kind: 'builtin', name: 'source', source: 'server' });
+    expect(parseCommand('source Desktop')).toEqual({ kind: 'builtin', name: 'source', source: 'desktop' });
+    expect(parseCommand('source all')).toMatchObject({ source: 'all' });
     expect(parseCommand('source disk')).toMatchObject({ kind: 'error' });
     expect(parseCommand('filter Ring Run')).toEqual({ kind: 'builtin', name: 'filter', query: 'Ring Run' });
     expect(parseCommand('state')).toEqual({ kind: 'tool', name: 'get_app_state', input: {} });

@@ -5,6 +5,7 @@
 // Read when the routes are built (apiRoutes), never when a module loads: the desktop app copies these from
 // the login shell (desktop/env.ts) after its modules have loaded.
 
+import { format } from 'node:util';
 import { formatServerArgs, serverLog } from './log';
 
 export const PROGRAM_ENV = {
@@ -36,5 +37,5 @@ export function programs(env: NodeJS.ProcessEnv = process.env): Programs {
 export const debug = (...args: unknown[]): void => {
   const { text, detail } = formatServerArgs(['[assistant]', ...args]);
   serverLog.push('debug', text, detail);
-  if (process.env[PROGRAM_ENV.debug]) console.error('[assistant]', ...args);
+  if (process.env[PROGRAM_ENV.debug]) process.stderr.write(`${format('[assistant]', ...args)}\n`);   // not console.error: the desktop app's main process logs that too
 };

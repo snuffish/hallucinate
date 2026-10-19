@@ -1,6 +1,7 @@
-// The local server's lines in the System log: /api/log streams what it said before the log opened, then
-// each new line. Followed only while the log is open (a browser has few connections per server, and the
-// downloads and the assistant stream too); a reconnect's backlog skips the lines already here.
+// The local server's lines in the System log, and in the desktop app the main process's (it hosts the
+// server): /api/log streams what they said before the log opened, then each new line. Followed only while the
+// log is open (a browser has few connections per server, and the downloads and the assistant stream too); a
+// reconnect's backlog skips the lines already here.
 
 import { z } from 'zod';
 import type { SystemLog } from './system-log';
@@ -9,6 +10,7 @@ export const LOG_URL = '/api/log';
 
 const ServerLineSchema = z.object({
   id: z.number(), t: z.number(), level: z.enum(['error', 'warn', 'info', 'debug']), text: z.string(), detail: z.string().optional(),
+  origin: z.enum(['server', 'desktop']).catch('server'),   // the desktop app's main process writes into the server's log
 });
 
 // Whether a line from the stream is new here. The server numbers its lines; a server started again
@@ -30,8 +32,8 @@ export function followServer(log: SystemLog, url = LOG_URL): () => void {
     const line = ServerLineSchema.safeParse(data);
     if (!line.success || !isNew(line.data, last)) return;
     last = { id: line.data.id, t: line.data.t };
-    const { level, text, detail, t } = line.data;
-    log.push({ level, source: 'server', text, detail, t });
+    const { level, text, detail, t, origin } = line.data;
+    log.push({ level, source: origin, text, detail, t });
   });
   source.addEventListener('error', () => {
     // CLOSED: refused or not there (a static host has no server); else the browser tries again by itself.

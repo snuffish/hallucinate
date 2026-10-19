@@ -1,14 +1,17 @@
 // The local server's side of the System log (Shift+S): the lines the server has to say (the assistant's
 // debug lines, each /api request and how it went), kept in a ring and streamed to the app over /api/log as
 // server-sent events: the lines so far, then each new one. Not the process's console: the dev server prints
-// the page's own console errors there, which the log has already.
+// the page's own console errors there, which the log has already. In the desktop app the server runs in
+// Electron's main process, which writes its own lines here too (desktop/main-log.ts), marked `desktop`.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { inspect } from 'node:util';
 import { isLoopbackHost, type Handler } from './guard';
 
 export type ServerLevel = 'error' | 'warn' | 'info' | 'debug';
-export interface ServerLine { id: number; t: number; level: ServerLevel; text: string; detail?: string }
+// Who said it: the server, or the desktop app's main process it runs in.
+export type LineOrigin = 'server' | 'desktop';
+export interface ServerLine { id: number; t: number; level: ServerLevel; origin: LineOrigin; text: string; detail?: string }
 
 export const SERVER_LOG_CAP = 500;
 export const LOG_EVENT = 'line';
@@ -20,8 +23,8 @@ export class ServerLog {
 
   constructor(private readonly cap = SERVER_LOG_CAP) {}
 
-  push(level: ServerLevel, text: string, detail?: string): ServerLine {
-    const line: ServerLine = { id: this.nextId++, t: Date.now(), level, text, ...(detail && { detail }) };
+  push(level: ServerLevel, text: string, detail?: string, origin: LineOrigin = 'server'): ServerLine {
+    const line: ServerLine = { id: this.nextId++, t: Date.now(), level, origin, text, ...(detail && { detail }) };
     this.lines.push(line);
     if (this.lines.length > this.cap) this.lines.splice(0, this.lines.length - this.cap);
     for (const l of this.listeners) l(line);
@@ -36,7 +39,7 @@ export class ServerLog {
   }
 }
 
-// The server's one log: the routes and the assistant's debug lines write here.
+// The server's one log: the routes, the assistant's debug lines and (in the desktop app) the main process write here.
 export const serverLog = new ServerLog();
 
 // Console arguments as one line and the rest, the way node prints them.

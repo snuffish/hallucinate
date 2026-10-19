@@ -38,6 +38,21 @@ test('desktop: serves the app and the API from its own fixed origin', async () =
   expect(await page.title()).toBe('Hallucinate');
 });
 
+test('desktop: the System log shows the main process\'s lines beside the server\'s', async () => {
+  await app.evaluate(() => console.warn('a warning from the main process'));
+  await page.keyboard.press('Shift+S');
+  const log = page.locator('#system-log');
+  await expect(log).toBeVisible();
+  await log.getByRole('combobox', { name: 'Source' }).selectOption('desktop');
+  const lines = log.locator('.syslog-line');
+  await expect(lines.filter({ hasText: `serving the app at http://127.0.0.1:${PORT}` })).toHaveAttribute('data-source', 'desktop');
+  await expect(lines.filter({ hasText: 'a warning from the main process' })).toHaveAttribute('data-level', 'warn');
+  await expect(lines.filter({ hasText: 'GET /api/' })).toHaveCount(0);   // the server's lines are under Server
+  await log.getByRole('combobox', { name: 'Source' }).selectOption('all');
+  await page.keyboard.press('Shift+S');
+  await expect(log).toBeHidden();
+});
+
 // No API key is saved here: that would add an entry to the real system keychain.
 test('desktop: Settings → Assistant saves into the app\'s profile; the environment still wins', async () => {
   const settings = (body?: object) => page.evaluate((b) => fetch('/api/settings', b

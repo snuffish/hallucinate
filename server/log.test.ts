@@ -17,6 +17,13 @@ describe('ServerLog', () => {
     expect(heard).toEqual(['a', 'b']);
   });
 
+  it('marks who said a line: the server, or the desktop app\'s main process it runs in', () => {
+    const log = new ServerLog();
+    log.push('info', 'request');
+    log.push('warn', 'window hung', undefined, 'desktop');
+    expect(log.backlog().map((l) => l.origin)).toEqual(['server', 'desktop']);
+  });
+
   it('prints arguments the way node does, the first line apart', () => {
     expect(formatServerArgs(['[assistant]', { a: [1] }])).toEqual({ text: '[assistant] { a: [ 1 ] }' });
     expect(formatServerArgs(['one\ntwo\nthree'])).toEqual({ text: 'one', detail: 'two\nthree' });
