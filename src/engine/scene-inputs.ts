@@ -44,6 +44,10 @@ export function writeInputs(to: Record<string, unknown>, frame: Readonly<Record<
   for (const i of SCENE_INPUTS) to[i.uniform] = frame[i.field];
 }
 
+// A frame's inputs by uniform, as its scene reads them (the Hearing monitor shows them).
+export const readInputs = (frame: Readonly<Record<InputField, number>>): Record<InputUniform, number> =>
+  Object.fromEntries(SCENE_INPUTS.map((i) => [i.uniform, frame[i.field]])) as Record<InputUniform, number>;
+
 // The header's declarations, each with what it means, for the shader and for whoever reads it.
 export const INPUT_DECLARATIONS = SCENE_INPUTS.map((i) => `${`uniform float ${i.uniform};`.padEnd(24)}// ${i.help} (${i.range})`).join('\n');
 

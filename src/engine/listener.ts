@@ -37,6 +37,7 @@ export const TEMPO_RANGE = [85, 175] as const;   // BPM: a half or double readin
 const FORGET_SECONDS = 90;     // playing this long without a kick (longer than any breakdown) forgets the tempo
 const HOLDING_TICKS = 4;       // this many ticks without a kick: the tempo is held, no longer heard
 const WATCH_SECONDS = 6;       // the Hearing monitor's timeline: the kicks and ticks this far back
+const FRAME_RATE_SECONDS = 2;  // ... and its frame rate: over the frames heard this far back
 
 // One frame of the analyser (AudioEngine.read): the dB-scaled byte spectrum and the byte waveform.
 export interface Bins {
@@ -76,6 +77,8 @@ export interface HearingDiagnostics {
     confidence: number;        // 0..1 how clearly the kicks repeat at the tempo; drains through a breakdown
     state: TempoState;
   };
+  frameRate: number;   // frames a second heard lately; 0 while none come (paused, nothing connected)
+  tickLag: number | null;   // ms the ticks land after their kicks lately (the median); null without a kick and its tick
   kicks: KickSignal & {
     kicks: number[];   // when each kick peaked, seconds before now, the latest last
     ticks: number[];   // when each tick came, likewise
@@ -114,6 +117,7 @@ export class Listener {
   private watching = false;   // the Hearing monitor is open ...
   private kickTimes: number[] = [];   // ... and the kicks and ticks of the last few seconds since it opened
   private tickTimes: number[] = [];
+  private frameTimes: number[] = [];   // ... and the frames heard
   private now = 0;
   private lastBins: Bins | null = null;
   private trackMood = 0.5; // the tempo's part of the mood, 0 calm … 1 energetic, eased over the track
@@ -141,7 +145,7 @@ export class Listener {
     if (playing) h.tickPhase = this.tempo.phase(now);
     if (h.tick) h.ticks++;
     this.now = now;
-    if (this.watching) this.remember(h.kick, h.tick, now);
+    if (this.watching) this.remember(bins !== null, h.kick, h.tick, now);
     h.energy = clamp01((this.avg.level - QUIET_LEVEL) / (LOUD_LEVEL - QUIET_LEVEL));
     if (playing) {
       const tempo = h.bpm ? clamp01((h.bpm - CALM_BPM) / (ENERGETIC_BPM - CALM_BPM)) : 0.5;
@@ -165,6 +169,7 @@ export class Listener {
     this.watching = on;
     this.kickTimes = [];
     this.tickTimes = [];
+    this.frameTimes = [];
   }
 
   // What the Hearing monitor is shown now, or null while it isn't watching.
@@ -173,7 +178,10 @@ export class Listener {
     const h = this.hearing, gap = this.kickGap;
     const heardBpm = gap ? 60 / gap : null;
     const holding = h.bpm !== null && this.sinceKick > HOLDING_TICKS * (60 / h.bpm);
+    const frames = this.frameTimes, span = frames.length > 1 ? frames.at(-1)! - frames[0]! : 0;
     return {
+      frameRate: span > 0 ? (frames.length - 1) / span : 0,
+      tickLag: this.tickLag(),
       tempo: {
         bpm: heardBpm && foldExact(heardBpm),
         heardBpm,
@@ -196,7 +204,20 @@ export class Listener {
     };
   }
 
-  private remember(kick: boolean, tick: boolean, now: number): void {
+  // Each kick of the last few seconds against the tick nearest it (within half a tick): the median gap, in ms.
+  private tickLag(): number | null {
+    const bpm = this.hearing.bpm;
+    if (!bpm) return null;
+    const lags = this.kickTimes.flatMap((kick) => {
+      const tick = this.tickTimes.reduce((best, t) => (Math.abs(t - kick) < Math.abs(best - kick) ? t : best), Infinity);
+      return Math.abs(tick - kick) < 30 / bpm ? [(tick - kick) * 1000] : [];
+    }).sort((a, b) => a - b);
+    return lags.length ? lags[Math.floor(lags.length / 2)]! : null;
+  }
+
+  private remember(heard: boolean, kick: boolean, tick: boolean, now: number): void {
+    if (heard) this.frameTimes.push(now);
+    while (this.frameTimes.length && this.frameTimes[0]! < now - FRAME_RATE_SECONDS) this.frameTimes.shift();
     if (kick) this.kickTimes.push(this.kickHearer.lastKickAt);
     if (tick) this.tickTimes.push(now);
     for (const times of [this.kickTimes, this.tickTimes]) while (times.length && times[0]! < now - WATCH_SECONDS) times.shift();

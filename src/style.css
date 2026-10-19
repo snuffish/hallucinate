@@ -335,6 +335,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   top: calc(var(--dock-top) + 16px);
   left: calc(var(--dock-left) + 16px);
   width: min(380px, calc(100vw - var(--dock-left) - var(--dock-right) - 32px));
+  max-height: calc(100vh - var(--dock-top) - var(--dock-bottom) - var(--player-bar) - 32px);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -368,7 +369,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .perf-bar span { display: block; height: 6px; border-radius: 3px; background: var(--accent2); transform-origin: left; }
 .perf-meta { margin-top: 6px; color: var(--muted); }
 .perf-fill { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-.perf-fill button { pointer-events: auto; flex: none; }
+.perf-fill button, .perf .help-btn { pointer-events: auto; flex: none; }
+.perf-head .help-btn { margin-left: auto; }
 .perf-fill span { color: var(--muted); }
 .perf-hint { margin-top: 6px; color: var(--muted); font-family: system-ui, sans-serif; }
 
@@ -380,6 +382,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .hearing .kick { color: #ff4fd8; }
 .hearing .tick { color: #4fffa0; }
 .hearing .average { color: #ffd84f; }
+/* Taller than a short screen: it stops above the player bar and scrolls (so it takes the wheel). */
+.hearing { min-height: 0; overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; }
+#hearing-fps[data-slow] { color: #ff4f7b; }
+#hearing-inputs .hearing-row { margin-top: 2px; }
+#hearing-inputs output { text-align: right; }
 #hearing-state { color: var(--muted); margin-left: auto; }
 #hearing-state[data-state="hearing"] { color: #4fffa0; }
 #hearing-state[data-state="holding"] { color: #ffd84f; }

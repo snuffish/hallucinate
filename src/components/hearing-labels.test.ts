@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { latencyLabel, stateLabel, tempoLabel } from './HearingMonitor';
+import { frameRateLabel, latencyLabel, stateLabel, tempoLabel, tickLagLabel } from './HearingMonitor';
 
 describe('the Hearing monitor at a glance', () => {
   it('reads the tempo to a tenth, with what the kicks gave when folding changed it', () => {
@@ -19,5 +19,18 @@ describe('the Hearing monitor at a glance', () => {
     expect(latencyLabel(11.6)).toBe('12 ms to the speakers');
     expect(latencyLabel('outside')).toBe('heard outside the app');
     expect(latencyLabel(null)).toBe('—');
+  });
+
+  it('gives the frames a second it hears, warning when too few come to hear every kick', () => {
+    expect(frameRateLabel(59.8)).toEqual({ text: 'hears 60 fps', slow: false });
+    expect(frameRateLabel(30)).toEqual({ text: 'hears 30 fps', slow: false });
+    expect(frameRateLabel(11.2)).toEqual({ text: 'hears 11 fps: too few to hear every kick', slow: true });
+    expect(frameRateLabel(0)).toEqual({ text: 'hears no frames', slow: false });
+  });
+
+  it('gives how late the ticks land after their kicks', () => {
+    expect(tickLagLabel(16.7)).toBe('ticks 17 ms after the kicks');
+    expect(tickLagLabel(-4.2)).toBe('ticks 4 ms before the kicks');
+    expect(tickLagLabel(null)).toBe('—');
   });
 });

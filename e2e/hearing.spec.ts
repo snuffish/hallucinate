@@ -1,4 +1,5 @@
 import { expect, test, type Page } from './fixtures';
+import { SCENE_INPUTS } from '../src/engine/scene-inputs';
 
 const monitor = (page: Page) => page.locator('#hearing');
 
@@ -23,6 +24,41 @@ test('hearing: Shift+L shows the demo beat\'s tempo and how it is heard, with th
 
   await page.keyboard.press('Shift+L');
   await expect(monitor(page)).toBeHidden();
+});
+
+test('hearing: it shows every scene input as the screen\'s scene gets it, the frames it hears and how late the ticks land', async ({ page }) => {
+  test.slow();   // tempo detection is slow on a loaded runner
+  await start(page);
+  await page.keyboard.press('Shift+L');
+  const inputs = monitor(page).locator('#hearing-inputs [data-input]');
+  await expect(inputs).toHaveCount(SCENE_INPUTS.length);
+  for (const { uniform } of SCENE_INPUTS) await expect(monitor(page).locator(`[data-input="${uniform}"]`)).toContainText(uniform);
+  const time = monitor(page).locator('[data-input="uTime"] output');
+  const before = Number(await time.textContent());
+  await expect.poll(async () => Number(await time.textContent())).toBeGreaterThan(before);   // the music's clock runs
+  await expect(page.locator('#hearing-fps')).toHaveText(/^hears \d+ fps/);
+  await expect(page.locator('#hearing-tick-lag')).toHaveText(/^ticks \d+ ms (after|before) the kicks$/, { timeout: 60_000 });
+});
+
+test('hearing: on a short screen it stops above the player bar and scrolls', async ({ page }) => {
+  await start(page);   // 1280×720
+  await page.keyboard.press('Shift+L');
+  await expect(monitor(page)).toBeVisible();
+  const box = (await monitor(page).boundingBox())!;
+  const bar = (await page.locator('#transport').boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(bar.y);
+  await monitor(page).hover();
+  await page.mouse.wheel(0, 2000);
+  await expect(monitor(page).locator('[data-input="uMood"]')).toBeInViewport();
+});
+
+test('hearing: its ? explains what the monitor shows', async ({ page }) => {
+  await start(page);
+  await page.keyboard.press('Shift+L');
+  await monitor(page).getByRole('button', { name: 'Help: Hearing monitor' }).click();
+  const pop = page.locator('#help-pop');
+  await expect(pop).toBeVisible();
+  for (const words of ['Confidence', 'running average', 'Tempo candidates', 'Scene inputs']) await expect(pop).toContainText(words);
 });
 
 test('hearing: the Hearing monitor and the performance monitor open together, one above the other', async ({ page }) => {

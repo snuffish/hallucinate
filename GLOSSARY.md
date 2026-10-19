@@ -24,8 +24,9 @@ What the music sounds like right now: its bands, kicks, ticks, tempo, tone, ener
 _Avoid_: features, audio state
 
 **Hearing monitor**:
-An overlay that shows the hearing as it happens and why the Listener hears it that way: the tempo and how sure it is,
-kicks and ticks as they land, the bands and the spectrum. It only shows the hearing, never changes it.
+An overlay that shows the hearing as it happens, why the Listener hears it that way, and the scene inputs the picture
+gets from it: the tempo and how sure it is, kicks and ticks as they land, the bands and the spectrum. It only shows,
+never changes anything.
 _Avoid_: audio monitor, analyser view, debug panel
 
 **Kick**:

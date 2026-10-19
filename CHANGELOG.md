@@ -12,6 +12,10 @@
   kick signal with its threshold, the windows where a kick was due and the kicks against the ticks, the tempo
   candidates against the Listener's preference, and the tone, energy and mood. It stacks under the performance
   monitor when both are open. The Listener keeps what it shows only while it is open.
+- The Hearing monitor also shows how many frames a second the Listener hears (red below 30, where kicks go unheard
+  and the tempo wanders), how late the ticks land after their kicks, and every scene input (`uTime` … `uMood`) as the
+  main screen's scene gets it, after the Look. Its **?** explains each part, and on a short screen it stops above the
+  player bar and scrolls.
 
 ### Changed
 

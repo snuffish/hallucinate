@@ -461,6 +461,36 @@ describe('what the Hearing monitor is shown', () => {
     }
   });
 
+  it('shows how many frames a second it hears, and none while no frames come', () => {
+    const fast = new Listener();
+    fast.watch(true);
+    listen(fast, music({ bpm: 124 }), 5, { fps: 60 });
+    expect(fast.diagnostics()!.frameRate).toBeCloseTo(60, 0);
+
+    const slow = new Listener();
+    slow.watch(true);
+    listen(slow, music({ bpm: 124 }), 5, { fps: 10 });
+    expect(slow.diagnostics()!.frameRate).toBeCloseTo(10, 0);
+
+    listen(slow, null, 3, { start: 5, fps: 10, playing: false });
+    expect(slow.diagnostics()!.frameRate).toBe(0);
+  });
+
+  it('shows how late the ticks land after their kicks: about a frame, later at a low frame rate', () => {
+    const fast = new Listener();
+    fast.watch(true);
+    expect(fast.diagnostics()!.tickLag).toBeNull();   // no kicks yet
+    listen(fast, music({ bpm: 124 }), 15, { fps: 60 });
+    const atSixty = fast.diagnostics()!.tickLag!;
+    expect(atSixty).toBeGreaterThanOrEqual(0);
+    expect(atSixty).toBeLessThanOrEqual(40);   // the kick is heard the frame after it peaks
+
+    const slow = new Listener();
+    slow.watch(true);
+    listen(slow, music({ bpm: 124 }), 15, { fps: 15 });
+    expect(slow.diagnostics()!.tickLag!).toBeGreaterThan(atSixty);
+  });
+
   it('keeps the kick signal in step with its kicks while nothing is heard (paused, nothing connected)', () => {
     const l = new Listener();
     l.watch(true);

@@ -2,8 +2,10 @@ import { useEffect, useRef } from 'react';
 import { useUI } from '../app/AppContext';
 import type { HearingDiagnostics, TempoState } from '../engine/listener';
 import type { HearingView, Latency } from '../state/ui-state';
+import { SCENE_INPUTS, type SceneInput } from '../engine/scene-inputs';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
+import { HelpButton } from './Help';
 
 const BAND_EDGES_HZ = [25, 140, 2000, 12000];   // the Listener's bands: bass, mid, high
 const SPECTRUM_HZ = [20, 20000] as const;
@@ -23,6 +25,20 @@ export function latencyLabel(latency: Latency): string {
   if (latency === null) return '—';
   if (latency === 'outside') return 'heard outside the app';
   return `${Math.round(latency)} ms to the speakers`;
+}
+
+// Below this many frames a second a beat is only a few frames long, and kicks go unheard (the tempo wanders).
+const SLOW_FPS = 30;
+
+export function frameRateLabel(fps: number): { text: string; slow: boolean } {
+  if (fps <= 0) return { text: 'hears no frames', slow: false };
+  const slow = fps < SLOW_FPS - 0.5;
+  return { text: `hears ${Math.round(fps)} fps${slow ? ': too few to hear every kick' : ''}`, slow };
+}
+
+export function tickLagLabel(ms: number | null): string {
+  if (ms === null) return '—';
+  return `ticks ${Math.round(Math.abs(ms))} ms ${ms < 0 ? 'before' : 'after'} the kicks`;
 }
 
 // Draws on a canvas at the device's pixel ratio whenever `draw` changes.
@@ -111,7 +127,23 @@ function drawCandidates(cand: HearingDiagnostics['candidates'], heard: number | 
 
 const bar = (v: number) => ({ transform: `scaleX(${Math.min(1, Math.max(0, v))})` });
 
-// Shift+L: what the Listener hears and why, ~15 Hz while open (see docs/audio.md).
+// A scene input as a bar over its range (the bands and the kick reach 1.5 at high reactivity: the mark is 1), or
+// as a number where it has no top (the clock, the tick count).
+const INPUT_TOP: Partial<Record<SceneInput['uniform'], number>> = { uBass: 1.5, uMid: 1.5, uHigh: 1.5, uLevel: 1.5, uBeat: 1.5, uTick: 1, uHue: 1, uBright: 1, uMood: 1 };
+
+function InputRow({ input, value }: { input: SceneInput; value: number }) {
+  const top = INPUT_TOP[input.uniform];
+  return (
+    <div className="hearing-row" data-input={input.uniform} title={`${input.help} (${input.range})`}>
+      <span>{input.uniform}</span>
+      {top
+        ? <b className="hearing-bar"><i style={bar(value / top)} />{top > 1 && <u style={{ left: `${(1 / top) * 100}%` }} />}<output hidden>{value.toFixed(2)}</output></b>
+        : <output>{Number.isInteger(value) ? value : value.toFixed(1)}</output>}
+    </div>
+  );
+}
+
+// Shift+L: what the Listener hears and why, and what the scene gets from it, ~15 Hz while open (see docs/audio.md).
 export function HearingMonitor() {
   const view = useUI((ui) => ui.hearingMonitor);
   if (!view) return <div id="hearing" className="hearing" hidden />;
@@ -120,7 +152,7 @@ export function HearingMonitor() {
 
 function HearingPanel({ view }: { view: HearingView }) {
   const { diagnostics: d } = view;
-  const t = d.tempo;
+  const t = d.tempo, fps = frameRateLabel(d.frameRate);
   return (
     <div id="hearing" className="hearing">
       <div className="hearing-head">
@@ -128,11 +160,14 @@ function HearingPanel({ view }: { view: HearingView }) {
         <span className="hearing-light kick" title="Kick" style={{ opacity: 0.15 + view.beat * 0.85 }} />
         <span className="hearing-light tick" title="Tick" style={{ opacity: 0.15 + (t.bpm === null ? 0 : Math.max(0, 1 - view.tickPhase * 4) * 0.85) }} />
         <span id="hearing-state" data-state={t.state}>{stateLabel(t.state)}</span>
+        <HelpButton topic="hearing" />
       </div>
       <div className="hearing-row" title="Confidence: how clearly the kicks repeat at the tempo">
         <span>Confidence</span><b className="hearing-bar"><i id="hearing-confidence" style={bar(t.confidence)} /></b>
       </div>
       <div className="hearing-meta" id="hearing-latency">{latencyLabel(view.latency)}</div>
+      <div className="hearing-meta" id="hearing-fps" data-slow={fps.slow || undefined}>{fps.text}</div>
+      <div className="hearing-meta" id="hearing-tick-lag">{tickLagLabel(d.tickLag)}</div>
 
       <h4>Spectrum <small>as heard; the top is where it clips</small></h4>
       {d.spectrum ? <Plot label="Spectrum" draw={drawSpectrum(d.spectrum)} /> : <div className="hearing-meta">Nothing connected</div>}
@@ -153,6 +188,11 @@ function HearingPanel({ view }: { view: HearingView }) {
 
       <div className="hearing-meta">
         tone {(view.centroid / 1000).toFixed(1)} kHz · energy {view.energy.toFixed(2)} · mood {view.mood.toFixed(2)}
+      </div>
+
+      <h4>Scene inputs <small>what the scene's shader reads, after the Look</small></h4>
+      <div id="hearing-inputs">
+        {SCENE_INPUTS.map((input) => <InputRow key={input.uniform} input={input} value={view.inputs[input.uniform]} />)}
       </div>
       <div className="perf-hint">Close with <Kbd hotkey={HOTKEYS.hearingMonitor} /></div>
     </div>

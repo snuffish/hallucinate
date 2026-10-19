@@ -6,6 +6,7 @@ import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
 import type { PerfReport } from '../engine/profiler';
 import type { HearingDiagnostics, MoodWord } from '../engine/listener';
+import type { InputUniform } from '../engine/scene-inputs';
 import type { HelpTopicId } from '../help/topics';
 import type { Look, SourceButton } from './app-state';
 import type { WidgetId } from './layout';
@@ -23,6 +24,7 @@ export interface HearingView {
   centroid: number;    // Hz
   energy: number;
   mood: number;
+  inputs: Record<InputUniform, number>;   // the scene inputs as the main screen's scene gets them this frame
 }
 
 export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | 'settings' | null;

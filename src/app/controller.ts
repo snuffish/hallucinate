@@ -11,7 +11,7 @@ import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState } from '../engine/renderer';
-import { silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
+import { readInputs, silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
 import type { Scene } from '../scenes';
 import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type LookKey, type SourceButton } from '../state/app-state';
 import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
@@ -864,7 +864,7 @@ export class AppController {
     const diagnostics = this.listener.diagnostics();
     if (!diagnostics) return null;
     const h = this.listener.hearing;
-    return { diagnostics, latency: this.audio.latency(), beat: h.beat, tickPhase: h.tickPhase, centroid: h.centroid, energy: h.energy, mood: h.mood };
+    return { diagnostics, latency: this.audio.latency(), beat: h.beat, tickPhase: h.tickPhase, centroid: h.centroid, energy: h.energy, mood: h.mood, inputs: readInputs(this.program) };
   }
 
   setPerf(on: boolean, trace = false): void {
