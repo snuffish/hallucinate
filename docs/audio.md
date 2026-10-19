@@ -33,6 +33,8 @@ listening volume, even when muted.
 
 ## 👂 Hearing monitor
 
+<img src="screenshots/hearing-monitor.jpg" alt="The Hearing monitor on the demo beat: 124.0 BPM, hearing kicks, a high confidence, the spectrum, the bands against their running averages, the kick signal with kicks and ticks lined up, and the tempo candidates peaking at 124" width="260" align="right">
+
 **Shift+L** opens the Hearing monitor over the main window (also with the studio open; never on Live or the
 projectors): what the Listener hears, and why it hears it that way. It only shows the hearing, never changes it.
 
@@ -43,8 +45,8 @@ projectors): what the Listener hears, and why it hears it that way. It only show
   reports it; music from the microphone or a shared tab is *heard outside the app*, so there is none to give.
 - **Spectrum** – the analyser's bins as the Listener gets them, on a log-frequency axis with the band edges (25, 140,
   2000 and 12000 Hz). The top of the plot is where the analyser clips: loud kicks sit there.
-- **Bands** – bass, mid, high and their level, each against its running average (the yellow mark): what a band is
-  compared with to react.
+- **Bands** – bass, mid, high and their level (the bar), each against its running average over the last few seconds
+  (the yellow mark): a band past its mark is louder than usual, and that is what the scenes react to.
 - **Kicks** – the last 6 s of the rise in the kick's bins, newest on the right, with the threshold a kick must reach
   (dashed) and the windows where the next kick was due (shaded). Under it the kicks (pink) against the ticks (green):
   a tick trailing its kick shows how late the tick clock re-anchors.
