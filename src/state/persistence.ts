@@ -22,6 +22,7 @@ export const KEYS = {
   // The assistant's conversations: this index; the transcripts live in IndexedDB (src/assistant/history-store.ts).
   assistantChats: 'hallucinate.assistantChats',
   assistantThinking: 'hallucinate.assistantThinking',   // the panel's "Show reasoning" toggle
+  hearingWorkbench: 'hallucinate.hearingWorkbench',   // the Hearing monitor's plot: the signals picked and how far back (src/components/hearing-workbench.ts)
   paramGroups: 'hallucinate.paramGroupsOpen',   // opened parameter groups per scene; they start folded (not exported)
   prefs: 'hallucinate.prefs',   // device preferences from the Settings overlay (src/state/prefs.ts); not exported
   // Migrated into `layout` (src/state/layout.ts) on first load, then removed.
@@ -45,7 +46,7 @@ export type KeyClass = 'setup' | 'device' | 'history' | 'migration' | 'import';
 export const KEY_CLASS: Record<keyof typeof KEYS, KeyClass> = {
   sceneEdits: 'setup', userScenes: 'setup', library: 'setup', params: 'setup', customShader: 'setup', nodeGraph: 'setup',
   show: 'setup', player: 'setup', mediaSound: 'setup', layout: 'setup',
-  prefs: 'device', assistantThinking: 'device',
+  prefs: 'device', assistantThinking: 'device', hearingWorkbench: 'device',
   scRecent: 'history', ytRecent: 'history', lastScene: 'history', screenEffects: 'history', renameReport: 'history', assistantChats: 'history', paramGroups: 'history', helpHint: 'history',
   paramsCollapsed: 'migration', paramsPos: 'migration',
   importedAt: 'import', importReport: 'import',

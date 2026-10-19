@@ -1,15 +1,23 @@
-import { useEffect, useRef } from 'react';
-import { useUI } from '../app/AppContext';
+import { useRef } from 'react';
+import { useApp, useLayout, useUI } from '../app/AppContext';
 import type { HearingDiagnostics, TempoState } from '../engine/listener';
-import type { HearingView, Latency } from '../state/ui-state';
-import { SCENE_INPUTS, type SceneInput } from '../engine/scene-inputs';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
+import { effective } from '../state/layout';
+import type { HearingView, Latency } from '../state/ui-state';
 import { HelpButton } from './Help';
+import { HearingWorkbench } from './HearingWorkbench';
+import { Plot, type Draw } from './HearingPlot';
+import { COLOURS } from './hearing-workbench';
+import { rectOf } from './widgets/drop';
+import { usePointerDrag } from './widgets/usePointerDrag';
+import { useFloatPlacement, useNarrow } from './widgets/Widget';
 
 const BAND_EDGES_HZ = [25, 140, 2000, 12000];   // the Listener's bands: bass, mid, high
+const BAND_NAMES = ['bass', 'mid', 'high'];       // between those edges
 const SPECTRUM_HZ = [20, 20000] as const;
-const COLOURS = { line: '#4fe3ff', kick: '#ff4fd8', tick: '#4fffa0', threshold: '#ffd84f', due: 'rgba(255, 255, 255, 0.1)', grid: 'rgba(255, 255, 255, 0.25)', muted: '#a99fc4' };
+const HZ_TICKS = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
+const AXIS = 12;   // px under a plot for its axis labels
 
 // The tempo to a tenth, with what the kicks gave when folding into the tempo range changed it.
 export function tempoLabel({ bpm, heardBpm }: Pick<HearingDiagnostics['tempo'], 'bpm' | 'heardBpm'>): string {
@@ -41,71 +49,38 @@ export function tickLagLabel(ms: number | null): string {
   return `ticks ${Math.round(Math.abs(ms))} ms ${ms < 0 ? 'before' : 'after'} the kicks`;
 }
 
-// Draws on a canvas at the device's pixel ratio whenever `draw` changes.
-function Plot({ draw, label, height = 56 }: { draw: (c: CanvasRenderingContext2D, w: number, h: number) => void; label: string; height?: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = ref.current;
-    const c = canvas?.getContext('2d');
-    if (!canvas || !c) return;
-    const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth, h = height;
-    if (canvas.width !== Math.round(w * dpr)) canvas.width = Math.round(w * dpr);
-    if (canvas.height !== Math.round(h * dpr)) canvas.height = Math.round(h * dpr);
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    c.clearRect(0, 0, w, h);
-    draw(c, w, h);
-  }, [draw, height]);
-  return <canvas ref={ref} className="hearing-plot" style={{ height }} role="img" aria-label={label} />;
-}
-
 const logX = (hz: number, w: number) => (Math.log(hz / SPECTRUM_HZ[0]) / Math.log(SPECTRUM_HZ[1] / SPECTRUM_HZ[0])) * w;
 
-// The analyser's bins on a log-frequency axis, as heard (the top of the plot is where they clip), with the band edges.
-function drawSpectrum(s: NonNullable<HearingDiagnostics['spectrum']>) {
-  return (c: CanvasRenderingContext2D, w: number, h: number) => {
+const hzLabel = (hz: number) => (hz >= 1000 ? `${hz / 1000}k` : String(hz));
+
+// The analyser's bins on a log-frequency axis, as heard (the top of the plot is where they clip), with the band
+// edges and names, and the frequencies along the bottom.
+function drawSpectrum(s: NonNullable<HearingDiagnostics['spectrum']>): Draw {
+  return (c, w, h) => {
+    const plot = h - AXIS;
+    c.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
     c.strokeStyle = COLOURS.grid;
-    for (const hz of BAND_EDGES_HZ) { const x = logX(hz, w); c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke(); }
+    for (const hz of BAND_EDGES_HZ) { const x = logX(hz, w); c.beginPath(); c.moveTo(x, 0); c.lineTo(x, plot); c.stroke(); }
+    c.fillStyle = COLOURS.muted;
+    BAND_NAMES.forEach((name, i) => c.fillText(name, logX(BAND_EDGES_HZ[i]!, w) + 3, 10));
     c.strokeStyle = COLOURS.line;
     c.beginPath();
     for (let i = 1; i < s.bins.length; i++) {
-      const x = logX(i * s.binHz, w), y = h - (s.bins[i]! / 255) * h;
+      const x = logX(i * s.binHz, w), y = plot - (s.bins[i]! / 255) * plot;
       if (i === 1) c.moveTo(x, y); else c.lineTo(x, y);
     }
     c.stroke();
-  };
-}
-
-// The kick signal over the last seconds, newest at the right: the windows where a kick was due shaded, the
-// threshold, the rises, and below them the kicks (top) against the ticks (bottom).
-function drawKicks(k: HearingDiagnostics['kicks']) {
-  return (c: CanvasRenderingContext2D, w: number, h: number) => {
-    const span = k.rises.length * k.cell, x = (ago: number) => w - (ago / span) * w;
-    const lanes = 14, plot = h - lanes * 2, top = Math.max(k.threshold * 2.5, ...k.rises, 1);
-    c.fillStyle = COLOURS.due;
-    for (const due of k.due) c.fillRect(x(due + k.window), 0, Math.max(1, x(due - k.window) - x(due + k.window)), plot);
-    c.strokeStyle = COLOURS.threshold;
-    c.setLineDash([3, 3]);
-    const ty = plot - (k.threshold / top) * plot;
-    c.beginPath(); c.moveTo(0, ty); c.lineTo(w, ty); c.stroke();
-    c.setLineDash([]);
-    c.strokeStyle = COLOURS.line;
-    c.beginPath();
-    for (let i = 0; i < k.rises.length; i++) {
-      const px = (i / (k.rises.length - 1)) * w, py = plot - (k.rises[i]! / top) * plot;
-      if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
-    }
-    c.stroke();
-    c.fillStyle = COLOURS.kick;
-    for (const ago of k.kicks) c.fillRect(x(ago) - 1, plot + 2, 2, lanes - 4);
-    c.fillStyle = COLOURS.tick;
-    for (const ago of k.ticks) c.fillRect(x(ago) - 1, plot + lanes + 2, 2, lanes - 4);
+    c.fillStyle = COLOURS.muted;
+    c.textAlign = 'center';
+    for (const hz of HZ_TICKS) { const x = logX(hz, w); c.fillRect(x, plot, 1, 3); c.fillText(hzLabel(hz), x, h - 1); }
+    c.textAlign = 'start';
   };
 }
 
 // How strongly the kick signal repeats at each tempo, scaled to its peak (but never past the strength it takes to
 // hear a pulse, dashed yellow, so noise stays flat), the Listener's preference dashed, and the tempo heard marked.
-function drawCandidates(cand: HearingDiagnostics['candidates'], heard: number | null) {
-  return (c: CanvasRenderingContext2D, w: number, h: number) => {
+function drawCandidates(cand: HearingDiagnostics['candidates'], heard: number | null): Draw {
+  return (c, w, h) => {
     if (cand.bpm.length < 2) return;
     const lo = cand.bpm[0]!, hi = cand.bpm[cand.bpm.length - 1]!;
     const x = (bpm: number) => ((bpm - lo) / (hi - lo)) * w;
@@ -127,22 +102,6 @@ function drawCandidates(cand: HearingDiagnostics['candidates'], heard: number | 
 
 const bar = (v: number) => ({ transform: `scaleX(${Math.min(1, Math.max(0, v))})` });
 
-// A scene input as a bar over its range (the bands and the kick reach 1.5 at high reactivity: the mark is 1), or
-// as a number where it has no top (the clock, the tick count).
-const INPUT_TOP: Partial<Record<SceneInput['uniform'], number>> = { uBass: 1.5, uMid: 1.5, uHigh: 1.5, uLevel: 1.5, uBeat: 1.5, uTick: 1, uHue: 1, uBright: 1, uMood: 1 };
-
-function InputRow({ input, value }: { input: SceneInput; value: number }) {
-  const top = INPUT_TOP[input.uniform];
-  return (
-    <div className="hearing-row" data-input={input.uniform} title={`${input.help} (${input.range})`}>
-      <span>{input.uniform}</span>
-      {top
-        ? <b className="hearing-bar"><i style={bar(value / top)} />{top > 1 && <u style={{ left: `${(1 / top) * 100}%` }} />}<output hidden>{value.toFixed(2)}</output></b>
-        : <output>{Number.isInteger(value) ? value : value.toFixed(1)}</output>}
-    </div>
-  );
-}
-
 // Shift+L: what the Listener hears and why, and what the scene gets from it, ~15 Hz while open (see docs/audio.md).
 export function HearingMonitor() {
   const view = useUI((ui) => ui.hearingMonitor);
@@ -150,11 +109,63 @@ export function HearingMonitor() {
   return <HearingPanel view={view} />;
 }
 
+// What takes a press itself instead of moving the monitor: its buttons and chips, the what-if slider, a link.
+const OWN_PRESS = 'button, input, select, a';
+const ownsPress = (e: React.MouseEvent) => !!(e.target as HTMLElement).closest(OWN_PRESS);
+// A press on the monitor's scrollbar (when it scrolls) drags the scrollbar, not the monitor.
+const onScrollbar = (e: React.PointerEvent<HTMLElement>) => e.clientX >= e.currentTarget.getBoundingClientRect().left + e.currentTarget.clientLeft + e.currentTarget.clientWidth;
+
+// In the monitors' corner until dragged, by any part that doesn't take the press itself; then where it was dropped
+// (stored in the layout), until a double-click on such a part puts it back. Phones keep it in the corner.
+function useDragToMove() {
+  const app = useApp();
+  const root = useRef<HTMLDivElement>(null);
+  const narrow = useNarrow();
+  const place = useLayout((l) => effective(l, narrow).hearing);
+  useFloatPlacement(root, place.kind === 'float' ? place : null);
+  const drag = useRef<{ dx: number; dy: number; style: string } | null>(null);
+  const restore = () => {
+    const el = root.current;
+    if (el && drag.current) el.style.cssText = drag.current.style;
+    drag.current = null;
+    app.setDragging(null);
+  };
+  const handlers = usePointerDrag({
+    onStart: (_e, grab) => {
+      const el = root.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      drag.current = { dx: grab.x, dy: grab.y, style: el.style.cssText };   // `grab`: where it was pressed
+      Object.assign(el.style, { position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, maxHeight: `${r.height}px` });
+      app.setDragging('hearing');
+    },
+    onMove: (e) => {
+      const el = root.current, d = drag.current;
+      if (!el || !d) return;
+      el.style.left = `${Math.min(Math.max(0, e.clientX - d.dx), window.innerWidth - el.offsetWidth)}px`;
+      el.style.top = `${Math.min(Math.max(0, e.clientY - d.dy), window.innerHeight - el.offsetHeight)}px`;
+    },
+    onEnd: () => {
+      const el = root.current;
+      if (!el || !drag.current) return restore();
+      const rect = rectOf(el);
+      restore();
+      app.moveHearingMonitor(rect);
+    },
+    onCancel: restore,
+  }, { enabled: !narrow });
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => { if (!onScrollbar(e)) handlers.onPointerDown(e); };
+  const onDoubleClick = (e: React.MouseEvent) => { if (place.kind === 'float' && !ownsPress(e)) app.resetHearingMonitor(); };
+  return { root, moved: place.kind === 'float', narrow, onPointerDown, onClickCapture: handlers.onClickCapture, onDoubleClick };
+}
+
 function HearingPanel({ view }: { view: HearingView }) {
+  const { root, moved, narrow, ...drag } = useDragToMove();
+  const dragging = useUI((ui) => ui.dragging === 'hearing');
   const { diagnostics: d } = view;
   const t = d.tempo, fps = frameRateLabel(d.frameRate);
   return (
-    <div id="hearing" className="hearing">
+    <div id="hearing" ref={root} className={`hearing${moved ? ' moved' : ''}${dragging ? ' dragging' : ''}`} data-draggable={!narrow || undefined} {...drag}>
       <div className="hearing-head">
         <b id="hearing-tempo">{tempoLabel(t)}</b>
         <span className="hearing-light kick" title="Kick" style={{ opacity: 0.15 + view.beat * 0.85 }} />
@@ -165,36 +176,28 @@ function HearingPanel({ view }: { view: HearingView }) {
       <div className="hearing-row" title="Confidence: how clearly the kicks repeat at the tempo">
         <span>Confidence</span><b className="hearing-bar"><i id="hearing-confidence" style={bar(t.confidence)} /></b>
       </div>
-      <div className="hearing-meta" id="hearing-latency">{latencyLabel(view.latency)}</div>
-      <div className="hearing-meta" id="hearing-fps" data-slow={fps.slow || undefined}>{fps.text}</div>
-      <div className="hearing-meta" id="hearing-tick-lag">{tickLagLabel(d.tickLag)}</div>
+      <div className="hearing-meta hearing-readouts">
+        <span id="hearing-latency">{latencyLabel(view.latency)}</span>
+        <span id="hearing-fps" data-slow={fps.slow || undefined}>{fps.text}</span>
+        <span id="hearing-tick-lag">{tickLagLabel(d.tickLag)}</span>
+      </div>
 
-      <h4>Spectrum <small>as heard; the top is where it clips</small></h4>
-      {d.spectrum ? <Plot label="Spectrum" draw={drawSpectrum(d.spectrum)} /> : <div className="hearing-meta">Nothing connected</div>}
+      <HearingWorkbench view={view} />
 
-      <h4>Bands <small>level · <span className="average">running average</span></small></h4>
-      {(['bass', 'mid', 'high', 'level'] as const).map((k) => (
-        <div key={k} className="hearing-row" data-band={k}>
-          <span>{k}</span>
-          <b className="hearing-bar"><i style={bar(d.bands[k].level)} /><u style={{ left: `${Math.min(1, d.bands[k].average) * 100}%` }} /></b>
-        </div>
-      ))}
-
-      <h4>Kicks <small>rise · <span className="average">threshold</span> · due · <span className="kick">kicks</span> / <span className="tick">ticks</span></small></h4>
-      <Plot label="Kick signal" height={84} draw={drawKicks(d.kicks)} />
-
-      <h4>Tempo candidates <small>strength · <span className="average">clear enough</span> · preference</small></h4>
-      <Plot label="Tempo candidates" height={64} draw={drawCandidates(d.candidates, t.heardBpm)} />
-
+      <div className="hearing-pair">
+        <section>
+          <h4>Spectrum <small>Hz, as heard; the top clips</small></h4>
+          {d.spectrum ? <Plot label="Spectrum" height={56 + AXIS} draw={drawSpectrum(d.spectrum)} /> : <div className="hearing-meta">Nothing connected</div>}
+        </section>
+        <section>
+          <h4>Tempo candidates <small>strength · <span className="average">clear enough</span> · preference</small></h4>
+          <Plot label="Tempo candidates" draw={drawCandidates(d.candidates, t.heardBpm)} />
+        </section>
+      </div>
       <div className="hearing-meta">
         tone {(view.centroid / 1000).toFixed(1)} kHz · energy {view.energy.toFixed(2)} · mood {view.mood.toFixed(2)}
       </div>
-
-      <h4>Scene inputs <small>what the scene's shader reads, after the Look</small></h4>
-      <div id="hearing-inputs">
-        {SCENE_INPUTS.map((input) => <InputRow key={input.uniform} input={input} value={view.inputs[input.uniform]} />)}
-      </div>
-      <div className="perf-hint">Close with <Kbd hotkey={HOTKEYS.hearingMonitor} /></div>
+      <div className="perf-hint">{narrow ? '' : moved ? 'Double-click it to put it back · ' : 'Drag it to move it · '}Close with <Kbd hotkey={HOTKEYS.hearingMonitor} /></div>
     </div>
   );
 }

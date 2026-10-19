@@ -25,8 +25,9 @@ _Avoid_: features, audio state
 
 **Hearing monitor**:
 An overlay that shows the hearing as it happens, why the Listener hears it that way, and the scene inputs the picture
-gets from it: the tempo and how sure it is, kicks and ticks as they land, the bands and the spectrum. It only shows,
-never changes anything.
+gets from it: the tempo and how sure it is, and a plot of the signals you pick (kicks and ticks as they land, the
+bands, the scene inputs) over the last minute, beside the spectrum. It only shows, never changes anything; it can be
+dragged anywhere and stays there.
 _Avoid_: audio monitor, analyser view, debug panel
 
 **Kick**:

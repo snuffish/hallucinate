@@ -5,6 +5,7 @@ import { NO_EFFECTS, type EffectStack } from '../engine/effects';
 import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
 import type { PerfReport } from '../engine/profiler';
+import type { HearingHistory } from '../engine/hearing-history';
 import type { HearingDiagnostics, MoodWord } from '../engine/listener';
 import type { InputUniform } from '../engine/scene-inputs';
 import type { HelpTopicId } from '../help/topics';
@@ -25,6 +26,7 @@ export interface HearingView {
   energy: number;
   mood: number;
   inputs: Record<InputUniform, number>;   // the scene inputs as the main screen's scene gets them this frame
+  history: HearingHistory;                 // the last minute, since the monitor opened
 }
 
 export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | 'settings' | null;
@@ -32,8 +34,8 @@ export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' |
 // A panel's help popover, or the sheet with every shortcut.
 export type HelpId = HelpTopicId | 'sheet';
 
-// What is being dragged around the screen ('resize': a widget's or a dock's resize grip).
-export type DragId = WidgetId | 'bubble' | 'resize';
+// What is being dragged around the screen ('hearing': the Hearing monitor; 'resize': a widget's or a dock's resize grip).
+export type DragId = WidgetId | 'bubble' | 'hearing' | 'resize';
 
 export interface Meters { bass: number; mid: number; high: number; bright: number; beat: number }
 export type MoodLabel = '' | `mood: ${MoodWord}`;

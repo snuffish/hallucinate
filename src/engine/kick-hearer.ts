@@ -18,7 +18,7 @@
 const KICK_HZ = [20, 280] as const;   // the kick's body and its top, which still rises when the sub is clipped
 const KICK_STRENGTH = 0.15;           // a kick rises at least this much of the rise usually heard on the pulse ...
 const KICK_MIN_RISE = 8;              // ... and at least this much at all (byte steps over the kick's bins)
-const KICK_MIN_GAP = 0.28;            // seconds between kicks, at least: caps them at ~214 BPM
+export const KICK_MIN_GAP = 0.28;            // seconds between kicks, at least: caps them at ~214 BPM
 const KICK_WINDOW = 0.06;             // a kick lands within this part of a pulse of where the pulse is due ...
 const KICK_WINDOW_MIN = 0.025;        // ... and seconds, at least: a frame and a half at 60 fps
 const RISES_CELL = 0.01;              // seconds: the rises' resolution, whatever the frame rate

@@ -71,6 +71,7 @@ export type TempoState = 'hearing' | 'holding' | 'none';
 
 // What the Hearing monitor is shown: the hearing, and why the Listener hears it that way. Made on request.
 export interface HearingDiagnostics {
+  at: number;   // the Listener's clock when this was made, seconds: the kicks' and ticks' "seconds before now" count from it
   tempo: {
     bpm: number | null;        // the tempo, unrounded
     heardBpm: number | null;   // ... as the kicks' gaps gave it, before folding into the tempo range
@@ -180,6 +181,7 @@ export class Listener {
     const holding = h.bpm !== null && this.sinceKick > HOLDING_TICKS * (60 / h.bpm);
     const frames = this.frameTimes, span = frames.length > 1 ? frames.at(-1)! - frames[0]! : 0;
     return {
+      at: this.now,
       frameRate: span > 0 ? (frames.length - 1) / span : 0,
       tickLag: this.tickLag(),
       tempo: {
