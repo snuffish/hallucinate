@@ -50,10 +50,13 @@ const countDraws = (page: Page) => page.addInitScript(() => {
 });
 
 const SYMMETRIC = 0.0005;   // a few stray pixels at most
+// 30 s, as display.spec.ts gives its pixel polls: each reading waits for a frame and reads back a full
+// canvas, and on a CI runner busy with software WebGL in the other worker one reading alone has taken
+// over 15 s.
 const mirrored = (page: Page, axes: { lr: boolean; tb: boolean }) => expect.poll(async () => {
   const a = await asymmetry(page);
   return { lr: a.lr < SYMMETRIC, tb: a.tb < SYMMETRIC };
-}, { timeout: 15_000 }).toEqual(axes);
+}, { timeout: 30_000 }).toEqual(axes);
 
 const addMenu = (page: Page) => page.locator('#fx-add');
 const row = (page: Page, id: string) => page.locator(`#w-effects [data-effect="${id}"]`);
@@ -72,7 +75,7 @@ async function start(page: Page) {
 }
 
 test('effects: the widget docks under the Look and adds, switches, sets and removes a Mirror on the main screen', async ({ page }) => {
-  test.setTimeout(2 * 60_000);
+  test.setTimeout(4 * 60_000);   // six symmetry checks of up to 30 s each
   // Light Sheet (not symmetric on its own) on screen from the start, without trails: switching to it
   // would crossfade from the first scene, and an afterglow would keep the picture from before each
   // change for a few frames. Under software WebGL on a loaded machine a frame can take seconds, so either
