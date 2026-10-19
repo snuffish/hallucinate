@@ -17,6 +17,7 @@
 
 <p align="center">
   <a href="https://snuffish.github.io/hallucinate/"><img alt="Live demo" src="https://img.shields.io/badge/demo-snuffish.github.io%2Fhallucinate-ff4fd8?logo=githubpages&logoColor=white"></a>
+  <a href="https://snuffish.github.io/hallucinate/docs/"><img alt="Docs" src="https://img.shields.io/badge/docs-snuffish.github.io%2Fhallucinate%2Fdocs-8a5cff?logo=vitepress&logoColor=white"></a>
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white">
   <img alt="Vite 8" src="https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white">
@@ -91,7 +92,7 @@ maker, or ask the assistant for one.
 | 💾 | **[Back up](docs/backup.md)** | Export everything you made to one file and import it elsewhere. |
 | 🖥 | **[Desktop app](docs/desktop.md)** | The whole app in its own window, with installers for macOS, Windows and Linux on the [releases page](https://github.com/snuffish/hallucinate/releases). |
 
-More: [keyboard shortcuts](docs/keys.md) · [development & project structure](docs/development.md) ·
+More: [📖 the docs as a website](https://snuffish.github.io/hallucinate/docs/) · [keyboard shortcuts](docs/keys.md) · [development & project structure](docs/development.md) ·
 [ARCHITECTURE.md](ARCHITECTURE.md) · [PERF.md](PERF.md) · [CHANGELOG.md](CHANGELOG.md)
 
 <table>

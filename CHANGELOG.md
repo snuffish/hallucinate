@@ -15,6 +15,14 @@
 - The studio lists **what the director changed**, under its status, the same way (the director's changes still can't
   be undone from the assistant panel).
 
+## Unreleased — docs website (2026-10-19)
+
+### Added
+
+- The guides in `docs/` (and the ADRs) are published as a website at
+  [snuffish.github.io/hallucinate/docs](https://snuffish.github.io/hallucinate/docs/), next to the web demo. It is built
+  with VitePress and has a sidebar, search and dark mode. Preview it with `npm run docs:dev`.
+
 ## Unreleased — Hearing monitor (2026-10-18)
 
 ### Added
