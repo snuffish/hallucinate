@@ -42,7 +42,14 @@ export interface LiveSlotDeps {
 // A frame state and its params table: one per output, refilled every frame.
 const output = (): FullFrame => ({ program: programState(), params: {} });
 
+// Live's master trims (ADR 0006), set in the studio: they turn down what each show scene's look sets, ×0–1,
+// and shift its colour, on Live and on the Preview monitor (which shows what Take puts on Live). Neutral
+// changes nothing; trims below 1 only lower what the safety rules checked.
+export interface MasterTrims { reactivity: number; speed: number; trails: number; aberration: number; hue: number }
+export const NEUTRAL_TRIMS: Readonly<MasterTrims> = { reactivity: 1, speed: 1, trails: 1, aberration: 1, hue: 0 };
+
 export class LiveSlot {
+  trims: Readonly<MasterTrims> = NEUTRAL_TRIMS;
   // What is pinned, and the show scene it crossfades from (`prevScene` is released when the fade ends).
   private pin: (Transition & { shot: Shot; from: Shot | null }) | null = null;
   private readonly live = output();
@@ -167,17 +174,18 @@ export class LiveSlot {
     return f;
   }
 
-  // A show scene's look, with the app's sliders for what it doesn't store (as Take does). Reused object.
+  // A show scene's look, with the app's sliders for what it doesn't store (as Take does), under the master
+  // trims. Reused object.
   private frameLook({ look, palette }: Shot): FrameLook {
-    const app = this.deps.state.look, l = this.look;
+    const app = this.deps.state.look, l = this.look, t = this.trims;
     l.palette = palette ?? app.palette;
     l.routes = app.routes;   // the screen's: show scenes don't keep routes yet
-    l.reactivity = look.reactivity ?? app.reactivity;
-    l.speed = look.speed ?? app.speed;
+    l.reactivity = (look.reactivity ?? app.reactivity) * t.reactivity;
+    l.speed = (look.speed ?? app.speed) * t.speed;
     l.cycle = look.cycle ?? app.cycle;
-    l.hue = look.hue ?? app.hue;
-    l.trails = look.trails ?? app.trails;
-    l.aberration = look.aberration ?? app.aberration;
+    l.hue = (look.hue ?? app.hue) + t.hue;
+    l.trails = (look.trails ?? app.trails) * t.trails;
+    l.aberration = (look.aberration ?? app.aberration) * t.aberration;
     l.synesthesia = look.synesthesia ?? app.synesthesia;
     return l;
   }

@@ -8,7 +8,7 @@ import { BUNDLE_VERSION, MAX_BUNDLE_BYTES, SECTIONS, applyWrites, buildBundle, p
 // A stand-in built-in, so the tests don't depend on which ones the app ships.
 const BUILTIN = scene('Alpha', 'Beams', 'Stand-in', 'void main() { fragColor = vec4(1.); }');
 const MIRRORED = [{ id: 'mirror', on: true, settings: { axis: 2 } }];
-const SHOW = { cues: [{ id: 'c1', name: 'Opener', scene: 'Mine', values: {}, look: {}, effects: MIRRORED }], mode: 'cut', seconds: 2, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120 };
+const SHOW = { cues: [{ id: 'c1', name: 'Opener', scene: 'Mine', values: {}, look: {}, effects: MIRRORED }], mode: 'cut', seconds: 2, autoBeats: 32, autoUnit: 'beats', autoSeconds: 30, plan: null, directorBeats: 128, directorUnit: 'beats', directorSeconds: 120, trims: { reactivity: 1, speed: 1, trails: 1, aberration: 1, hue: 0 } };
 
 describe('settings bundle', () => {
   let store: Map<string, string>;

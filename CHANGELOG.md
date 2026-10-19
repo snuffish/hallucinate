@@ -20,6 +20,10 @@
   wheel, blending or in steps (each step eases, so cycling never switches the colour in one frame). Show scenes keep
   it; `set_look` takes `palette` and `get_app_state` reports it. Scenes of your own follow it through `laser()`;
   `laserWheel()` is the whole wheel ([ADR 0004](docs/adr/0004-palettes-are-hues-on-the-laser-wheel.md)).
+- **Master look** in the studio, under the master fader: Live's master trims turn down what every show scene sets
+  (Reactivity, Speed, Trails, Fringing, 0–100%) and shift its colour (±180°), on Live and the Preview monitor, without
+  editing a show scene. Kept with the show; a show saved before them opens neutral
+  ([ADR 0006](docs/adr/0006-master-trims-turn-down-live.md)).
 - Sliders that **follow the music**: the ♪ beside Speed, Trails, Colour, Synesthesia or Fringing makes it move with
   the bass, mids, highs, level, kick, tone or mood, by a depth either way, with an attack and a release. It never goes
   above the higher of where you set it and the top of the Randomize range, rises no faster than 50 ms (Colour 150 ms,

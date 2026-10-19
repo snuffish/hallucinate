@@ -18,7 +18,7 @@ import { KEYS, debouncedWriter, readWithDefaults } from '../state/persistence';
 import { paramKey } from '../state/scene-list';
 import { LIST_MAX_SECONDS, PlanSchema, type Plan, type PlanStep } from '../state/show-plan';
 import type { AppPort } from './app-port';
-import type { Shot } from './live-slot';
+import { NEUTRAL_TRIMS, type MasterTrims, type Shot } from './live-slot';
 import { PaletteSchema } from '../state/look-store';
 
 const CueSchema = z.object({
@@ -46,6 +46,10 @@ export const ShowSchema = z.object({
   directorBeats: bounded(16, 1024, 128),
   directorUnit: z.enum(['beats', 'seconds']).default('beats'),
   directorSeconds: bounded(15, 3600, 120),
+  // Live's master trims (ADR 0006): neutral in a show saved before them.
+  trims: z.object({
+    reactivity: bounded(0, 1, 1), speed: bounded(0, 1, 1), trails: bounded(0, 1, 1), aberration: bounded(0, 1, 1), hue: bounded(-0.5, 0.5, 0),
+  }).catch({ ...NEUTRAL_TRIMS }).default({ ...NEUTRAL_TRIMS }),
 });
 export type Cue = z.infer<typeof CueSchema>;
 export type ParamTab = 'preview' | 'live';
@@ -80,6 +84,7 @@ export class StudioSession {
   screens: ScreenDetailed[] = [];
   master = 1;
   masterTarget = 1;
+  trims: Readonly<MasterTrims> = NEUTRAL_TRIMS;
   version = 0;
   // Bumps whenever the show itself (its scenes or its plan) changes, whoever changed it: an undo only
   // restores a snapshot when nothing changed the show after the step it undoes.
@@ -105,6 +110,8 @@ export class StudioSession {
     this.directorBeats = saved.directorBeats;
     this.directorUnit = saved.directorUnit;
     this.directorSeconds = saved.directorSeconds;
+    this.trims = saved.trims;
+    app.live.trims = this.trims;
     this.previewId = this.cues[0]?.id ?? null;
     this.lastShow = { cues: this.cues, plan: this.plan };
   }
@@ -213,7 +220,7 @@ export class StudioSession {
   save(): void { this.writer.schedule(); }
 
   private serialised() {
-    return { cues: this.cues, mode: this.mode, seconds: this.seconds, autoBeats: this.autopilot.beats, autoUnit: this.autopilot.unit, autoSeconds: this.autopilot.seconds, plan: this.plan, directorBeats: this.directorBeats, directorUnit: this.directorUnit, directorSeconds: this.directorSeconds };
+    return { cues: this.cues, mode: this.mode, seconds: this.seconds, autoBeats: this.autopilot.beats, autoUnit: this.autopilot.unit, autoSeconds: this.autopilot.seconds, plan: this.plan, directorBeats: this.directorBeats, directorUnit: this.directorUnit, directorSeconds: this.directorSeconds, trims: this.trims };
   }
 
   // ---------- Show scenes ----------
@@ -452,6 +459,20 @@ export class StudioSession {
     this.masterTarget = level;
     if (level > 0) this.lastLevel = level;
     this.changed(false);
+  }
+
+  // A master trim on Live (ADR 0006): ×0–1 for the sliders, ±0.5 of the wheel for the colour.
+  setTrim(key: keyof MasterTrims, value: number): void {
+    const v = key === 'hue' ? Math.min(0.5, Math.max(-0.5, value)) : Math.min(1, Math.max(0, value));
+    this.trims = { ...this.trims, [key]: v };
+    this.app.live.trims = this.trims;
+    this.changed();
+  }
+
+  resetTrims(): void {
+    this.trims = { ...NEUTRAL_TRIMS };
+    this.app.live.trims = this.trims;
+    this.changed();
   }
 
   blackout(): void {

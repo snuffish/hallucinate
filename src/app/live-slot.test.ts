@@ -182,6 +182,20 @@ describe('LiveSlot', () => {
     expect([...live.route(base, true, 0).projector!.program.palette.slice(5, 7)]).toEqual([2, 0]);
   });
 
+  it('turns down what a show scene sets on Live and Preview by the master trims, and shifts its colour', () => {
+    const { live, base, state } = slot();
+    state.look.synesthesia = 0;
+    const shot = { scene: 1, values: glow(2), look: { reactivity: 1, trails: 0.5, aberration: 0.004, hue: 0.2 }, effects: [] };
+    live.trims = { reactivity: 0.5, speed: 1, trails: 0.5, aberration: 0, hue: 0.1 };
+    live.take(shot, 'Beta');
+    const p = live.route(base, true, 0).projector!.program;
+    expect(p.bass).toBeCloseTo(0.4);              // the hearing's 0.8 at reactivity 1 × 0.5
+    expect(p.feedback).toBeCloseTo(0.25);         // trails 0.5 × 0.5
+    expect(p.aberration).toBe(0);
+    expect(p.hue).toBeCloseTo(0.3);
+    expect(live.preview(base, shot, 0).program.feedback).toBeCloseTo(0.25);
+  });
+
   it('grades each output on its own: Live never writes into the main frame', () => {
     const { live, base, hearing } = slot();
     hearing.bright = 1;

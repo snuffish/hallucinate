@@ -111,6 +111,7 @@ export const HELP_TOPICS = {
     body: [
       'Run a show: click a show scene to put it in Preview (green), then Take sends it to Live (red) with a cut or a fade.',
       'Open a projector window on another display: it renders the show itself at its own resolution. Blackout fades Live to black.',
+      'Master look, under the master fader, turns down what every show scene sets on Live (Reactivity, Speed, Trails, Fringing, 0–100%) and shifts its colour, without editing a show scene. Double-click one to put it back; it is kept with the show.',
       'Autopilot takes the next scene every few beats (or seconds).',
       ...(STATIC_DEMO ? ['The Director, which plans the show with Claude, needs the local server.'] : ['The Director lets Claude plan the show from the music.']),
     ],

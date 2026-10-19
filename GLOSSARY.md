@@ -122,6 +122,11 @@ A Look slider moving with one part of the music (a band, the kick, the tone or t
 and a release, never above the higher of its own value and the top of its Randomize range.
 _Avoid_: route (the code's name for it), modulation, LFO, sidechain
 
+**Master trim**:
+One of Live's controls in the studio's Master look: it turns down what every show scene's look sets on Live (or shifts
+its colour), kept with the show.
+_Avoid_: master look (that is the row), grand master, offset
+
 **Intensity**:
 One Look control that moves Reactivity, Trails and Fringing together, inside the ranges Randomize uses.
 _Avoid_: master, macro, energy

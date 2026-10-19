@@ -323,6 +323,10 @@ input.look-hue-track::-moz-range-thumb { width: 12px; height: 12px; border-radiu
 .look-follow-head select { flex: 1; min-width: 0; padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; background: rgba(0, 0, 0, 0.35); color: var(--text); font-size: 11px; }
 .look-follow-head button { padding: 1px 6px; font-size: 10.5px; }
 .look-follow-edit .look-row { grid-template-columns: 0 56px 1fr auto; }
+.master-look summary { cursor: pointer; }
+.master-look summary small { margin-left: 6px; color: var(--locked); }
+.master-look .look-row label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.master-look > button { margin-top: 4px; font-size: 11px; }
 .look-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
 .look-slot { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 3px 0; font-size: 11px; font-weight: 600; border-style: dashed; color: var(--muted); background: transparent; }
 .look-slot.filled { border-style: solid; border-color: var(--c); box-shadow: inset 0 -3px 0 var(--c); color: var(--text); }
