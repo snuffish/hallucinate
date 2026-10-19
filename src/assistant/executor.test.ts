@@ -71,6 +71,17 @@ describe('tool runner', () => {
     expect(app.state.look).toMatchObject({ intensity: 0.5, reactivity: 1, trails: 0.35, aberration: 0 });
   });
 
+  it('set_look sets a palette, keeps its steps when not given, and undoes back to the wheel', async () => {
+    const { run, app, undo } = setup();
+    await run('set_look', { palette: { hues: [0.6, 0.1], steps: true } });
+    expect(app.state.look.palette).toEqual({ hues: [0.6, 0.1], steps: true });
+    await run('set_look', { palette: { hues: [0.2, 0.3, 0.4] } });
+    expect(app.state.look.palette).toEqual({ hues: [0.2, 0.3, 0.4], steps: true });
+    undo.pop()!.undo();
+    undo.pop()!.undo();
+    expect(app.state.look.palette).toEqual({ hues: [], steps: false });
+  });
+
   it('undoes a show change, but not once something else changed the show after it', async () => {
     const { run, studio, undo } = setup();
     await run('add_show_scene', { scene: 'Alpha' });

@@ -101,7 +101,7 @@ describe('LiveSlot', () => {
     const p = live.route(base, true, 0).projector!.program;
     expect(p.hue).toBeCloseTo(0.75);
     expect(p.feedback).toBeCloseTo(0.5);
-    expect(live.unpin()).toEqual({ scene: 1, values: glow(2), look: expect.objectContaining({ hue: 0.75, trails: 0.5 }), effects: [] });
+    expect(live.unpin()).toEqual({ scene: 1, values: glow(2), look: expect.objectContaining({ hue: 0.75, trails: 0.5 }), palette: { hues: [], steps: false }, effects: [] });
   });
 
   it('unpinning hands back what was pinned and the main program returns everywhere', () => {
@@ -171,6 +171,15 @@ describe('LiveSlot', () => {
     expect(live.route(base, true, 0).projector!.program.grade.exposure).toBe(1);   // synesthesia 0: no grade
     live.take({ scene: 2, values: glow(2), look: {}, effects: [] }, 'Gamma, an older show');
     expect(live.route(base, true, 0).projector!.program.grade.exposure).toBeGreaterThan(1);   // the app's 1
+  });
+
+  it("draws Live through its show scene's palette, and the screen's for one saved before palettes", () => {
+    const { live, base, state } = slot();
+    state.look.palette = { hues: [0.1, 0.2], steps: false };
+    live.take({ scene: 1, values: glow(2), look: {}, palette: { hues: [0.5, 0.6, 0.7], steps: true }, effects: [] }, 'Beta cool');
+    expect([...live.route(base, true, 0).projector!.program.palette.slice(5, 7)]).toEqual([3, 1]);
+    live.take({ scene: 2, values: glow(2), look: {}, effects: [] }, 'Gamma, an older show');
+    expect([...live.route(base, true, 0).projector!.program.palette.slice(5, 7)]).toEqual([2, 0]);
   });
 
   it('grades each output on its own: Live never writes into the main frame', () => {

@@ -4,7 +4,9 @@
 // move. Every rule from the sound to the picture lives here: reactivity, the clock's pace, the hue's walk,
 // the synesthesia grade, the trails' afterglow and fringing.
 
+import { WHEEL, type Palette } from '../state/app-state';
 import { NO_EFFECTS, type EffectStack } from './effects';
+import { PALETTE_FLOATS, packPalette } from './laser-colour';
 import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
 import { stillHearing, type SnapshotUniforms } from './scene-inputs';
@@ -14,6 +16,7 @@ import { stillHearing, type SnapshotUniforms } from './scene-inputs';
 export interface FrameLook {
   reactivity: number; speed: number; cycle: number;
   hue: number; trails: number; aberration: number; synesthesia: number;
+  palette?: Readonly<Palette>;   // none: the whole laser wheel
 }
 
 // Where an output's picture is in its own time: the clock the shaders see, how fast it runs (it eases
@@ -69,6 +72,7 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
   // trails), bright sound is crisp (shorter trails, more fringing).
   const s = look.synesthesia;
   p.hue = look.hue + motion.huePhase;
+  packPalette(p.palette, look.palette ?? WHEEL);
   p.feedback = Math.min(0.97, look.trails * sceneTrails * (1 + s * (0.5 - p.bright) * 0.12));
   p.aberration = look.aberration * (1 + p.beat * 1.5) * (1 + s * (p.bright - 0.5) * 1.2);
 }
@@ -128,7 +132,7 @@ export function crossfade(t: Transition, now: number): number {
 export function programState(spectrum: Uint8Array = new Uint8Array(512)): ProgramState {
   return {
     scene: -1, prevScene: -1, effects: NO_EFFECTS, prevEffects: NO_EFFECTS, mix: 1, time: 0, turn: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, tickPhase: 0, ticks: 0, hue: 0,
-    spectrum, bright: 0.5, mood: 0.5,
+    palette: new Float32Array(PALETTE_FLOATS), spectrum, bright: 0.5, mood: 0.5,
     grade: { exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] },
     feedback: 0.86, aberration: 0, master: 1,
   };

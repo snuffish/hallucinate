@@ -34,6 +34,15 @@ describe('the Look, kept for the next start', () => {
     expect(loadLook()).toEqual({ ...defaultLook(), reactivity: 2, trails: 0.5, locked: ['hue'] });
   });
 
+  it('loads a palette of 2–5 hues wrapped into the wheel, and fewer than two as the whole wheel', () => {
+    map.set(KEYS.look, JSON.stringify({ palette: { hues: [1.25, -0.5, 0.1, 0.2, 0.3, 0.4], steps: true } }));
+    expect(loadLook().palette).toEqual({ hues: [0.25, 0.5, 0.1, 0.2, 0.3], steps: true });
+    map.set(KEYS.look, JSON.stringify({ palette: { hues: [0.3], steps: 'yes' } }));
+    expect(loadLook().palette).toEqual({ hues: [], steps: false });
+    map.set(KEYS.look, JSON.stringify({ palette: 'warm' }));
+    expect(loadLook().palette).toEqual({ hues: [], steps: false });
+  });
+
   it('loads as the laser look when what is stored is not a look', () => {
     map.set(KEYS.look, '{broken');
     expect(loadLook()).toEqual(defaultLook());

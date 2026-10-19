@@ -15,7 +15,7 @@ import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, 
 import { Renderer, type ProgramState } from '../engine/renderer';
 import { readInputs, silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
 import { userSceneId, type Scene } from '../scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, SLIDER_KEYS, defaultClock, defaultLook, type AppState, type LookKey, type SliderKey, type SourceButton, type XYAxes } from '../state/app-state';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, PALETTE_MAX, SLIDER_KEYS, defaultClock, defaultLook, type AppState, type LookKey, type Palette, type SliderKey, type SourceButton, type XYAxes } from '../state/app-state';
 import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
@@ -557,12 +557,12 @@ export class AppController {
 
   // ---------- A scene as a whole: which one, its parameter values, the look ----------
 
-  // A scene as a show scene keeps it: its parameter values, the look sliders and the screen's effects, as
-  // they are now.
+  // A scene as a show scene keeps it: its parameter values, the look sliders, the palette and the screen's
+  // effects, as they are now.
   captureScene(i = this.state.clock.scene): Shot {
     const look: Record<string, number> = {};
     for (const k of LOOK_KEYS) look[k] = this.state.look[k];
-    return { scene: i, values: this.library.values(i), look, effects: this.state.effects };
+    return { scene: i, values: this.library.values(i), look, palette: this.state.look.palette, effects: this.state.effects };
   }
 
   // Puts a scene on screen in one step, as the studio takes it: the look sliders it has, its values, its
@@ -573,6 +573,7 @@ export class AppController {
     const scene = this.state.scenes[snap.scene];
     if (!scene || scene.removed) return;
     for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) this.setLook(k, snap.look[k]!);
+    if (snap.palette) this.setPalette(snap.palette);
     this.library.replaceValues(snap.scene, snap.values);
     const outgoing = this.state.effects, before = this.state.clock.scene;
     this.setEffects(snap.effects);
@@ -637,6 +638,14 @@ export class AppController {
   setLookLock(key: SliderKey, locked: boolean): void {
     const now = this.state.look.locked;
     this.state.look.locked = SLIDER_KEYS.filter((k) => (k === key ? locked : now.includes(k)));
+    this.publishLook();
+  }
+
+  // The palette every scene draws through laser() (ADR 0004): 2–5 hues on the wheel, or none for the whole
+  // wheel. Randomize and Drift leave it alone.
+  setPalette(palette: Readonly<Palette>): void {
+    const hues = palette.hues.length >= 2 ? palette.hues.slice(0, PALETTE_MAX).map(fract) : [];
+    this.state.look.palette = { hues, steps: palette.steps };
     this.publishLook();
   }
 

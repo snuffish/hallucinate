@@ -77,6 +77,7 @@ The editor's *Cheat sheet* has the full list. A few worth knowing:
   scaled by Reactivity.
 - `laser(t)`, `rainbow(t)`, `neon(t)` – colour palettes that repeat every 1.0; add `uHue` so the Colour slider and
   Colour cycling move them. `laser` is the laser palette: pure, fully saturated colours on a continuous wheel (red →
-  yellow → green → cyan → blue → magenta → red), which the built-in scenes and the new-scene template use. `rainbow` is
-  the softer one.
+  yellow → green → cyan → blue → magenta → red), which the built-in scenes and the new-scene template use. It follows
+  the Look's palette when one is set (only its colours, see [ADR 0004](adr/0004-palettes-are-hues-on-the-laser-wheel.md));
+  `laserWheel(t)` is always the whole wheel. `rainbow` is the softer one.
 - `media(p)`, `untone(col)` – sample the dropped image or video; see [Media](media.md#in-code-and-the-visual-maker).

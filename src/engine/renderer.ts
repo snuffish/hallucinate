@@ -95,6 +95,7 @@ export interface ProgramState {
   tickPhase: number;
   ticks: number;
   hue: number;
+  palette: Float32Array;      // the Look's palette as the shaders read it (packPalette)
   spectrum: Uint8Array;
   bright: number;
   mood: number;
@@ -742,6 +743,7 @@ export class Renderer {
     const u = this.sceneUniforms;
     u.uRes = [t.sceneA.w, t.sceneA.h];
     writeInputs(u, s);
+    u.uPalette = s.palette;
     u.uSpec = this.specTex;
     const media = this.mediaUniforms(s.scene, s.prevScene);
     this.drawScene(s.scene, t.sceneA, u, media);

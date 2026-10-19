@@ -1,7 +1,7 @@
 // The bodies of the control widgets: sources, media, meters, scene, look sliders,
 // actions. Each reads its own slice of the store; the widget frame (title, drag, dock) is `Widget`.
 
-import type { CSSProperties } from 'react';
+import { Fragment, type CSSProperties } from 'react';
 import { useApp, useUI } from '../../app/AppContext';
 import { STATIC_DEMO } from '../../app/static-demo';
 import { HOTKEYS } from '../../hotkeys/registry';
@@ -11,6 +11,7 @@ import { SOURCES } from '../StartScreen';
 import { laserCss } from '../../engine/laser-colour';
 import { SLOT_NAMES } from '../../state/look-slots';
 import { FineRange, LookSlider, NumberField } from './LookSlider';
+import { PaletteStrip } from './PaletteStrip';
 import { XYPad } from './XYPad';
 
 export interface PanelActions {
@@ -193,8 +194,11 @@ export function LookBody() {
       </button>
       {look.xyOpen && <div className="look-xy">{look.xy.map((axes, i) => <XYPad key={i} index={i} axes={axes} />)}</div>}
       {SLIDER_KEYS.map((k) => (
-        <LookSlider key={k} k={k} value={look[k]} lock={look.locked.includes(k)}
-          tag={tags.has(k) && <em className="look-tag" title="Also on this XY pad axis">{tags.get(k)!.join(' ')}</em>} />
+        <Fragment key={k}>
+          <LookSlider k={k} value={look[k]} lock={look.locked.includes(k)}
+            tag={tags.has(k) && <em className="look-tag" title="Also on this XY pad axis">{tags.get(k)!.join(' ')}</em>} />
+          {k === 'hue' && <PaletteStrip />}
+        </Fragment>
       ))}
       <LookSlotsAndIntensity />
       <label className="toggle"><input type="checkbox" id="drift" checked={look.drift} onChange={(e) => app.setLookFlag('drift', e.target.checked)} /> Drift <small>sliders glide to random values, each at its own pace</small></label>

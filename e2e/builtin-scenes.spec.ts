@@ -130,6 +130,19 @@ for (const { name: sceneName } of SCENES) for (const { name, look } of LOOKS) {
   });
 }
 
+// A stepped palette across the widest brightness gap on the wheel, blue to yellow, at the strongest Look
+// (ADR 0004): the hue sits in the middle of the step's ease, where a kick moves the colour the most in one
+// frame. Two scenes, not every one: the step is the palette's, the same in every scene that uses laser().
+const STEPPED_BLUE_YELLOW = { hues: [2 / 3, 1 / 6], steps: true };
+for (const sceneName of ['Light Sheet', 'Beam Fan']) {
+  test(`${sceneName} with a stepped blue and yellow palette at the strongest Look: a strobe-safe kick and tick across a step`, async ({ page }) => {
+    test.setTimeout(4 * 60_000);
+    const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
+    const look: FrameLook = { ...STRONGEST_LOOK, hue: 0.425, palette: STEPPED_BLUE_YELLOW };   // 0.35–0.5 eases blue into yellow
+    judge(await verdict(page, scene.index, look), `${sceneName} with a stepped blue and yellow palette`);
+  });
+}
+
 // Each effect alone at its strongest: it may reshape the picture, but never light the edges or make a
 // kick or a tick strobe. Only at the strongest Look, where it reacts the most.
 for (const effect of EFFECTS) for (const { name: sceneName } of SCENES) {

@@ -3,7 +3,7 @@ import { INPUT_NAMES } from '../engine/scene-inputs';
 // Starting point for your own scene in the shader editor.
 export const TEMPLATE = /* glsl */ `// Your own scene. Edit me — it recompiles as you type.
 // Available: ${INPUT_NAMES} uRes
-//            spec(x) wave(x) laser(t) rainbow(t) neon(t) rot(a) noise(p) fbm(p) centered() onePixel() beam(d, w)
+//            spec(x) wave(x) laser(t) laserWheel(t) rainbow(t) neon(t) rot(a) noise(p) fbm(p) centered() onePixel() beam(d, w)
 //            tickFlash() easedTicks()
 // Lines tagged // @param get a live control in the Parameters overlay (P);
 // a // @group line gives the ones after it a heading that folds.

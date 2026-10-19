@@ -134,6 +134,11 @@ The wheel of pure, fully saturated colours that the built-in scenes colour their
 it, or the softer rainbow.
 _Avoid_: rainbow (that is the softer one)
 
+**Palette**:
+2–5 hues on the laser palette that every scene's colours walk instead of the whole wheel, blending or in steps. Part
+of the Look, kept by show scenes.
+_Avoid_: colour scheme, gradient, colour preset
+
 **Show scene**:
 A scene with its parameter values, its effects and the look it keeps, as the studio plays it.
 _Avoid_: cue (the code's name for it), preset

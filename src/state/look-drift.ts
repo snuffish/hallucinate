@@ -4,7 +4,7 @@
 // allocation per frame.
 
 import type { FrameLook } from '../engine/look';
-import type { Look } from './app-state';
+import type { Look, SliderKey } from './app-state';
 
 // What Randomize and Drift may pick from: laser-friendly territory (ADR 0002). Narrower than the
 // sliders' full range, which stays open for hand use.
@@ -16,7 +16,7 @@ export const RANDOM_RANGES = {
   cycle: [0, 1],
   synesthesia: [0, 0.6],
   aberration: [0, 0.006],   // Fringing
-} as const satisfies Record<keyof FrameLook, readonly [number, number]>;   // every slider a frame is composed with, and only those
+} as const satisfies Record<SliderKey, readonly [number, number]>;   // every slider a frame is composed with, and only those
 export type DriftKey = keyof typeof RANDOM_RANGES;
 // The sliders Randomize rolls and Drift moves, in a fixed order.
 export const DRIFT_KEYS = Object.keys(RANDOM_RANGES) as DriftKey[];

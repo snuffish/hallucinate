@@ -82,10 +82,12 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
     sceneByName: (name) => library.byName(name),
     setLook,
     setIntensity,
-    captureScene: (i = state.clock.scene) => ({ scene: i, values: library.values(i), look: Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), effects: state.effects }),
+    setPalette: (p) => { look.palette = { hues: p.hues.length >= 2 ? p.hues.slice(0, 5) : [], steps: p.steps }; },
+    captureScene: (i = state.clock.scene) => ({ scene: i, values: library.values(i), look: Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), palette: look.palette, effects: state.effects }),
     applyScene: (snap, fade) => {
       if (!scenes[snap.scene] || scenes[snap.scene]!.removed) return;
       for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) setLook(k, snap.look[k]!);
+      if (snap.palette) look.palette = snap.palette;
       library.replaceValues(snap.scene, snap.values);
       if (snap.effects !== state.effects) { state.effects = snap.effects; ui.set({ effects: snap.effects }); }   // as the controller's setEffects
       show(snap.scene, fade);

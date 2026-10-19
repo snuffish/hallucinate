@@ -15,12 +15,13 @@ import { toUniform, type ParamSpec, type ParamValues } from '../engine/params';
 import type { Hearing } from '../engine/listener';
 import { composeFrame, copyMotion, crossfade, programState, type FrameLook, type Motion, type Transition } from '../engine/look';
 import type { ProgramState, SceneUniforms } from '../engine/renderer';
-import { LOOK_KEYS, type AppState } from '../state/app-state';
+import { LOOK_KEYS, type AppState, type Palette } from '../state/app-state';
 import type { Store } from '../state/store';
 import type { ScreenMode, UIState } from '../state/ui-state';
 
 // A show scene on an output: a scene, its parameter values, its look sliders and its effects.
-export interface Shot { scene: number; values: ParamValues; look: Readonly<Record<string, number>>; effects: EffectStack }
+// `palette` absent: the app's (a show scene saved before palettes, or one the assistant wrote).
+export interface Shot { scene: number; values: ParamValues; look: Readonly<Record<string, number>>; palette?: Readonly<Palette>; effects: EffectStack }
 
 // What one renderer draws this frame. `params` stands in for the stored @param values of the scenes it
 // lists (Renderer.render's second argument).
@@ -71,7 +72,7 @@ export class LiveSlot {
     const from = this.pin && this.pin.shot.scene !== shot.scene ? this.pin.shot : null;
     if (!this.pin) copyMotion(this.liveMotion, this.deps.state.clock);   // Live goes on from the screen
     this.pin = {
-      shot: { scene: shot.scene, values: shot.values, look, effects: shot.effects },
+      shot: { scene: shot.scene, values: shot.values, look, palette: shot.palette ?? now.palette, effects: shot.effects },
       from,
       prevScene: from?.scene ?? -1,
       transitionStart: this.deps.state.clock.clock,
@@ -158,7 +159,7 @@ export class LiveSlot {
     const p = this.fill(f, base);
     p.scene = shot.scene; p.prevScene = from?.scene ?? -1; p.mix = mix;
     p.effects = shot.effects; p.prevEffects = from?.effects ?? NO_EFFECTS;   // each picture keeps its own
-    composeFrame(p, motion, this.deps.hearing, this.frameLook(shot.look), this.deps.state.scenes[shot.scene]?.trails ?? 1, dt);
+    composeFrame(p, motion, this.deps.hearing, this.frameLook(shot), this.deps.state.scenes[shot.scene]?.trails ?? 1, dt);
     const params = f.params;
     for (const k in params) delete params[k];
     params[shot.scene] = this.uniforms(shot.scene, shot.values);
@@ -167,8 +168,9 @@ export class LiveSlot {
   }
 
   // A show scene's look, with the app's sliders for what it doesn't store (as Take does). Reused object.
-  private frameLook(look: Readonly<Record<string, number>>): FrameLook {
+  private frameLook({ look, palette }: Shot): FrameLook {
     const app = this.deps.state.look, l = this.look;
+    l.palette = palette ?? app.palette;
     l.reactivity = look.reactivity ?? app.reactivity;
     l.speed = look.speed ?? app.speed;
     l.cycle = look.cycle ?? app.cycle;

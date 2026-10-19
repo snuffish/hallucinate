@@ -4,7 +4,7 @@
 // of its range is clamped back into it.
 
 import { z } from 'zod';
-import { DEFAULT_XY, LOOK_RANGES, SLIDER_KEYS, defaultLook, type Look, type LookKey, type SliderKey } from './app-state';
+import { DEFAULT_XY, LOOK_RANGES, PALETTE_MAX, SLIDER_KEYS, WHEEL, defaultLook, type Look, type LookKey, type Palette, type SliderKey } from './app-state';
 import { KEYS, debouncedWriter, readWithDefaults, type DebouncedWriter } from './persistence';
 
 const DEFAULTS = defaultLook();
@@ -14,6 +14,13 @@ export const slider = (key: LookKey) => {
   const r = LOOK_RANGES[key];
   return z.number().catch(DEFAULTS[key]).transform((v) => Math.min(r.max, Math.max(r.min, v)));
 };
+// A palette (ADR 0004): 2–5 hues on the wheel, each wrapped into 0–1, or none (the whole wheel); fewer than
+// two hues read as none, extra ones are dropped.
+export const PaletteSchema = z.object({
+  hues: z.array(z.number().transform((h) => h - Math.floor(h))).catch([]).transform((h) => (h.length >= 2 ? h.slice(0, PALETTE_MAX) : [])),
+  steps: z.boolean().catch(false),
+}).catch(() => ({ hues: [], steps: WHEEL.steps })) satisfies z.ZodType<Palette>;
+
 const sliderKey = z.custom<SliderKey>((v) => SLIDER_KEYS.includes(v as SliderKey));
 const xyAxes = z.object({ x: sliderKey, y: sliderKey }).refine((a) => a.x !== a.y);
 
@@ -30,6 +37,7 @@ export const LookSchema = z.object({
   drift: z.boolean().catch(DEFAULTS.drift),
   driftSpeed: slider('driftSpeed'),
   intensity: z.number().min(0).max(1).catch(DEFAULTS.intensity),
+  palette: PaletteSchema,
   locked: z.array(z.unknown()).catch([]).transform((keys) => SLIDER_KEYS.filter((k) => keys.includes(k))),
   xyOpen: z.boolean().catch(DEFAULTS.xyOpen),
   xy: z.array(xyAxes).length(DEFAULT_XY.length).catch(DEFAULT_XY.map((a) => ({ ...a }))),

@@ -19,6 +19,7 @@ import { paramKey } from '../state/scene-list';
 import { LIST_MAX_SECONDS, PlanSchema, type Plan, type PlanStep } from '../state/show-plan';
 import type { AppPort } from './app-port';
 import type { Shot } from './live-slot';
+import { PaletteSchema } from '../state/look-store';
 
 const CueSchema = z.object({
   id: z.string(),
@@ -26,6 +27,7 @@ const CueSchema = z.object({
   scene: z.string(),
   values: z.record(z.string(), ParamValueSchema).default({}),
   look: z.record(z.string(), z.number()).default({}),
+  palette: PaletteSchema.optional(),   // ADR 0004; absent in a show saved before palettes (the app's then). An older app strips it.
   // Cleaned up through the effect catalogue: a show saved before effects reads as none, and a broken
   // entry is dropped instead of failing the whole show. An older app strips the field.
   effects: EffectStackSchema,
@@ -227,9 +229,9 @@ export class StudioSession {
   // A show scene = a scene, its parameter values, the look sliders and the effects, as they are on Live now.
   capture(): Omit<Cue, 'id'> {
     const app = this.app;
-    const { scene, values, look, effects } = app.captureScene();
+    const { scene, values, look, palette, effects } = app.captureScene();
     const { name } = app.state.scenes[scene]!;
-    return { name, scene: name, values, look: { ...look }, effects };
+    return { name, scene: name, values, look: { ...look }, ...(palette && { palette: { hues: [...palette.hues], steps: palette.steps } }), effects };
   }
 
   addFromSelect(value: string): void {
@@ -488,7 +490,7 @@ export class StudioSession {
   private shot(cue: Cue, index: number): Shot {
     const hit = this.shots.get(cue);
     if (hit && hit.scene === index) return hit;
-    const shot = { scene: index, values: cue.values, look: cue.look, effects: cue.effects };
+    const shot = { scene: index, values: cue.values, look: cue.look, palette: cue.palette, effects: cue.effects };
     this.shots.set(cue, shot);
     return shot;
   }

@@ -80,7 +80,7 @@ export function NumberField({ d, value, onSet }: { d: Display; value: number; on
 // A range input with fine tuning. A press on the track jumps there (on the thumb it doesn't); from
 // then on the drag is relative.
 export function FineRange({ id, label, value, r, onSet, onReset, hue }: {
-  id: string; label: string; value: number; r: Range; onSet: (v: number) => void; onReset: () => void; hue?: boolean;
+  id: string; label: string; value: number; r: Range; onSet: (v: number) => void; onReset?: () => void; hue?: boolean;
 }) {
   const span = r.max - r.min;
   const drag = useRef<{ x: number; v: number } | null>(null);
@@ -89,7 +89,7 @@ export function FineRange({ id, label, value, r, onSet, onReset, hue }: {
   const at = (b: DOMRect, x: number) => r.min + clampTo((x - b.left - THUMB) / (b.width - 2 * THUMB), 0, 1) * span;
   return (
     <input ref={wheel} type="range" id={id} className={hue ? 'look-hue-track' : undefined} min={r.min} max={r.max} step={r.step} value={value}
-      aria-label={label} title="Double-click to reset · Shift-drag: finer · wheel steps once it has focus"
+      aria-label={label} title={`${onReset ? 'Double-click to reset · ' : ''}Shift-drag: finer · wheel steps once it has focus`}
       style={{ '--p': `${((value - r.min) / span) * 100}%`, ...(hue && { background: LASER_GRADIENT('90deg') }) } as CSSProperties}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
