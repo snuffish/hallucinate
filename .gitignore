@@ -9,6 +9,8 @@ test-results/
 *.local
 .DS_Store
 dist-desktop/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
 release/
 # Reference music and its recordings: copyrighted, rebuilt locally with `npm run clips` (docs/reference-clips.md)
 reference/clips/

@@ -2,7 +2,7 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'dist-desktop/**', 'release/**', 'node_modules/**', '.claude/**', 'src/**/*.js', 'perf/**', '*.md'] },
+  { ignores: ['dist/**', 'dist-desktop/**', 'release/**', 'node_modules/**', '.claude/**', 'docs/.vitepress/cache/**', 'src/**/*.js', 'perf/**', '*.md'] },
   ...tseslint.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],

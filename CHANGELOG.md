@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — docs website (2026-10-19)
+
+### Added
+
+- The guides in `docs/` (and the ADRs) are published as a website at
+  [snuffish.github.io/hallucinate/docs](https://snuffish.github.io/hallucinate/docs/), next to the web demo. It is built
+  with VitePress and has a sidebar, search and dark mode. Preview it with `npm run docs:dev`.
+
 ## Unreleased — Hearing monitor (2026-10-18)
 
 ### Added

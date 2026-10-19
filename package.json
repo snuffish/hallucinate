@@ -38,6 +38,9 @@
     "dev": "vite",
     "start": "vite",
     "build": "vite build",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "preview": "vite preview",
     "desktop": "node desktop/dev.mjs",
     "build:desktop": "vite build && vite build -c vite.desktop.config.ts",
@@ -69,6 +72,7 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.2",
     "vite": "^8.3.4",
+    "vitepress": "^1.6.4",
     "vitest": "^4.1.11"
   },
   "dependencies": {
