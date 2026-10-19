@@ -22,10 +22,10 @@ async function expectResolutionUntouched(page: import('@playwright/test').Page) 
   await page.keyboard.press('Escape');
 }
 
-test('a fresh start opens with the laser look: Reactivity to Fringing, then Drift', async ({ page }) => {
+test('a fresh start opens with the laser look: Reactivity to Fringing, Intensity, then Drift', async ({ page }) => {
   await page.goto('/');
   const labels = await page.locator('#w-look label').evaluateAll((els) => els.map((e) => [...e.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim())?.textContent?.trim()));
-  expect(labels).toEqual(['Reactivity', 'Speed', 'Trails', 'Colour', 'Colour cycling', 'Synesthesia', 'Fringing', 'Drift']);
+  expect(labels).toEqual(['Reactivity', 'Speed', 'Trails', 'Colour', 'Colour cycling', 'Synesthesia', 'Fringing', 'Intensity', 'Drift']);
   expect(await rolledValues(page)).toEqual({ reactivity: 1, speed: 1, trails: 0.35, hue: 0, cycle: 0.2, synesthesia: 0.3, aberration: 0 });
 });
 

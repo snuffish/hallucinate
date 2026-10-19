@@ -25,6 +25,7 @@ import { SceneHistory } from '../state/scene-history';
 import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
 import { takeRenameReport } from '../state/scene-renames';
 import { loadLook, lookWriter } from '../state/look-store';
+import { INTENSITY_KEYS, LookGlide, SLOT_NAMES, intensityValue, loadLookSlots, lookSlotsWriter, slotOf, type LookSlots } from '../state/look-slots';
 import { loadScreenEffects, screenEffectsWriter } from '../state/screen-effects';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HearingView, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
@@ -124,6 +125,9 @@ export class AppController {
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly effectsWriter = screenEffectsWriter(() => this.state.effects);
   private readonly lookWriter = lookWriter(() => this.state.look);
+  private lookSlots: LookSlots = loadLookSlots();
+  private readonly lookSlotsWriter = lookSlotsWriter(() => this.lookSlots);
+  private readonly glide = new LookGlide();   // a slot being recalled
   // While a show scene crossfades in on the main screen, the stack the outgoing picture keeps; null once the
   // crossfade ends (or on a manual scene change), when the outgoing picture draws with the screen's own.
   private outgoingEffects: Effects.EffectStack | null = null;
@@ -200,7 +204,7 @@ export class AppController {
       look: loadLook(), effects: loadScreenEffects(), clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
-    this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, effects: this.state.effects });
+    this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, effects: this.state.effects, lookSlots: this.lookSlots });
     this.renderer.setMedia(this.media);
     this.output = new OutputLink(list.scenes, (outputs) => { this.ui.set({ outputs }); this.logOutputs(outputs.length); }, outputPrefs(this.prefs.get()));
     for (const r of list.renamed) this.history.rename(userSceneId(r.from), userSceneId(r.to));
@@ -273,6 +277,7 @@ export class AppController {
     this.prefsWriter.dispose();
     this.effectsWriter.dispose();
     this.lookWriter.dispose();
+    this.lookSlotsWriter.dispose();
     this.transport.dispose();
     this.output.dispose();
     this.paramStore.dispose();
@@ -612,7 +617,9 @@ export class AppController {
 
   // ---------- Look ----------
 
+  // Any change to a slider (a hand, a take, the assistant) ends a slot's glide there.
   setLook(key: LookKey, value: number): void {
+    this.glide.stop();
     const r = LOOK_RANGES[key];
     const v = Math.min(r.max, Math.max(r.min, value));
     this.state.look[key] = v;
@@ -638,6 +645,32 @@ export class AppController {
     if (!this.state.look.xy[i] || axes.x === axes.y) return;
     this.state.look.xy = this.state.look.xy.map((a, j) => (j === i ? { ...axes } : a));
     this.publishLook();
+  }
+
+  // Intensity: Reactivity, Trails and Fringing together, inside the Randomize ranges; locked ones stay.
+  setIntensity(x: number): void {
+    const look = this.state.look;
+    this.glide.stop();
+    look.intensity = Math.min(1, Math.max(0, x));
+    for (const k of INTENSITY_KEYS) if (!look.locked.includes(k)) look[k] = intensityValue(k, look.intensity);
+    this.publishLook();
+  }
+
+  // Stores the look now in slot `i` (A–D).
+  saveLookSlot(i: number): void {
+    if (i < 0 || i >= SLOT_NAMES.length) return;
+    this.lookSlots = this.lookSlots.map((s, j) => (j === i ? slotOf(this.state.look) : s));
+    this.ui.set({ lookSlots: this.lookSlots });
+    this.lookSlotsWriter.schedule();
+    this.toast(`Look stored in slot ${SLOT_NAMES[i]}`, 1200);
+  }
+
+  // Glides to the look in slot `i` over a second. Shift+R comes back from it, as from a Randomize.
+  recallLookSlot(i: number): void {
+    const slot = this.lookSlots[i];
+    if (!slot) { if (SLOT_NAMES[i]) this.toast(`Slot ${SLOT_NAMES[i]} is empty: Shift+click it to store the look`, 1800); return; }
+    this.rememberForBack();
+    this.glide.start(slotOf(this.state.look), slot);
   }
 
   // The Look changed: the widget shows it, and it's kept for the next start.
@@ -673,17 +706,24 @@ export class AppController {
   // only changes when "Also pick a random scene" is on.
   randomize(): void {
     const look = this.state.look;
-    this.beforeRandom.push({ look: Object.fromEntries(DRIFT_KEYS.map((k) => [k, look[k]])) as Record<DriftKey, number>, scene: this.state.clock.scene });
-    if (this.beforeRandom.length > RANDOM_HISTORY) this.beforeRandom.shift();
+    this.rememberForBack();
+    this.glide.stop();
     for (const key of DRIFT_KEYS) if (!look.locked.includes(key)) { const [min, max] = RANDOM_RANGES[key]; this.setLook(key, min + Math.random() * (max - min)); }
     if (this.state.look.randomScene) this.nextRandomScene();
   }
 
-  // Shift+R: the look (and scene, if Randomize changed it) from before the last Randomize, locked sliders
-  // aside. Again for the one before that.
+  // What Shift+R comes back to: the look and the scene before a Randomize or a slot recall.
+  private rememberForBack(): void {
+    this.beforeRandom.push({ look: slotOf(this.state.look), scene: this.state.clock.scene });
+    if (this.beforeRandom.length > RANDOM_HISTORY) this.beforeRandom.shift();
+  }
+
+  // Shift+R: the look (and scene, if Randomize changed it) from before the last Randomize or slot recall,
+  // locked sliders aside. Again for the one before that.
   randomizeBack(): void {
     const prev = this.beforeRandom.pop();
     if (!prev) { this.toast('No earlier random look to go back to', 1500); return; }
+    this.glide.stop();
     for (const key of DRIFT_KEYS) if (!this.state.look.locked.includes(key)) this.setLook(key, prev.look[key]);
     if (prev.scene !== this.state.clock.scene) this.setScene(prev.scene);
     const left = this.beforeRandom.length;
@@ -1002,9 +1042,11 @@ export class AppController {
     this.onBeats(f);
     this.profiler.lap(Stage.audio);
     if (look.drift) this.drift.step(look, dt, look.driftSpeed, look.locked);
-    if (++this.lookFrames % LOOK_PUBLISH_FRAMES === 0) {
+    const gliding = this.glide.active;
+    this.glide.step(look, dt);
+    if (++this.lookFrames % LOOK_PUBLISH_FRAMES === 0 || (gliding && !this.glide.active)) {
       const liveHue = fract(look.hue + c.huePhase);
-      if (look.drift) { this.ui.set({ look: { ...look }, liveHue }); this.lookWriter.schedule(); }
+      if (look.drift || gliding) { this.ui.set({ look: { ...look }, liveHue }); this.lookWriter.schedule(); }
       else if (liveHue !== this.ui.get().liveHue) this.ui.set({ liveHue });
     }
     if (this.state.activeSource === 'media') this.media.follow(this.player);

@@ -9,7 +9,8 @@ import { KEYS, debouncedWriter, readWithDefaults, type DebouncedWriter } from '.
 
 const DEFAULTS = defaultLook();
 
-const slider = (key: LookKey) => {
+// A slider's stored value: the default when it isn't a number, clamped into its range when it is.
+export const slider = (key: LookKey) => {
   const r = LOOK_RANGES[key];
   return z.number().catch(DEFAULTS[key]).transform((v) => Math.min(r.max, Math.max(r.min, v)));
 };
@@ -28,6 +29,7 @@ export const LookSchema = z.object({
   randomScene: z.boolean().catch(DEFAULTS.randomScene),
   drift: z.boolean().catch(DEFAULTS.drift),
   driftSpeed: slider('driftSpeed'),
+  intensity: z.number().min(0).max(1).catch(DEFAULTS.intensity),
   locked: z.array(z.unknown()).catch([]).transform((keys) => SLIDER_KEYS.filter((k) => keys.includes(k))),
   xyOpen: z.boolean().catch(DEFAULTS.xyOpen),
   xy: z.array(xyAxes).length(DEFAULT_XY.length).catch(DEFAULT_XY.map((a) => ({ ...a }))),

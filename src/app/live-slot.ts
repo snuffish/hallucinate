@@ -50,8 +50,8 @@ export class LiveSlot {
   private readonly mainProjector = output();
   private readonly routed: Routed = { screen: this.mainScreen, projector: null };
   private readonly look: FrameLook = { reactivity: 1, speed: 1, cycle: 0, hue: 0, trails: 0.86, aberration: 0, synesthesia: 0 };
-  private readonly liveMotion: Motion = { time: 0, timeRate: 1, huePhase: 0, turn: 0 };
-  private readonly previewMotion: Motion = { time: 0, timeRate: 1, huePhase: 0, turn: 0 };
+  private readonly liveMotion: Motion = { time: 0, timeRate: 1, huePhase: 0, hueKick: 0, turn: 0 };
+  private readonly previewMotion: Motion = { time: 0, timeRate: 1, huePhase: 0, hueKick: 0, turn: 0 };
   private previewShot: Shot | null = null;   // what Preview's motion runs for
   // A show scene's uniforms, per values object (a show scene's values are replaced, never edited, so the
   // object names one set of values): the outputs reuse them instead of rebuilding them every frame.
@@ -175,7 +175,7 @@ export class LiveSlot {
     l.hue = look.hue ?? app.hue;
     l.trails = look.trails ?? app.trails;
     l.aberration = look.aberration ?? app.aberration;
-    l.synesthesia = app.synesthesia;
+    l.synesthesia = look.synesthesia ?? app.synesthesia;
     return l;
   }
 

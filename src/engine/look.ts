@@ -9,24 +9,30 @@ import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
 import { stillHearing, type SnapshotUniforms } from './scene-inputs';
 
-// The sliders a frame is composed with: a show scene stores the numbers it keeps (LOOK_KEYS), the rest
-// (synesthesia) is the app's.
+// The sliders a frame is composed with: a show scene stores them (LOOK_KEYS); one saved before it kept
+// synesthesia takes the app's.
 export interface FrameLook {
   reactivity: number; speed: number; cycle: number;
   hue: number; trails: number; aberration: number; synesthesia: number;
 }
 
 // Where an output's picture is in its own time: the clock the shaders see, how fast it runs (it eases
-// with the music), how far the hue has walked and how far the effects have turned. Each output keeps one.
-export interface Motion { time: number; timeRate: number; huePhase: number; turn: number }
+// with the music), how far the hue has walked (and how much further the kicks still move it) and how far
+// the effects have turned. Each output keeps one.
+export interface Motion { time: number; timeRate: number; huePhase: number; hueKick: number; turn: number }
 
-export const copyMotion = (to: Motion, from: Readonly<Motion>): void => { to.time = from.time; to.timeRate = from.timeRate; to.huePhase = from.huePhase; to.turn = from.turn; };
+export const copyMotion = (to: Motion, from: Readonly<Motion>): void => { to.time = from.time; to.timeRate = from.timeRate; to.huePhase = from.huePhase; to.hueKick = from.hueKick; to.turn = from.turn; };
 
 // The effects' turn (uTurn, radians at an effect's full spin): it only ever runs on, at a steady pace
 // plus the bass, plus the beat, so each kick leaves it a step further on (the beat fades out within half
 // a second: about a fifth of a radian a kick) and nothing it hears can turn it back. Speed scales it all,
 // Reactivity the bass's and the kick's share (they arrive scaled).
 const TURN = { pace: 0.15, bass: 0.2, beat: 1 } as const;
+
+// How far a kick moves the hue at Colour cycling 1, and how it gets there: eased in with this time constant
+// (about 95% within 150 ms), so a kick never changes the colour in one frame.
+const KICK_HUE = 0.05;
+const KICK_HUE_SECONDS = 0.05;
 
 const COOL = [0.7, 0.85, 1.35];
 const WARM = [1.3, 1.05, 0.7];
@@ -45,8 +51,11 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
   const targetRate = look.speed * (0.55 + level * 0.9 + beat * 0.35);
   motion.timeRate += (targetRate - motion.timeRate) * (1 - Math.exp(-dt * 3));
   motion.time += dt * motion.timeRate;
-  // Colour cycling sets both the hue's walk and how far a kick jumps it, so at 0 the colour holds.
-  motion.huePhase += look.cycle * (dt * 0.06 + (h.kick ? 0.05 : 0));
+  // Colour cycling sets both the hue's walk and how far a kick moves it, so at 0 the colour holds.
+  if (h.kick) motion.hueKick += look.cycle * KICK_HUE;
+  const kicked = motion.hueKick * (1 - Math.exp(-dt / KICK_HUE_SECONDS));
+  motion.hueKick -= kicked;
+  motion.huePhase += look.cycle * dt * 0.06 + kicked;
   motion.turn += dt * look.speed * (TURN.pace + TURN.bass * bass + TURN.beat * beat);
 
   p.time = motion.time;
@@ -96,7 +105,7 @@ export function composeStill(scene: number, inputs: Readonly<SnapshotUniforms>, 
     composeFrame(p, motion, h, look, sceneTrails, BURST_DT);
     return p;
   });
-  const start = (): Motion => ({ time: 0, timeRate: look.speed, huePhase: inputs.uHue, turn: 0 });
+  const start = (): Motion => ({ time: 0, timeRate: look.speed, huePhase: inputs.uHue, hueKick: 0, turn: 0 });
   const elapsed = play(start()).at(-1)!;   // the clock's pace eases with the sound: measure it, then start early by that much
   const end = (then ?? inputs).uTime;
   return play({ ...start(), time: end - elapsed.time, turn: end - elapsed.turn });

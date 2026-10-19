@@ -56,6 +56,10 @@ export const HOTKEYS = {
   auto: { id: 'auto', keys: 'A', label: 'Auto-switch', group: 'Scenes', when: 'noNodes' },
   randomize: { id: 'randomize', keys: 'R', label: 'Randomize', group: 'Look', when: 'noNodes' },
   randomizeBack: { id: 'randomizeBack', keys: 'Shift+R', label: 'Back to the previous random look', group: 'Look', when: 'noNodes' },
+  lookSlotA: { id: 'lookSlotA', keys: 'Alt+1', label: 'Glide to Look slot A', group: 'Look', when: 'noNodes' },
+  lookSlotB: { id: 'lookSlotB', keys: 'Alt+2', label: 'Glide to Look slot B', group: 'Look', when: 'noNodes' },
+  lookSlotC: { id: 'lookSlotC', keys: 'Alt+3', label: 'Glide to Look slot C', group: 'Look', when: 'noNodes' },
+  lookSlotD: { id: 'lookSlotD', keys: 'Alt+4', label: 'Glide to Look slot D', group: 'Look', when: 'noNodes' },
 
   assistant: { id: 'assistant', keys: 'I', label: 'AI assistant', group: 'Panels', when: 'noNodes' },
   assistantNew: { id: 'assistantNew', keys: 'Alt+N', label: 'New conversation', group: 'Panels', when: 'assistantOpen', inInputs: true, owner: 'assistant' },

@@ -5,7 +5,7 @@ import { BURST_FRAMES, composeFrame, composeStill, programState, type Motion } f
 import { stillSpectrum, stillUniforms } from './scene-inputs';
 
 const sound = (o: Partial<Hearing> = {}): Hearing => ({ bass: 0.5, mid: 0.5, high: 0.5, level: 0.5, beat: 0, kick: false, tick: false, tickPhase: 0, ticks: 0, bpm: 120, bright: 0.5, centroid: 2500, energy: 0.5, mood: 0.5, ...o });
-const still = (): Motion => ({ time: 0, timeRate: 1, huePhase: 0, turn: 0 });
+const still = (): Motion => ({ time: 0, timeRate: 1, huePhase: 0, hueKick: 0, turn: 0 });
 
 function frame(h: Hearing, look = defaultLook(), motion = still(), dt = 1 / 60) {
   const p = programState();
@@ -92,16 +92,27 @@ describe('composeFrame', () => {
     }
   });
 
-  it('jumps the hue on a kick further the higher Colour cycling is', () => {
-    const jump = (cycle: number) => { const m = still(); frame(sound({ kick: true }), { ...defaultLook(), cycle }, m, 0); return m.huePhase; };
-    expect(jump(0.5)).toBeGreaterThan(0);
-    expect(jump(1)).toBeGreaterThan(jump(0.5));
-    expect(jump(2)).toBeGreaterThan(jump(1));
+  // How far a kick moves the hue in all: what it moved already plus what it still owes.
+  const kickMove = (look: Partial<ReturnType<typeof defaultLook>>) => { const m = still(); frame(sound({ kick: true }), { ...defaultLook(), ...look }, m, 0); return m.huePhase + m.hueKick; };
+
+  it('moves the hue on a kick further the higher Colour cycling is', () => {
+    expect(kickMove({ cycle: 0.5 })).toBeGreaterThan(0);
+    expect(kickMove({ cycle: 1 })).toBeGreaterThan(kickMove({ cycle: 0.5 }));
+    expect(kickMove({ cycle: 2 })).toBeGreaterThan(kickMove({ cycle: 1 }));
   });
 
-  it('jumps the hue on a kick no further at higher reactivity', () => {
-    const jump = (reactivity: number) => { const m = still(); frame(sound({ kick: true }), { ...defaultLook(), cycle: 1, reactivity }, m, 0); return m.huePhase; };
-    expect(jump(2)).toBe(jump(1));
+  it('moves the hue on a kick no further at higher reactivity', () => {
+    expect(kickMove({ cycle: 1, reactivity: 2 })).toBe(kickMove({ cycle: 1, reactivity: 1 }));
+  });
+
+  it("eases a kick's hue move in over about 150 ms instead of landing it in one frame", () => {
+    const look = { ...defaultLook(), cycle: 1 };
+    const walk = (frames: number, kick: boolean) => { const m = still(); for (let i = 0; i < frames; i++) frame(sound({ kick: kick && i === 0 }), look, m); return m.huePhase; };
+    const move = (frames: number) => walk(frames, true) - walk(frames, false);   // the kick's part of the hue's walk
+    expect(move(1)).toBeGreaterThan(0);
+    expect(move(1)).toBeLessThan(0.05 / 3);
+    expect(move(12)).toBeGreaterThan(0.05 * 0.95);   // 200 ms
+    expect(move(120)).toBeCloseTo(0.05, 6);   // in all, as far as the kick always moved it
   });
 });
 

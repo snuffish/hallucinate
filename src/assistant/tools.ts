@@ -10,7 +10,7 @@ const sceneName = z.string().describe('Exact scene name. Omit for the scene on s
 const record = z.record(z.string(), z.unknown());
 const cueRef = z.string().describe('A show scene: its id, or its exact name (get_show lists both).');
 const cueValues = z.record(z.string(), z.unknown()).describe('Parameter values for the show scene\'s scene (name or label → number, true/false, "#rrggbb", or an array). Omitted parameters keep the scene\'s defaults.');
-const cueLook = z.record(z.string(), z.number()).describe('Look sliders stored with the show scene: hue 0-1, cycle 0-2, trails 0-0.97 (afterglow), speed 0-2.5, reactivity 0-2, aberration 0-0.04 (fringing).');
+const cueLook = z.record(z.string(), z.number()).describe('Look sliders stored with the show scene: hue 0-1, cycle 0-2, trails 0-0.97 (afterglow), speed 0-2.5, reactivity 0-2, aberration 0-0.04 (fringing), synesthesia 0-1.');
 
 // A picture the tool hands back to the model, in TanStack's content-part shape.
 export const ImagePartSchema = z.object({
@@ -41,7 +41,7 @@ const lookKeys = ['hue', 'cycle', 'trails', 'speed', 'reactivity', 'aberration',
 export const TOOLS = [
   tool({
     name: 'get_app_state',
-    description: 'Get what is on screen now: the playing scene (name, kind, description, live parameters with their ranges and values), the look sliders and switches (autoSwitch: whether the screen moves to another scene by itself; drift: whether the sliders wander; locked: the sliders Randomize and Drift leave alone), the main screen\'s effects (in the order they run), the audio source, BPM, mood and tone, the live levels while music plays (energy, bass, mid, high, 0-1), whether media is loaded, whether Live is pinned and what the screen shows then, and every scene name by category (a mark after a name: * edited by the user, (mine), (visual maker); unmarked ones are built-in). Call this when you need to know the current situation or the exact scene names.',
+    description: 'Get what is on screen now: the playing scene (name, kind, description, live parameters with their ranges and values), the look sliders and switches (autoSwitch: whether the screen moves to another scene by itself; drift: whether the sliders wander; locked: the sliders Randomize and Drift leave alone; intensity: the Intensity control 0-1; slots: the Look slots A-D that hold a look), the main screen\'s effects (in the order they run), the audio source, BPM, mood and tone, the live levels while music plays (energy, bass, mid, high, 0-1), whether media is loaded, whether Live is pinned and what the screen shows then, and every scene name by category (a mark after a name: * edited by the user, (mine), (visual maker); unmarked ones are built-in). Call this when you need to know the current situation or the exact scene names.',
     inputSchema: z.object({}),
     outputSchema: record,
     running: () => 'Looking around',
@@ -101,8 +101,8 @@ export const TOOLS = [
   }),
   tool({
     name: 'set_look',
-    description: 'Adjust the global look sliders that apply to every scene. hue 0-1 (colour shift), cycle 0-2 (colour cycling speed), trails 0-0.97 (afterglow: how long a line keeps glowing where it was drawn, fading in place; 0 = none), speed 0-2.5 (animation speed), reactivity 0-2 (how strongly visuals follow the music), aberration 0-0.04 (fringing: how far each line splits into red, green and blue copies; 0 = none), synesthesia 0-1 (how much the music tints the colours: the sound\'s tone warms or cools them and the music\'s mood is always part of it; 0 = off).',
-    inputSchema: z.object(Object.fromEntries(lookKeys.map((k) => [k, z.number().optional()])) as Record<(typeof lookKeys)[number], z.ZodOptional<z.ZodNumber>>),
+    description: 'Adjust the global look sliders that apply to every scene. hue 0-1 (colour shift), cycle 0-2 (colour cycling speed), trails 0-0.97 (afterglow: how long a line keeps glowing where it was drawn, fading in place; 0 = none), speed 0-2.5 (animation speed), reactivity 0-2 (how strongly visuals follow the music), aberration 0-0.04 (fringing: how far each line splits into red, green and blue copies; 0 = none), synesthesia 0-1 (how much the music tints the colours: the sound\'s tone warms or cools them and the music\'s mood is always part of it; 0 = off), intensity 0-1 (the Intensity control: sets reactivity, trails and aberration together inside the Randomize ranges, leaving locked ones; a slider given alongside it wins).',
+    inputSchema: z.object({ ...Object.fromEntries(lookKeys.map((k) => [k, z.number().optional()])) as Record<(typeof lookKeys)[number], z.ZodOptional<z.ZodNumber>>, intensity: z.number().optional() }),
     outputSchema: record,
     running: () => 'Adjusting the look',
     done: () => 'Adjusted the look',

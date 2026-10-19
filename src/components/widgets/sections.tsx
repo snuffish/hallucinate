@@ -8,7 +8,9 @@ import { HOTKEYS } from '../../hotkeys/registry';
 import { Kbd } from '../../hotkeys/Kbd';
 import { SLIDER_KEYS, type SliderKey, type SourceButton } from '../../state/app-state';
 import { SOURCES } from '../StartScreen';
-import { LookSlider } from './LookSlider';
+import { laserCss } from '../../engine/laser-colour';
+import { SLOT_NAMES } from '../../state/look-slots';
+import { FineRange, LookSlider, NumberField } from './LookSlider';
 import { XYPad } from './XYPad';
 
 export interface PanelActions {
@@ -142,7 +144,42 @@ export function ScreenBody() {
   );
 }
 
-// The Look widget: its XY pads (each moves two sliders), then every slider as a row, then Drift.
+const SLOT_HOTKEYS = [HOTKEYS.lookSlotA, HOTKEYS.lookSlotB, HOTKEYS.lookSlotC, HOTKEYS.lookSlotD];
+const INTENSITY = { label: 'Intensity', scale: 100, unit: '%', digits: 0 };
+
+// The Look slots A–D and Intensity, under the sliders. A slot glides to its look; an empty one, or
+// Shift+click, stores the look now. A filled slot shows its colour.
+function LookSlotsAndIntensity() {
+  const app = useApp();
+  const slots = useUI((ui) => ui.lookSlots);
+  const intensity = useUI((ui) => ui.look.intensity);
+  return (
+    <>
+      <div className="look-slots" role="group" aria-label="Look slots">
+        {SLOT_NAMES.map((name, i) => {
+          const slot = slots[i];
+          return (
+            <button key={name} type="button" id={`look-slot-${name}`} className={`look-slot${slot ? ' filled' : ''}`}
+              style={slot ? { '--c': laserCss(slot.hue) } as CSSProperties : undefined}
+              title={slot ? `Glide to the look in slot ${name} · Shift+click: store the look now in it` : `Slot ${name} is empty: click to store the look now`}
+              onClick={(e) => (slot && !e.shiftKey ? app.recallLookSlot(i) : app.saveLookSlot(i))}>
+              {name}<Kbd hotkey={SLOT_HOTKEYS[i]!} />
+            </button>
+          );
+        })}
+      </div>
+      <div className="look-row" title="Moves Reactivity, Trails and Fringing together, inside the ranges Randomize uses; locked ones stay">
+        <span />
+        <label htmlFor="intensity">Intensity</label>
+        <FineRange id="intensity" label="Intensity" value={intensity} r={{ min: 0, max: 1, step: 0.01 }} onSet={(v) => app.setIntensity(v)} onReset={() => app.setIntensity(0.5)} />
+        <NumberField d={INTENSITY} value={intensity} onSet={(v) => app.setIntensity(v)} />
+      </div>
+    </>
+  );
+}
+
+// The Look widget: its XY pads (each moves two sliders), then every slider as a row, the slots and
+// Intensity, then Drift.
 export function LookBody() {
   const app = useApp();
   const look = useUI((ui) => ui.look);
@@ -159,6 +196,7 @@ export function LookBody() {
         <LookSlider key={k} k={k} value={look[k]} lock={look.locked.includes(k)}
           tag={tags.has(k) && <em className="look-tag" title="Also on this XY pad axis">{tags.get(k)!.join(' ')}</em>} />
       ))}
+      <LookSlotsAndIntensity />
       <label className="toggle"><input type="checkbox" id="drift" checked={look.drift} onChange={(e) => app.setLookFlag('drift', e.target.checked)} /> Drift <small>sliders glide to random values, each at its own pace</small></label>
       {look.drift && <LookSlider k="driftSpeed" value={look.driftSpeed} />}
     </>

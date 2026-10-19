@@ -61,6 +61,16 @@ describe('tool runner', () => {
     expect(studio.mode).toBe('cut');
   });
 
+  it('set_look sets Intensity, leaving locked sliders, lets a slider given alongside win, and undoes it all', async () => {
+    const { run, app, undo } = setup();
+    app.state.look.locked = ['trails'];
+    const out = await run('set_look', { intensity: 1, aberration: 0.002 }) as { applied: Record<string, number> };
+    expect(app.state.look).toMatchObject({ intensity: 1, reactivity: 1.4, trails: 0.35, aberration: 0.002 });
+    expect(out.applied).toEqual({ intensity: 1, reactivity: 1.4, trails: 0.35, aberration: 0.002 });
+    undo.pop()!.undo();
+    expect(app.state.look).toMatchObject({ intensity: 0.5, reactivity: 1, trails: 0.35, aberration: 0 });
+  });
+
   it('undoes a show change, but not once something else changed the show after it', async () => {
     const { run, studio, undo } = setup();
     await run('add_show_scene', { scene: 'Alpha' });
@@ -307,7 +317,7 @@ describe('scene code and parameter tools', () => {
     app.state.effects = [{ id: 'mirror', on: true, settings: { axis: 0 } }];
     app.state.look.locked = ['hue'];
     const out = await run('get_app_state', {}) as { look: Record<string, unknown>; effects: unknown; listening: unknown; livePinned?: unknown };
-    expect(out.look).toMatchObject({ autoSwitch: true, drift: false, driftSpeed: 1, randomizePicksScene: false, locked: ['hue'] });
+    expect(out.look).toMatchObject({ autoSwitch: true, drift: false, driftSpeed: 1, randomizePicksScene: false, locked: ['hue'], intensity: 0.5, slots: [], synesthesia: 0.3 });
     expect(out.effects).toEqual([{ id: 'mirror', on: true, settings: { axis: 0 } }]);
     expect(out.listening).toBeNull();   // nothing plays
     expect(out.livePinned).toBeUndefined();

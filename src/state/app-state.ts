@@ -20,16 +20,18 @@ export interface Look {
   randomScene: boolean;   // Randomize also jumps to a random scene
   drift: boolean;         // the sliders wander on their own (src/state/look-drift.ts)
   driftSpeed: number;
+  intensity: number;              // the Intensity control, 0–1 (src/state/look-slots.ts)
   locked: readonly SliderKey[];   // Randomize and Drift leave these alone
   xyOpen: boolean;                // the Look widget shows its XY pads
   xy: readonly XYAxes[];          // what each XY pad moves, across and up
 }
 export type LookKey = 'hue' | 'cycle' | 'trails' | 'speed' | 'reactivity' | 'aberration' | 'synesthesia' | 'driftSpeed';
-// The Look's sliders: every number a frame is composed with (Drift speed only paces Drift).
+// The Look's sliders: every number a frame is composed with (Drift speed only paces Drift, Intensity
+// moves three of them).
 export type SliderKey = Exclude<LookKey, 'driftSpeed'>;
 export const SLIDER_KEYS: readonly SliderKey[] = ['reactivity', 'speed', 'trails', 'hue', 'cycle', 'synesthesia', 'aberration'];
 export interface XYAxes { x: SliderKey; y: SliderKey }
-export const LOOK_KEYS: readonly LookKey[] = ['hue', 'cycle', 'trails', 'speed', 'reactivity', 'aberration'];   // stored in show scenes
+export const LOOK_KEYS: readonly LookKey[] = ['hue', 'cycle', 'trails', 'speed', 'reactivity', 'aberration', 'synesthesia'];   // stored in show scenes
 export const LOOK_RANGES: Record<LookKey, { min: number; max: number; step: number }> = {
   reactivity: { min: 0, max: 2, step: 0.01 },
   speed: { min: 0, max: 2.5, step: 0.01 },
@@ -48,7 +50,7 @@ export const DEFAULT_XY: readonly XYAxes[] = [{ x: 'speed', y: 'reactivity' }, {
 export const defaultLook = (): Look => ({
   reactivity: 1, speed: 1, trails: 0.35, hue: 0, cycle: 0.2, aberration: 0,
   synesthesia: 0.3, auto: true, randomScene: false, drift: false, driftSpeed: 1,
-  locked: [], xyOpen: true, xy: DEFAULT_XY,
+  intensity: 0.5, locked: [], xyOpen: true, xy: DEFAULT_XY,
 });
 
 export interface Clock {
@@ -56,6 +58,7 @@ export interface Clock {
   time: number;
   timeRate: number;
   huePhase: number;
+  hueKick: number;   // hue the kicks still move it by (src/engine/look.ts)
   turn: number;
   scene: number;
   prevScene: number;
@@ -66,7 +69,7 @@ export interface Clock {
 }
 
 export const defaultClock = (): Clock => ({
-  clock: 0, time: 0, timeRate: 1, huePhase: 0, turn: 0,
+  clock: 0, time: 0, timeRate: 1, huePhase: 0, hueKick: 0, turn: 0,
   scene: 0, prevScene: -1, transitionStart: -10, sceneStart: 0, fade: CROSSFADE_SECONDS,
   beatsInScene: 0,
 });

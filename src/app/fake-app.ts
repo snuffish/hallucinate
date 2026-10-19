@@ -8,6 +8,7 @@ import type { MediaLayer } from '../engine/media';
 import { ParamStore, type ParamSpec } from '../engine/params';
 import type { Scene } from '../scenes';
 import { defaultClock, defaultLook, LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
+import { INTENSITY_KEYS, intensityValue } from '../state/look-slots';
 import { DEFAULT_PREFS } from '../state/prefs';
 import { Store } from '../state/store';
 import { initialUIState } from '../state/ui-state';
@@ -50,6 +51,10 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
     state.clock.fade = fade;
   };
   const setLook = (k: LookKey, v: number) => { const r = LOOK_RANGES[k]; look[k] = Math.min(r.max, Math.max(r.min, v)); };
+  const setIntensity = (x: number) => {   // as the controller's
+    look.intensity = Math.min(1, Math.max(0, x));
+    for (const k of INTENSITY_KEYS) if (!look.locked.includes(k)) look[k] = intensityValue(k, look.intensity);
+  };
 
   const hearing: Hearing = { bass: 0.4, mid: 0.4, high: 0.4, level: 0.5, beat: 0, kick: false, tick: false, tickPhase: 0, ticks: 0, bpm: 120, bright: 0.6, centroid: 2500, energy: 0.5, mood: 0.5 };
 
@@ -76,6 +81,7 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
     setScene: (i, fade = 0) => { hooks.onManualSceneChange?.(); show(i, fade); },
     sceneByName: (name) => library.byName(name),
     setLook,
+    setIntensity,
     captureScene: (i = state.clock.scene) => ({ scene: i, values: library.values(i), look: Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), effects: state.effects }),
     applyScene: (snap, fade) => {
       if (!scenes[snap.scene] || scenes[snap.scene]!.removed) return;

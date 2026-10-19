@@ -433,7 +433,7 @@ const MOMENTS = { before: KICK_AT - 0.02, kicked: KICK_AT + 0.05, fading: KICK_A
 
 // The effects' turn at each moment of a second with a kick at KICK_AT (or without it), at `look`.
 function heardTurns(look: FrameLook, kick: boolean): Record<keyof typeof MOMENTS, number> {
-  const motion = { time: 0, timeRate: look.speed, huePhase: 0, turn: 0 }, p = programState();
+  const motion = { time: 0, timeRate: look.speed, huePhase: 0, hueKick: 0, turn: 0 }, p = programState();
   const out = {} as Record<keyof typeof MOMENTS, number>;
   for (let i = 1; i <= 60; i++) {
     const t = i / 60, beat = kick && t >= KICK_AT ? Math.exp(-5 * (t - KICK_AT)) : 0;

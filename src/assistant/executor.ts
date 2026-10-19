@@ -13,6 +13,7 @@ import type { Scene } from '../scenes';
 import { soundNow } from '../engine/listener';
 import { HELP_TOPICS, shortcutRows, type HelpTopic } from '../help/topics';
 import { LOOK_KEYS, LOOK_RANGES, type LookKey } from '../state/app-state';
+import { INTENSITY_KEYS, SLOT_NAMES } from '../state/look-slots';
 import { MAX_PLAN_STEP_SECONDS, PlanSchema, type Plan } from '../state/show-plan';
 import type { z } from 'zod';
 import type { UndoStack } from './undo';
@@ -257,10 +258,12 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
     read: () => { const v = app.library.values(i); return Object.fromEntries(specs.map((s) => [s.name, structuredClone(v[s.name]!)])); },
     write: (b) => app.library.setValues(i, b),
   });
-  const look = (keys: readonly LookKey[]): Touched<Partial<Record<LookKey, number>>> => ({
+  // The sliders `keys`, and Intensity's position too when `intensity`: undone in that order, so the sliders
+  // end exactly where they were.
+  const look = (keys: readonly LookKey[], intensity = false): Touched<Partial<Record<LookKey | 'intensity', number>>> => ({
     kind: 'look',
-    read: () => Object.fromEntries(keys.map((k) => [k, app.state.look[k]])),
-    write: (b) => { for (const k of keys) app.setLook(k, b[k]!); },
+    read: () => ({ ...Object.fromEntries(keys.map((k) => [k, app.state.look[k]])), ...(intensity && { intensity: app.state.look.intensity }) }),
+    write: (b) => { if (intensity) app.setIntensity(b.intensity!); for (const k of keys) app.setLook(k, b[k]!); },
   });
 
   const paramSummary = (i: number) => {
@@ -304,7 +307,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
       const i = app.sceneIndex, s = app.currentScene, look = app.state.look, h = app.hearing, ui = app.ui.get();
       return {
         playing: { name: s.name, kind: kindOf(s), category: s.cat || null, description: s.desc || null, editedByUser: !!s.edited, parameters: paramSummary(i) },
-        look: { ...Object.fromEntries([...LOOK_KEYS, 'synesthesia'].map((k) => [k, look[k as LookKey]])), autoSwitch: look.auto, drift: look.drift, driftSpeed: look.driftSpeed, randomizePicksScene: look.randomScene, locked: look.locked },
+        look: { ...Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), autoSwitch: look.auto, drift: look.drift, driftSpeed: look.driftSpeed, randomizePicksScene: look.randomScene, locked: look.locked, intensity: look.intensity, slots: SLOT_NAMES.filter((_, i) => ui.lookSlots[i]) },
         effects: app.state.effects,
         audio: soundNow(h, app.music.playing, app.state.activeSource),
         listening: app.music.playing ? { energy: round2(h.energy), bass: round2(h.bass), mid: round2(h.mid), high: round2(h.high) } : null,
@@ -362,9 +365,15 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
 
     set_look(values) {
       const keys = Object.entries(values).filter(([k, v]) => k in LOOK_RANGES && Number.isFinite(v)).map(([k]) => k as LookKey);
-      if (!keys.length) throw new Error('No look values given.');
-      undoable('Adjusted the look', look(keys), () => { for (const k of keys) app.setLook(k, Number(values[k as keyof typeof values])); });
-      return { applied: look(keys).read() };
+      const intensity = Number.isFinite(values.intensity) ? Number(values.intensity) : null;
+      if (!keys.length && intensity === null) throw new Error('No look values given.');
+      // Intensity first, so a slider given alongside it wins.
+      const touched = look([...new Set([...(intensity === null ? [] : INTENSITY_KEYS), ...keys])], intensity !== null);
+      undoable('Adjusted the look', touched, () => {
+        if (intensity !== null) app.setIntensity(intensity);
+        for (const k of keys) app.setLook(k, Number(values[k as keyof typeof values]));
+      });
+      return { applied: touched.read() };
     },
 
     switch_scene({ scene }) {

@@ -154,7 +154,7 @@ describe('the edge fade', () => {
   it('leaves the scene alone across the measured band and the Look\'s strongest fringing beyond it', () => {
     const p = programState();
     const quiet = stillHearing(stillUniforms({ uBass: 0, uMid: 0, uHigh: 0, uLevel: 0, uBeat: 0, uBright: 1 }), false);
-    composeFrame(p, { time: 0, timeRate: 1, huePhase: 0, turn: 0 }, quiet, STRONGEST_LOOK, 1, 1 / 60);
+    composeFrame(p, { time: 0, timeRate: 1, huePhase: 0, hueKick: 0, turn: 0 }, quiet, STRONGEST_LOOK, 1, 1 / 60);
     const fringing = 0.5 * p.aberration * (16 / 9);
     expect(fringing).toBeGreaterThan(0.005);   // 3.6 px of 720: there is a reach to cover
     expect(EDGE_BAND).toBeGreaterThan(0);

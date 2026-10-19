@@ -14,6 +14,10 @@
 - A **lock** beside each slider keeps Randomize, Shift+R and Drift off it. `get_app_state` tells the assistant
   which are locked.
 - A dot beside **Colour** shows the colour on screen now, cycling included.
+- **Look slots** A–D: click an empty slot (or Shift+click any) to store the look, click a filled one or press
+  Alt+1–4 to glide to it over a second. Shift+R comes back from a slot as from a Randomize. They go with an Export.
+- **Intensity**: one control that moves Reactivity, Trails and Fringing together, from the gentlest to the strongest
+  look Randomize can reach. `set_look` takes `intensity`; `get_app_state` reports it and the filled slots.
 
 ### Changed
 
@@ -21,6 +25,8 @@
   computer, not exported; show scenes still carry their own look).
 - Synesthesia's explanation moved from under its label to its tooltip and the help.
 - The studio's cue swatches show the laser palette's colour for the cue's hue.
+- A kick's colour change eases in over about 150 ms instead of landing in one frame. It goes as far as before.
+- Show scenes keep **Synesthesia** with the rest of their look. One saved before takes the app's, as it did.
 
 ## Unreleased — System log (2026-10-19)
 

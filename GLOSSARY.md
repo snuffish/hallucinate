@@ -113,8 +113,17 @@ The Look sliders wandering to random values on their own, each at its own pace, 
 _Avoid_: auto-look, wander
 
 **Lock**:
-A Look slider that Randomize, Shift+R and Drift leave alone. A take, the assistant and your hand still move it.
+A Look slider that Randomize, Shift+R, Drift and Intensity leave alone. A take, a Look slot, the assistant and your
+hand still move it.
 _Avoid_: pin (that is Live's), freeze, hold
+
+**Intensity**:
+One Look control that moves Reactivity, Trails and Fringing together, inside the ranges Randomize uses.
+_Avoid_: master, macro, energy
+
+**Look slot**:
+One of four places (A–D) that keep a Look's sliders to glide back to. They go with an export.
+_Avoid_: preset (a show scene is not one either), snapshot, bank
 
 **XY pad**:
 A square in the Look widget that moves two Look sliders at once, one across and one up, picked per pad.

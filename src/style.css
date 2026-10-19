@@ -307,6 +307,9 @@ input.look-hue-track::-moz-range-thumb { width: 12px; height: 12px; border-radiu
 .xy-line { position: absolute; background: rgba(255, 79, 216, 0.35); pointer-events: none; }
 .xy-line.across { left: 0; right: 0; height: 1px; }
 .xy-line.up { top: 0; bottom: 0; width: 1px; }
+.look-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
+.look-slot { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 3px 0; font-size: 11px; font-weight: 600; border-style: dashed; color: var(--muted); background: transparent; }
+.look-slot.filled { border-style: solid; border-color: var(--c); box-shadow: inset 0 -3px 0 var(--c); color: var(--text); }
 .xy-puck { position: absolute; width: 14px; height: 14px; margin: 0 0 -7px -7px; border: 2px solid #111; border-radius: 50%; background: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.6); pointer-events: none; }
 #mood-label { margin-left: auto; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }

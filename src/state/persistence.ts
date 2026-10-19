@@ -19,6 +19,7 @@ export const KEYS = {
   layout: 'hallucinate.layout',
   lastScene: 'hallucinate.lastScene',   // the scene on screen (its paramKey), restored on the next start; not exported
   screenEffects: 'hallucinate.screenEffects',   // the main screen's effects (src/state/screen-effects.ts), restored on the next start; not exported
+  lookSlots: 'hallucinate.lookSlots',   // the Look slots A–D (src/state/look-slots.ts)
   look: 'hallucinate.look',   // the Look widget: its sliders, locks, switches and XY pads (src/state/look-store.ts), restored on the next start; not exported
   // The assistant's conversations: this index; the transcripts live in IndexedDB (src/assistant/history-store.ts).
   assistantChats: 'hallucinate.assistantChats',
@@ -48,7 +49,7 @@ export const KEYS = {
 export type KeyClass = 'setup' | 'device' | 'history' | 'migration' | 'import';
 export const KEY_CLASS: Record<keyof typeof KEYS, KeyClass> = {
   sceneEdits: 'setup', userScenes: 'setup', library: 'setup', params: 'setup', customShader: 'setup', nodeGraph: 'setup',
-  show: 'setup', player: 'setup', mediaSound: 'setup', layout: 'setup',
+  show: 'setup', lookSlots: 'setup', player: 'setup', mediaSound: 'setup', layout: 'setup',
   prefs: 'device', assistantThinking: 'device', hearingWorkbench: 'device', systemLogView: 'device',
   scRecent: 'history', ytRecent: 'history', lastScene: 'history', screenEffects: 'history', look: 'history', renameReport: 'history', assistantChats: 'history', paramGroups: 'history', helpHint: 'history', systemLogCommands: 'history',
   paramsCollapsed: 'migration', paramsPos: 'migration',

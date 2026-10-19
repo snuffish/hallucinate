@@ -47,11 +47,12 @@ export function useWheelStep<E extends HTMLElement>(step: (by: number) => void, 
   return ref;
 }
 
-// A Look value as an editable number in its display units. Enter or leaving the field sets it, Escape
+export interface Display { label: string; scale: number; unit: string; digits: number }
+export interface Range { min: number; max: number; step: number }
+
+// A value as an editable number in its display units. Enter or leaving the field sets it, Escape
 // cancels; keys stay in the field (no hotkeys while typing).
-export function LookValue({ k, value }: { k: LookKey; value: number }) {
-  const app = useApp();
-  const d = LOOK_DISPLAY[k];
+export function NumberField({ d, value, onSet }: { d: Display; value: number; onSet: (v: number) => void }) {
   const [text, setText] = useState<string | null>(null);
   const cancelled = useRef(false);
   const shown = (value * d.scale).toFixed(d.digits);
@@ -62,7 +63,7 @@ export function LookValue({ k, value }: { k: LookKey; value: number }) {
         onChange={(e) => setText(e.target.value)}
         onBlur={() => {
           const v = Number((text ?? '').replace(',', '.'));
-          if (!cancelled.current && text !== null && text.trim() !== '' && Number.isFinite(v)) app.setLook(k, v / d.scale);
+          if (!cancelled.current && text !== null && text.trim() !== '' && Number.isFinite(v)) onSet(v / d.scale);
           cancelled.current = false;
           setText(null);
         }}
@@ -76,20 +77,19 @@ export function LookValue({ k, value }: { k: LookKey; value: number }) {
   );
 }
 
-// The range input with fine tuning. A press on the track jumps there (on the thumb it doesn't); from
+// A range input with fine tuning. A press on the track jumps there (on the thumb it doesn't); from
 // then on the drag is relative.
-function FineRange({ k, value }: { k: LookKey; value: number }) {
-  const app = useApp();
-  const r = LOOK_RANGES[k];
+export function FineRange({ id, label, value, r, onSet, onReset, hue }: {
+  id: string; label: string; value: number; r: Range; onSet: (v: number) => void; onReset: () => void; hue?: boolean;
+}) {
   const span = r.max - r.min;
   const drag = useRef<{ x: number; v: number } | null>(null);
-  const set = (v: number) => app.setLook(k, snap(clampTo(v, r.min, r.max), r.step));
+  const set = (v: number) => onSet(snap(clampTo(v, r.min, r.max), r.step));
   const wheel = useWheelStep<HTMLInputElement>((by) => set(value + by * r.step), (el) => document.activeElement === el);
   const at = (b: DOMRect, x: number) => r.min + clampTo((x - b.left - THUMB) / (b.width - 2 * THUMB), 0, 1) * span;
-  const hue = k === 'hue';
   return (
-    <input ref={wheel} type="range" id={k} className={hue ? 'look-hue-track' : undefined} min={r.min} max={r.max} step={r.step} value={value}
-      aria-label={LOOK_DISPLAY[k].label} title="Double-click to reset · Shift-drag: finer · wheel steps once it has focus"
+    <input ref={wheel} type="range" id={id} className={hue ? 'look-hue-track' : undefined} min={r.min} max={r.max} step={r.step} value={value}
+      aria-label={label} title="Double-click to reset · Shift-drag: finer · wheel steps once it has focus"
       style={{ '--p': `${((value - r.min) / span) * 100}%`, ...(hue && { background: LASER_GRADIENT('90deg') }) } as CSSProperties}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
@@ -114,8 +114,8 @@ function FineRange({ k, value }: { k: LookKey; value: number }) {
       }}
       onPointerUp={() => { drag.current = null; }}
       onPointerCancel={() => { drag.current = null; }}
-      onChange={(e) => { if (!drag.current) app.setLook(k, Number(e.target.value)); }}   // the arrow keys
-      onDoubleClick={() => app.setLook(k, defaultLook()[k])} />
+      onChange={(e) => { if (!drag.current) onSet(Number(e.target.value)); }}   // the arrow keys
+      onDoubleClick={onReset} />
   );
 }
 
@@ -147,13 +147,15 @@ export function LiveSwatch() {
 // A row. `lock` is whether it is locked (undefined: it can't be, like Drift speed); `tag` names the XY pad
 // axis it is also on.
 export function LookSlider({ k, value, lock, tag }: { k: LookKey; value: number; lock?: boolean; tag?: ReactNode }) {
+  const app = useApp();
   const d = LOOK_DISPLAY[k];
+  const set = (v: number) => app.setLook(k, v);
   return (
     <div className={`look-row${lock ? ' locked' : ''}`}>
       {lock === undefined ? <span /> : <LookLock k={k as SliderKey} locked={lock} />}
       <label htmlFor={k} title={d.hint}>{k === 'hue' && <LiveSwatch />}{d.label}{tag}</label>
-      <FineRange k={k} value={value} />
-      <LookValue k={k} value={value} />
+      <FineRange id={k} label={d.label} value={value} r={LOOK_RANGES[k]} onSet={set} onReset={() => set(defaultLook()[k])} hue={k === 'hue'} />
+      <NumberField d={d} value={value} onSet={set} />
     </div>
   );
 }

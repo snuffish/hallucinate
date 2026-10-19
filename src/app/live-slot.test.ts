@@ -163,6 +163,16 @@ describe('LiveSlot', () => {
     expect(live.route(base, true, 1 / 60).projector!.program.bass).toBeCloseTo(0.2);
   });
 
+  it("grades Live with its show scene's own synesthesia, and the app's for one saved before it kept it", () => {
+    const { live, base, state, hearing } = slot();
+    hearing.bright = 1;
+    state.look.synesthesia = 1;
+    live.take({ scene: 1, values: glow(2), look: { synesthesia: 0 }, effects: [] }, 'Beta plain');
+    expect(live.route(base, true, 0).projector!.program.grade.exposure).toBe(1);   // synesthesia 0: no grade
+    live.take({ scene: 2, values: glow(2), look: {}, effects: [] }, 'Gamma, an older show');
+    expect(live.route(base, true, 0).projector!.program.grade.exposure).toBeGreaterThan(1);   // the app's 1
+  });
+
   it('grades each output on its own: Live never writes into the main frame', () => {
     const { live, base, hearing } = slot();
     hearing.bright = 1;
