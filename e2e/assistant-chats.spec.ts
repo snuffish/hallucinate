@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from './fixtures';
+import { expect, seedScenes, solidScene, test, type Page, type Route } from './fixtures';
 import { chat, chatParamsFromRequestBody, convertMessagesToModelMessages, EventType, maxIterations, toServerSentEventsResponse, type AdapterYieldChunk, type DefaultMessageMetadataByModality, type ModelMessage, type TextOptions } from '@tanstack/ai';
 import { BaseTextAdapter, type StructuredOutputOptions } from '@tanstack/ai/adapters';
 import { TOOL_DEFINITIONS } from '../src/assistant/tools';
@@ -7,6 +7,10 @@ import { TOOL_DEFINITIONS } from '../src/assistant/tools';
 // the test with a fake model, so the browser gets exactly what the dev server would send. No Claude.
 //   "slow …"   answers after 6 s          "think …"  reasons first, then answers
 //   "look …"   calls set_look, then answers on the continuation
+//   "recolour …"  rewrites Red Room's code (write_scene_code), then answers
+
+const RED = solidScene('Red Room', '1., 0., 0.');
+const GREEN = 'void main() { fragColor = vec4(0., 1., 0., 1.); }';
 
 const text = (m: ModelMessage | undefined) => (typeof m?.content === 'string' ? m.content : Array.isArray(m?.content) ? m!.content.map((p) => ('content' in p && typeof p.content === 'string' ? p.content : '')).join('') : '');
 
@@ -26,6 +30,14 @@ class ScriptedModel extends BaseTextAdapter<string, Record<string, never>, reado
       yield { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call-look', model, timestamp: now, delta: JSON.stringify(input), args: JSON.stringify(input) };
       yield { type: EventType.TOOL_CALL_END, toolCallId: 'call-look', toolCallName: 'set_look', toolName: 'set_look', model, timestamp: now, input };
       yield { type: EventType.RUN_FINISHED, runId, threadId, model, timestamp: now, finishReason: 'tool_calls', usage: { promptTokens: 3000, completionTokens: 40, totalTokens: 3040, promptTokensDetails: { cachedTokens: 2500 } } };
+      return;
+    }
+    if (typed.startsWith('recolour') && last?.role !== 'tool') {
+      const input = { scene: 'Red Room', code: GREEN };
+      yield { type: EventType.TOOL_CALL_START, toolCallId: 'call-code', toolCallName: 'write_scene_code', toolName: 'write_scene_code', model, timestamp: now };
+      yield { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call-code', model, timestamp: now, delta: JSON.stringify(input), args: JSON.stringify(input) };
+      yield { type: EventType.TOOL_CALL_END, toolCallId: 'call-code', toolCallName: 'write_scene_code', toolName: 'write_scene_code', model, timestamp: now, input };
+      yield { type: EventType.RUN_FINISHED, runId, threadId, model, timestamp: now, finishReason: 'tool_calls', usage: { promptTokens: 3000, completionTokens: 40, totalTokens: 3040 } };
       return;
     }
     if (typed.startsWith('think')) {
@@ -213,4 +225,25 @@ test('assistant: the panel resizes from its corner, keeps the size after a reloa
   expect(Math.round(kept.width)).toBe(Math.round(after.width));
   await page.locator('#ai > .ai-grip').dblclick();
   await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(Math.round(before.width));
+});
+
+test('assistant: a code change opens to its diff, puts the old code back, and both are versions in History', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept());
+  await seedScenes(page, [RED], { 'hallucinate.lastScene': 'user:Red Room' });
+  await fakeBackend(page);
+  await open(page);
+  await page.locator('#auto').uncheck();   // auto-switch must not move the editor off the scene
+  await send(page, 'recolour it green');
+  const chip = page.locator('#ai-log .ai-tool.ok', { hasText: 'Edited Red Room' });
+  await expect(chip).toBeVisible();
+  await chip.locator('.ai-tool-toggle').click();
+  await expect(chip.locator('.code-diff pre .del')).toContainText('vec4(1., 0., 0., 1.)');
+  await expect(chip.locator('.code-diff pre .add')).toContainText('vec4(0., 1., 0., 1.)');
+
+  await chip.getByRole('button', { name: 'Put back the code from before' }).click();
+  await chip.getByRole('button', { name: 'Open in editor' }).click();
+  await expect(page.locator('#ed-code')).toHaveValue(RED.body);
+  await page.locator('#ed-history').click();
+  await expect(page.locator('#ed-history-panel .ed-version .who')).toHaveText(['Restored · Before "Edited Red Room"', '✦ Assistant · Edited Red Room', 'Earlier code']);
+  await expect(page.locator('#ed-history-panel .ed-version-chat')).toHaveCount(1);
 });

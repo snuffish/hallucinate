@@ -11,6 +11,7 @@ import { HOTKEYS, CUE_DIGITS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { useStore } from '../state/store';
 import { StudioParams } from './ParamOverlay';
+import { DirectorChanges } from './DirectorChanges';
 import { HelpButton } from './Help';
 
 export function Studio() {
@@ -192,6 +193,7 @@ export function Studio() {
             </label>
             <p id="st-director-status" className={`st-director${dir.error ? ' error' : ''}${dir.on ? ' on' : ''}`}>{directorStatus}</p>
             {dir.hidden && <p className="st-director error">The show stands still while this window is hidden — keep it visible.</p>}
+            <DirectorChanges />
           </footer>
         </section>
         <section className="dock">

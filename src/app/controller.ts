@@ -13,13 +13,14 @@ import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValue
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState } from '../engine/renderer';
 import { readInputs, silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
-import type { Scene } from '../scenes';
+import { userSceneId, type Scene } from '../scenes';
 import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type LookKey, type SourceButton } from '../state/app-state';
 import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
 import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
+import { SceneHistory } from '../state/scene-history';
 import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
 import { takeRenameReport } from '../state/scene-renames';
 import { loadScreenEffects, screenEffectsWriter } from '../state/screen-effects';
@@ -84,6 +85,7 @@ export class AppController {
   readonly music: MusicSource;
   // Each scene's code, @params and stored values; adding, compiling and removing scenes (scene-library.ts).
   readonly library: SceneLibrary;
+  readonly history = new SceneHistory();   // every scene's versions (scene-history.ts)
   // What the music sounds like this frame: bands, kicks, tempo, tone, mood (listener.ts).
   readonly listener = new Listener();
   private readonly hearingRecorder = new HearingRecorder();   // the Hearing monitor's last minute, while it is open
@@ -193,7 +195,8 @@ export class AppController {
     this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, effects: this.state.effects });
     this.renderer.setMedia(this.media);
     this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
-    this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what));
+    for (const r of list.renamed) this.history.rename(userSceneId(r.from), userSceneId(r.to));
+    this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what), this.history);
     this.live = new LiveSlot({ state: this.state, hearing: this.listener.hearing, specs: (i) => this.library.specs(i), stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
     this.applyPrefs();
 

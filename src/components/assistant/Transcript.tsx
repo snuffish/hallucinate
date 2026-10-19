@@ -1,16 +1,20 @@
 // One conversation's messages: replies as Markdown, the assistant's reasoning (folded or shown, see
-// the panel's "Show reasoning"), tool calls as chips with the frames the assistant looked at, app
-// notes (undo, reopened), the token usage of each turn, and messages queued behind a running one.
+// the panel's "Show reasoning"), tool calls as chips with the frames the assistant looked at and what
+// they changed (opened from the chip), app notes (undo, reopened), the token usage of each turn, and
+// messages queued behind a running one.
 
 import type { UIMessage } from '@tanstack/ai-client';
 import { Markdown } from '@tanstack/markdown/react';
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
+import { useSessions } from '../../app/sessions';
 import type { ChatView, Conversation } from '../../assistant/conversations';
 import { splitFollowUps } from '../../assistant/follow-ups';
 import { describeNote, splitNotes } from '../../assistant/notes';
 import { ContentPartsSchema, toolLabel } from '../../assistant/tools';
 import { textOf } from '../../assistant/transcript';
 import { addUsage, formatCost, formatTokens, newInput, NO_USAGE, type Usage } from '../../assistant/usage';
+import { useStore } from '../../state/store';
+import { AiChange } from './AiChange';
 
 type Part = UIMessage['parts'][number];
 
@@ -68,7 +72,11 @@ function Thinking({ content, live, open }: { content: string; live: boolean; ope
   );
 }
 
-function ToolChip({ part, message }: { part: Extract<Part, { type: 'tool-call' }>; message: UIMessage }) {
+function ToolChip({ part, message, chatId }: { part: Extract<Part, { type: 'tool-call' }>; message: UIMessage; chatId: string }) {
+  const { changes: log } = useSessions();
+  useStore(log.store, (s) => s.revision);
+  const changes = log.forCall(chatId, part.id);
+  const [open, setOpen] = useState(false);
   const input = (part.input ?? {}) as Record<string, unknown>;
   const result = message.parts.find((q): q is Extract<Part, { type: 'tool-result' }> => q.type === 'tool-result' && q.toolCallId === part.id);
   const error = result?.state === 'error';
@@ -76,10 +84,16 @@ function ToolChip({ part, message }: { part: Extract<Part, { type: 'tool-call' }
   const label = toolLabel(part.name, input, done && !error);
   const images = imagesOf(part.output ?? result?.content);
   const why = error && typeof result?.content === 'string' ? result.content : undefined;
+  const text = done ? `${error ? '✗' : '✓'} ${label}` : `${label}…`;
   return (
-    <div className={`ai-tool ${done ? (error ? 'error' : 'ok') : 'running'}`} title={why}>
-      <span>{done ? `${error ? '✗' : '✓'} ${label}` : `${label}…`}</span>
+    <div className={`ai-tool ${done ? (error ? 'error' : 'ok') : 'running'}${open ? ' open' : ''}`} title={why}>
+      {changes.length && done ? (
+        <button type="button" className="ai-tool-toggle" aria-expanded={open} title={open ? 'Hide what changed' : 'Show what changed'} onClick={() => setOpen(!open)}>
+          <span className="ai-tool-label">{text}</span><span className="ai-tool-more">{open ? '▾' : '▸'} what changed</span>
+        </button>
+      ) : <span>{text}</span>}
       {images.map((src, k) => <img key={k} src={src} alt="What the assistant saw" />)}
+      {open && changes.map((c) => <AiChange key={c.id} change={c} />)}
     </div>
   );
 }
@@ -160,7 +174,7 @@ export function Transcript({ chat, view, showThinking, costLabel, onFollowUp, on
                   if (i === lastText) followUps = split.followUps;
                   return split.text ? <div key={i} className="ai-text"><Markdown components={MD_COMPONENTS}>{split.text}</Markdown></div> : null;
                 }
-                if (p.type === 'tool-call') return <ToolChip key={i} part={p} message={m} />;
+                if (p.type === 'tool-call') return <ToolChip key={i} part={p} message={m} chatId={chat.id} />;
                 return null;
               })}
               {endsTurn && !(isLast && running) && (

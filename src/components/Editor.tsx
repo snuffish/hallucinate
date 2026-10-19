@@ -1,6 +1,6 @@
 // Live GLSL editor. It always shows the scene that's on screen and edits it in place: recompiles
 // while you type (in the background, the last working version keeps running), shows errors with
-// line numbers, and saves every successful compile.
+// line numbers, and saves every successful compile. History lists the scene's versions.
 
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
@@ -8,9 +8,12 @@ import type { EditorTarget } from '../app/editor';
 import { SUPERSEDED } from '../app/scene-library';
 import { SCENE_INPUTS } from '../engine/scene-inputs';
 import { SCENES, TEMPLATE } from '../scenes';
+import type { Origin, Version } from '../state/scene-history';
+import { paramKey } from '../state/scene-list';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { HelpButton } from './Help';
+import { relativeTime, SceneHistoryPanel } from './SceneHistoryPanel';
 
 const TITLES: Record<EditorTarget['kind'], string> = {
   custom: 'Your own scene',
@@ -31,7 +34,8 @@ export function Editor() {
   const editor = app.editor;
   const textarea = useRef<HTMLTextAreaElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pending = useRef<{ target: EditorTarget; code: string } | null>(null);
+  const pending = useRef<{ target: EditorTarget; code: string; origin?: Origin } | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // The editor follows the scene on screen while it's open: when the target changes, the code and
   // status are re-derived (state adjusted during render, so no effect round-trip).
@@ -50,9 +54,9 @@ export function Editor() {
     }
   }
 
-  const compile = async (t: EditorTarget, source: string) => {
+  const compile = async (t: EditorTarget, source: string, origin?: Origin) => {
     if (t.kind === 'nodes') return;
-    const error = await editor.compileInto(t, source);
+    const error = await editor.compileInto(t, source, origin);
     if (error === SUPERSEDED) return;   // a newer compile reports instead
     if (error) setStatus({ text: error, kind: 'error' });
     else {
@@ -65,7 +69,7 @@ export function Editor() {
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     const p = pending.current;
     pending.current = null;
-    if (p) void compile(p.target, p.code);
+    if (p) void compile(p.target, p.code, p.origin);
   };
 
   useEffect(() => {
@@ -85,21 +89,27 @@ export function Editor() {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(flush, 350);
   };
-  const replaceCode = (value: string) => {
+  // Code from elsewhere (a template, the original, a version): compiled now, as a version of its own.
+  const replaceCode = (value: string, origin: Origin) => {
     setCode(value);
-    pending.current = { target, code: value };
+    pending.current = { target, code: value, origin };
     flush();
   };
   const loadTemplate = (i: string) => {
     const t = templates[Number(i)];
     if (!t || readOnly) return;
     if (code !== t.body && !confirm(`Replace the code of "${target.name}" with "${t.name}"?`)) return;
-    replaceCode(t.body);
+    replaceCode(t.body, { by: 'template', label: t.name });
   };
   const revert = () => {
     if (!target.original || !confirm(`Revert "${target.name}" to its original code? Your edits will be lost.`)) return;
-    replaceCode(target.original);
-    app.toast(`"${target.name}" is back to the original`);
+    replaceCode(target.original, { by: 'revert' });
+    app.toast(`"${target.name}" is back to the original — the edited code is kept in History`);
+  };
+  const restore = (v: Version) => {
+    if (!confirm(`Restore "${target.name}" to the version from ${relativeTime(v.at)}? The code now stays in History.`)) return;
+    replaceCode(v.body, { by: 'restore', label: `the version from ${new Date(v.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` });
+    app.toast(`Restored "${target.name}" — the code before is kept in History`);
   };
   const copyGenerated = async () => {
     await editor.setCustomCode(code);
@@ -126,10 +136,16 @@ export function Editor() {
         </select>
         <button id="ed-revert" title="Undo your edits to this built-in scene" hidden={!edited} onClick={revert}>Revert to original</button>
         <button id="ed-copy" title="Copy this generated code into My Shader and edit it there" hidden={!readOnly} onClick={() => void copyGenerated()}>Edit a copy</button>
+        <button id="ed-history" title="Earlier versions of this scene's code, and who changed it" aria-pressed={historyOpen} hidden={readOnly} onClick={() => { flush(); setHistoryOpen(!historyOpen); }}>History</button>
         <button id="ed-save" title="Save this code as a new scene in the library" onClick={save}>Save to library</button>
         <HelpButton topic="editor" />
         <button id="ed-close" className="icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
       </header>
+      {historyOpen && !readOnly && (
+        <section id="ed-history-panel" aria-label="History">
+          <SceneHistoryPanel historyKey={paramKey(app.state.scenes[target.index]!)} code={code} readOnly={readOnly} onRestore={restore} />
+        </section>
+      )}
       <details>
         <summary>Cheat sheet</summary>
         <dl>

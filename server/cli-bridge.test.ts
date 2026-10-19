@@ -179,7 +179,7 @@ describe('the browser relay and the bridge agree on the wire', () => {
     const ev = r.ofType(EventType.CUSTOM)[0]!;
     relayToolCalls(runner)(ev.name, ev.value);
     await vi.waitFor(() => expect(posts).toHaveLength(1));
-    expect(runner).toHaveBeenCalledWith('set_look', { hue: 0.5 });
+    expect(runner).toHaveBeenCalledWith('set_look', { hue: 0.5 }, { toolCallId: 'toolu_1' });   // the model's id: the chip it shows under
     expect(posts[0]!.url).toBe('/api/assistant/tool-result');
 
     expect(await r.post(posts[0]!.body)).toEqual({ status: 200, body: { ok: true } });

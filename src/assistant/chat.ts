@@ -42,11 +42,11 @@ export class Chat {
   private readonly waiting: (() => void)[] = [];
 
   constructor(opts: ChatOptions, private readonly on: ChatEvents = {}) {
-    const counted: ToolRunner = (name, input) => {
+    const counted: ToolRunner = (name, input, call) => {
       this.inflight++;
       if (!this.disposed) this.on.tool?.();
       this.check();
-      return opts.runner(name, input).finally(() => { this.inflight--; this.check(); });
+      return opts.runner(name, input, call).finally(() => { this.inflight--; this.check(); });
     };
     this.client = new ChatClient(createChatClientOptions({
       connection: opts.connection,

@@ -2,9 +2,10 @@
 // director and the assistant's conversations. They are created once per controller (not by the panels
 // that show them), so the shortcuts, the tools and the director always reach the same objects, and
 // rules that span them have one owner: every assistant tool, from any conversation or the director,
-// waits its turn on one lock.
+// waits its turn on one lock, and what each one changed is recorded in one change log.
 
 import { createContext, useContext } from 'react';
+import { ChangeLog } from '../assistant/change-log';
 import { AssistantSession } from '../assistant/conversations';
 import { createLock } from '../assistant/lock';
 import { Director } from '../director/director';
@@ -15,19 +16,22 @@ export interface Sessions {
   studio: StudioSession;
   director: Director;
   assistant: AssistantSession;
+  changes: ChangeLog;   // what the assistant's and the director's tools changed
   dispose(): void;
 }
 
 export function createSessions(app: AppController): Sessions {
   const lock = createLock();
+  const changes = new ChangeLog();
   const studio = new StudioSession(app);
-  const director = new Director(app, studio, { lock });
-  const assistant = new AssistantSession(app, { lock, studio: () => studio });
+  const director = new Director(app, studio, { lock, changes });
+  const assistant = new AssistantSession(app, { lock, studio: () => studio, changes });
   const detach = [studio.attach(), director.attach(), assistant.attach()];
   return {
     studio,
     director,
     assistant,
+    changes,
     dispose() {
       for (const off of detach.reverse()) off();
       assistant.dispose();
