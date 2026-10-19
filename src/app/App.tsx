@@ -13,6 +13,7 @@ import { SessionsProvider, useSessions } from './sessions';
 import { HelpLayer } from '../components/Help';
 import { Library } from '../components/Library';
 import { PerfOverlay } from '../components/PerfOverlay';
+import { HearingMonitor } from '../components/HearingMonitor';
 import { Settings } from '../components/Settings';
 import { SoundCloudPicker, YouTubePicker } from '../components/Pickers';
 import { StartScreen } from '../components/StartScreen';
@@ -89,7 +90,10 @@ function Shell({ app }: { app: AppController }) {
       <SoundCloudPicker />
       <YouTubePicker />
       <Settings />
-      <PerfOverlay />
+      <div className="monitors">
+        <PerfOverlay />
+        <HearingMonitor />
+      </div>
       <Toast />
       <HelpLayer />
       <Hotkeys />
@@ -109,8 +113,8 @@ function Hotkeys() {
     seekFwd: () => tr.skip(10),
     volumeUp: () => app.toast(`Volume ${Math.round(tr.changeVolume(0.05) * 100)}%`, 900),
     volumeDown: () => app.toast(`Volume ${Math.round(tr.changeVolume(-0.05) * 100)}%`, 900),
-    tempoDown: () => app.toast(`Tempo ${tr.changeRate(-0.05).toFixed(2)}×`, 900),
-    tempoUp: () => app.toast(`Tempo ${tr.changeRate(0.05).toFixed(2)}×`, 900),
+    tempoDown: () => app.toast(`Playback speed ${tr.changeRate(-0.05).toFixed(2)}×`, 900),
+    tempoUp: () => app.toast(`Playback speed ${tr.changeRate(0.05).toFixed(2)}×`, 900),
     mute: () => app.toast(tr.toggleMute() ? 'Muted' : 'Sound on', 900),
     scenePrev: () => app.stepScene(-1),
     sceneNext: () => app.stepScene(1),
@@ -125,6 +129,7 @@ function Hotkeys() {
     hidePanel: () => app.toggleWidgets(),
     resetLayout: () => app.resetLayout(),
     perf: () => app.togglePerf(),
+    hearingMonitor: () => app.toggleHearingMonitor(),
     fullscreen: () => app.toggleFullscreen(),
     record: () => app.toggleRecording(),
     help: () => app.toggleHelp('sheet'),

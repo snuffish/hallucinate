@@ -31,6 +31,31 @@ and ticking it makes the pitch follow for a vinyl / nightcore effect. The demo b
 the assistant and toasts keep above it. Volume is applied after the analyser, so the visuals react the same at any
 listening volume, even when muted.
 
+## 👂 Hearing monitor
+
+**Shift+L** opens the Hearing monitor over the main window (also with the studio open; never on Live or the
+projectors): what the Listener hears, and why it hears it that way. It only shows the hearing, never changes it.
+
+- **At a glance** – the tempo to a tenth of a BPM; when it was folded into 85–175, what the kicks gave too
+  (*95.0 BPM (heard 190)*). **Confidence**: how clearly the kicks repeat at that tempo; it drains through a breakdown,
+  while no kick confirms it. The kick and tick lights. The state: *hearing kicks*, *holding* (no kick for four ticks:
+  the tempo is held and the ticks carry on) or *no tempo*. The delay from the app to the speakers as the browser
+  reports it; music from the microphone or a shared tab is *heard outside the app*, so there is none to give.
+- **Spectrum** – the analyser's bins as the Listener gets them, on a log-frequency axis with the band edges (25, 140,
+  2000 and 12000 Hz). The top of the plot is where the analyser clips: loud kicks sit there.
+- **Bands** – bass, mid, high and their level, each against its running average (the yellow mark): what a band is
+  compared with to react.
+- **Kicks** – the last 6 s of the rise in the kick's bins, newest on the right, with the threshold a kick must reach
+  (dashed) and the windows where the next kick was due (shaded). Under it the kicks (pink) against the ticks (green):
+  a tick trailing its kick shows how late the tick clock re-anchors.
+- **Tempo candidates** – how strongly the kick signal repeats at each tempo from 40 to 200 BPM, the Listener's
+  preference for tempos around 120 dashed, and the tempo the kicks gave marked. A half or double tempo standing as
+  tall as the heard one is where a half- or double-time reading comes from.
+- **Tone, energy, mood** – the spectral centroid in kHz and the two values (see below).
+
+It stacks under the performance monitor (Shift+P) when both are open. Research notes behind it:
+[audio reactivity](research/audio-reactivity.md).
+
 ## 🌈 Synesthesia (sound ↔ light mapping)
 
 <img src="screenshots/look-drift.jpg" alt="The Look widget: reactivity, speed, trails, colour, synesthesia and the other sliders, with Drift and its speed switched on" width="220" align="right">

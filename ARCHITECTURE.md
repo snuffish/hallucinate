@@ -170,8 +170,9 @@ composed) → `composeFrame` fills one reused `ProgramState` for the main screen
 projectors draw → `Renderer.render` (scene pass → effects, one pass per switched-on effect of each picture's stack plus that effect's
 own `passes` (Glow's blur), none when none is on → feedback pass → display pass) → `OutputLink.sendFrame` when a
 projector is connected → `hooks.onFrame` (studio preview and master
-fader) → every second frame: publish meters to the UI store. `FrameProfiler` (Shift+P, `?perf`) laps between these stages;
-while it is off each lap is one flag check.
+fader) → every second frame: publish meters to the UI store, and every fourth the Hearing monitor's view (Shift+L)
+while it is open: `Listener.diagnostics()`, which the Listener only keeps the kicks and ticks for while watched.
+`FrameProfiler` (Shift+P, `?perf`) laps between these stages; while it is off each lap is one flag check.
 
 ## Assistant flow
 

@@ -1,15 +1,16 @@
 // What the music sounds like, heard once a frame from the analyser's bins: the band energies, the kicks
 // and the tempo, the tone and the mood, and the spectrum texture the shaders read. The one owner of every
-// threshold and time constant behind them; nothing outside reads the analysis' state. Pure: the tests
-// drive it with synthetic bins.
+// threshold and time constant behind them; nothing outside reads the analysis' state, except the Hearing
+// monitor through a snapshot made only while it watches. Pure: the tests drive it with synthetic bins.
 //
 //   listener.hear(audio.read(), music.playing, dt, now)   once a frame, on real time (seconds)
 //   listener.reset()                                      a new source: the tempo starts over
 //                                                         (as it does by itself after ~90 s without kicks)
 //   listener.setSmoothing(prefs.audioSmoothing)           how calm the bands and the spectrum texture look
+//   listener.watch(true) / listener.diagnostics()         the Hearing monitor: why it hears what it hears
 
 import { TempoClock } from '../state/tempo-clock';
-import { KickHearer } from './kick-hearer';
+import { KickHearer, type KickSignal, type PulseCandidates } from './kick-hearer';
 
 const BANDS = { bass: [25, 140], mid: [140, 2000], high: [2000, 12000] } as const;
 const BAND_KEYS = ['bass', 'mid', 'high', 'level'] as const;
@@ -34,6 +35,8 @@ const QUIET_LEVEL = 0.45, LOUD_LEVEL = 0.8;
 const MOOD_TEMPO = 0.55, MOOD_ENERGY = 1 - MOOD_TEMPO;
 export const TEMPO_RANGE = [85, 175] as const;   // BPM: a half or double reading is folded into it
 const FORGET_SECONDS = 90;     // playing this long without a kick (longer than any breakdown) forgets the tempo
+const HOLDING_TICKS = 4;       // this many ticks without a kick: the tempo is held, no longer heard
+const WATCH_SECONDS = 6;       // the Hearing monitor's timeline: the kicks and ticks this far back
 
 // One frame of the analyser (AudioEngine.read): the dB-scaled byte spectrum and the byte waveform.
 export interface Bins {
@@ -62,6 +65,35 @@ export interface Hearing {
   mood: number;      // 0 calm … 1 energetic: the tempo sets where a track sits, the energy moves it
 }
 
+// Whether the tempo is heard in the kicks now, held through a breakdown, or not known.
+export type TempoState = 'hearing' | 'holding' | 'none';
+
+// What the Hearing monitor is shown: the hearing, and why the Listener hears it that way. Made on request.
+export interface HearingDiagnostics {
+  tempo: {
+    bpm: number | null;        // the tempo, unrounded
+    heardBpm: number | null;   // ... as the kicks' gaps gave it, before folding into the tempo range
+    confidence: number;        // 0..1 how clearly the kicks repeat at the tempo; drains through a breakdown
+    state: TempoState;
+  };
+  kicks: KickSignal & {
+    kicks: number[];   // when each kick peaked, seconds before now, the latest last
+    ticks: number[];   // when each tick came, likewise
+  };
+  candidates: PulseCandidates;   // the tempos the kicks could be, as last read
+  bands: Record<(typeof BAND_KEYS)[number], {
+    level: number;     // 0..1 the band's loudness this frame
+    average: number;   // ... over the last few seconds: what the band is compared against
+    shown: number;     // the band as the hearing gives it (see Hearing)
+  }>;
+  spectrum: {          // the analyser's bins as last heard; null while nothing is connected
+    bins: Uint8Array;
+    binHz: number;
+    minDecibels: number;
+    maxDecibels: number;
+  } | null;
+}
+
 type Bands = Record<(typeof BAND_KEYS)[number], number>;
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const ease = (dt: number, seconds: number) => 1 - Math.exp(-dt / seconds);
@@ -78,6 +110,12 @@ export class Listener {
   private kickCount = 0;                                     // ... and how many there are
   private readonly gaps = new Float64Array(KICK_WINDOW - 1); // scratch for hearTempo
   private sinceKick = 0;   // seconds played since the last kick
+  private kickGap = 0;     // seconds between kicks, as the tempo was last heard; 0 = none
+  private watching = false;   // the Hearing monitor is open ...
+  private kickTimes: number[] = [];   // ... and the kicks and ticks of the last few seconds since it opened
+  private tickTimes: number[] = [];
+  private now = 0;
+  private lastBins: Bins | null = null;
   private trackMood = 0.5; // the tempo's part of the mood, 0 calm … 1 energetic, eased over the track
   private amplitude = new Float32Array(256);   // byte -> linear amplitude, for the analyser's dB range
   private dbRange = '';
@@ -89,6 +127,7 @@ export class Listener {
     const h = this.hearing;
     h.beat *= Math.exp(-dt * 5);
     h.kick = false;
+    this.lastBins = bins;
     if (bins) this.listen(bins, dt, now);
     else {
       for (const k of BAND_KEYS) h[k] *= Math.exp(-dt * 3);
@@ -101,6 +140,8 @@ export class Listener {
     h.tick = playing && (this.tempo.advance(now) > 0 || ticked);
     if (playing) h.tickPhase = this.tempo.phase(now);
     if (h.tick) h.ticks++;
+    this.now = now;
+    if (this.watching) this.remember(h.kick, h.tick, now);
     h.energy = clamp01((this.avg.level - QUIET_LEVEL) / (LOUD_LEVEL - QUIET_LEVEL));
     if (playing) {
       const tempo = h.bpm ? clamp01((h.bpm - CALM_BPM) / (ENERGETIC_BPM - CALM_BPM)) : 0.5;
@@ -119,11 +160,54 @@ export class Listener {
     this.smoothing = value;
   }
 
+  // The Hearing monitor opens or closes: only while it watches are diagnostics made.
+  watch(on: boolean): void {
+    this.watching = on;
+    this.kickTimes = [];
+    this.tickTimes = [];
+  }
+
+  // What the Hearing monitor is shown now, or null while it isn't watching.
+  diagnostics(): HearingDiagnostics | null {
+    if (!this.watching) return null;
+    const h = this.hearing, gap = this.kickGap;
+    const heardBpm = gap ? 60 / gap : null;
+    const holding = h.bpm !== null && this.sinceKick > HOLDING_TICKS * (60 / h.bpm);
+    return {
+      tempo: {
+        bpm: heardBpm && foldExact(heardBpm),
+        heardBpm,
+        confidence: h.bpm === null ? 0 : this.kickHearer.clarity,
+        state: h.bpm === null ? 'none' : holding ? 'holding' : 'hearing',
+      },
+      kicks: {
+        ...this.kickHearer.signal(this.now),
+        kicks: this.kickTimes.map((t) => this.now - t),
+        ticks: this.tickTimes.map((t) => this.now - t),
+      },
+      candidates: this.kickHearer.candidates(),
+      bands: Object.fromEntries(BAND_KEYS.map((k) => [k, { level: this.raw[k], average: this.avg[k], shown: h[k] }])) as HearingDiagnostics['bands'],
+      spectrum: this.lastBins && {
+        bins: Uint8Array.from(this.lastBins.freq),
+        binHz: this.lastBins.sampleRate / (this.lastBins.freq.length * 2),
+        minDecibels: this.lastBins.minDecibels,
+        maxDecibels: this.lastBins.maxDecibels,
+      },
+    };
+  }
+
+  private remember(kick: boolean, tick: boolean, now: number): void {
+    if (kick) this.kickTimes.push(this.kickHearer.lastKickAt);
+    if (tick) this.tickTimes.push(now);
+    for (const times of [this.kickTimes, this.tickTimes]) while (times.length && times[0]! < now - WATCH_SECONDS) times.shift();
+  }
+
   // Forgets the tempo: the ticks stop and the mood lets it go, until enough kicks come to hear it again.
   reset(): void {
     this.kickCount = 0;
     this.kickHearer.reset();
     this.sinceKick = 0;
+    this.kickGap = 0;
     this.hearing.bpm = null;
     this.tempo.reset();
   }
@@ -204,6 +288,7 @@ export class Listener {
       if (Math.abs(gaps[i]! - median) <= median * TEMPO_AGREE) { sum += gaps[i]!; agreeing++; }
     }
     const gap = sum / agreeing;   // ... and frame timing averages out
+    this.kickGap = gap;
     const bpm = foldTempo(Math.round(60 / gap));
     this.hearing.bpm = bpm;
     this.tempo.setBpm(bpm);
@@ -262,6 +347,14 @@ export function foldTempo(bpm: number): number {
   const [lo, hi] = TEMPO_RANGE;
   while (bpm > hi) bpm = Math.round(bpm / 2);
   while (bpm < lo) bpm *= 2;
+  return bpm;
+}
+
+// foldTempo to a fraction of a BPM, for the Hearing monitor.
+function foldExact(bpm: number): number {
+  const [lo, hi] = TEMPO_RANGE;
+  while (bpm > hi + 0.5) bpm /= 2;
+  while (bpm < lo - 0.5) bpm *= 2;
   return bpm;
 }
 

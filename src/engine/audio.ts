@@ -20,6 +20,7 @@ export class AudioEngine {
   private output: GainNode | null = null;
   private volume = 1;
   private demoRate = 1;
+  private audible = false;   // the source plays through the app's own output (not heard elsewhere)
   private bins: (Bins & { freq: Uint8Array<ArrayBuffer>; time: Uint8Array<ArrayBuffer> }) | null = null;
 
   init(): void {
@@ -68,6 +69,15 @@ export class AudioEngine {
     if (audible) node.connect(this.output!);
     this.source = node;
     this.kind = kind;
+    this.audible = audible;
+  }
+
+  // How long the sound takes from here to the speakers, in ms, as the browser reports it; music heard
+  // outside the app (the microphone, a shared tab) never passes through here.
+  latency(): number | 'outside' | null {
+    if (!this.source || !this.ctx) return null;
+    if (!this.audible) return 'outside';
+    return ((this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0)) * 1000;
   }
 
   async useElement(el: HTMLMediaElement): Promise<void> {

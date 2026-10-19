@@ -5,10 +5,25 @@ import { NO_EFFECTS, type EffectStack } from '../engine/effects';
 import type { OutputStatus } from '../engine/output-link';
 import type { ParamSpec, ParamValues } from '../engine/params';
 import type { PerfReport } from '../engine/profiler';
-import type { MoodWord } from '../engine/listener';
+import type { HearingDiagnostics, MoodWord } from '../engine/listener';
 import type { HelpTopicId } from '../help/topics';
 import type { Look, SourceButton } from './app-state';
 import type { WidgetId } from './layout';
+
+// The delay from the app to the speakers in ms; 'outside' for music heard outside the app (the microphone,
+// a shared tab); null while nothing is connected.
+export type Latency = number | 'outside' | null;
+
+// What the Hearing monitor (Shift+L) shows: the Listener's diagnostics and the hearing beside them.
+export interface HearingView {
+  diagnostics: HearingDiagnostics;
+  latency: Latency;
+  beat: number;        // the kick pulse, 1 on a kick
+  tickPhase: number;   // 0 on a tick
+  centroid: number;    // Hz
+  energy: number;
+  mood: number;
+}
 
 export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' | 'youtube' | 'settings' | null;
 
@@ -77,6 +92,7 @@ export interface UIState {
   paramsVisible: boolean;
   params: ParamsView;
   perf: PerfReport | null;  // Shift+P: the performance overlay, ~2 Hz while on; null = off (not persisted)
+  hearingMonitor: HearingView | null;   // Shift+L: the Hearing monitor, ~15 Hz while on; null = off (not persisted)
   recording: boolean;
   transport: TransportView;
   media: MediaView;
@@ -116,6 +132,7 @@ export const initialUIState = (look: Look): UIState => ({
   paramsVisible: false,
   params: { title: 'Parameters', key: '', specs: [], values: {}, inStudio: false },
   perf: null,
+  hearingMonitor: null,
   recording: false,
   transport: { mode: null, hasQueue: false, playing: false, currentTime: 0, duration: 0, loop: false },
   media: { name: '', kind: null, width: 1, height: 1, loaded: false },
