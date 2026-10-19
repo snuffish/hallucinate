@@ -33,7 +33,7 @@ listening volume, even when muted.
 
 ## 👂 Hearing monitor
 
-<img src="screenshots/hearing-monitor.jpg" alt="The Hearing monitor on the demo beat: 124.0 BPM, hearing kicks, a high confidence, the spectrum, the bands against their running averages, the kick signal with kicks and ticks lined up, and the tempo candidates peaking at 124" width="260" align="right">
+<img src="screenshots/hearing-monitor.jpg" alt="The Hearing monitor on the demo beat: 123.8 BPM, hearing kicks, a high confidence; the Overview preset plotting the kicks lane (rises, threshold, due windows, kicks against ticks) and the bands, with the values read at −2.70 s where the pointer is; below, the spectrum and the tempo candidates peaking at 124" width="320" align="right">
 
 **Shift+L** opens the Hearing monitor over the main window (also with the studio open; never on Live or the
 projectors): what the Listener hears, why it hears it that way, and what the scene gets from it. It only shows, never
@@ -47,24 +47,37 @@ changes anything. Its **?** explains each part; on a short screen it stops above
   many frames a second it hears, in red below 30: a beat is then only a few frames long, kicks go unheard and the
   tempo wanders (the headless test browser, at 8–11 fps, hears the 124 BPM demo anywhere from 85 to 153). And how
   late the ticks land after their kicks (the median over the last 6 s): about a frame at 60 fps.
-- **Spectrum** – the analyser's bins as the Listener gets them, on a log-frequency axis with the band edges (25, 140,
-  2000 and 12000 Hz). The top of the plot is where the analyser clips: loud kicks sit there.
-- **Bands** – bass, mid, high and their level (the bar), each against its running average over the last few seconds
-  (the yellow mark): a band past its mark is louder than usual, and that is what the scenes react to.
-- **Kicks** – the last 6 s of the rise in the kick's bins, newest on the right, with the threshold a kick must reach
-  (dashed) and the windows where the next kick was due (shaded). Under it the kicks (pink) against the ticks (green):
-  a tick trailing its kick shows how late the tick clock re-anchors.
+- **The plot** – what you pick, on one time axis looking 6, 20 or 60 s back, newest on the right. Every signal is a
+  chip with its value now: click one to show or hide it, double-click to show only it, or start from a preset
+  (*Overview*, *Kicks*, *Kicks → scene*, *Bands*, *Tempo*). Each group of signals gets a lane:
+  - **kicks** – the rise in the kick's bins (the Listener's own 6 s at full resolution; further back, the highest rise
+    between two updates), the threshold a kick must reach (dashed), the windows where the next kick was due
+    (shaded, the last 6 s), and the kicks (pink, top) against the ticks (green, bottom): a tick trailing its kick
+    shows how late the tick clock re-anchors.
+  - **bands** – bass, mid, high and their level as heard (each band's running average is what scenes react against).
+  - **scene** – every value the scene's shader reads, from `uTime` to `uMood` (see [the editor's list](editor.md)),
+    as the main screen's scene gets them: after the Look, so Reactivity scales the bands and `uBeat` up to 1.5. With
+    the studio open, Live runs on its own clock and can differ.
+  - **tempo** – the tempo (80–180 BPM) and the confidence.
+
+  Hover the plot to read every shown value at that moment; **Pause** holds it still to read. **What if the threshold
+  were…** draws a second threshold and marks the rise peaks it would let through in the last 6 s, against the kicks
+  the Listener heard: a way to see whether kicks are missed or doubled. It only draws; the Listener keeps its own
+  threshold. The signals picked and how far back are kept on this computer. The monitor keeps the last minute only
+  while it is open.
+- **Spectrum** – the analyser's bins as the Listener gets them, on a log-frequency axis marked in Hz (50 Hz to
+  10 kHz) with the band edges (25, 140, 2000 and 12000 Hz) and the bands named. The top of the plot is where the
+  analyser clips: loud kicks sit there.
 - **Tempo candidates** – how strongly the kick signal repeats at each tempo from 40 to 200 BPM, scaled to its peak,
   with the strength it takes to hear a pulse at all dashed in yellow (a curve that never reaches it is noise; the
   Confidence bar gives the absolute strength), the Listener's preference for tempos around 120 dashed in grey, and
   the tempo the kicks gave marked. A half or double tempo standing as tall as the heard one is where a half- or
   double-time reading comes from.
 - **Tone, energy, mood** – the spectral centroid in kHz and the two values (see below).
-- **Scene inputs** – every value the scene's shader reads this frame, from `uTime` to `uMood` (see
-  [the editor's list](editor.md)), as the main screen's scene gets them: after the Look, so Reactivity scales the bands
-  and `uBeat` up to 1.5 (the yellow mark is 1). With the studio open, Live runs on its own clock and can differ.
 
-It stacks under the performance monitor (Shift+P) when both are open. Research notes behind it:
+Drag it anywhere, by any part but its buttons, chips and slider; it opens there again next time (the spot is kept
+with the widget layout, and Reset layout puts it back). A double-click puts it back in the corner, where it stacks
+under the performance monitor (Shift+P) when both are open. Research notes behind it:
 [audio reactivity](research/audio-reactivity.md).
 
 ## 🌈 Synesthesia (sound ↔ light mapping)

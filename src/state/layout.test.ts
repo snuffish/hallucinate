@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KEYS } from './persistence';
 import {
-  DEFAULT_LAYOUT, DROP_EDGE, WIDGET_IDS, chatPlacement, dock, dropTarget, type DockView, effective, float, floatToPx, loadLayout, moveBubble, parseLayout,
-  CHAT_MIN_H, CHAT_MIN_W, DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetLayout, resetWidget, resize, resizeChat, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
+  DEFAULT_LAYOUT, DROP_EDGE, WIDGET_IDS, chatPlacement, dock, dropTarget, type DockView, effective, float, floatToPx, loadLayout, moveBubble, moveHearing, parseLayout,
+  CHAT_MIN_H, CHAT_MIN_W, DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetHearing, resetLayout, resetWidget, resize, resizeChat, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
 } from './layout';
 
 const VIEW = { width: 1280, height: 720 };
@@ -101,6 +101,16 @@ describe('layout', () => {
     expect(effective(l, false)).toBe(l);
   });
 
+  it('floats the Hearing monitor where it was dropped, keeps it on phones in its corner, and puts it back on reset', () => {
+    expect(DEFAULT_LAYOUT.hearing).toEqual({ kind: 'auto' });
+    const l = moveHearing(resetLayout(), { left: 900, top: 400, width: 620, height: 300 }, VIEW);
+    expect(l.hearing).toEqual({ kind: 'float', ax: 'r', ay: 'b', dx: 1280 - 900 - 620, dy: 720 - 400 - 300 });
+    expect(effective(l, true).hearing).toEqual({ kind: 'auto' });
+    expect(effective(l, true).hearing).toBe(effective(l, true).hearing);   // selected from the store: a new object each time loops
+    expect(resetHearing(l).hearing).toEqual({ kind: 'auto' });
+    expect(resetLayout().hearing).toEqual({ kind: 'auto' });
+  });
+
   it('opens the chat toward the room from a bubble in each corner', () => {
     const chat = { width: 400, height: 640 };
     const corners = [
@@ -154,6 +164,15 @@ describe('layout storage', () => {
     expect(parseLayout({ ...stored, bubbleShown: 'no' }).bubbleShown).toBe(true);
     expect(parseLayout({ ...stored, bubbleShown: false }).bubbleShown).toBe(false);
     expect(parseLayout({ ...stored, bubbleShown: 'no' }).bubbleShown).toBe(true);
+  });
+
+  it('keeps where the Hearing monitor was dropped across a reload, and its corner for layouts saved before it moved', () => {
+    const moved = moveHearing(resetLayout(), { left: 40, top: 300, width: 620, height: 300 }, VIEW);
+    expect(parseLayout(JSON.parse(JSON.stringify(moved))).hearing).toEqual(moved.hearing);
+    const old = JSON.parse(JSON.stringify(resetLayout())) as Record<string, unknown>;
+    delete old.hearing;
+    expect(parseLayout(old).hearing).toEqual({ kind: 'auto' });
+    expect(parseLayout({ ...old, hearing: { kind: 'float', ax: 'up' } }).hearing).toEqual({ kind: 'auto' });
   });
 
   it('falls back to the default for anything that is not a layout', () => {

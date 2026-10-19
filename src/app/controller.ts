@@ -4,6 +4,7 @@
 
 import { AudioEngine } from '../engine/audio';
 import * as Effects from '../engine/effects';
+import { HearingRecorder } from '../engine/hearing-history';
 import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
 import { composeFrame, composeStill, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
@@ -85,6 +86,7 @@ export class AppController {
   readonly library: SceneLibrary;
   // What the music sounds like this frame: bands, kicks, tempo, tone, mood (listener.ts).
   readonly listener = new Listener();
+  private readonly hearingRecorder = new HearingRecorder();   // the Hearing monitor's last minute, while it is open
   readonly editor: EditorCore;
   readonly pickers: Partial<Record<'sc' | 'yt', PickerApi>> = {};
   libraryPrefs: LibraryPrefs;   // read after the scene list is built: a rename on load moves entries in it
@@ -386,6 +388,9 @@ export class AppController {
   resetWidget(id: L.WidgetId): void { this.setLayout(L.resetWidget(this.layout.get(), id)); }
   setWidgetOpen(id: L.WidgetId, open: boolean): void { this.setLayout(L.setOpen(this.layout.get(), id, open)); }
   moveBubble(rect: L.Rect): void { this.setLayout(L.moveBubble(this.layout.get(), rect, viewport())); }
+  // The Hearing monitor floats where it was dropped; reset puts it back in its corner under the performance monitor.
+  moveHearingMonitor(rect: L.Rect): void { this.setLayout(L.moveHearing(this.layout.get(), rect, viewport())); }
+  resetHearingMonitor(): void { this.setLayout(L.resetHearing(this.layout.get())); }
   // Hiding the assistant's bubble closes the chat too (I still opens it).
   setBubbleShown(shown: boolean): void {
     this.setLayout(L.setBubbleShown(this.layout.get(), shown));
@@ -857,14 +862,16 @@ export class AppController {
   toggleHearingMonitor(): void {
     const on = !this.ui.get().hearingMonitor;
     this.listener.watch(on);
+    this.hearingRecorder.clear();
     this.ui.set({ hearingMonitor: on ? this.hearingView() : null });
   }
 
   private hearingView(): HearingView | null {
     const diagnostics = this.listener.diagnostics();
     if (!diagnostics) return null;
-    const h = this.listener.hearing;
-    return { diagnostics, latency: this.audio.latency(), beat: h.beat, tickPhase: h.tickPhase, centroid: h.centroid, energy: h.energy, mood: h.mood, inputs: readInputs(this.program) };
+    const h = this.listener.hearing, inputs = readInputs(this.program);
+    const history = this.hearingRecorder.record(diagnostics, inputs);
+    return { diagnostics, latency: this.audio.latency(), beat: h.beat, tickPhase: h.tickPhase, centroid: h.centroid, energy: h.energy, mood: h.mood, inputs, history };
   }
 
   setPerf(on: boolean, trace = false): void {
