@@ -1,0 +1,81 @@
+/* PROTOTYPE, throwaway: the Hearing monitor's variants B, C and D (see HearingMonitor.prototype.tsx). */
+
+.pv-legend { margin-top: 3px; color: var(--muted); font-size: 11px; }
+
+/* B. Verdict */
+.pv-b-hero { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; }
+.pv-b-bpm { font-size: 34px; font-weight: 700; line-height: 1; }
+.pv-b-bpm small { font-size: 13px; font-weight: 400; color: var(--muted); }
+.pv-b-headline { margin-top: 4px; font-family: system-ui, sans-serif; font-size: 13px; color: var(--muted); }
+.pv-b-hero[data-state="hearing"] .pv-b-headline { color: #4fffa0; }
+.pv-b-hero[data-state="holding"] .pv-b-headline { color: #ffd84f; }
+.pv-b-hero .help-btn { align-self: start; }
+.pv-b-orb { position: relative; width: 46px; height: 46px; }
+.pv-b-orb i, .pv-b-orb u { position: absolute; border-radius: 50%; }
+.pv-b-orb i { inset: 8px; background: #ff4fd8; opacity: calc(0.15 + var(--beat) * 0.85); transform: scale(calc(0.7 + var(--beat) * 0.3)); }
+.pv-b-orb u { inset: 0; border: 2px solid #4fffa0; opacity: calc(0.15 + var(--tick) * 0.85); }
+.pv-b-confidence { margin: 10px 0 8px; }
+.pv-b-reasons { list-style: none; margin: 0 0 8px; padding: 0; font-family: system-ui, sans-serif; font-size: 12.5px; }
+.pv-b-reasons li { position: relative; padding: 3px 0 3px 18px; }
+.pv-b-reasons li::before { content: ''; position: absolute; left: 2px; top: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.pv-b-reasons li[data-tone="good"]::before { background: #4fffa0; }
+.pv-b-reasons li[data-tone="warn"]::before { background: #ffd84f; }
+.pv-b-reasons li[data-tone="bad"]::before { background: #ff4f7b; }
+.pv-b-reasons li[data-tone="bad"] { color: #ffb3c6; }
+.pv-b-reasons li[data-tone="info"] { color: var(--muted); }
+.pv-evidence { border-top: 1px solid var(--line); }
+.pv-evidence summary { display: flex; gap: 8px; align-items: baseline; padding: 6px 0; cursor: pointer; list-style: none; }
+.pv-evidence summary::-webkit-details-marker { display: none; }
+.pv-evidence summary::before { content: '▸'; color: var(--muted); width: 10px; }
+.pv-evidence[open] summary::before { content: '▾'; }
+.pv-evidence summary span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.pv-evidence summary small { margin-left: auto; color: var(--muted); }
+.pv-evidence-body { padding-bottom: 8px; }
+
+/* C. Timeline: a wide strip along the bottom, out of the monitors' corner. */
+.hearing.pv-c {
+  position: fixed;
+  left: calc(var(--dock-left) + 16px);
+  right: calc(var(--dock-right) + 16px);
+  bottom: calc(var(--dock-bottom) + var(--player-bar) + 60px);
+  display: grid;
+  grid-template-columns: 220px 1fr 130px;
+  gap: 14px;
+  overflow: visible;
+}
+.pv-c-now { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pv-c-now > .hearing-bar { margin: 6px 0 2px; }
+.pv-c-now .hearing-meta { margin-top: 2px; }
+.pv-c-now [data-slow] { color: #ff4f7b; }
+.pv-c-bpm { display: flex; gap: 8px; align-items: center; }
+.pv-c-bpm b { font-size: 18px; }
+.pv-c .pv-c-now #hearing-state { margin-left: 0; font-family: system-ui, sans-serif; }
+.pv-c-cand { margin-top: auto; padding-top: 6px; }
+.pv-c-foot { display: flex; gap: 8px; align-items: center; justify-content: space-between; color: var(--muted); }
+.pv-c-axis { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pv-c-axis .pv-legend { margin: 0; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+canvas.pv-c-timeline { position: static; display: block; width: 100%; }
+.pv-c-inputs { display: flex; flex-direction: column; justify-content: space-between; border-left: 1px solid var(--line); padding-left: 10px; }
+.pv-c-inputs div { display: flex; justify-content: space-between; gap: 6px; }
+.pv-c-inputs span { color: var(--muted); }
+
+/* D. Radar */
+.pv-d-corners { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+.pv-d-corners [data-slow] { color: #ff4f7b; }
+.pv-d .pv-d-corners #hearing-state { margin-left: 0; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.pv-d-meta { margin: 2px 0 10px; color: var(--muted); font-size: 11px; }
+.pv-d-mixer { display: flex; gap: 6px; align-items: stretch; height: 96px; padding-top: 8px; border-top: 1px solid var(--line); }
+.pv-d-sep { width: 1px; background: var(--line); margin: 0 2px 16px; }
+.pv-d-fader { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.pv-d-fader > span { font-size: 10px; color: var(--muted); }
+.pv-d-slots { flex: 1; display: flex; gap: 3px; width: 100%; justify-content: center; }
+.pv-d-slots b { position: relative; display: block; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: visible; }
+.pv-d-slots i { position: absolute; inset: 0; border-radius: 3px; transform-origin: bottom; }
+.pv-d-slots u { position: absolute; left: -2px; right: -2px; height: 2px; margin-bottom: -1px; background: #ffd84f; }
+.pv-d-heard { width: 5px; }
+.pv-d-heard i { background: rgba(255, 255, 255, 0.55); }
+.pv-d-scene { width: 12px; }
+.pv-d-scene i { background: var(--accent2); }
+.pv-d-strips { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.pv-d-strips small { color: var(--muted); font-size: 10px; }
+.pv-d-foot { display: flex; justify-content: space-between; align-items: center; }

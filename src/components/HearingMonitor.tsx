@@ -6,10 +6,15 @@ import { SCENE_INPUTS, type SceneInput } from '../engine/scene-inputs';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { HelpButton } from './Help';
+import { HEARING_VARIANTS, VariantB, VariantC, VariantD } from './HearingMonitor.prototype';
+import { VariantE, VariantF, VariantG } from './HearingMonitor.prototype-views';
+import { VariantH, VariantI, VariantJ } from './HearingMonitor.prototype-wide';
+import { VariantK, VariantL, VariantM } from './HearingMonitor.prototype-interactive';
+import { PrototypeSwitcher, usePrototypeVariant } from './PrototypeSwitcher';
 
-const BAND_EDGES_HZ = [25, 140, 2000, 12000];   // the Listener's bands: bass, mid, high
+export const BAND_EDGES_HZ = [25, 140, 2000, 12000];   // the Listener's bands: bass, mid, high
 const SPECTRUM_HZ = [20, 20000] as const;
-const COLOURS = { line: '#4fe3ff', kick: '#ff4fd8', tick: '#4fffa0', threshold: '#ffd84f', due: 'rgba(255, 255, 255, 0.1)', grid: 'rgba(255, 255, 255, 0.25)', muted: '#a99fc4' };
+export const COLOURS = { line: '#4fe3ff', kick: '#ff4fd8', tick: '#4fffa0', threshold: '#ffd84f', due: 'rgba(255, 255, 255, 0.1)', grid: 'rgba(255, 255, 255, 0.25)', muted: '#a99fc4' };
 
 // The tempo to a tenth, with what the kicks gave when folding into the tempo range changed it.
 export function tempoLabel({ bpm, heardBpm }: Pick<HearingDiagnostics['tempo'], 'bpm' | 'heardBpm'>): string {
@@ -42,7 +47,7 @@ export function tickLagLabel(ms: number | null): string {
 }
 
 // Draws on a canvas at the device's pixel ratio whenever `draw` changes.
-function Plot({ draw, label, height = 56 }: { draw: (c: CanvasRenderingContext2D, w: number, h: number) => void; label: string; height?: number }) {
+export function Plot({ draw, label, height = 56 }: { draw: (c: CanvasRenderingContext2D, w: number, h: number) => void; label: string; height?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -58,10 +63,10 @@ function Plot({ draw, label, height = 56 }: { draw: (c: CanvasRenderingContext2D
   return <canvas ref={ref} className="hearing-plot" style={{ height }} role="img" aria-label={label} />;
 }
 
-const logX = (hz: number, w: number) => (Math.log(hz / SPECTRUM_HZ[0]) / Math.log(SPECTRUM_HZ[1] / SPECTRUM_HZ[0])) * w;
+export const logX = (hz: number, w: number) => (Math.log(hz / SPECTRUM_HZ[0]) / Math.log(SPECTRUM_HZ[1] / SPECTRUM_HZ[0])) * w;
 
 // The analyser's bins on a log-frequency axis, as heard (the top of the plot is where they clip), with the band edges.
-function drawSpectrum(s: NonNullable<HearingDiagnostics['spectrum']>) {
+export function drawSpectrum(s: NonNullable<HearingDiagnostics['spectrum']>) {
   return (c: CanvasRenderingContext2D, w: number, h: number) => {
     c.strokeStyle = COLOURS.grid;
     for (const hz of BAND_EDGES_HZ) { const x = logX(hz, w); c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke(); }
@@ -77,7 +82,7 @@ function drawSpectrum(s: NonNullable<HearingDiagnostics['spectrum']>) {
 
 // The kick signal over the last seconds, newest at the right: the windows where a kick was due shaded, the
 // threshold, the rises, and below them the kicks (top) against the ticks (bottom).
-function drawKicks(k: HearingDiagnostics['kicks']) {
+export function drawKicks(k: HearingDiagnostics['kicks']) {
   return (c: CanvasRenderingContext2D, w: number, h: number) => {
     const span = k.rises.length * k.cell, x = (ago: number) => w - (ago / span) * w;
     const lanes = 14, plot = h - lanes * 2, top = Math.max(k.threshold * 2.5, ...k.rises, 1);
@@ -104,7 +109,7 @@ function drawKicks(k: HearingDiagnostics['kicks']) {
 
 // How strongly the kick signal repeats at each tempo, scaled to its peak (but never past the strength it takes to
 // hear a pulse, dashed yellow, so noise stays flat), the Listener's preference dashed, and the tempo heard marked.
-function drawCandidates(cand: HearingDiagnostics['candidates'], heard: number | null) {
+export function drawCandidates(cand: HearingDiagnostics['candidates'], heard: number | null) {
   return (c: CanvasRenderingContext2D, w: number, h: number) => {
     if (cand.bpm.length < 2) return;
     const lo = cand.bpm[0]!, hi = cand.bpm[cand.bpm.length - 1]!;
@@ -125,13 +130,13 @@ function drawCandidates(cand: HearingDiagnostics['candidates'], heard: number | 
   };
 }
 
-const bar = (v: number) => ({ transform: `scaleX(${Math.min(1, Math.max(0, v))})` });
+export const bar = (v: number) => ({ transform: `scaleX(${Math.min(1, Math.max(0, v))})` });
 
 // A scene input as a bar over its range (the bands and the kick reach 1.5 at high reactivity: the mark is 1), or
 // as a number where it has no top (the clock, the tick count).
 const INPUT_TOP: Partial<Record<SceneInput['uniform'], number>> = { uBass: 1.5, uMid: 1.5, uHigh: 1.5, uLevel: 1.5, uBeat: 1.5, uTick: 1, uHue: 1, uBright: 1, uMood: 1 };
 
-function InputRow({ input, value }: { input: SceneInput; value: number }) {
+export function InputRow({ input, value }: { input: SceneInput; value: number }) {
   const top = INPUT_TOP[input.uniform];
   return (
     <div className="hearing-row" data-input={input.uniform} title={`${input.help} (${input.range})`}>
@@ -146,8 +151,26 @@ function InputRow({ input, value }: { input: SceneInput; value: number }) {
 // Shift+L: what the Listener hears and why, and what the scene gets from it, ~15 Hz while open (see docs/audio.md).
 export function HearingMonitor() {
   const view = useUI((ui) => ui.hearingMonitor);
+  const [variant, setVariant] = usePrototypeVariant(HEARING_VARIANTS);   // PROTOTYPE: ?variant=A…M, and ?view= inside E, F, G, H
   if (!view) return <div id="hearing" className="hearing" hidden />;
-  return <HearingPanel view={view} />;
+  return (
+    <>
+      {variant === 'A' && <HearingPanel view={view} />}
+      {variant === 'B' && <VariantB view={view} />}
+      {variant === 'C' && <VariantC view={view} />}
+      {variant === 'D' && <VariantD view={view} />}
+      {variant === 'E' && <VariantE view={view} />}
+      {variant === 'F' && <VariantF view={view} />}
+      {variant === 'G' && <VariantG view={view} />}
+      {variant === 'H' && <VariantH view={view} />}
+      {variant === 'I' && <VariantI view={view} />}
+      {variant === 'J' && <VariantJ view={view} />}
+      {variant === 'K' && <VariantK view={view} />}
+      {variant === 'L' && <VariantL view={view} />}
+      {variant === 'M' && <VariantM view={view} />}
+      <PrototypeSwitcher variants={HEARING_VARIANTS} current={variant} onChange={setVariant} />
+    </>
+  );
 }
 
 function HearingPanel({ view }: { view: HearingView }) {

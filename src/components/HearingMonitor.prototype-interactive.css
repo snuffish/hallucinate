@@ -1,0 +1,113 @@
+/* PROTOTYPE, throwaway: the Hearing monitor's variants K, L and M (see HearingMonitor.prototype-interactive.tsx). */
+
+.pv-k button, .pv-l button, .pv-m button, .pv-k input, .pv-l input { pointer-events: auto; font: inherit; color: inherit; }
+.pv-k button, .pv-l button, .pv-m button { cursor: pointer; }
+.pv-k-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pv-k-head > b { font-size: 16px; }
+.pv-k .pv-k-head #hearing-state { margin-left: 0; font-size: 11px; }
+.pv-k-tools { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.pv-k-tools > button, .pv-m-edit button, .pv-m-card-tools > button {
+  padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, 0.06);
+}
+.pv-k-tools > button[aria-pressed="true"], .pv-m-edit button[aria-pressed="true"] { border-color: #ffd84f; color: #ffd84f; }
+.pv-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.pv-seg button { padding: 2px 9px; border: 0; background: none; color: var(--muted) !important; }
+.pv-seg button + button { border-left: 1px solid var(--line); }
+.pv-seg button[aria-pressed="true"] { background: rgba(255, 255, 255, 0.12); color: var(--text) !important; }
+
+/* Toggle chips, coloured by what they stand for (--chip). */
+.pv-k-chips button, .pv-l-filters button {
+  padding: 1px 8px; border: 1px solid color-mix(in srgb, var(--chip) 45%, transparent); border-radius: 999px;
+  background: none; color: var(--muted) !important; opacity: 0.6;
+}
+.pv-k-chips button[aria-pressed="true"], .pv-l-filters button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--chip) 22%, transparent); color: var(--text) !important; opacity: 1; border-color: var(--chip);
+}
+
+/* K. Workbench: a wider panel along the bottom left. */
+.hearing.pv-k {
+  position: fixed;
+  left: calc(var(--dock-left) + 16px);
+  bottom: calc(var(--dock-bottom) + var(--player-bar) + 62px);
+  width: min(860px, calc(100vw - var(--dock-left) - var(--dock-right) - 32px));
+  max-height: calc(100vh - var(--dock-top) - var(--dock-bottom) - var(--player-bar) - 90px);
+}
+.pv-k-presets { display: flex; gap: 6px; margin: 8px 0 6px; flex-wrap: wrap; }
+.pv-k-presets button { padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 255, 255, 0.04); color: var(--muted) !important; }
+.pv-k-presets button[aria-pressed="true"] { border-color: var(--accent); color: var(--text) !important; }
+.pv-k-chips { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+.pv-k-chips > span { display: flex; gap: 4px; align-items: center; }
+.pv-k-chips small { color: var(--muted); text-transform: uppercase; font-size: 9px; letter-spacing: 0.06em; margin-right: 2px; }
+.pv-k-plot { position: relative; cursor: crosshair; }
+.pv-k-tip {
+  position: absolute; top: 4px; pointer-events: none; padding: 6px 8px; border-radius: 6px; min-width: 120px;
+  background: rgba(10, 7, 18, 0.95); border: 1px solid var(--line); font-size: 11px; white-space: nowrap;
+}
+.pv-k-whatif { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.pv-k-whatif label { display: flex; gap: 8px; align-items: center; }
+.pv-k-whatif input { width: 160px; accent-color: #ff9f4f; }
+.pv-k-whatif b { color: #ff9f4f; width: 44px; }
+.pv-k-whatif button { margin-left: 4px; border: 0; background: none; color: var(--accent2) !important; text-decoration: underline; padding: 0; }
+
+/* L. Event log */
+.hearing.pv-l { display: flex; flex-direction: column; }
+.pv-l-hist { margin: 8px 0; }
+.pv-l-hist-bars { display: flex; gap: 2px; align-items: flex-end; height: 48px; }
+.pv-l-hist-bars button { flex: 1; height: 100%; display: flex; align-items: flex-end; padding: 0; border: 0; border-radius: 2px; background: rgba(255, 255, 255, 0.04); }
+.pv-l-hist-bars button:hover { background: rgba(255, 255, 255, 0.1); }
+.pv-l-hist-bars button[aria-pressed="true"] { outline: 1px solid #ffd84f; background: rgba(255, 216, 79, 0.12); }
+.pv-l-hist-bars i { display: block; width: 100%; border-radius: 2px; min-height: 1px; }
+.pv-l-hist-axis { display: flex; flex-wrap: wrap; justify-content: space-between; color: var(--muted); font-size: 10px; margin-top: 2px; }
+.pv-l-hist-axis span:nth-child(2) { order: 3; width: 100%; text-align: center; }
+.pv-m-cards { align-items: start; }
+.pv-l-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+.pv-l-filters small { color: var(--muted); margin-left: 2px; }
+.pv-l-search {
+  margin: 6px 0; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 255, 255, 0.05); outline: none;
+}
+.pv-l-search:focus { border-color: var(--accent2); }
+.pv-l-list { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; border-top: 1px solid var(--line); }
+.pv-l-list li { border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.pv-l-list li > button { display: grid; grid-template-columns: 54px 8px 1fr; gap: 8px; align-items: center; width: 100%; padding: 3px 2px; border: 0; background: none; text-align: left; }
+.pv-l-list li > button:hover, .pv-l-list li[data-open] > button { background: rgba(255, 255, 255, 0.05); }
+.pv-l-list time { color: var(--muted); text-align: right; }
+.pv-l-list li > button > i { width: 8px; height: 8px; border-radius: 50%; }
+.pv-l-list li[data-tone="warn"] span { color: #ffd84f; }
+.pv-l-list li[data-tone="bad"] span { color: #ff8fab; }
+.pv-l-list li[data-tone="good"] span { color: var(--text); }
+.pv-l-list li[data-tone="info"] span { color: var(--muted); }
+.pv-l-moment { padding: 4px 4px 8px 64px; }
+
+/* M. Build your own */
+.hearing.pv-m[data-wide] {
+  position: fixed;
+  top: calc(var(--dock-top) + 16px);
+  left: calc(var(--dock-left) + 16px);
+  width: min(780px, calc(100vw - var(--dock-left) - var(--dock-right) - 32px));
+  max-height: calc(100vh - var(--dock-top) - var(--dock-bottom) - var(--player-bar) - 90px);
+}
+.pv-m-edit { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; padding: 8px; border: 1px dashed rgba(255, 216, 79, 0.5); border-radius: 8px; }
+.pv-m-edit > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.pv-m-edit small { color: var(--muted); width: 64px; }
+.pv-m-cards { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 8px; }
+.pv-m[data-wide] .pv-m-cards { grid-template-columns: 1fr 1fr; }
+.pv-m[data-wide] .pv-m-card[data-size="l"] { grid-column: 1 / -1; }
+.pv-m-card { min-width: 0; padding: 6px 8px 8px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, 0.025); }
+.pv-m-card[data-dragging] { opacity: 0.4; }
+.pv-m[data-editing] .pv-m-card { border-style: dashed; }
+.pv-m-card h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; }
+.pv-m[data-editing] .pv-m-card h4 { cursor: grab; }
+.pv-m-grip { color: var(--muted); }
+.pv-m-title { border: 0; background: none; padding: 0; font-weight: 600 !important; text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px !important; }
+.pv-m-card-tools { margin-left: auto; display: flex; gap: 4px; align-items: center; text-transform: none; }
+.pv-m-card-tools .pv-seg button { padding: 0 6px; font-size: 10px !important; }
+.pv-m-card-tools > button { padding: 0 6px; }
+.pv-m-card-tools > button:disabled { opacity: 0.3; cursor: default; }
+.pv-m-tempo { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center; }
+.pv-m-tempo > b:first-child { font-size: 26px; grid-row: span 2; }
+.pv-m-tempo.pv-m-s > b:first-child { font-size: 18px; }
+.pv-m-tempo.pv-m-l > b:first-child { font-size: 40px; }
+.pv-m-tempo small { font-size: 11px; color: var(--muted); font-weight: 400; }
+.pv-m .pv-m-tempo #hearing-state { margin-left: 0; }
+.pv-m-numbers { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); }
+.pv-m-numbers b { color: var(--text); }

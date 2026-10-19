@@ -51,7 +51,8 @@
     "perf": "node perf/measure.mjs",
     "clips": "node tools/reference/fetch-clips.ts",
     "clips:suggest": "node tools/reference/suggest-clips.ts",
-    "clips:record": "node tools/reference/record-clips.ts"
+    "clips:record": "node tools/reference/record-clips.ts",
+    "prototype:hearing": "vite --open \"/?variant=B\""
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

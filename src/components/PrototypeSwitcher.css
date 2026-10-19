@@ -1,0 +1,25 @@
+/* PROTOTYPE, throwaway: the variant switcher. Deliberately not in the app's style, so it reads as tooling. */
+.proto-switcher {
+  position: fixed;
+  z-index: 1000;
+  left: 50%;
+  bottom: calc(var(--player-bar) + 14px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #fff;
+  color: #111;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 0 2px #ffd84f;
+  font: 600 13px/1 system-ui, sans-serif;
+  pointer-events: auto;
+}
+.proto-switcher span { padding: 0 10px; white-space: nowrap; }
+.proto-switcher small { color: #777; font-weight: 400; margin-left: 4px; }
+.proto-switcher button {
+  width: 30px; height: 30px; border: 0; border-radius: 50%;
+  background: #111; color: #fff; font: inherit; cursor: pointer;
+}
+.proto-switcher button:hover { background: #333; }

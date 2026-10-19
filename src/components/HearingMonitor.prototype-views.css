@@ -1,0 +1,87 @@
+/* PROTOTYPE, throwaway: the Hearing monitor's variants E, F and G (see HearingMonitor.prototype-views.tsx). */
+
+.pv-e button, .pv-f button, .pv-g button { pointer-events: auto; font: inherit; color: inherit; cursor: pointer; }
+.pv-hint { display: flex; justify-content: space-between; gap: 8px; }
+.pv-hint kbd, .pv-g-foot kbd { font: 10px ui-monospace, monospace; padding: 1px 4px; border: 1px solid var(--line); border-radius: 3px; }
+.pv-spark-row { display: grid; grid-template-columns: 64px 1fr 64px; gap: 8px; align-items: center; margin-top: 3px; }
+.pv-spark-row > span { color: var(--muted); }
+.pv-spark-row > output { text-align: right; }
+.pv-kick-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
+.pv-kick-table th { color: var(--muted); font-weight: 400; text-align: left; }
+.pv-kick-table td { padding: 1px 0; color: #ff9f4f; }
+.pv-kick-table tr[data-on] td { color: var(--text); }
+.pv-kick-table td:first-child { color: var(--muted); }
+
+/* E. Tabs */
+.pv-e .hearing-head #hearing-state { font-size: 11px; }
+.pv-tabs { display: flex; gap: 2px; margin: 10px -12px 0; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.pv-tabs button { flex: 1; padding: 6px 0; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted) !important; text-transform: capitalize; }
+.pv-tabs button[aria-selected="true"] { color: var(--text) !important; border-bottom-color: var(--accent); }
+.pv-tabs button:hover { color: var(--text) !important; }
+.pv-e-body { min-height: 400px; padding-top: 8px; }
+.pv-e-body .pv-b-reasons { margin-top: 8px; }
+.pv-e-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pv-e-card { display: flex; flex-direction: column; gap: 2px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, 0.03); text-align: left; }
+.pv-e-card:hover { border-color: var(--accent2); }
+.pv-e-card > span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.pv-e-card > small { color: var(--muted); margin-bottom: 4px; }
+
+/* F. Flow */
+.pv-f-map { margin-top: 10px; }
+.pv-f-node { display: grid; grid-template-columns: 22px 1fr 110px; gap: 10px; align-items: center; width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, 0.03); text-align: left; }
+.pv-f-node:hover { border-color: var(--accent2); background: rgba(79, 227, 255, 0.06); }
+.pv-f-node > i { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.08); font-style: normal; font-size: 11px; }
+.pv-f-node > span:nth-child(2) { display: flex; flex-direction: column; min-width: 0; }
+.pv-f-node small { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-f-mini { display: block; height: 30px; }
+.pv-f-arrow { text-align: center; color: var(--muted); line-height: 14px; font-size: 11px; padding-left: 30px; text-align: left; }
+.pv-f-minibars { display: flex; gap: 4px; align-items: flex-end; height: 30px; }
+.pv-f-minibars i { flex: 1; height: 100%; border-radius: 2px; transform-origin: bottom; }
+.pv-f-crumbs { display: flex; gap: 6px; align-items: baseline; }
+.pv-f-crumbs button { border: 0; background: none; padding: 0; color: var(--accent2) !important; text-decoration: underline; }
+.pv-f-crumbs b { font-size: 14px; }
+.pv-f-sum { margin-left: auto; color: var(--muted); font-size: 11px; }
+.pv-f-what { margin: 6px 0; font-family: system-ui, sans-serif; color: var(--muted); }
+.pv-f-links { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; color: var(--muted); font-size: 11px; }
+.pv-f-links button, .pv-f-steps button { margin-left: 4px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, 0.05); }
+.pv-f-links button:hover, .pv-f-steps button:hover { border-color: var(--accent2); }
+.pv-f-steps { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+.pv-f-steps button { margin: 0; }
+.pv-f-look { width: 100%; border-collapse: collapse; }
+.pv-f-look th { color: var(--muted); font-weight: 400; font-size: 10px; text-align: left; }
+.pv-f-look td { padding: 3px 4px 3px 0; }
+.pv-f-look td:first-child { color: var(--muted); width: 40px; }
+.pv-f-look td:last-child { text-align: right; width: 44px; }
+
+/* G. Inspector: a window over the visuals, out of the monitors' corner. */
+.hearing.pv-g {
+  position: fixed;
+  top: calc(var(--dock-top) + 32px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1000px, calc(100vw - var(--dock-left) - var(--dock-right) - 48px));
+  height: min(680px, calc(100vh - var(--dock-top) - var(--dock-bottom) - var(--player-bar) - 110px));
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  padding: 0;
+  overflow: hidden;
+  background: rgba(14, 10, 24, 0.86);
+}
+.pv-g-rail { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; border-right: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); }
+.pv-g-title { display: flex; gap: 6px; align-items: baseline; padding: 0 6px; }
+.pv-g-title b { font-size: 24px; }
+.pv-g-title small { color: var(--muted); }
+.pv-g .pv-g-rail #hearing-state { margin: 0 0 10px; padding: 0 6px; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; font-weight: 600; }
+.pv-g-rail > button { display: flex; flex-direction: column; padding: 7px 8px; border: 0; border-left: 2px solid transparent; border-radius: 6px; background: none; text-align: left; }
+.pv-g-rail > button small { color: var(--muted); font-size: 10px; }
+.pv-g-rail > button:hover { background: rgba(255, 255, 255, 0.05); }
+.pv-g-rail > button[aria-current] { background: rgba(255, 79, 216, 0.12); border-left-color: var(--accent); }
+.pv-g-foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 0 6px; color: var(--muted); font-size: 11px; }
+.pv-g-main { min-width: 0; padding: 12px 16px; overflow-y: auto; }
+.pv-g-main h3 { margin: 0 0 8px; font: 600 15px system-ui, sans-serif; }
+.pv-g-split { display: grid; grid-template-columns: 300px 1fr; gap: 16px; margin: 10px 0; }
+.pv-g-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.pv-g-card { display: flex; flex-direction: column; gap: 4px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, 0.03); }
+.pv-g-card > div { display: flex; justify-content: space-between; align-items: baseline; }
+.pv-g-card output { font-size: 18px; }
+.pv-g-card small { color: var(--muted); font-family: system-ui, sans-serif; }

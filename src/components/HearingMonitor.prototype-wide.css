@@ -1,0 +1,102 @@
+/* PROTOTYPE, throwaway: the Hearing monitor's variants H, I and J (see HearingMonitor.prototype-wide.tsx). */
+
+.pv-h-mini button, .pv-h-full button, .pv-j button { pointer-events: auto; font: inherit; color: inherit; cursor: pointer; }
+.pv-h-full kbd { font: 10px ui-monospace, monospace; padding: 1px 4px; border: 1px solid var(--line); border-radius: 3px; }
+
+/* H. Expand — the mini */
+.hearing.pv-h-mini { width: 230px; display: flex; flex-direction: column; gap: 6px; }
+.pv-h-row { display: flex; gap: 8px; align-items: center; }
+.pv-h-row b { font-size: 18px; }
+.pv-h-mini #hearing-state { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+.pv-h-mini #hearing-state[data-state="hearing"] { color: #4fffa0; }
+.pv-h-mini #hearing-state[data-state="holding"] { color: #ffd84f; }
+.pv-h-expand { margin-left: auto; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 255, 255, 0.06); font-size: 15px !important; line-height: 1; }
+.pv-h-expand:hover { border-color: var(--accent2); }
+.pv-h-bands { display: flex; gap: 3px; align-items: flex-end; height: 22px; }
+.pv-h-bands i { width: 14px; height: 100%; border-radius: 2px; transform-origin: bottom; }
+.pv-h-bands span { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+/* H. Expand — fullscreen: over everything but the player bar. */
+.hearing.pv-h-full {
+  position: fixed;
+  inset: 0 0 var(--player-bar) 0;
+  border-radius: 0;
+  border: 0;
+  padding: 14px 18px 10px;
+  background: rgba(10, 7, 18, 0.9);
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr) 290px;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  overflow: auto;
+}
+.pv-h-head { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.pv-h-head > b { font-size: 22px; }
+.pv-h-full .pv-h-head #hearing-state { margin-left: 0; }
+.pv-h-conf { width: 120px; }
+.pv-h-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; flex: 1; }
+.pv-h-chips li { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); font-size: 11px; color: var(--muted); }
+.pv-h-chips li[data-tone="good"] { border-color: rgba(79, 255, 160, 0.5); color: #b6ffd9; }
+.pv-h-chips li[data-tone="warn"] { border-color: rgba(255, 216, 79, 0.6); color: #ffeaa6; }
+.pv-h-chips li[data-tone="bad"] { border-color: rgba(255, 79, 123, 0.7); color: #ffb3c6; }
+.pv-h-tools { display: flex; gap: 6px; align-items: center; }
+.pv-h-tools > button { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 255, 255, 0.06); font-size: 16px !important; }
+.pv-h-tools > button:hover { border-color: var(--accent2); }
+.pv-h-tile { min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.025); overflow: hidden; }
+.pv-h-tile h4 { margin-top: 0; }
+.pv-h-tile h4 + canvas + h4 { margin-top: 10px; }
+.pv-h-foot { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+
+/* I. HUD: the whole stage, clicks pass through to the visuals and widgets. */
+.pv-i {
+  position: fixed;
+  top: var(--dock-top); left: var(--dock-left); right: var(--dock-right); bottom: calc(var(--dock-bottom) + var(--player-bar));
+  pointer-events: none;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.pv-i-flash { position: absolute; inset: 0; }
+.pv-i-top { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 340px; text-align: center; }
+.pv-i-top > b { font-size: 44px; line-height: 1; }
+.pv-i-top > small { margin-left: 6px; color: var(--muted); }
+.pv-i #hearing-state { margin: 2px 0 6px; color: var(--muted); font-family: system-ui, sans-serif; }
+.pv-i #hearing-state[data-state="hearing"] { color: #4fffa0; }
+.pv-i #hearing-state[data-state="holding"] { color: #ffd84f; }
+.pv-i-top ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.pv-i-top li { padding: 2px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.55); font-size: 11px; text-shadow: none; }
+.pv-i-top li[data-tone="bad"] { color: #ff8fab; }
+.pv-i-top li[data-tone="warn"] { color: #ffd84f; }
+.pv-i-bottom { position: absolute; left: 340px; right: 16px; bottom: 76px; display: flex; gap: 16px; align-items: flex-end; }
+.pv-i-strip { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 8px; background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.15)); }
+.pv-i-numbers { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; color: var(--muted); font-size: 11px; }
+.pv-i-keys { margin-left: auto; pointer-events: auto; }
+.pv-i-meters { display: flex; gap: 6px; height: 120px; }
+.pv-i-meter { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 34px; }
+.pv-i-meter b { position: relative; flex: 1; width: 10px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); }
+.pv-i-meter i { position: absolute; inset: 0; border-radius: 3px; transform-origin: bottom; box-shadow: 0 0 10px currentColor; }
+.pv-i-meter u { position: absolute; left: -3px; right: -3px; height: 2px; background: #ffd84f; }
+.pv-i-meter span { font-size: 9px; color: var(--muted); }
+
+/* J. Tape: a full-width sheet along the bottom. */
+.hearing.pv-j {
+  position: fixed;
+  left: calc(var(--dock-left) + 12px);
+  right: calc(var(--dock-right) + 12px);
+  bottom: calc(var(--dock-bottom) + var(--player-bar) + 62px);
+  max-height: 60vh;
+  background: rgba(10, 7, 18, 0.88);
+}
+.hearing.pv-j[data-frozen] { border-color: rgba(255, 216, 79, 0.6); }
+.pv-j-head { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; color: var(--muted); }
+.pv-j-badge { display: flex; gap: 6px; align-items: center; padding: 2px 10px; border-radius: 999px; background: rgba(255, 79, 216, 0.15); color: var(--text); }
+.pv-j-badge.frozen { background: rgba(255, 216, 79, 0.18); color: #ffd84f; }
+.pv-j-tools { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.pv-j-tools button { padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, 0.06); }
+.pv-j-tools button:hover { border-color: var(--accent2); }
+.pv-j-tools .pv-j-live { border-color: var(--accent); }
+.pv-j-tape { cursor: ew-resize; pointer-events: auto; touch-action: none; border-radius: 6px; background: rgba(255, 255, 255, 0.03); }
+.pv-j-detail { display: grid; grid-template-columns: 1.1fr 1.3fr 1fr 150px; gap: 16px; margin-top: 4px; }
+.pv-j-detail section { min-width: 0; }
+.pv-j-inputs div { display: flex; justify-content: space-between; }
+.pv-j-inputs span { color: var(--muted); }
