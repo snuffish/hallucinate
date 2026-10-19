@@ -15,4 +15,4 @@ export function createLock(): Lock {
 }
 
 // A runner whose calls wait their turn on `lock` (shared by every conversation's runner).
-export const serialized = (runner: ToolRunner, lock: Lock): ToolRunner => (name, input) => lock(() => runner(name, input));
+export const serialized = (runner: ToolRunner, lock: Lock): ToolRunner => (name, input, call) => lock(() => runner(name, input, call));

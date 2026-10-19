@@ -6,11 +6,13 @@
 //
 // The controller says what a change means for the screen (onChange): new code reaches the renderer,
 // the projector and the Parameters panel, new values the renderer and the panel. Compiling goes
-// through a Compiler, the renderer or a test's fake.
+// through a Compiler, the renderer or a test's fake. Every code change is noted in the scenes'
+// history (scene-history.ts), with who made it.
 
 import { parseParams, type ParamSpec, type ParamStore, type ParamValues } from '../engine/params';
-import { COMMON, type Scene } from '../scenes';
+import { COMMON, userSceneId, type Scene } from '../scenes';
 import { appendScene, discardParked, paramKey, saveSceneEdit, saveUserScenes, sceneByName, userScene, type ParkedScenes } from '../state/scene-list';
+import type { Origin, SceneHistory } from '../state/scene-history';
 
 // What a scene's code compiles with (Renderer has these). Errors are the GLSL compiler's text.
 export interface Compiler {
@@ -54,6 +56,7 @@ export class SceneLibrary {
     private readonly compiler: Compiler,
     private readonly store: ParamStore,
     private readonly onChange: (index: number, what: SceneChange) => void = () => {},
+    private readonly history: Pick<SceneHistory, 'note' | 'drop'> | null = null,
   ) {}
 
   // ---------- Parameters ----------
@@ -95,8 +98,9 @@ export class SceneLibrary {
   // the error (line numbers count from `source`), or null once the new code and its @params are the
   // scene's and saved: your scenes and your edits of built-ins are stored here, the editor slots
   // ("My Shader", the visual maker's) by their editors. A newer compile for the same scene supersedes
-  // one still in flight (SUPERSEDED; its program is released).
-  async compile(i: number, source: string): Promise<CompileResult> {
+  // one still in flight (SUPERSEDED; its program is released). `origin`: who made the change, for
+  // the scene's history (the visual maker's generated code has none).
+  async compile(i: number, source: string, origin: Origin = { by: 'you' }): Promise<CompileResult> {
     const scene = this.scenes[i];
     if (!scene) return 'No such scene.';
     const { code, params } = parseParams(source);
@@ -109,11 +113,13 @@ export class SceneLibrary {
       return SUPERSEDED;
     }
     if (error) return formatError(error);
+    const before = scene.body;
     scene.frag = frag;
     scene.params = params;
     scene.body = source;
     if (scene.user) saveUserScenes(this.scenes, this.parked);
     else if (scene.kind !== 'custom' && scene.kind !== 'nodes') saveSceneEdit(scene, this.scenes, this.parked);
+    if (scene.kind !== 'nodes') this.history?.note(paramKey(scene), source, origin, before);
     this.onChange(i, 'code');
     return null;
   }
@@ -125,7 +131,7 @@ export class SceneLibrary {
   // A new scene of yours (appended), or with `replace` one of yours under that name overwritten in
   // place, or a parked one of that name superseded. `valuesFrom`: the scene whose parameter values it
   // starts with (Save to library keeps what you tweaked). Nothing changes unless it compiles.
-  add(name: string, body: string, { replace = false, valuesFrom }: { replace?: boolean; valuesFrom?: number } = {}): AddResult {
+  add(name: string, body: string, { replace = false, valuesFrom, origin = { by: 'library' } }: { replace?: boolean; valuesFrom?: number; origin?: Origin } = {}): AddResult {
     const existing = this.byName(name);
     if (existing >= 0 && !this.scenes[existing]!.user) return { error: `A scene called "${name}" already exists (a built-in one).`, conflict: 'builtin' };
     if (existing >= 0 && !replace) return { error: `A scene called "${name}" already exists.`, conflict: 'mine' };
@@ -136,11 +142,13 @@ export class SceneLibrary {
     const error = this.compiler.check(scene.frag, name);
     if (error) return { error };
     let index = existing;
+    const before = existing >= 0 ? this.scenes[existing]!.body : this.parked.userScenes.find((p) => p.name === name)?.body;
     if (existing >= 0) Object.assign(this.scenes[existing]!, scene);
     else index = appendScene(this.scenes, scene);
     const from = valuesFrom === undefined ? undefined : this.scenes[valuesFrom];
     if (from && valuesFrom !== index) this.store.copy(paramKey(from), paramKey(this.scenes[index]!));
     saveUserScenes(this.scenes, this.parked);
+    this.history?.note(paramKey(this.scenes[index]!), body, origin, before);
     this.onChange(index, 'code');
     return { index };
   }
@@ -157,6 +165,7 @@ export class SceneLibrary {
   // A parked scene or edit (didn't compile here) is deleted for good.
   discardParked(kind: 'scene' | 'edit', name: string): void {
     discardParked(this.parked, kind, name, this.scenes);
+    if (kind === 'scene' && this.byName(name) < 0) this.history?.drop(userSceneId(name));
     this.onChange(-1, 'list');
   }
 }

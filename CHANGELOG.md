@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — scene history and what the assistant changed (2026-10-19)
+
+### Added
+
+- **History** in the code editor: every scene keeps its versions, newest first, with who made each (you, the
+  assistant and the conversation it came from, *Start from…*, *Revert to original*, *Save to library* over a scene, a
+  restore). Pick one to see how the code changed since, and restore it; a restore is a version too. A version is kept
+  before and after every change that isn't your typing; your typing folds into one version until you pause for about a
+  minute. The last 50 per scene are kept, on this computer only (not in exports).
+- The assistant's tool chips open to **what changed**: a code diff (with *Open in editor* and *Put back the code from
+  before*), parameters, Look, transition and autopilot from → to, and the show scenes and plan before and after. It is
+  kept with the conversation, so it is still there after a reload, and deleted with it.
+- The studio lists **what the director changed**, under its status, the same way (the director's changes still can't
+  be undone from the assistant panel).
+
 ## Unreleased — docs website (2026-10-19)
 
 ### Added

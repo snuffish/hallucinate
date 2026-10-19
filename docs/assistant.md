@@ -19,7 +19,13 @@ right in the app, while everything else stays where it is. It:
 Every change shows up live. **Undo** in the panel reverts the assistant's newest change (edits, new scenes, parameters,
 look, show), and Claude is told with your next message, as it is when the scene on screen changed since its last
 reply (auto-switch, or you); built-in scenes can also be reverted to their original in the
-[code editor](editor.md). **Stop** interrupts it. After each reply the assistant suggests three things you could ask
+[code editor](editor.md). **Stop** interrupts it.
+
+A tool chip that changed something opens to **what changed**: a code diff for a scene's code (with *Open in editor*
+and *Put back the code from before*), from → to for parameters, Look sliders, the transition and the autopilot, and
+the show scenes added, removed, changed or moved and the plan before and after. Unlike Undo, this stays with the
+conversation after a reload; the scene's [History](editor.md#history) keeps every version the assistant made too. What
+the [director](studio.md) changed is listed in the studio, under its status. After each reply the assistant suggests three things you could ask
 next, as buttons under the reply, like the examples on an empty chat.
 
 ## Features

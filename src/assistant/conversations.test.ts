@@ -333,6 +333,21 @@ describe('assistant conversations', () => {
     second.s.dispose();
   });
 
+  it('records what each tool call changed under its id, and deletes the records with the conversation', async () => {
+    const seen: Seen[] = [];
+    const { s } = session(seen);
+    const c = s.active;
+    await c.load();
+    c.send('look brighter');
+    await until(() => !c.running && seen.length === 2);
+    const call = c.view.messages.flatMap((m) => m.parts).find((p) => p.type === 'tool-call');
+    expect(call).toBeDefined();
+    expect(s.changes.forCall(c.id, (call as { id: string }).id)).toMatchObject([{ chatId: c.id, tool: 'set_look', kind: 'look', after: { hue: 0.5 } }]);
+    await s.remove(c.id);
+    expect(s.changes.forChat(c.id)).toEqual([]);
+    s.dispose();
+  });
+
   it('deletes a conversation everywhere: index, transcript and the CLI session', async () => {
     const transcripts = memoryTranscripts();
     const seen: Seen[] = [];

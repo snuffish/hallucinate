@@ -4,6 +4,7 @@ import type { Compiler } from '../app/scene-library';
 import { StudioSession } from '../app/studio';
 import { parseParams } from '../engine/params';
 import { applyEdits, createToolRunner, fitCeilings, resolveParam, UndoConflict } from './executor';
+import type { ChangeDraft } from './change-log';
 import { UndoStack } from './undo';
 
 const { params } = parseParams(`
@@ -206,7 +207,7 @@ describe('scene code and parameter tools', () => {
     expect(out).toEqual({ compiled: true, scene: 'Alpha', nowPlaying: true, parameters: { uGlow: 1.235, uMirror: true } });
     expect(undo.last).toBe('Edited Alpha');
     undo.pop()!.undo();
-    expect(compileInto).toHaveBeenLastCalledWith(expect.anything(), before);
+    expect(compileInto).toHaveBeenLastCalledWith(expect.anything(), before, { by: 'undo' });
   });
 
   it('does not undo a code change once the scene\'s code was changed after it', async () => {
@@ -331,5 +332,50 @@ describe('scene code and parameter tools', () => {
     expect(panel.title).toBe('Controls & layout');
     expect(panel.text).toContain('Randomize (R)');
     await expect(run('get_help', { topic: 'nope' })).rejects.toThrow(/no help topic "nope". Topics: panel/);
+  });
+});
+
+describe('what the tools changed', () => {
+  beforeEach(() => vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} }));
+
+  function setup() {
+    const app = fakeApp({ scenes: [{ name: 'Alpha', cat: 'Fractal', body: 'float k = 1.;\nvoid main() { fragColor = vec4(k); }', user: true }, { name: 'Beta', cat: 'Space' }], playing: false });
+    const studio = new StudioSession(app);
+    const undo = new UndoStack();
+    const changes: ChangeDraft[] = [];
+    const run = createToolRunner(app, { chatId: 'c1', push: (e) => undo.push(e), change: (d) => changes.push(d) }, () => studio);
+    return { app, studio, undo, changes, run, compileInto: vi.spyOn(app.editor, 'compileInto') };
+  }
+
+  it('records a code edit with the code before and after, under the tool call that made it', async () => {
+    const { changes, run, compileInto } = setup();
+    await run('edit_scene_code', { edits: [{ find: 'float k = 1.;', replace: 'float k = .5;' }] }, { toolCallId: 't1' });
+    expect(changes).toEqual([{
+      tool: 'edit_scene_code', toolCallId: 't1', label: 'Edited Alpha', kind: 'code', scene: 'Alpha',
+      before: 'float k = 1.;\nvoid main() { fragColor = vec4(k); }', after: 'float k = .5;\nvoid main() { fragColor = vec4(k); }',
+    }]);
+    expect(compileInto).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('.5;'), { by: 'assistant', label: 'Edited Alpha', chatId: 'c1', toolCallId: 't1' });
+  });
+
+  it('records a new scene, parameter values, the look and the show, and nothing for a failed call', async () => {
+    const { changes, run, studio } = setup();
+    await run('create_scene', { name: 'Neon', code: 'void main() { fragColor = vec4(1.); }' }, { toolCallId: 'a' });
+    await run('set_look', { hue: 0.5 }, { toolCallId: 'b' });
+    await run('add_show_scene', { scene: 'Beta' }, { toolCallId: 'c' });
+    await run('set_transition', { mode: 'cut' }, { toolCallId: 'd' });
+    await expect(run('remove_show_scene', { cue: 'nope' }, { toolCallId: 'e' })).rejects.toThrow();
+    expect(changes.map((c) => [c.toolCallId, c.kind])).toEqual([['a', 'created'], ['b', 'look'], ['c', 'show'], ['d', 'transition']]);
+    expect(changes[0]).toMatchObject({ scene: 'Neon', before: null, after: 'void main() { fragColor = vec4(1.); }' });
+    expect((changes[1]!.after as { hue: number }).hue).toBe(0.5);
+    expect((changes[2]!.before as { cues: unknown[] }).cues).toHaveLength(0);
+    expect((changes[2]!.after as { cues: { name: string }[] }).cues.map((c) => c.name)).toEqual(['Beta']);
+    expect(changes[3]!.after).toEqual({ mode: 'cut', seconds: studio.seconds });
+  });
+
+  it('keeps what it recorded when the state changes afterwards', async () => {
+    const { changes, run, app } = setup();
+    await run('set_look', { hue: 0.5 });
+    app.setLook('hue', 0.9);
+    expect((changes[0]!.after as { hue: number }).hue).toBe(0.5);
   });
 });

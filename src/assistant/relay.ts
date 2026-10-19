@@ -6,7 +6,7 @@ import { TOOL_CALL_EVENT, TOOL_RESULT_URL, ToolCallEventSchema, type ToolResult,
 import { ContentPartsSchema } from './tools';
 
 // executor.ts's ToolRunner, said again so that the server's tests can load the relay without the app.
-type ToolRunner = (name: string, input: unknown) => Promise<unknown>;
+type ToolRunner = (name: string, input: unknown, call?: { toolCallId?: string }) => Promise<unknown>;
 
 // A tool's output (TanStack content parts, or anything else as JSON text) in the wire's MCP form.
 function toToolResult(out: unknown): ToolResult {
@@ -22,8 +22,8 @@ export function relayToolCalls(runner: ToolRunner): (type: string, data: unknown
     if (type !== TOOL_CALL_EVENT) return;
     const ev = ToolCallEventSchema.safeParse(data);
     if (!ev.success) return;
-    const { threadId, callId, name, input } = ev.data;
-    runner(name, (input ?? {}) as Record<string, unknown>)
+    const { threadId, callId, toolCallId, name, input } = ev.data;
+    runner(name, (input ?? {}) as Record<string, unknown>, { toolCallId })
       .then(toToolResult)
       .catch((err: Error): ToolResult => ({ content: [{ type: 'text', text: err.message }], isError: true }))
       .then((result) => fetch(TOOL_RESULT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId, callId, result } satisfies ToolResultPost) }))

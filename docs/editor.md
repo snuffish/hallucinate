@@ -19,6 +19,18 @@ running), and saves automatically in the browser. While it's open the editor fol
   code as a new scene. The *Cheat sheet* lists the audio uniforms and helpers. In the library, *Edit code* plays a scene
   and opens it here.
 
+## History
+
+**History** in the editor lists the versions of the scene's code, newest first, and who made each: you, the
+✦ assistant (with the conversation it came from: click it to open that chat), *Start from…*, *Revert to original*,
+*Save to library* over an existing scene, or a restore. Click a version to see how the code changed since, and
+*Restore this version* to bring it back. A restore is a version too, so the code you had stays in the list.
+
+A version is kept before and after every change that isn't your typing, so the assistant's edits, templates and
+reverts can always be gone back on. Your own typing is saved as you go and folds into one version until you pause for
+about a minute. Each scene keeps its last 50 versions (your typing goes first when it's trimmed). History stays on this
+computer: it isn't part of an [export](backup.md).
+
 ## 🎛 Live parameters — press P
 
 <img src="screenshots/params-groups.jpg" alt="A scene with its parameters in folding groups, some open and some folded" width="100%">
