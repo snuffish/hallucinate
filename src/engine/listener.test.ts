@@ -486,6 +486,8 @@ describe('what the Hearing monitor is shown', () => {
     const best = candidates.bpm[weighed.indexOf(Math.max(...weighed))]!;
     expect(best).toBeGreaterThan(121);
     expect(best).toBeLessThan(127);
+    expect(candidates.clear).toBeGreaterThan(0);   // the strength it takes to hear a pulse at all ...
+    expect(Math.max(...candidates.strength)).toBeGreaterThanOrEqual(candidates.clear);   // ... which a steady kick drum has
     // A kick grid repeats at twice its period too: 62 is a candidate nearly as strong, only preferred less.
     const at = (bpm: number) => candidates.bpm.reduce((b, v, i) => (Math.abs(v - bpm) < Math.abs(candidates.bpm[b]! - bpm) ? i : b), 0);
     expect(candidates.strength[at(62)]).toBeGreaterThan(candidates.strength[at(124)]! * 0.5);

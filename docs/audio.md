@@ -50,9 +50,11 @@ projectors): what the Listener hears, and why it hears it that way. It only show
 - **Kicks** – the last 6 s of the rise in the kick's bins, newest on the right, with the threshold a kick must reach
   (dashed) and the windows where the next kick was due (shaded). Under it the kicks (pink) against the ticks (green):
   a tick trailing its kick shows how late the tick clock re-anchors.
-- **Tempo candidates** – how strongly the kick signal repeats at each tempo from 40 to 200 BPM, the Listener's
-  preference for tempos around 120 dashed, and the tempo the kicks gave marked. A half or double tempo standing as
-  tall as the heard one is where a half- or double-time reading comes from.
+- **Tempo candidates** – how strongly the kick signal repeats at each tempo from 40 to 200 BPM, scaled to its peak,
+  with the strength it takes to hear a pulse at all dashed in yellow (a curve that never reaches it is noise; the
+  Confidence bar gives the absolute strength), the Listener's preference for tempos around 120 dashed in grey, and
+  the tempo the kicks gave marked. A half or double tempo standing as tall as the heard one is where a half- or
+  double-time reading comes from.
 - **Tone, energy, mood** – the spectral centroid in kHz and the two values (see below).
 
 It stacks under the performance monitor (Shift+P) when both are open. Research notes behind it:

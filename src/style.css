@@ -379,6 +379,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .hearing-light.tick { background: #4fffa0; }
 .hearing .kick { color: #ff4fd8; }
 .hearing .tick { color: #4fffa0; }
+.hearing .average { color: #ffd84f; }
 #hearing-state { color: var(--muted); margin-left: auto; }
 #hearing-state[data-state="hearing"] { color: #4fffa0; }
 #hearing-state[data-state="holding"] { color: #ffd84f; }

@@ -57,6 +57,7 @@ export interface PulseCandidates {
   bpm: number[];          // the pulse, slowest first
   strength: number[];     // 0..1 how strongly the rises repeat at it and its multiples
   preference: number[];   // 0..1 how much it is preferred for where pulses usually sit
+  clear: number;          // the strength it takes to hear a pulse at all
 }
 
 // How much a pulse `lag` cells long is preferred: most around PULSE_PRIOR_BPM, less an octave either side.
@@ -179,7 +180,7 @@ export class KickHearer {
   }
 
   candidates(): PulseCandidates {
-    const [lo, hi] = this.strengthLags, out: PulseCandidates = { bpm: [], strength: [], preference: [] };
+    const [lo, hi] = this.strengthLags, out: PulseCandidates = { bpm: [], strength: [], preference: [], clear: PULSE_CLARITY };
     for (let lag = hi; lag >= lo; lag--) {
       out.bpm.push(60 / (lag * RISES_CELL));
       out.strength.push(this.strengths[lag]!);

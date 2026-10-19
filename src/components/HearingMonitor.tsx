@@ -86,21 +86,24 @@ function drawKicks(k: HearingDiagnostics['kicks']) {
   };
 }
 
-// How strongly the kick signal repeats at each tempo, the Listener's preference dashed, and the tempo heard marked.
+// How strongly the kick signal repeats at each tempo, scaled to its peak (but never past the strength it takes to
+// hear a pulse, dashed yellow, so noise stays flat), the Listener's preference dashed, and the tempo heard marked.
 function drawCandidates(cand: HearingDiagnostics['candidates'], heard: number | null) {
   return (c: CanvasRenderingContext2D, w: number, h: number) => {
     if (cand.bpm.length < 2) return;
     const lo = cand.bpm[0]!, hi = cand.bpm[cand.bpm.length - 1]!;
     const x = (bpm: number) => ((bpm - lo) / (hi - lo)) * w;
-    const curve = (values: number[], colour: string, dash: number[]) => {
+    const top = Math.max(cand.clear, ...cand.strength);
+    const curve = (values: number[], scale: number, colour: string, dash: number[]) => {
       c.strokeStyle = colour;
       c.setLineDash(dash);
       c.beginPath();
-      values.forEach((v, i) => (i ? c.lineTo(x(cand.bpm[i]!), h - v * h) : c.moveTo(x(cand.bpm[i]!), h - v * h)));
+      values.forEach((v, i) => (i ? c.lineTo(x(cand.bpm[i]!), h - (v / scale) * h) : c.moveTo(x(cand.bpm[i]!), h - (v / scale) * h)));
       c.stroke();
     };
-    curve(cand.preference, COLOURS.muted, [3, 3]);
-    curve(cand.strength, COLOURS.line, []);
+    curve(cand.preference, 1, COLOURS.muted, [3, 3]);
+    curve(cand.bpm.map(() => cand.clear), top, COLOURS.threshold, [3, 3]);
+    curve(cand.strength, top, COLOURS.line, []);
     c.setLineDash([]);
     if (heard !== null) { c.fillStyle = COLOURS.kick; c.fillRect(x(heard) - 1, 0, 2, h); }
   };
@@ -134,7 +137,7 @@ function HearingPanel({ view }: { view: HearingView }) {
       <h4>Spectrum <small>as heard; the top is where it clips</small></h4>
       {d.spectrum ? <Plot label="Spectrum" draw={drawSpectrum(d.spectrum)} /> : <div className="hearing-meta">Nothing connected</div>}
 
-      <h4>Bands <small>level · running average</small></h4>
+      <h4>Bands <small>level · <span className="average">running average</span></small></h4>
       {(['bass', 'mid', 'high', 'level'] as const).map((k) => (
         <div key={k} className="hearing-row" data-band={k}>
           <span>{k}</span>
@@ -142,11 +145,11 @@ function HearingPanel({ view }: { view: HearingView }) {
         </div>
       ))}
 
-      <h4>Kicks <small>rise · threshold · due · <span className="kick">kicks</span> / <span className="tick">ticks</span></small></h4>
+      <h4>Kicks <small>rise · <span className="average">threshold</span> · due · <span className="kick">kicks</span> / <span className="tick">ticks</span></small></h4>
       <Plot label="Kick signal" height={84} draw={drawKicks(d.kicks)} />
 
-      <h4>Tempo candidates <small>strength · preference</small></h4>
-      <Plot label="Tempo candidates" height={48} draw={drawCandidates(d.candidates, t.heardBpm)} />
+      <h4>Tempo candidates <small>strength · <span className="average">clear enough</span> · preference</small></h4>
+      <Plot label="Tempo candidates" height={64} draw={drawCandidates(d.candidates, t.heardBpm)} />
 
       <div className="hearing-meta">
         tone {(view.centroid / 1000).toFixed(1)} kHz · energy {view.energy.toFixed(2)} · mood {view.mood.toFixed(2)}
