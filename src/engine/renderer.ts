@@ -171,8 +171,8 @@ export class Renderer {
   private readonly displayUniforms: SceneUniforms = {};
   private lost = false;
   private disposed = false;
-  private readonly onLost = (e: Event) => { e.preventDefault(); this.lost = true; };
-  private readonly onRestored = () => this.rebuild();
+  private readonly onLost = (e: Event) => { e.preventDefault(); this.lost = true; console.warn('WebGL context lost: the GPU reset or ran out of memory. The picture comes back when it is restored.'); };
+  private readonly onRestored = () => { console.info('WebGL context restored.'); this.rebuild(); };
 
   // `scenes` is a shared list of { name, frag }. Programs compile on first use and are cached by
   // source, so several renderers (main, studio preview, projector) can share one list.

@@ -1,3 +1,4 @@
+import './log/install';   // first: the System log hears the console from here on
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';

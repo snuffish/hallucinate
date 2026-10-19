@@ -34,8 +34,8 @@ export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' |
 // A panel's help popover, or the sheet with every shortcut.
 export type HelpId = HelpTopicId | 'sheet';
 
-// What is being dragged around the screen ('hearing': the Hearing monitor; 'resize': a widget's or a dock's resize grip).
-export type DragId = WidgetId | 'bubble' | 'hearing' | 'resize';
+// What is being dragged around the screen ('hearing': the Hearing monitor; 'log': the System log; 'resize': a widget's or a dock's resize grip).
+export type DragId = WidgetId | 'bubble' | 'hearing' | 'log' | 'resize';
 
 export interface Meters { bass: number; mid: number; high: number; bright: number; beat: number }
 export type MoodLabel = '' | `mood: ${MoodWord}`;
@@ -97,6 +97,7 @@ export interface UIState {
   params: ParamsView;
   perf: PerfReport | null;  // Shift+P: the performance overlay, ~2 Hz while on; null = off (not persisted)
   hearingMonitor: HearingView | null;   // Shift+L: the Hearing monitor, ~15 Hz while on; null = off (not persisted)
+  systemLog: boolean;       // Shift+S: the System log is open (its lines live in src/log/system-log.ts; not persisted)
   recording: boolean;
   transport: TransportView;
   media: MediaView;
@@ -137,6 +138,7 @@ export const initialUIState = (look: Look): UIState => ({
   params: { title: 'Parameters', key: '', specs: [], values: {}, inStudio: false },
   perf: null,
   hearingMonitor: null,
+  systemLog: false,
   recording: false,
   transport: { mode: null, hasQueue: false, playing: false, currentTime: 0, duration: 0, loop: false },
   media: { name: '', kind: null, width: 1, height: 1, loaded: false },

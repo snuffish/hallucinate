@@ -21,13 +21,16 @@ export interface WidgetLayout { open: boolean; collapsed: boolean; place: Place;
 export type SideZone = 'left' | 'right';
 // The assistant bubble: `auto` keeps it beside the left dock (the stylesheet places it), a float pins it.
 export type BubblePlace = { kind: 'auto' } | FloatPlace;
-// The Hearing monitor: `auto` keeps it in the monitors' corner under the performance monitor, a float pins it.
-export type HearingPlace = { kind: 'auto' } | FloatPlace;
+// A monitor (the Hearing monitor, the System log): `auto` keeps it in the monitors' corner, a float pins it.
+export type MonitorPlace = { kind: 'auto' } | FloatPlace;
+export type HearingPlace = MonitorPlace;
+export const MONITOR_IDS = ['hearing', 'log'] as const;
+export type MonitorId = (typeof MONITOR_IDS)[number];
 // `dockWidth`: the left and right docks are one column each, as wide as this.
 // `bubbleShown`: the assistant bubble can be switched off from the Widgets menu like a widget.
 // `chatSize`: the assistant's chat window, resized by its grip like a widget (null: the stylesheet's size).
-// `hearing`: where the Hearing monitor (Shift+L) opens.
-export interface Layout { v: 1; widgets: Record<WidgetId, WidgetLayout>; bubble: BubblePlace; bubbleShown: boolean; dockWidth: Record<SideZone, number>; chatSize: WidgetSize; hearing: HearingPlace }
+// `hearing`: where the Hearing monitor (Shift+L) opens; `log`: where the System log (Shift+S) opens.
+export interface Layout { v: 1; widgets: Record<WidgetId, WidgetLayout>; bubble: BubblePlace; bubbleShown: boolean; dockWidth: Record<SideZone, number>; chatSize: WidgetSize; hearing: MonitorPlace; log: MonitorPlace }
 
 export const MIN_W = 200;
 export const MIN_H = 80;
@@ -37,7 +40,7 @@ export const DOCK_WIDTH = 290;
 export const CHAT_MIN_W = 300;
 export const CHAT_MIN_H = 260;
 const AUTO: WidgetSize = { w: null, h: null };
-const AUTO_PLACE: BubblePlace & HearingPlace = { kind: 'auto' };
+const AUTO_PLACE: BubblePlace & MonitorPlace = { kind: 'auto' };
 const clampTo = (v: number, lo: number, hi: number) => Math.round(Math.min(Math.max(v, lo), Math.max(lo, hi)));
 export const clampW = (w: number, viewport?: Size) => clampTo(w, MIN_W, (viewport?.width ?? Infinity) - 32);
 export const clampH = (h: number, viewport?: Size) => clampTo(h, MIN_H, (viewport?.height ?? Infinity) - 32);
@@ -68,6 +71,7 @@ export const DEFAULT_LAYOUT: Layout = {
   dockWidth: { left: DOCK_WIDTH, right: DOCK_WIDTH },
   chatSize: AUTO,
   hearing: { kind: 'auto' },
+  log: { kind: 'auto' },
 };
 
 const withWidget = (layout: Layout, id: WidgetId, patch: Partial<WidgetLayout>): Layout =>
@@ -184,22 +188,25 @@ export function moveBubble(layout: Layout, rect: Rect, viewport: Size): Layout {
   return { ...layout, bubble: anchorFor(rect, viewport) };
 }
 
-export function moveHearing(layout: Layout, rect: Rect, viewport: Size): Layout {
-  return { ...layout, hearing: anchorFor(rect, viewport) };
+export function moveMonitor(layout: Layout, id: MonitorId, rect: Rect, viewport: Size): Layout {
+  return { ...layout, [id]: anchorFor(rect, viewport) };
 }
 
-export function resetHearing(layout: Layout): Layout {
-  return { ...layout, hearing: { kind: 'auto' } };
+export function resetMonitor(layout: Layout, id: MonitorId): Layout {
+  return { ...layout, [id]: { kind: 'auto' } };
 }
 
-// Phones: one column on the left in the default order and natural sizes, the bubble and the Hearing
-// monitor in their default spots. The stored layout is untouched, so the desktop arrangement comes back on a wider window.
+export const moveHearing = (layout: Layout, rect: Rect, viewport: Size): Layout => moveMonitor(layout, 'hearing', rect, viewport);
+export const resetHearing = (layout: Layout): Layout => resetMonitor(layout, 'hearing');
+
+// Phones: one column on the left in the default order and natural sizes, the bubble and the monitors
+// in their default spots. The stored layout is untouched, so the desktop arrangement comes back on a wider window.
 export function effective(layout: Layout, narrow: boolean): Layout {
   if (!narrow) return layout;
   const widgets = { ...layout.widgets };
   WIDGET_IDS.forEach((id, order) => { widgets[id] = { ...widgets[id], place: dockAt('left', order), size: AUTO }; });
   // The same place object every call: the assistant and the monitor select it from the store, and a new one each time re-renders forever.
-  return { ...layout, widgets, bubble: AUTO_PLACE, dockWidth: DEFAULT_LAYOUT.dockWidth, chatSize: AUTO, hearing: AUTO_PLACE };
+  return { ...layout, widgets, bubble: AUTO_PLACE, dockWidth: DEFAULT_LAYOUT.dockWidth, chatSize: AUTO, hearing: AUTO_PLACE, log: AUTO_PLACE };
 }
 
 // Where the chat window opens next to a moved bubble: toward the side with more room, above or
@@ -228,7 +235,7 @@ const SizeSchema = z.object({ w: z.number().nullable(), h: z.number().nullable()
 const WidgetLayoutSchema = z.object({ open: z.boolean(), collapsed: z.boolean(), place: z.discriminatedUnion('kind', [DockSchema, FloatSchema]), size: SizeSchema.optional() });
 const DockWidthSchema = z.object({ left: z.number(), right: z.number() });
 const AutoOrFloatSchema = z.discriminatedUnion('kind', [z.object({ kind: z.literal('auto') }), FloatSchema]);
-export const StoredLayoutSchema = z.object({ v: z.literal(1), widgets: z.record(z.string(), z.unknown()), bubble: z.unknown().optional(), bubbleShown: z.unknown().optional(), dockWidth: z.unknown().optional(), chatSize: z.unknown().optional(), hearing: z.unknown().optional() });
+export const StoredLayoutSchema = z.object({ v: z.literal(1), widgets: z.record(z.string(), z.unknown()), bubble: z.unknown().optional(), bubbleShown: z.unknown().optional(), dockWidth: z.unknown().optional(), chatSize: z.unknown().optional(), hearing: z.unknown().optional(), log: z.unknown().optional() });
 
 // Every entry is checked on its own: an unknown widget is dropped and a missing or broken one falls
 // back to its default, so adding a widget in a later version never resets the rest of the layout.
@@ -250,8 +257,10 @@ export function parseLayout(raw: unknown): Layout {
   if (widths.success) layout.dockWidth = { left: clampDock(widths.data.left), right: clampDock(widths.data.right) };
   const chat = SizeSchema.safeParse(stored.data.chatSize);
   if (chat.success) layout.chatSize = resizeChat(layout, chat.data).chatSize;
-  const hearing = AutoOrFloatSchema.safeParse(stored.data.hearing);
-  if (hearing.success) layout.hearing = hearing.data;
+  for (const id of MONITOR_IDS) {
+    const place = AutoOrFloatSchema.safeParse(stored.data[id]);
+    if (place.success) layout[id] = place.data;
+  }
   return renumber(layout);
 }
 

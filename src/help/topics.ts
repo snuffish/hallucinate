@@ -134,6 +134,18 @@ export const HELP_TOPICS = {
     ],
     hotkeys: ['hearingMonitor', 'perf'],
   },
+  log: {
+    id: 'log',
+    title: 'System log',
+    body: [
+      'Everything the app has to say, as it happens: the page\'s console (and errors nothing caught), the local server (its warnings, each request it answered, the assistant\'s traffic) and the app\'s own events (the scene, the music, the tempo locking and letting go, projectors, the GPU). It records from the moment the page loads, so it has the lines from before you opened it; while it is closed, a badge in the corner counts the errors you haven\'t seen.',
+      'Show what you need: the level buttons switch errors, warnings, info and debug on and off, each with its count; the menu picks one source; the search box keeps the lines containing your text. Pause holds the lines still while new ones keep coming in behind it. A line with more to it (a stack, a whole object) opens with a click. The same line again right after shows ×2, ×3… instead of repeating.',
+      'Clear empties it. Copy puts the lines shown on the clipboard and Export saves them as a .log file, with every line that matches, not only the 500 drawn.',
+      'The field at the bottom takes commands: help lists them, and help <name> says what one takes. level, source and filter set what is shown; clear, copy and export do what their buttons do. Every assistant tool runs here by name, exactly as the assistant runs it: state (what is on screen), switch_scene scene="Ring Run", set_look {"hue": 0.3}. Give a tool its input as key=value pairs or as JSON. undo takes back the last change a tool made, here or in the assistant. ↑ and ↓ step through the commands you typed, Tab completes a name.',
+      'The server\'s lines appear only when the app runs from its own server (npm run dev, the desktop app), on that computer. Move it: drag it by any part but its buttons, fields and lines; a double-click puts it back in the corner.',
+    ],
+    hotkeys: ['systemLog', 'hearingMonitor', 'perf'],
+  },
   screen: {
     id: 'screen',
     title: 'Screen: preview or Live',

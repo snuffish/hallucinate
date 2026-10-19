@@ -29,6 +29,7 @@ Press **?** in the app for the same list. Every button with a shortcut also show
 | Shift+H | reset the widget layout |
 | Shift+P | performance monitor: where each frame's time goes, and a GPU test (see [PERF.md](../PERF.md)) |
 | Shift+L | [Hearing monitor](audio.md#-hearing-monitor): the tempo and how sure it is, kicks and ticks, the spectrum and why |
+| Shift+S | [System log](interface.md#system-log): what the app, the page's console and the local server said, and a command line |
 | ? | help & every shortcut |
 | , | [settings](settings.md) |
 | Esc | close the open panel (in the library: leave the search field first) |

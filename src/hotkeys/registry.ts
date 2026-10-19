@@ -69,6 +69,7 @@ export const HOTKEYS = {
   resetLayout: { id: 'resetLayout', keys: 'Shift+H', label: 'Reset layout', group: 'Panels', when: 'noNodes' },
   perf: { id: 'perf', keys: 'Shift+P', label: 'Performance monitor', group: 'Panels', when: 'noNodes' },
   hearingMonitor: { id: 'hearingMonitor', keys: 'Shift+L', label: 'Hearing monitor', group: 'Panels', when: 'noNodes' },
+  systemLog: { id: 'systemLog', keys: 'Shift+S', label: 'System log', group: 'Panels', when: 'noNodes' },
   fullscreen: { id: 'fullscreen', keys: 'F', label: 'Fullscreen', group: 'Panels', when: 'always' },
   record: { id: 'record', keys: 'C', label: 'Record', group: 'Panels', when: 'noNodes' },
   help: { id: 'help', keys: '?', label: 'Help & shortcuts', group: 'Panels', when: 'always' },

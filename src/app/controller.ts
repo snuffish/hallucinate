@@ -6,6 +6,7 @@ import { AudioEngine } from '../engine/audio';
 import * as Effects from '../engine/effects';
 import { HearingRecorder } from '../engine/hearing-history';
 import { Listener, moodWord, toneWord, type Hearing } from '../engine/listener';
+import { systemLog } from '../log/system-log';
 import { composeFrame, composeStill, crossfade, programState } from '../engine/look';
 import { MediaLayer, StaleMediaLoad, isMediaFile, type MediaSource } from '../engine/media';
 import { applyRendererPrefs, OutputLink } from '../engine/output-link';
@@ -96,9 +97,13 @@ export class AppController {
   readonly prefs = new Store<Prefs>(loadPrefs());
   // Where each frame's time goes (Shift+P, or ?perf / ?perf=trace in the URL). Off: one flag check per stage.
   readonly profiler = new FrameProfiler();
+  // What the app, the console and the server have said (Shift+S); the app's own events are written here.
+  readonly log = systemLog;
 
   private raf = 0;
   private frameError: string | null = null;   // the last per-frame error reported (each is logged once)
+  private loggedBpm: number | null = null;    // the tempo the System log last reported (it logs a lock and a loss, not every frame)
+  private loggedOutputs = 0;
   private last = 0;
   private meterTick = 0;
   private perfPublishedAt = 0;
@@ -192,7 +197,7 @@ export class AppController {
     this.ui = new Store(initialUIState(this.state.look));
     this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, effects: this.state.effects });
     this.renderer.setMedia(this.media);
-    this.output = new OutputLink(list.scenes, (outputs) => this.ui.set({ outputs }), outputPrefs(this.prefs.get()));
+    this.output = new OutputLink(list.scenes, (outputs) => { this.ui.set({ outputs }); this.logOutputs(outputs.length); }, outputPrefs(this.prefs.get()));
     this.library = new SceneLibrary(list.scenes, list.parked, this.renderer, this.paramStore, (i, what) => this.sceneChanged(i, what));
     this.live = new LiveSlot({ state: this.state, hearing: this.listener.hearing, specs: (i) => this.library.specs(i), stored: this.renderer.sceneParams, ui: this.ui, toast: (text, ms) => this.toast(text, ms) });
     this.applyPrefs();
@@ -242,6 +247,7 @@ export class AppController {
     if (imported !== null) remove(KEYS.importReport);
     const errors = this.ui.get().startupErrors;
     const broken = errors.length ? `Couldn't compile your saved scene(s): ${errors.join(', ')} — kept in the library under "Doesn't compile here"` : '';
+    if (errors.length) this.log.app('error', `Couldn't compile your saved scene(s): ${errors.join(', ')}`);
     const notes = [takeRenameReport(), broken].filter(Boolean).map((n) => `${n}.`).join(' ');
     if (imported !== null) this.toast(`Imported ${imported}.${notes ? ` ${notes}` : ''}`, notes ? 9000 : 5000);
     else if (notes) this.toast(notes, 6000);
@@ -388,9 +394,9 @@ export class AppController {
   resetWidget(id: L.WidgetId): void { this.setLayout(L.resetWidget(this.layout.get(), id)); }
   setWidgetOpen(id: L.WidgetId, open: boolean): void { this.setLayout(L.setOpen(this.layout.get(), id, open)); }
   moveBubble(rect: L.Rect): void { this.setLayout(L.moveBubble(this.layout.get(), rect, viewport())); }
-  // The Hearing monitor floats where it was dropped; reset puts it back in its corner under the performance monitor.
-  moveHearingMonitor(rect: L.Rect): void { this.setLayout(L.moveHearing(this.layout.get(), rect, viewport())); }
-  resetHearingMonitor(): void { this.setLayout(L.resetHearing(this.layout.get())); }
+  // A monitor (the Hearing monitor, the System log) floats where it was dropped; reset puts it back in the monitors' corner.
+  moveMonitor(id: L.MonitorId, rect: L.Rect): void { this.setLayout(L.moveMonitor(this.layout.get(), id, rect, viewport())); }
+  resetMonitor(id: L.MonitorId): void { this.setLayout(L.resetMonitor(this.layout.get(), id)); }
   // Hiding the assistant's bubble closes the chat too (I still opens it).
   setBubbleShown(shown: boolean): void {
     this.setLayout(L.setBubbleShown(this.layout.get(), shown));
@@ -483,6 +489,7 @@ export class AppController {
     c.transitionStart = c.clock;
     c.sceneStart = c.clock;
     c.beatsInScene = 0;
+    this.log.app('info', `Scene: ${scene.name}${fade ? '' : ' (cut)'}`);
     this.publishScene();
     this.showParams();
   }
@@ -667,6 +674,7 @@ export class AppController {
 
   private sourceFailed(err: unknown): void {
     const e = err as Error;
+    this.log.app('warn', `The music didn't start: ${e.name}: ${e.message || String(err)}`);
     if (e.name === 'NotAllowedError') this.toast('Permission denied or capture cancelled.');
     else this.toast(e.message || String(err));
   }
@@ -686,6 +694,7 @@ export class AppController {
     try {
       await this.music.play(src, label, sourceButton, { hasQueue: !!this.queueFor(sourceButton)?.hasQueue });
     } catch (err) {
+      this.log.app('error', `Couldn't play "${label}": ${(err as Error).message}`);
       this.toast(`Couldn't play this: ${(err as Error).message}`);
     }
   }
@@ -696,6 +705,7 @@ export class AppController {
   private sourceStarted(source: SourceButton): void {
     if (source !== 'media' && this.mediaSound) this.setMediaSound(false, { quiet: true });   // another source is the music now
     this.ui.set({ started: true });
+    this.log.app('info', `Music: ${source} · ${this.ui.get().nowText}`);
     document.body.classList.add('started');
     if (!readFlag(KEYS.helpHint)) { writeFlag(KEYS.helpHint, true); this.toast('Press ? for help & shortcuts', 4000); }
     this.listener.reset();
@@ -716,6 +726,7 @@ export class AppController {
       await this.media.load(source);
     } catch (err) {
       if (err instanceof StaleMediaLoad) return;   // the user picked something else (or cleared) meanwhile
+      this.log.app('error', `Couldn't load the media: ${(err as Error).message}`);
       return this.toast((err as Error).message, 6000);
     }
     this.output.sendMedia(source);
@@ -725,6 +736,7 @@ export class AppController {
     const mediaScene = this.state.scenes.findIndex((s) => s.cat === 'Media' && !s.removed);
     if (!this.renderer.usesMedia(this.state.clock.scene)) this.setScene(mediaScene);
     const what = this.media.kind === 'video' ? 'Video' : 'Image';
+    this.log.app('info', `${what} loaded: ${this.media.size.join('×')}`);
     this.toast(mediaScene >= 0
       ? `${what} loaded — ${this.state.scenes[mediaScene]!.name} draws it (library → Media). In code, sample it with media(p).`
       : `${what} loaded. In a scene's code, sample it with media(p).`, 5000);
@@ -801,6 +813,7 @@ export class AppController {
 
   exportSettings(): void {
     this.downloadSettings(`hallucinate-${fileStamp()}.json`);
+    this.log.app('info', 'Exported your scenes & settings');
     this.toast('Exported your scenes & settings');
   }
 
@@ -817,7 +830,7 @@ export class AppController {
     let text: string;
     try { text = await file.text(); } catch { return this.toast(`Couldn't read "${file.name}".`); }
     const parsed = parseBundle(text);
-    if (!parsed.ok) return this.toast(parsed.error, 7000);
+    if (!parsed.ok) { this.log.app('error', `Import of "${file.name}" refused: ${parsed.error}`); return this.toast(parsed.error, 7000); }
     const { writes, summary } = parsed.bundle;
     if (!confirm(`Import "${file.name}"?\n\nIt replaces your ${summary}.\n\nYour current setup is downloaded first as a backup. The app reloads, and other open Hallucinate tabs reload too.`)) return;
     this.downloadSettings(`hallucinate-before-import-${fileStamp()}.json`);
@@ -826,6 +839,7 @@ export class AppController {
       applyWrites([...writes, [KEYS.importReport, summary], [KEYS.importedAt, String(Date.now())]]);
     } catch (err) {
       unfreeze();
+      this.log.app('error', `Import failed: ${(err as Error).message}`);
       return this.toast(`Import failed: ${(err as Error).message} Nothing was changed.`, 7000);
     }
     location.reload();
@@ -847,11 +861,32 @@ export class AppController {
       downloadFile(blob, `hallucinate-${fileStamp()}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`);
       this.recorder = null;
       this.ui.set({ recording: false });
-      if (!this.disposed) this.toast('Recording saved');
+      if (!this.disposed) { this.toast('Recording saved'); this.log.app('info', `Recording saved (${(blob.size / 1e6).toFixed(1)} MB)`); }
     };
     recorder.start(1000);
     this.ui.set({ recording: true });
     this.toast('Recording… press C or click "Stop rec" to save');
+  }
+
+  // ---------- System log ----------
+
+  // Shift+S: the System log. Opening it sees the errors the badge counted.
+  toggleSystemLog(on = !this.ui.get().systemLog): void {
+    this.log.watch(on);
+    this.ui.set({ systemLog: on });
+  }
+
+  private logOutputs(n: number): void {
+    if (n === this.loggedOutputs) return;
+    this.log.app('info', n > this.loggedOutputs ? `Projector connected (${n} open)` : `Projector closed (${n} open)`);
+    this.loggedOutputs = n;
+  }
+
+  // A tempo heard after none, and a tempo forgotten: the System log's tempo lines.
+  private logTempo(bpm: number | null): void {
+    if ((bpm === null) === (this.loggedBpm === null)) return;
+    this.log.app('info', bpm === null ? 'Tempo lost: no kicks for a long while' : `Tempo: ${bpm.toFixed(1)} BPM`);
+    this.loggedBpm = bpm;
   }
 
   // ---------- Performance ----------
@@ -965,6 +1000,7 @@ export class AppController {
     this.hooks.onFrame?.(dt, p);
     this.profiler.lap(Stage.studio);
 
+    this.logTempo(f.bpm);
     if (++this.meterTick % 2 === 0) {
       const tone = toneWord(f.bright);
       const moodLabel: MoodLabel = !this.music.playing ? '' : `mood: ${moodWord(f.mood)}`;

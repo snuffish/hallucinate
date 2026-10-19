@@ -14,6 +14,7 @@ import { HelpLayer } from '../components/Help';
 import { Library } from '../components/Library';
 import { PerfOverlay } from '../components/PerfOverlay';
 import { HearingMonitor } from '../components/HearingMonitor';
+import { LogBadge, SystemLog } from '../components/SystemLog';
 import { Settings } from '../components/Settings';
 import { SoundCloudPicker, YouTubePicker } from '../components/Pickers';
 import { StartScreen } from '../components/StartScreen';
@@ -93,6 +94,8 @@ function Shell({ app }: { app: AppController }) {
       <div className="monitors">
         <PerfOverlay />
         <HearingMonitor />
+        <SystemLog />
+        <LogBadge />
       </div>
       <Toast />
       <HelpLayer />
@@ -130,6 +133,7 @@ function Hotkeys() {
     resetLayout: () => app.resetLayout(),
     perf: () => app.togglePerf(),
     hearingMonitor: () => app.toggleHearingMonitor(),
+    systemLog: () => app.toggleSystemLog(),
     fullscreen: () => app.toggleFullscreen(),
     record: () => app.toggleRecording(),
     help: () => app.toggleHelp('sheet'),

@@ -6,6 +6,7 @@ import { createAssistant } from './assistant';
 import { CliBridge } from './cli-bridge';
 import { defaultConfigPath, fileConfigStore, type ConfigStore } from './config';
 import { guarded, type Handler } from './guard';
+import { createLogRoute, logged } from './log';
 import { programs } from './programs';
 import { createSettingsRoute } from './settings-route';
 import { createBridge, SITES } from './ytdlp-bridge';
@@ -23,7 +24,7 @@ export interface RouteOptions {
 export function apiRoutes({ env = {}, config = fileConfigStore(defaultConfigPath()) }: RouteOptions = {}): [prefix: string, handler: Handler][] {
   const { claudeBin, ytdlp, ytdlpCacheBytes } = programs();
   const assistant = assistantConfig(config, { claudeBin });
-  return [
+  const routes: [string, Handler][] = [
     ...Object.keys(SITES).map((site): [string, Handler] => [`/api/${site}`, guarded(createBridge(site as keyof typeof SITES, { ytdlp, env, cacheBytes: ytdlpCacheBytes }))]),
     ['/api/assistant', guarded(createAssistant(assistant, new CliBridge({ claudeBin })))],
     ['/api/settings', guarded(createSettingsRoute(config, {
@@ -31,4 +32,6 @@ export function apiRoutes({ env = {}, config = fileConfigStore(defaultConfigPath
       paths: { claudeBin, ytdlp },
     }))],
   ];
+  // Every request is a line in the System log, except the log's own stream (it would only talk about itself).
+  return [...routes.map(([prefix, handler]): [string, Handler] => [prefix, logged(handler)]), ['/api/log', guarded(createLogRoute())]];
 }

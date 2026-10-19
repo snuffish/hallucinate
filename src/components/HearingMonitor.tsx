@@ -1,17 +1,13 @@
-import { useRef } from 'react';
-import { useApp, useLayout, useUI } from '../app/AppContext';
+import { useUI } from '../app/AppContext';
 import type { HearingDiagnostics, TempoState } from '../engine/listener';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
-import { effective } from '../state/layout';
 import type { HearingView, Latency } from '../state/ui-state';
 import { HelpButton } from './Help';
 import { HearingWorkbench } from './HearingWorkbench';
 import { Plot, type Draw } from './HearingPlot';
 import { COLOURS } from './hearing-workbench';
-import { rectOf } from './widgets/drop';
-import { usePointerDrag } from './widgets/usePointerDrag';
-import { useFloatPlacement, useNarrow } from './widgets/Widget';
+import { useMonitorDrag } from './widgets/useMonitorDrag';
 
 const BAND_EDGES_HZ = [25, 140, 2000, 12000];   // the Listener's bands: bass, mid, high
 const BAND_NAMES = ['bass', 'mid', 'high'];       // between those edges
@@ -109,58 +105,8 @@ export function HearingMonitor() {
   return <HearingPanel view={view} />;
 }
 
-// What takes a press itself instead of moving the monitor: its buttons and chips, the what-if slider, a link.
-const OWN_PRESS = 'button, input, select, a';
-const ownsPress = (e: React.MouseEvent) => !!(e.target as HTMLElement).closest(OWN_PRESS);
-// A press on the monitor's scrollbar (when it scrolls) drags the scrollbar, not the monitor.
-const onScrollbar = (e: React.PointerEvent<HTMLElement>) => e.clientX >= e.currentTarget.getBoundingClientRect().left + e.currentTarget.clientLeft + e.currentTarget.clientWidth;
-
-// In the monitors' corner until dragged, by any part that doesn't take the press itself; then where it was dropped
-// (stored in the layout), until a double-click on such a part puts it back. Phones keep it in the corner.
-function useDragToMove() {
-  const app = useApp();
-  const root = useRef<HTMLDivElement>(null);
-  const narrow = useNarrow();
-  const place = useLayout((l) => effective(l, narrow).hearing);
-  useFloatPlacement(root, place.kind === 'float' ? place : null);
-  const drag = useRef<{ dx: number; dy: number; style: string } | null>(null);
-  const restore = () => {
-    const el = root.current;
-    if (el && drag.current) el.style.cssText = drag.current.style;
-    drag.current = null;
-    app.setDragging(null);
-  };
-  const handlers = usePointerDrag({
-    onStart: (_e, grab) => {
-      const el = root.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      drag.current = { dx: grab.x, dy: grab.y, style: el.style.cssText };   // `grab`: where it was pressed
-      Object.assign(el.style, { position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, maxHeight: `${r.height}px` });
-      app.setDragging('hearing');
-    },
-    onMove: (e) => {
-      const el = root.current, d = drag.current;
-      if (!el || !d) return;
-      el.style.left = `${Math.min(Math.max(0, e.clientX - d.dx), window.innerWidth - el.offsetWidth)}px`;
-      el.style.top = `${Math.min(Math.max(0, e.clientY - d.dy), window.innerHeight - el.offsetHeight)}px`;
-    },
-    onEnd: () => {
-      const el = root.current;
-      if (!el || !drag.current) return restore();
-      const rect = rectOf(el);
-      restore();
-      app.moveHearingMonitor(rect);
-    },
-    onCancel: restore,
-  }, { enabled: !narrow });
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => { if (!onScrollbar(e)) handlers.onPointerDown(e); };
-  const onDoubleClick = (e: React.MouseEvent) => { if (place.kind === 'float' && !ownsPress(e)) app.resetHearingMonitor(); };
-  return { root, moved: place.kind === 'float', narrow, onPointerDown, onClickCapture: handlers.onClickCapture, onDoubleClick };
-}
-
 function HearingPanel({ view }: { view: HearingView }) {
-  const { root, moved, narrow, ...drag } = useDragToMove();
+  const { root, moved, narrow, ...drag } = useMonitorDrag('hearing');
   const dragging = useUI((ui) => ui.dragging === 'hearing');
   const { diagnostics: d } = view;
   const t = d.tempo, fps = frameRateLabel(d.frameRate);
