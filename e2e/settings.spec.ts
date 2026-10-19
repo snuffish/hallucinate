@@ -82,9 +82,13 @@ test('two tabs stay in step: a change in one is not undone by the other', async 
   await other.locator('#settings-tab-interface').click();
   await expect(other.locator('#pref-idle')).toHaveValue('10');
   await other.locator('#pref-kbd').uncheck();
-  await other.close();   // flushes its writer on pagehide
+  // Stored by its own writer, not the pagehide flush on close: on a loaded CI runner Chromium can tear the
+  // tab down before that runs. 15 s: with two tabs rendering, an evaluate can wait seconds for the page.
+  const both = { idleHideSeconds: 10, showKeyBadges: false };
+  await expect.poll(() => storedPrefs(other), { timeout: 15_000 }).toMatchObject(both);
+  await other.close();
 
-  await expect.poll(() => storedPrefs(page)).toMatchObject({ idleHideSeconds: 10, showKeyBadges: false });
+  await expect.poll(() => storedPrefs(page), { timeout: 15_000 }).toMatchObject(both);
   await expect(page.locator('#pref-kbd')).not.toBeChecked();
 });
 
