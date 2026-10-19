@@ -461,6 +461,19 @@ describe('what the Hearing monitor is shown', () => {
     }
   });
 
+  it('keeps the kick signal in step with its kicks while nothing is heard (paused, nothing connected)', () => {
+    const l = new Listener();
+    l.watch(true);
+    listen(l, music({ bpm: 124 }), 10);
+    listen(l, null, 2, { start: 10, playing: false });
+    const { kicks } = l.diagnostics()!;
+    expect(kicks.kicks.length).toBeGreaterThan(0);
+    for (const ago of kicks.kicks) {
+      const i = kicks.rises.length - 1 - Math.round(ago / kicks.cell);
+      expect(Math.max(...kicks.rises.slice(Math.max(0, i - 2), i + 3)), `the kick ${ago.toFixed(2)} s ago`).toBeGreaterThanOrEqual(kicks.threshold);
+    }
+  });
+
   it('shows the tempos the kick signal could be, the one heard standing out once preferred like the Listener prefers it', () => {
     const l = new Listener();
     l.watch(true);

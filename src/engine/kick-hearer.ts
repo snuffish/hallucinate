@@ -163,8 +163,10 @@ export class KickHearer {
   get lastKickAt(): number { return this.lastKick.at; }
 
   signal(now: number): KickSignal {
+    // The cells gone by since the last frame (none came: paused, nothing connected): nothing rose in them.
     const n = this.cells, rises = new Float32Array(n);
-    for (let k = 0; k < Math.min(this.filled, n); k++) rises[n - 1 - k] = this.riseAgo(k);
+    const since = this.cell < 0 ? n : Math.max(0, Math.floor(now / RISES_CELL) - this.cell);
+    for (let k = since; k < Math.min(this.filled + since, n); k++) rises[n - 1 - k] = this.riseAgo(k - since);
     const p = this.period, due: number[] = [];
     if (p > 0) for (let t = this.due; t > now - RISES_HISTORY; t -= p) due.push(now - t);
     return {
