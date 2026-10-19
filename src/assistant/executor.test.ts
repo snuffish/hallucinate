@@ -302,11 +302,12 @@ describe('scene code and parameter tools', () => {
     expect(out.scenes).toEqual({ Fractal: 'Alpha (mine), Beta*', Mine: 'Maker (visual maker)' });
   });
 
-  it('get_app_state reports the switches, the effects and, while music plays, the live levels', async () => {
+  it('get_app_state reports the switches, the locks, the effects and, while music plays, the live levels', async () => {
     const { run, app } = setup();
     app.state.effects = [{ id: 'mirror', on: true, settings: { axis: 0 } }];
+    app.state.look.locked = ['hue'];
     const out = await run('get_app_state', {}) as { look: Record<string, unknown>; effects: unknown; listening: unknown; livePinned?: unknown };
-    expect(out.look).toMatchObject({ autoSwitch: true, drift: false, driftSpeed: 1, randomizePicksScene: false });
+    expect(out.look).toMatchObject({ autoSwitch: true, drift: false, driftSpeed: 1, randomizePicksScene: false, locked: ['hue'] });
     expect(out.effects).toEqual([{ id: 'mirror', on: true, settings: { axis: 0 } }]);
     expect(out.listening).toBeNull();   // nothing plays
     expect(out.livePinned).toBeUndefined();

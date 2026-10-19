@@ -112,6 +112,14 @@ _Avoid_: colour grade (that is what it does)
 The Look sliders wandering to random values on their own, each at its own pace, within the Randomize ranges.
 _Avoid_: auto-look, wander
 
+**Lock**:
+A Look slider that Randomize, Shift+R and Drift leave alone. A take, the assistant and your hand still move it.
+_Avoid_: pin (that is Live's), freeze, hold
+
+**XY pad**:
+A square in the Look widget that moves two Look sliders at once, one across and one up, picked per pad.
+_Avoid_: XY controller, joystick, 2D slider
+
 **Laser palette**:
 The wheel of pure, fully saturated colours that the built-in scenes colour their lines from. Your own scenes can use
 it, or the softer rainbow.

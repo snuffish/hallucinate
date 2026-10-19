@@ -41,7 +41,7 @@ const lookKeys = ['hue', 'cycle', 'trails', 'speed', 'reactivity', 'aberration',
 export const TOOLS = [
   tool({
     name: 'get_app_state',
-    description: 'Get what is on screen now: the playing scene (name, kind, description, live parameters with their ranges and values), the look sliders and switches (autoSwitch: whether the screen moves to another scene by itself; drift: whether the sliders wander), the main screen\'s effects (in the order they run), the audio source, BPM, mood and tone, the live levels while music plays (energy, bass, mid, high, 0-1), whether media is loaded, whether Live is pinned and what the screen shows then, and every scene name by category (a mark after a name: * edited by the user, (mine), (visual maker); unmarked ones are built-in). Call this when you need to know the current situation or the exact scene names.',
+    description: 'Get what is on screen now: the playing scene (name, kind, description, live parameters with their ranges and values), the look sliders and switches (autoSwitch: whether the screen moves to another scene by itself; drift: whether the sliders wander; locked: the sliders Randomize and Drift leave alone), the main screen\'s effects (in the order they run), the audio source, BPM, mood and tone, the live levels while music plays (energy, bass, mid, high, 0-1), whether media is loaded, whether Live is pinned and what the screen shows then, and every scene name by category (a mark after a name: * edited by the user, (mine), (visual maker); unmarked ones are built-in). Call this when you need to know the current situation or the exact scene names.',
     inputSchema: z.object({}),
     outputSchema: record,
     running: () => 'Looking around',

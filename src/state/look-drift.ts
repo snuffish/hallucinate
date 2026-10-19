@@ -1,6 +1,7 @@
 // Drift: the Look sliders wander on their own. Each one glides (eased in and out) to a random value
 // within the same watchable range Randomize uses, then picks the next, each at its own pace, so the
-// look keeps changing without ever jumping. Runs in the frame loop: no allocation per frame.
+// look keeps changing without ever jumping. A locked slider stays where it is. Runs in the frame loop: no
+// allocation per frame.
 
 import type { FrameLook } from '../engine/look';
 import type { Look } from './app-state';
@@ -43,9 +44,11 @@ export class LookDrift {
   // Forget the glides in progress, so the next step starts from the sliders as they are now.
   reset(): void { this.lanes.clear(); }
 
-  // Advance every slider by `dt` seconds at `speed` (1 = normal). Writes into `look`.
-  step(look: Look, dt: number, speed: number): void {
+  // Advance every slider but the `locked` ones by `dt` seconds at `speed` (1 = normal). Writes into `look`.
+  // A locked slider forgets its glide, so once unlocked it glides on from where it is.
+  step(look: Look, dt: number, speed: number, locked: readonly DriftKey[] = []): void {
     for (const key of DRIFT_KEYS) {
+      if (locked.includes(key)) { this.lanes.delete(key); continue; }
       let lane = this.lanes.get(key);
       // A new lane, or the user moved the slider since the last step: glide on from where it is.
       if (!lane || look[key] !== lane.written) {

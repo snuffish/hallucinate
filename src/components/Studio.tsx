@@ -7,6 +7,7 @@ import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
 import { useSessions } from '../app/sessions';
 import { AUTO_BEATS, AUTO_SECONDS, type AutoUnit, type Cue } from '../app/studio';
 import { DIRECTOR_BEATS, DIRECTOR_SECONDS } from '../director/director';
+import { laserCss } from '../engine/laser-colour';
 import { HOTKEYS, CUE_DIGITS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { useStore } from '../state/store';
@@ -121,7 +122,7 @@ export function Studio() {
                 onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) studio.setPreview(cue); }}
                 onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) studio.take(cue); }}>
                 {n < 9 ? <Kbd hotkey={CUE_DIGITS[n]!} title={`Preview cue ${n + 1}`} /> : <kbd>·</kbd>}
-                <i className="cue-swatch" style={{ background: `hsl(${Math.round(((cue.look.hue ?? 0) % 1) * 360)} 80% 60%)` }} />
+                <i className="cue-swatch" style={{ background: laserCss(cue.look.hue ?? 0) }} />
                 <div className="cue-text">
                   <strong>{cue.name}</strong>
                   <span>{missing(cue) ? `missing scene "${cue.scene}"` : cue.scene}</span>

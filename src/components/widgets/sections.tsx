@@ -6,8 +6,10 @@ import { useApp, useUI } from '../../app/AppContext';
 import { STATIC_DEMO } from '../../app/static-demo';
 import { HOTKEYS } from '../../hotkeys/registry';
 import { Kbd } from '../../hotkeys/Kbd';
-import { LOOK_RANGES, type LookKey, type SourceButton } from '../../state/app-state';
+import { SLIDER_KEYS, type SliderKey, type SourceButton } from '../../state/app-state';
 import { SOURCES } from '../StartScreen';
+import { LookSlider } from './LookSlider';
+import { XYPad } from './XYPad';
 
 export interface PanelActions {
   onSource: (kind: SourceButton) => void;
@@ -140,28 +142,25 @@ export function ScreenBody() {
   );
 }
 
-const SLIDERS: { key: LookKey; label: string; hint?: string }[] = [
-  { key: 'reactivity', label: 'Reactivity' },
-  { key: 'speed', label: 'Speed' },
-  { key: 'trails', label: 'Trails' },
-  { key: 'hue', label: 'Colour' },
-  { key: 'cycle', label: 'Colour cycling' },
-  { key: 'synesthesia', label: 'Synesthesia', hint: 'dark sound → dim & cool · bright sound → light & warm · energetic mood → vivid & warm' },
-];
-
+// The Look widget: its XY pads (each moves two sliders), then every slider as a row, then Drift.
 export function LookBody() {
   const app = useApp();
   const look = useUI((ui) => ui.look);
-  const slider = (key: LookKey) => {
-    const r = LOOK_RANGES[key];
-    return <input type="range" id={key} min={r.min} max={r.max} step={r.step} value={look[key]} onChange={(e) => app.setLook(key, Number(e.target.value))} />;
-  };
+  // The XY pad axis each slider is also on: "1↔" is pad 1 across.
+  const tags = new Map<SliderKey, string[]>();
+  if (look.xyOpen) look.xy.forEach((a, i) => { for (const [k, arrow] of [[a.x, '↔'], [a.y, '↕']] as const) tags.set(k, [...(tags.get(k) ?? []), `${i + 1}${arrow}`]); });
   return (
     <>
-      {SLIDERS.map((s) => <label key={s.key}>{s.label} {s.hint && <small>{s.hint}</small>}{slider(s.key)}</label>)}
-      <label>Fringing {slider('aberration')}</label>
+      <button type="button" id="xy-toggle" className="look-xy-toggle" aria-expanded={look.xyOpen} onClick={() => app.setLookFlag('xyOpen', !look.xyOpen)}>
+        {look.xyOpen ? '▾' : '▸'} XY pads
+      </button>
+      {look.xyOpen && <div className="look-xy">{look.xy.map((axes, i) => <XYPad key={i} index={i} axes={axes} />)}</div>}
+      {SLIDER_KEYS.map((k) => (
+        <LookSlider key={k} k={k} value={look[k]} lock={look.locked.includes(k)}
+          tag={tags.has(k) && <em className="look-tag" title="Also on this XY pad axis">{tags.get(k)!.join(' ')}</em>} />
+      ))}
       <label className="toggle"><input type="checkbox" id="drift" checked={look.drift} onChange={(e) => app.setLookFlag('drift', e.target.checked)} /> Drift <small>sliders glide to random values, each at its own pace</small></label>
-      {look.drift && <label>Drift speed {slider('driftSpeed')}</label>}
+      {look.drift && <LookSlider k="driftSpeed" value={look.driftSpeed} />}
     </>
   );
 }

@@ -37,7 +37,7 @@ test('randomize: rolls the look without changing scene unless the random-scene b
   await page.locator('#auto').uncheck();   // auto-switch must not change the scene under the test
   await expect(page.locator('#random-scene')).not.toBeChecked();
   await expect(page.locator('#mood')).toHaveCount(0);   // mood always feeds Synesthesia: no toggle to flip
-  await expect(page.locator('#w-look')).toContainText('energetic mood');
+  await expect(page.locator('#w-look label[for="synesthesia"]')).toHaveAttribute('title', /energetic mood/);
 
   const scene = await page.locator('#scene-name').textContent();
   const before = await lookValues(page);

@@ -75,6 +75,7 @@ export interface UIState {
   sceneName: string;        // "3 · Ring Run"
   sceneVersion: number;     // bumps when the scene list changes (add/remove/edit), for lists
   look: Look;
+  liveHue: number;          // the hue on screen now (Colour plus how far cycling has walked), 0–1, for the Colour swatch
   effects: EffectStack;     // the main screen's effects (the Effects widget)
   meters: Meters;
   bpm: number | null;
@@ -116,6 +117,7 @@ export const initialUIState = (look: Look): UIState => ({
   sceneName: '',
   sceneVersion: 0,
   look,
+  liveHue: look.hue,
   effects: NO_EFFECTS,
   meters: { bass: 0, mid: 0, high: 0, bright: 0.5, beat: 0 },
   bpm: null,

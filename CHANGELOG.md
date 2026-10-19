@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — a more customizable Look (2026-10-20)
+
+### Added
+
+- Every **Look** slider shows its value (Reactivity, Trails, Synesthesia and Fringing in %, Colour in degrees,
+  Speed and Colour cycling as ×). Click the value to type one; double-click a slider to put it back.
+- **Fine tuning** on every Look control: Shift while dragging moves ten times finer, even when pressed halfway
+  through a drag; the wheel steps a slider once it has focus (Shift: one step), and so do the arrow keys.
+- Two **XY pads** above the sliders, each moving two of them at once, one across and one up, picked per pad
+  (Speed and Reactivity, Colour and Colour cycling to start). A tag on a slider says which pad axis it is also on.
+  The pads fold away.
+- A **lock** beside each slider keeps Randomize, Shift+R and Drift off it. `get_app_state` tells the assistant
+  which are locked.
+- A dot beside **Colour** shows the colour on screen now, cycling included.
+
+### Changed
+
+- The Look stays as you left it the next time the app opens: sliders, locks, switches and pads (stored on this
+  computer, not exported; show scenes still carry their own look).
+- Synesthesia's explanation moved from under its label to its tooltip and the help.
+- The studio's cue swatches show the laser palette's colour for the cue's hue.
+
 ## Unreleased — System log (2026-10-19)
 
 ### Added

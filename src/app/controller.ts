@@ -15,7 +15,7 @@ import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, 
 import { Renderer, type ProgramState } from '../engine/renderer';
 import { readInputs, silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
 import { userSceneId, type Scene } from '../scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type LookKey, type SourceButton } from '../state/app-state';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, SLIDER_KEYS, defaultClock, defaultLook, type AppState, type LookKey, type SliderKey, type SourceButton, type XYAxes } from '../state/app-state';
 import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
@@ -24,6 +24,7 @@ import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, ty
 import { SceneHistory } from '../state/scene-history';
 import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
 import { takeRenameReport } from '../state/scene-renames';
+import { loadLook, lookWriter } from '../state/look-store';
 import { loadScreenEffects, screenEffectsWriter } from '../state/screen-effects';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HearingView, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
@@ -36,7 +37,8 @@ import { SceneLibrary, type SceneChange } from './scene-library';
 import { Transport } from './transport';
 
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
-const DRIFT_PUBLISH_FRAMES = 6;
+const LOOK_PUBLISH_FRAMES = 6;
+const fract = (x: number): number => x - Math.floor(x);   // the Look widget follows Drift and the hue on screen at ~10 Hz
 const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second, however slow the frames
 const HEARING_PUBLISH_FRAMES = 4;   // the Hearing monitor follows at ~15 Hz: its lights and traces move
 
@@ -113,7 +115,7 @@ export class AppController {
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly drift = new LookDrift();
-  private driftFrames = 0;
+  private lookFrames = 0;
   private readonly beforeRandom: { look: Record<DriftKey, number>; scene: number }[] = [];   // Shift+R steps back through these
   private toastKey = 0;
   private readonly downloads = new Map<'sc' | 'yt', DownloadView>();
@@ -121,6 +123,7 @@ export class AppController {
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly effectsWriter = screenEffectsWriter(() => this.state.effects);
+  private readonly lookWriter = lookWriter(() => this.state.look);
   // While a show scene crossfades in on the main screen, the stack the outgoing picture keeps; null once the
   // crossfade ends (or on a manual scene change), when the outgoing picture draws with the screen's own.
   private outgoingEffects: Effects.EffectStack | null = null;
@@ -194,7 +197,7 @@ export class AppController {
     this.paramStore = new ParamStore();
     this.state = {
       scenes: list.scenes, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
-      look: defaultLook(), effects: loadScreenEffects(), clock: defaultClock(), activeSource: null,
+      look: loadLook(), effects: loadScreenEffects(), clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
     this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, effects: this.state.effects });
@@ -269,6 +272,7 @@ export class AppController {
     this.layoutWriter.dispose();
     this.prefsWriter.dispose();
     this.effectsWriter.dispose();
+    this.lookWriter.dispose();
     this.transport.dispose();
     this.output.dispose();
     this.paramStore.dispose();
@@ -612,13 +616,34 @@ export class AppController {
     const r = LOOK_RANGES[key];
     const v = Math.min(r.max, Math.max(r.min, value));
     this.state.look[key] = v;
-    this.ui.set({ look: { ...this.state.look } });
+    this.publishLook();
   }
 
-  setLookFlag(key: 'auto' | 'randomScene' | 'drift', value: boolean): void {
+  setLookFlag(key: 'auto' | 'randomScene' | 'drift' | 'xyOpen', value: boolean): void {
     if (key === 'drift' && value) this.drift.reset();   // start from the sliders as they are
     this.state.look[key] = value;
-    this.ui.set({ look: { ...this.state.look } });
+    this.publishLook();
+  }
+
+  // A locked slider is left alone by Randomize (and Shift+R) and Drift; a Take, the assistant and a hand
+  // still move it.
+  setLookLock(key: SliderKey, locked: boolean): void {
+    const now = this.state.look.locked;
+    this.state.look.locked = SLIDER_KEYS.filter((k) => (k === key ? locked : now.includes(k)));
+    this.publishLook();
+  }
+
+  // What XY pad `i` moves across and up.
+  setXYAxes(i: number, axes: XYAxes): void {
+    if (!this.state.look.xy[i] || axes.x === axes.y) return;
+    this.state.look.xy = this.state.look.xy.map((a, j) => (j === i ? { ...axes } : a));
+    this.publishLook();
+  }
+
+  // The Look changed: the widget shows it, and it's kept for the next start.
+  private publishLook(): void {
+    this.ui.set({ look: { ...this.state.look }, liveHue: fract(this.state.look.hue + this.state.clock.huePhase) });
+    this.lookWriter.schedule();
   }
 
   // ---------- Effects (the main screen's: they stay through scene changes, like the Look) ----------
@@ -644,22 +669,22 @@ export class AppController {
     return this.state.look.auto;
   }
 
-  // Rolls the Look widget's values, within ranges that stay watchable. The scene only changes when
-  // "Also pick a random scene" is on.
+  // Rolls the Look widget's values, within ranges that stay watchable, except the locked ones. The scene
+  // only changes when "Also pick a random scene" is on.
   randomize(): void {
     const look = this.state.look;
     this.beforeRandom.push({ look: Object.fromEntries(DRIFT_KEYS.map((k) => [k, look[k]])) as Record<DriftKey, number>, scene: this.state.clock.scene });
     if (this.beforeRandom.length > RANDOM_HISTORY) this.beforeRandom.shift();
-    for (const key of DRIFT_KEYS) { const [min, max] = RANDOM_RANGES[key]; this.setLook(key, min + Math.random() * (max - min)); }
+    for (const key of DRIFT_KEYS) if (!look.locked.includes(key)) { const [min, max] = RANDOM_RANGES[key]; this.setLook(key, min + Math.random() * (max - min)); }
     if (this.state.look.randomScene) this.nextRandomScene();
   }
 
-  // Shift+R: the look (and scene, if Randomize changed it) from before the last Randomize. Again for
-  // the one before that.
+  // Shift+R: the look (and scene, if Randomize changed it) from before the last Randomize, locked sliders
+  // aside. Again for the one before that.
   randomizeBack(): void {
     const prev = this.beforeRandom.pop();
     if (!prev) { this.toast('No earlier random look to go back to', 1500); return; }
-    for (const key of DRIFT_KEYS) this.setLook(key, prev.look[key]);
+    for (const key of DRIFT_KEYS) if (!this.state.look.locked.includes(key)) this.setLook(key, prev.look[key]);
     if (prev.scene !== this.state.clock.scene) this.setScene(prev.scene);
     const left = this.beforeRandom.length;
     this.toast(`Back to the previous look${left ? ` (${left} more)` : ''}`, 1500);
@@ -976,9 +1001,11 @@ export class AppController {
     const f = this.listener.hear(this.audio.read(), this.music.playing, elapsed, now / 1000);
     this.onBeats(f);
     this.profiler.lap(Stage.audio);
-    if (look.drift) {
-      this.drift.step(look, dt, look.driftSpeed);
-      if (++this.driftFrames % DRIFT_PUBLISH_FRAMES === 0) this.ui.set({ look: { ...look } });   // the sliders follow at ~10 Hz
+    if (look.drift) this.drift.step(look, dt, look.driftSpeed, look.locked);
+    if (++this.lookFrames % LOOK_PUBLISH_FRAMES === 0) {
+      const liveHue = fract(look.hue + c.huePhase);
+      if (look.drift) { this.ui.set({ look: { ...look }, liveHue }); this.lookWriter.schedule(); }
+      else if (liveHue !== this.ui.get().liveHue) this.ui.set({ liveHue });
     }
     if (this.state.activeSource === 'media') this.media.follow(this.player);
 

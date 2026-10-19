@@ -49,7 +49,11 @@ export const HELP_TOPICS = {
     body: [
       'These sliders apply to every scene: how strongly it reacts, how fast it moves, how long the afterglow of its trails lasts, its colour, and Fringing, how far each line splits into red, green and blue.',
       'Synesthesia grades the picture by the sound: dark sound goes dim and cool, bright sound light and warm, and an energetic mood more vivid. At 0 it is off.',
+      'Each slider shows its value: click it to type one (Enter sets it, Escape doesn\'t). Double-click a slider to put it back. Drag with Shift held for a ten times finer move, even halfway through a drag; once a slider has focus the wheel steps it (Shift: one step), and so do the arrow keys. The dot beside Colour is the colour on screen now, cycling included.',
+      'The XY pads each move two sliders at once, one across and one up: pick which with the menus above a pad. A tag on a slider (1↔, 2↕) says which pad axis it is also on. Drag on a pad to set both, Shift for finer; the wheel steps the one going up; double-click resets both. Fold the pads away with XY pads.',
+      'The lock beside a slider keeps Randomize, Shift+R and Drift off it. A show scene you take, the assistant and your own hand still move it.',
       'Drift lets the sliders glide to new random values (within the same laser-friendly ranges as Randomize) on their own, each at its own pace, for a look that keeps slowly changing; Drift speed sets how fast. Move a slider yourself and it drifts on from there.',
+      'The Look stays as you left it the next time the app opens.',
       'If the frame rate drops, lower Resolution in Settings → Display & performance.',
     ],
     hotkeys: ['randomize', 'randomizeBack', 'auto'],
