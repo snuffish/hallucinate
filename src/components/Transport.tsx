@@ -1,5 +1,5 @@
 // The player bar along the bottom of the screen, Media Player style: a thin seek line across its top edge,
-// what's playing on the left, the transport around a round play button in the middle (tempo and pitch in
+// what's playing on the left, the transport around a round play button in the middle (playback speed and pitch in
 // a popover off its chip), and the time and volume on the right. Shown while there is something to
 // control (a file, a SoundCloud track, a video's sound or the demo beat), and hides with the widgets.
 
@@ -60,7 +60,7 @@ export function PlayerBar() {
           <button id="tp-play" className="tp-play" title={`${t.playing ? 'Pause' : 'Play'} (Space)`} onClick={() => app.togglePlay()}><Icon d={t.playing ? ICONS.pause : ICONS.play} /><Kbd hotkey={HOTKEYS.playPause} /></button>
           <button id="tp-next" className="tp-file" title="Next track" disabled={!t.hasQueue} onClick={() => tr.next()}><Icon d={ICONS.next} /></button>
           <button id="tp-fwd" className="tp-file" title="Forward 10 s (Shift+→)" onClick={() => tr.skip(10)}><Icon d={ICONS.fwd} /><Kbd hotkey={HOTKEYS.seekFwd} /></button>
-          <TempoChip file={file} onChange={() => rerender((n) => n + 1)} />
+          <SpeedChip file={file} onChange={() => rerender((n) => n + 1)} />
         </div>
         <div className="tp-controls">
           <span className="tp-time tp-file"><time id="tp-cur">{formatTime(scrubbing === null ? t.currentTime : (scrubbing / 1000) * t.duration)}</time> / <time id="tp-dur">{t.duration ? formatTime(t.duration) : '–:––'}</time></span>
@@ -80,9 +80,9 @@ function Cover() {
   return <div className="tp-cover" aria-hidden="true" style={{ '--bass': bass } as React.CSSProperties} />;
 }
 
-// The tempo chip shows the rate; it opens a popover with the slider, a reset and Pitch follows tempo.
+// The playback speed chip shows the rate; it opens a popover with the slider, a reset and Pitch follows speed.
 // Native popover: light dismiss and Esc for free. Placed above the chip when it opens.
-function TempoChip({ file, onChange }: { file: boolean; onChange: () => void }) {
+function SpeedChip({ file, onChange }: { file: boolean; onChange: () => void }) {
   const tr = useApp().transport;
   const chip = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
@@ -103,18 +103,18 @@ function TempoChip({ file, onChange }: { file: boolean; onChange: () => void }) 
   return (
     <>
       <button ref={chip} id="tp-rate-val" className="tp-rate-val" popoverTarget="tp-tempo"
-        title={file ? 'Tempo ([ / ])' : `Tempo: ${Math.round(124 * tr.rate)} BPM ([ / ])`}>{tr.rate.toFixed(2)}×</button>
-      <div ref={pop} id="tp-tempo" className="tp-tempo" popover="auto" aria-label="Tempo">
+        title={file ? 'Playback speed ([ / ])' : `Playback speed: ${Math.round(124 * tr.rate)} BPM ([ / ])`}>{tr.rate.toFixed(2)}×</button>
+      <div ref={pop} id="tp-tempo" className="tp-tempo" popover="auto" aria-label="Playback speed">
         <div className="tp-tempo-row">
-          <span>Tempo</span>
-          <input type="range" id="tp-rate" min={0.5} max={2} step={0.01} value={tr.rate} aria-label="Tempo" title="Double-click to reset" style={{ '--p': `${((tr.rate - 0.5) / 1.5) * 100}%` } as React.CSSProperties}
+          <span>Playback speed</span>
+          <input type="range" id="tp-rate" min={0.5} max={2} step={0.01} value={tr.rate} aria-label="Playback speed" title="Double-click to reset" style={{ '--p': `${((tr.rate - 0.5) / 1.5) * 100}%` } as React.CSSProperties}
             onChange={(e) => setRate(Number(e.target.value))}
             onDoubleClick={() => setRate(1)} />
           <button id="tp-rate-reset" title="Reset to 1×" onClick={() => setRate(1)}>{tr.rate.toFixed(2)}×</button>
         </div>
         {file && (
           <label className="toggle tp-pitch">
-            <input type="checkbox" id="tp-pitch" checked={tr.pitchFollows} onChange={(e) => { tr.setPitchFollows(e.target.checked); onChange(); }} /> Pitch follows tempo <small>vinyl / nightcore style</small>
+            <input type="checkbox" id="tp-pitch" checked={tr.pitchFollows} onChange={(e) => { tr.setPitchFollows(e.target.checked); onChange(); }} /> Pitch follows speed <small>vinyl / nightcore style</small>
           </label>
         )}
       </div>

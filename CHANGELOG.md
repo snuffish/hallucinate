@@ -15,8 +15,8 @@
 
 ### Changed
 
-- `[` / `]` are listed as **Playback speed** −5 % / +5 %: they change how fast the music plays, not the tempo heard
-  in it.
+- The player's tempo chip and `[` / `]` are called **Playback speed** (and *Pitch follows speed*): they change how
+  fast the music plays, not the tempo heard in it.
 
 ## Unreleased — new scenes (2026-10-18)
 

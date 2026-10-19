@@ -1,6 +1,6 @@
 // The music player's logic, without its buttons: play/pause, stop, seek, ±10 s, previous/next track,
-// loop, volume and tempo over the <audio> element (tempo = playbackRate); the demo beat gets
-// play/pause, volume and tempo (its BPM). Volume and pitch mode are remembered.
+// loop, volume and playback speed over the <audio> element (playbackRate); the demo beat gets
+// play/pause, volume and playback speed (its BPM). Volume and pitch mode are remembered.
 
 import { z } from 'zod';
 import type { AudioEngine } from '../engine/audio';

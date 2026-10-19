@@ -36,8 +36,12 @@ test('hearing: the Hearing monitor and the performance monitor open together, on
   expect(hearing.y).toBeGreaterThanOrEqual(perf.y + perf.height);
 });
 
-test('hearing: the shortcut sheet lists it, and calls [ and ] the playback speed, not the tempo', async ({ page }) => {
+test('hearing: the shortcut sheet lists it, and it and the player call [ and ] the playback speed, not the tempo', async ({ page }) => {
   await start(page);
+  await expect(page.locator('#tp-rate-val')).toHaveAttribute('title', /^Playback speed: 124 BPM/);
+  await page.locator('#tp-rate-val').click();
+  await expect(page.getByRole('slider', { name: 'Playback speed' })).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.keyboard.press('?');
   const sheet = page.locator('#help-pop');
   await expect(sheet).toContainText('Hearing monitor');

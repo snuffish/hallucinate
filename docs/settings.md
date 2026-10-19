@@ -5,7 +5,7 @@
 Open Settings with **⚙** in the Hallucinate widget, **☰ → Settings…**, or the **,** key. Esc closes it.
 
 Settings hold how *this computer* renders, listens and shows the controls, and how the assistant reaches Claude. They
-are defaults, not live controls (the player keeps volume and tempo), with one exception: Display & performance is the
+are defaults, not live controls (the player keeps volume and playback speed), with one exception: Display & performance is the
 live control for how the picture renders, and a change there applies at once.
 Display, Audio and Interface are kept in this browser (or in the [desktop app](desktop.md)'s own profile), Assistant
 on the local server. None of them are in Export: a setup moved to a projector laptop shouldn't bring the GPU and
