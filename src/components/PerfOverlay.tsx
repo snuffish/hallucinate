@@ -2,6 +2,7 @@ import { useApp, useUI } from '../app/AppContext';
 import { STAGE_LABELS, type PerfReport } from '../engine/profiler';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
+import { HelpButton } from './Help';
 
 const ms = (v: number) => v.toFixed(1);
 
@@ -26,6 +27,7 @@ export function PerfOverlay() {
         <b>{Math.round(perf.fps)} fps</b>
         <span>frame {ms(perf.frameP50)} · p95 {ms(perf.frameP95)} ms</span>
         <span>budget {ms(perf.budget)} ms</span>
+        <HelpButton topic="perf" />
       </div>
       <div className={`perf-verdict ${perf.verdict.kind}`} data-kind={perf.verdict.kind}>{perf.verdict.text}</div>
       <table className="perf-cpu">

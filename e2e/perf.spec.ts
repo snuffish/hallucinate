@@ -29,6 +29,15 @@ test('perf: Shift+P shows where the frame time goes, and hides it again', async 
   expect(await report(page)).toBeNull();
 });
 
+test('perf: its ? explains the verdict, the stages and Test GPU', async ({ page }) => {
+  await start(page);
+  await page.keyboard.press('Shift+P');
+  await overlay(page).getByRole('button', { name: 'Help: Performance monitor' }).click();
+  const pop = page.locator('#help-pop');
+  await expect(pop).toBeVisible();
+  for (const words of ['budget', 'Draw calls', 'Test GPU', 'Resolution']) await expect(pop).toContainText(words);
+});
+
 test('perf: ?perf starts with it on and offers window.__profiler', async ({ page }) => {
   await start(page, '/?perf');
   await expect(overlay(page)).toBeVisible();

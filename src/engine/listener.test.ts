@@ -386,6 +386,190 @@ describe('Listener', () => {
   });
 });
 
+describe('what the Hearing monitor is shown', () => {
+  it('shows nothing while nobody watches', () => {
+    const l = new Listener();
+    listen(l, music({ bpm: 124 }), 10);
+    expect(l.diagnostics()).toBeNull();
+  });
+
+  it('shows a steady kick drum as heard, at its tempo, with high confidence', () => {
+    const l = new Listener();
+    l.watch(true);
+    listen(l, music({ bpm: 124 }), 20);
+    const { tempo } = l.diagnostics()!;
+    expect(tempo.state).toBe('hearing');
+    expect(tempo.bpm).toBeGreaterThan(123.5);
+    expect(tempo.bpm).toBeLessThan(124.5);
+    expect(tempo.confidence).toBeGreaterThan(0.6);
+  });
+
+  it('shows a breakdown as holding the tempo, its confidence draining while no kick confirms it', () => {
+    const l = new Listener();
+    l.watch(true);
+    listen(l, music({ bpm: 120 }), 15);
+    const confident = l.diagnostics()!.tempo.confidence;
+    const quiet = () => bins(() => 30);
+    listen(l, quiet, 1, { start: 15 });
+    expect(l.diagnostics()!.tempo.state).toBe('hearing');   // a missed kick or two is not a breakdown yet
+    listen(l, quiet, 3, { start: 16 });
+    const early = l.diagnostics()!.tempo;
+    listen(l, quiet, 4, { start: 19 });
+    const late = l.diagnostics()!.tempo;
+    expect(early.state).toBe('holding');
+    expect(late.state).toBe('holding');
+    expect(late.bpm).toBeCloseTo(120, 0);
+    expect(early.confidence).toBeLessThan(confident);
+    expect(late.confidence).toBeLessThan(early.confidence);
+  });
+
+  it('shows the tempo to a fraction of a BPM, and what the kicks gave before it was folded', () => {
+    const fast = new Listener();
+    fast.watch(true);
+    listen(fast, music({ bpm: 190 }), 20);
+    const folded = fast.diagnostics()!.tempo;
+    expect(folded.bpm).toBeCloseTo(95, 0);
+    expect(folded.heardBpm).toBeCloseTo(190, 0);
+
+    const between = new Listener();
+    between.watch(true);
+    listen(between, music({ bpm: 128.5 }), 30);
+    const { bpm, heardBpm } = between.diagnostics()!.tempo;
+    expect(bpm).toBeGreaterThan(128.2);
+    expect(bpm).toBeLessThan(128.8);
+    expect(heardBpm).toBe(bpm);   // nothing to fold
+  });
+
+  it('shows the last seconds of the kick signal: every kick rises past the threshold, inside a window where one was due', () => {
+    const l = new Listener();
+    l.watch(true);
+    listen(l, music({ bpm: 124 }), 20);
+    const { kicks } = l.diagnostics()!;
+    expect(kicks.rises.length * kicks.cell).toBeCloseTo(6, 5);
+    expect(kicks.kicks.length).toBeGreaterThanOrEqual(11);   // 12.4 beats in 6 s
+    expect(kicks.kicks.length).toBeLessThanOrEqual(13);
+    expect(kicks.ticks.length).toBeGreaterThanOrEqual(11);
+    expect(kicks.ticks.length).toBeLessThanOrEqual(13);
+    expect(kicks.threshold).toBeGreaterThan(0);
+    const riseAt = (ago: number) => {   // the strongest rise within two cells of `ago` seconds ago (rises run oldest first)
+      const i = kicks.rises.length - 1 - Math.round(ago / kicks.cell);
+      return Math.max(...kicks.rises.slice(Math.max(0, i - 2), i + 3));
+    };
+    for (const ago of kicks.kicks) {
+      expect(riseAt(ago)).toBeGreaterThanOrEqual(kicks.threshold);
+      expect(kicks.due.some((due) => Math.abs(due - ago) <= kicks.window)).toBe(true);
+    }
+  });
+
+  it('shows how many frames a second it hears, and none while no frames come', () => {
+    const fast = new Listener();
+    fast.watch(true);
+    listen(fast, music({ bpm: 124 }), 5, { fps: 60 });
+    expect(fast.diagnostics()!.frameRate).toBeCloseTo(60, 0);
+
+    const slow = new Listener();
+    slow.watch(true);
+    listen(slow, music({ bpm: 124 }), 5, { fps: 10 });
+    expect(slow.diagnostics()!.frameRate).toBeCloseTo(10, 0);
+
+    listen(slow, null, 3, { start: 5, fps: 10, playing: false });
+    expect(slow.diagnostics()!.frameRate).toBe(0);
+  });
+
+  it('shows how late the ticks land after their kicks: about a frame, later at a low frame rate', () => {
+    const fast = new Listener();
+    fast.watch(true);
+    expect(fast.diagnostics()!.tickLag).toBeNull();   // no kicks yet
+    listen(fast, music({ bpm: 124 }), 15, { fps: 60 });
+    const atSixty = fast.diagnostics()!.tickLag!;
+    expect(atSixty).toBeGreaterThanOrEqual(0);
+    expect(atSixty).toBeLessThanOrEqual(40);   // the kick is heard the frame after it peaks
+
+    const slow = new Listener();
+    slow.watch(true);
+    listen(slow, music({ bpm: 124 }), 15, { fps: 15 });
+    expect(slow.diagnostics()!.tickLag!).toBeGreaterThan(atSixty);
+  });
+
+  it('keeps the kick signal in step with its kicks while nothing is heard (paused, nothing connected)', () => {
+    const l = new Listener();
+    l.watch(true);
+    listen(l, music({ bpm: 124 }), 10);
+    listen(l, null, 2, { start: 10, playing: false });
+    const { kicks } = l.diagnostics()!;
+    expect(kicks.kicks.length).toBeGreaterThan(0);
+    for (const ago of kicks.kicks) {
+      const i = kicks.rises.length - 1 - Math.round(ago / kicks.cell);
+      expect(Math.max(...kicks.rises.slice(Math.max(0, i - 2), i + 3)), `the kick ${ago.toFixed(2)} s ago`).toBeGreaterThanOrEqual(kicks.threshold);
+    }
+  });
+
+  it('shows the tempos the kick signal could be, the one heard standing out once preferred like the Listener prefers it', () => {
+    const l = new Listener();
+    l.watch(true);
+    listen(l, music({ bpm: 124 }), 20);
+    const { candidates } = l.diagnostics()!;
+    expect(candidates.bpm.length).toBeGreaterThan(50);
+    expect(Math.min(...candidates.bpm)).toBeLessThanOrEqual(45);    // a pulse from 40 ...
+    expect(Math.max(...candidates.bpm)).toBeGreaterThanOrEqual(195); // ... to 200 BPM
+    const weighed = candidates.strength.map((s, i) => s * candidates.preference[i]!);
+    const best = candidates.bpm[weighed.indexOf(Math.max(...weighed))]!;
+    expect(best).toBeGreaterThan(121);
+    expect(best).toBeLessThan(127);
+    expect(candidates.clear).toBeGreaterThan(0);   // the strength it takes to hear a pulse at all ...
+    expect(Math.max(...candidates.strength)).toBeGreaterThanOrEqual(candidates.clear);   // ... which a steady kick drum has
+    // A kick grid repeats at twice its period too: 62 is a candidate nearly as strong, only preferred less.
+    const at = (bpm: number) => candidates.bpm.reduce((b, v, i) => (Math.abs(v - bpm) < Math.abs(candidates.bpm[b]! - bpm) ? i : b), 0);
+    expect(candidates.strength[at(62)]).toBeGreaterThan(candidates.strength[at(124)]! * 0.5);
+    expect(candidates.preference[at(62)]).toBeLessThan(candidates.preference[at(124)]!);
+  });
+
+  it('shows each band against its running average: a jump stands out, then becomes the new normal', () => {
+    const l = new Listener();
+    l.watch(true);
+    listen(l, () => bins(() => 60), 15);
+    listen(l, () => bins(() => 180), 0.2, { start: 15 });
+    const jump = l.diagnostics()!.bands;
+    for (const k of BAND_NAMES) {
+      expect(jump[k].level, k).toBeGreaterThan(jump[k].average + 0.2);
+      expect(jump[k].shown, k).toBeGreaterThan(0.5);
+    }
+    listen(l, () => bins(() => 180), 15, { start: 15.2 });
+    const steady = l.diagnostics()!.bands;
+    for (const k of BAND_NAMES) expect(steady[k].average, k).toBeCloseTo(steady[k].level, 1);
+  });
+
+  it('shows the spectrum exactly as it was heard, clipping and all', () => {
+    const l = new Listener();
+    l.watch(true);
+    const frame = bins((hz) => (hz < 300 ? 255 : 90));
+    l.hear(frame, true, 1 / 60, 0);
+    const spectrum = l.diagnostics()!.spectrum!;
+    frame.freq.fill(0);   // the analyser refills the same arrays next frame: what was shown stays
+    l.hear(frame, true, 1 / 60, 1 / 60);
+    expect(spectrum.bins).toEqual(bins((hz) => (hz < 300 ? 255 : 90)).freq);
+    expect(spectrum.binHz).toBeCloseTo(HZ, 5);
+    expect([spectrum.minDecibels, spectrum.maxDecibels]).toEqual([-100, -30]);
+  });
+
+  it('shows no confidence until there is a tempo to be sure of, though the kicks already repeat', () => {
+    const l = new Listener();
+    l.watch(true);
+    listen(l, music({ bpm: 124 }), 1.8);   // a pulse in the rises, but fewer kicks than a tempo takes
+    expect(l.diagnostics()!.tempo).toMatchObject({ state: 'none', confidence: 0 });
+  });
+
+  it('shows no tempo before any kick, and again on a new source', () => {
+    const l = new Listener();
+    l.watch(true);
+    listen(l, () => bins(() => 120), 5);
+    expect(l.diagnostics()!.tempo).toEqual({ bpm: null, heardBpm: null, confidence: 0, state: 'none' });
+    listen(l, music({ bpm: 124 }), 15, { start: 5 });
+    l.reset();
+    expect(l.diagnostics()!.tempo).toEqual({ bpm: null, heardBpm: null, confidence: 0, state: 'none' });
+  });
+});
+
 describe('the sound in words', () => {
   it('reads the mood and the tone in thirds', () => {
     expect([0, 0.34, 0.35, 0.65, 0.66, 1].map(moodWord)).toEqual(['calm', 'calm', 'groovy', 'groovy', 'energetic', 'energetic']);

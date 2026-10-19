@@ -23,6 +23,12 @@ _Avoid_: analyser, audio engine
 What the music sounds like right now: its bands, kicks, ticks, tempo, tone, energy and mood.
 _Avoid_: features, audio state
 
+**Hearing monitor**:
+An overlay that shows the hearing as it happens, why the Listener hears it that way, and the scene inputs the picture
+gets from it: the tempo and how sure it is, kicks and ticks as they land, the bands and the spectrum. It only shows,
+never changes anything.
+_Avoid_: audio monitor, analyser view, debug panel
+
 **Kick**:
 A clear bass hit heard in the music, on the beat: the bass notes of a rolling bassline between the kicks are not kicks. Kicks jump the hue, as far as colour cycling allows, and count towards auto-switch.
 _Avoid_: beat, onset
@@ -36,7 +42,12 @@ _Avoid_: beat, tempo beat
 **Tempo**:
 The music's beats per minute, heard from the gaps between kicks: held through breakdowns, and forgotten when the next
 music starts or the music has gone a long while without kicks.
-_Avoid_: BPM estimate
+_Avoid_: BPM estimate, playback tempo (that is the playback speed)
+
+**Confidence**:
+How sure the Listener is of the tempo: how clearly the kicks repeat at it. It drains while the tempo is held through
+a breakdown.
+_Avoid_: clarity, certainty
 
 **Tone**:
 How bright the music sounds, from dark and muffled to bright and crisp; follows the track over seconds, not single

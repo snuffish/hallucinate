@@ -9,7 +9,7 @@ Press **?** in the app for the same list. Every button with a shortcut also show
 | Space | play / pause |
 | Shift + ← / → | seek −10 s / +10 s |
 | ↑ / ↓ | volume |
-| [ / ] | tempo −5 % / +5 % |
+| [ / ] | playback speed −5 % / +5 % |
 | M | mute |
 | ← / → , 1–9, 0 | change scene (1–0: the first ten scenes, built-ins first and then yours), also with the code editor open while the code itself isn't focused |
 | L | scene library (inside: `/` search, Tab categories, arrows move, Enter play) |
@@ -28,6 +28,7 @@ Press **?** in the app for the same list. Every button with a shortcut also show
 | H | hide the controls (they also auto-hide after 3 s of no mouse movement; change that in Settings) |
 | Shift+H | reset the widget layout |
 | Shift+P | performance monitor: where each frame's time goes, and a GPU test (see [PERF.md](../PERF.md)) |
+| Shift+L | [Hearing monitor](audio.md#-hearing-monitor): the tempo and how sure it is, kicks and ticks, the spectrum and why |
 | ? | help & every shortcut |
 | , | [settings](settings.md) |
 | Esc | close the open panel (in the library: leave the search field first) |

@@ -108,6 +108,31 @@ export const HELP_TOPICS = {
     ],
     hotkeys: ['take', 'blackout', 'studioPrev', 'studioNext', 'studio', 'closeOverlay'],
   },
+  perf: {
+    id: 'perf',
+    title: 'Performance monitor',
+    body: [
+      'Where each frame\'s time goes, over the last 3 s. On top: the frame rate, the typical frame and the slowest 1 in 20 (p95), against the budget: the time one refresh of the display allows (16.7 ms at 60 Hz).',
+      'The verdict says what holds the frame rate back. Keeping up: nothing to do. Hitches (1 frame in 20 too slow): work outside the frame loop, such as garbage collection or thumbnails. Main thread: a stage below fills the frame. Probably the GPU: frames are slow but the main thread is nearly idle, so run Test GPU.',
+      'Main thread: what each stage of the frame costs on average and at p95. Audio analysis is the Listener; Clock & look moves the scene; Draw calls only hands the frame to the GPU (not the GPU\'s own time); Projector link sends frames to projector windows; Studio & Preview is the studio\'s monitors; Publish to UI and React & microtasks update the controls.',
+      'Test GPU renders the scene for a few seconds at half the pixels, then puts it back (the picture softens meanwhile). Clearly faster at half: the GPU\'s pixels are the cost, so lower Resolution (Settings) or simplify the scene. No faster: look at projectors, the Preview monitor or other tabs.',
+      'Open the app with ?perf to start with it on, or ?perf=trace to add the stages to a DevTools Performance recording.',
+    ],
+    hotkeys: ['perf', 'hearingMonitor'],
+  },
+  hearing: {
+    id: 'hearing',
+    title: 'Hearing monitor',
+    body: [
+      'What the app hears in the music, why it hears it that way, and what the scene gets from it. It only shows; nothing here changes the picture.',
+      'On top: the tempo (with what the kicks gave when it was folded into 85–175 BPM), the kick and tick lights, and whether it is hearing kicks, holding the tempo through a breakdown, or has no tempo. Confidence is how clearly the kicks repeat at the tempo: it drains while no kick confirms it. Below 30 frames a second it warns that kicks go unheard and the tempo wanders.',
+      'Spectrum: the sound as heard, bass on the left; the top is where loud sound clips. Bands: each band\'s level against its running average (yellow); a band past its mark is louder than usual, and that is what scenes react to.',
+      'Kicks: the last 6 s of the rise in the bass, the threshold a kick must reach (yellow), the windows where a kick was due (shaded), and the kicks (pink) against the ticks (green). Ticks trailing their kicks show how late the beat clock follows.',
+      'Tempo candidates: how strongly the kicks repeat at each tempo, against how clear a repeat must be to count (yellow) and the usual tempos the Listener prefers (grey). A half or double tempo as tall as the heard one is where half- and double-time readings come from.',
+      'Scene inputs: every value the scene\'s shader reads this frame (uBass, uBeat, uTick…), after the Look: Reactivity scales the bands and the kick up to 1.5 (the mark is 1).',
+    ],
+    hotkeys: ['hearingMonitor', 'perf'],
+  },
   screen: {
     id: 'screen',
     title: 'Screen: preview or Live',

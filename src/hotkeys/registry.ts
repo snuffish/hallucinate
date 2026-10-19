@@ -38,8 +38,8 @@ export const HOTKEYS = {
   seekFwd: { id: 'seekFwd', keys: 'Shift+ArrowRight', label: 'Seek +10 s', group: 'Playback', when: 'noNodes' },
   volumeUp: { id: 'volumeUp', keys: 'ArrowUp', label: 'Volume up', group: 'Playback', when: 'noLibrary' },
   volumeDown: { id: 'volumeDown', keys: 'ArrowDown', label: 'Volume down', group: 'Playback', when: 'noLibrary' },
-  tempoDown: { id: 'tempoDown', keys: '[', label: 'Tempo −5 %', group: 'Playback', when: 'noNodes' },
-  tempoUp: { id: 'tempoUp', keys: ']', label: 'Tempo +5 %', group: 'Playback', when: 'noNodes' },
+  tempoDown: { id: 'tempoDown', keys: '[', label: 'Playback speed −5 %', group: 'Playback', when: 'noNodes' },
+  tempoUp: { id: 'tempoUp', keys: ']', label: 'Playback speed +5 %', group: 'Playback', when: 'noNodes' },
   mute: { id: 'mute', keys: 'M', label: 'Mute', group: 'Playback', when: 'noNodes' },
 
   scenePrev: { id: 'scenePrev', keys: 'ArrowLeft', label: 'Previous scene', group: 'Scenes', when: 'noOverlay' },
@@ -68,6 +68,7 @@ export const HOTKEYS = {
   hidePanel: { id: 'hidePanel', keys: 'H', label: 'Hide controls', group: 'Panels', when: 'noNodes' },
   resetLayout: { id: 'resetLayout', keys: 'Shift+H', label: 'Reset layout', group: 'Panels', when: 'noNodes' },
   perf: { id: 'perf', keys: 'Shift+P', label: 'Performance monitor', group: 'Panels', when: 'noNodes' },
+  hearingMonitor: { id: 'hearingMonitor', keys: 'Shift+L', label: 'Hearing monitor', group: 'Panels', when: 'noNodes' },
   fullscreen: { id: 'fullscreen', keys: 'F', label: 'Fullscreen', group: 'Panels', when: 'always' },
   record: { id: 'record', keys: 'C', label: 'Record', group: 'Panels', when: 'noNodes' },
   help: { id: 'help', keys: '?', label: 'Help & shortcuts', group: 'Panels', when: 'always' },

@@ -23,13 +23,49 @@
 The player is a bar along the bottom of the screen, like Media Player's: a thin seek line runs along its top edge,
 what's playing is on the left, and in the middle a round play button sits between loop, stop, −10 s and previous
 track on one side and next track and +10 s on the other (SoundCloud results act as the queue; ⏮ restarts the track
-after 3 s). The time, mute and volume are on the right. The **tempo** chip (1.00×) opens tempo from 0.5× to 2×
-(click the value or double-click the slider to reset) and *Pitch follows tempo*: by default tempo keeps the pitch,
-and ticking it makes the pitch follow for a vinyl / nightcore effect. The demo beat gets play/pause, volume and tempo
-(its BPM). The bar shows while there is something to control
+after 3 s). The time, mute and volume are on the right. The **playback speed** chip (1.00×) opens the playback speed from 0.5× to
+2× (click the value or double-click the slider to reset) and *Pitch follows speed*: by default the speed keeps the
+pitch, and ticking it makes the pitch follow for a vinyl / nightcore effect. The demo beat gets play/pause, volume and
+playback speed (its BPM). The bar shows while there is something to control
 (not for the mic or tab audio), hides with the other controls (H, or after a few seconds idle), and docked widgets,
 the assistant and toasts keep above it. Volume is applied after the analyser, so the visuals react the same at any
 listening volume, even when muted.
+
+## 👂 Hearing monitor
+
+<img src="screenshots/hearing-monitor.jpg" alt="The Hearing monitor on the demo beat: 124.0 BPM, hearing kicks, a high confidence, the spectrum, the bands against their running averages, the kick signal with kicks and ticks lined up, and the tempo candidates peaking at 124" width="260" align="right">
+
+**Shift+L** opens the Hearing monitor over the main window (also with the studio open; never on Live or the
+projectors): what the Listener hears, why it hears it that way, and what the scene gets from it. It only shows, never
+changes anything. Its **?** explains each part; on a short screen it stops above the player bar and scrolls.
+
+- **At a glance** – the tempo to a tenth of a BPM; when it was folded into 85–175, what the kicks gave too
+  (*95.0 BPM (heard 190)*). **Confidence**: how clearly the kicks repeat at that tempo; it drains through a breakdown,
+  while no kick confirms it. The kick and tick lights. The state: *hearing kicks*, *holding* (no kick for four ticks:
+  the tempo is held and the ticks carry on) or *no tempo*. The delay from the app to the speakers as the browser
+  reports it; music from the microphone or a shared tab is *heard outside the app*, so there is none to give. How
+  many frames a second it hears, in red below 30: a beat is then only a few frames long, kicks go unheard and the
+  tempo wanders (the headless test browser, at 8–11 fps, hears the 124 BPM demo anywhere from 85 to 153). And how
+  late the ticks land after their kicks (the median over the last 6 s): about a frame at 60 fps.
+- **Spectrum** – the analyser's bins as the Listener gets them, on a log-frequency axis with the band edges (25, 140,
+  2000 and 12000 Hz). The top of the plot is where the analyser clips: loud kicks sit there.
+- **Bands** – bass, mid, high and their level (the bar), each against its running average over the last few seconds
+  (the yellow mark): a band past its mark is louder than usual, and that is what the scenes react to.
+- **Kicks** – the last 6 s of the rise in the kick's bins, newest on the right, with the threshold a kick must reach
+  (dashed) and the windows where the next kick was due (shaded). Under it the kicks (pink) against the ticks (green):
+  a tick trailing its kick shows how late the tick clock re-anchors.
+- **Tempo candidates** – how strongly the kick signal repeats at each tempo from 40 to 200 BPM, scaled to its peak,
+  with the strength it takes to hear a pulse at all dashed in yellow (a curve that never reaches it is noise; the
+  Confidence bar gives the absolute strength), the Listener's preference for tempos around 120 dashed in grey, and
+  the tempo the kicks gave marked. A half or double tempo standing as tall as the heard one is where a half- or
+  double-time reading comes from.
+- **Tone, energy, mood** – the spectral centroid in kHz and the two values (see below).
+- **Scene inputs** – every value the scene's shader reads this frame, from `uTime` to `uMood` (see
+  [the editor's list](editor.md)), as the main screen's scene gets them: after the Look, so Reactivity scales the bands
+  and `uBeat` up to 1.5 (the yellow mark is 1). With the studio open, Live runs on its own clock and can differ.
+
+It stacks under the performance monitor (Shift+P) when both are open. Research notes behind it:
+[audio reactivity](research/audio-reactivity.md).
 
 ## 🌈 Synesthesia (sound ↔ light mapping)
 

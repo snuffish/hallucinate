@@ -11,7 +11,7 @@ import { applyRendererPrefs, OutputLink } from '../engine/output-link';
 import { ParamStore, toUniform, type ParamSpec, type ParamValue, type ParamValues } from '../engine/params';
 import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, type PerfReport, type ProfilerApi } from '../engine/profiler';
 import { Renderer, type ProgramState } from '../engine/renderer';
-import { silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
+import { readInputs, silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
 import type { Scene } from '../scenes';
 import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type LookKey, type SourceButton } from '../state/app-state';
 import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
@@ -23,7 +23,7 @@ import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-l
 import { takeRenameReport } from '../state/scene-renames';
 import { loadScreenEffects, screenEffectsWriter } from '../state/screen-effects';
 import { Store } from '../state/store';
-import { initialUIState, type DownloadView, type DragId, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
+import { initialUIState, type DownloadView, type DragId, type HearingView, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
 import { applyWrites, buildBundle, parseBundle } from './bundle';
 import { downloadFile, fileStamp } from './download';
 import { EditorCore } from './editor';
@@ -35,6 +35,7 @@ import { Transport } from './transport';
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
 const DRIFT_PUBLISH_FRAMES = 6;
 const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second, however slow the frames
+const HEARING_PUBLISH_FRAMES = 4;   // the Hearing monitor follows at ~15 Hz: its lights and traces move
 
 const viewport = (): L.Size => ({ width: window.innerWidth, height: window.innerHeight });
 
@@ -852,6 +853,20 @@ export class AppController {
 
   togglePerf(): void { this.setPerf(!this.profiler.on); }
 
+  // Shift+L: the Hearing monitor. The Listener keeps what it shows only while it is open.
+  toggleHearingMonitor(): void {
+    const on = !this.ui.get().hearingMonitor;
+    this.listener.watch(on);
+    this.ui.set({ hearingMonitor: on ? this.hearingView() : null });
+  }
+
+  private hearingView(): HearingView | null {
+    const diagnostics = this.listener.diagnostics();
+    if (!diagnostics) return null;
+    const h = this.listener.hearing;
+    return { diagnostics, latency: this.audio.latency(), beat: h.beat, tickPhase: h.tickPhase, centroid: h.centroid, energy: h.energy, mood: h.mood, inputs: readInputs(this.program) };
+  }
+
   setPerf(on: boolean, trace = false): void {
     this.profiler.setOn(on, trace);
     if (on) {
@@ -953,6 +968,7 @@ export class AppController {
         toneTitle: `Timbral brightness: ${tone} (spectral centroid ≈ ${(f.centroid / 1000).toFixed(1)} kHz)`,
       });
     }
+    if (this.ui.get().hearingMonitor && this.meterTick % HEARING_PUBLISH_FRAMES === 0) this.ui.set({ hearingMonitor: this.hearingView() });
     this.profiler.lap(Stage.ui);
     if (this.profiler.on && now - this.perfPublishedAt >= PERF_PUBLISH_MS) {
       this.perfPublishedAt = now;

@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Hearing monitor (2026-10-18)
+
+### Added
+
+- A **Hearing monitor** (Shift+L): what the Listener hears and why, over the main window (never on Live or the
+  projectors). On top, at a glance: the tempo to a tenth (with what the kicks gave when it was folded into 85–175,
+  e.g. *95.0 BPM (heard 190)*), how confident it is, kick and tick lights, whether it is *hearing kicks*, *holding*
+  through a breakdown or has *no tempo*, and the delay to the speakers (or *heard outside the app* for the microphone
+  and a shared tab). Below: the spectrum as heard, the bands against their running averages, the last 6 s of the
+  kick signal with its threshold, the windows where a kick was due and the kicks against the ticks, the tempo
+  candidates against the Listener's preference, and the tone, energy and mood. It stacks under the performance
+  monitor when both are open. The Listener keeps what it shows only while it is open.
+- The Hearing monitor also shows how many frames a second the Listener hears (red below 30, where kicks go unheard
+  and the tempo wanders), how late the ticks land after their kicks, and every scene input (`uTime` … `uMood`) as the
+  main screen's scene gets it, after the Look. Its **?** explains each part, and on a short screen it stops above the
+  player bar and scrolls.
+
+### Changed
+
+- The player's tempo chip and `[` / `]` are called **Playback speed** (and *Pitch follows speed*): they change how
+  fast the music plays, not the tempo heard in it.
+
 ## Unreleased — new scenes (2026-10-18)
 
 ### Added

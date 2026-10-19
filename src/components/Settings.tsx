@@ -1,6 +1,6 @@
 // Settings: the device preferences (src/state/prefs.ts), a few app-wide conveniences and the setup's
 // data. A preference is a default, never a second control for something live (the transport keeps
-// volume and tempo), except Display & performance: Resolution and Pixel density are the live controls.
+// volume and playback speed), except Display & performance: Resolution and Pixel density are the live controls.
 
 import { useRef, useState, type ReactNode } from 'react';
 import { useApp, usePrefs, useUI } from '../app/AppContext';

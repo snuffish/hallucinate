@@ -327,13 +327,21 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .crash-actions button { flex: 1; }
 
 
-/* Performance overlay (Shift+P). Inset by the docks like the other overlays; only its button takes clicks. */
-.perf {
+/* The monitors: the performance overlay (Shift+P) and the Hearing monitor (Shift+L), stacked in one corner.
+   Inset by the docks like the other overlays; only their buttons take clicks. */
+.monitors {
   z-index: var(--z-perf);
   position: fixed;
   top: calc(var(--dock-top) + 16px);
   left: calc(var(--dock-left) + 16px);
   width: min(380px, calc(100vw - var(--dock-left) - var(--dock-right) - 32px));
+  max-height: calc(100vh - var(--dock-top) - var(--dock-bottom) - var(--player-bar) - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.perf, .hearing {
   background: var(--glass);
   backdrop-filter: blur(12px);
   border: 1px solid var(--line);
@@ -343,7 +351,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
-.perf[hidden] { display: none; }
+.perf[hidden], .hearing[hidden] { display: none; }
 .perf-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
 .perf-head b { font-size: 16px; }
 .perf-head span { color: var(--muted); }
@@ -361,9 +369,36 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .perf-bar span { display: block; height: 6px; border-radius: 3px; background: var(--accent2); transform-origin: left; }
 .perf-meta { margin-top: 6px; color: var(--muted); }
 .perf-fill { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-.perf-fill button { pointer-events: auto; flex: none; }
+.perf-fill button, .perf .help-btn { pointer-events: auto; flex: none; }
+.perf-head .help-btn { margin-left: auto; }
 .perf-fill span { color: var(--muted); }
 .perf-hint { margin-top: 6px; color: var(--muted); font-family: system-ui, sans-serif; }
+
+.hearing-head { display: flex; gap: 10px; align-items: center; }
+.hearing-head b { font-size: 16px; }
+.hearing-light { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.hearing-light.kick { background: #ff4fd8; }
+.hearing-light.tick { background: #4fffa0; }
+.hearing .kick { color: #ff4fd8; }
+.hearing .tick { color: #4fffa0; }
+.hearing .average { color: #ffd84f; }
+/* Taller than a short screen: it stops above the player bar and scrolls (so it takes the wheel). */
+.hearing { min-height: 0; overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; }
+#hearing-fps[data-slow] { color: #ff4f7b; }
+#hearing-inputs .hearing-row { margin-top: 2px; }
+#hearing-inputs output { text-align: right; }
+#hearing-state { color: var(--muted); margin-left: auto; }
+#hearing-state[data-state="hearing"] { color: #4fffa0; }
+#hearing-state[data-state="holding"] { color: #ffd84f; }
+.hearing h4 { margin: 10px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.hearing h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); }
+.hearing-row { display: grid; grid-template-columns: 80px 1fr; gap: 8px; align-items: center; margin-top: 4px; }
+.hearing-row > span { color: var(--muted); }
+.hearing-bar { position: relative; display: block; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); }
+.hearing-bar i { position: absolute; inset: 0; border-radius: 3px; background: var(--accent2); transform-origin: left; }
+.hearing-bar u { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: #ffd84f; }
+.hearing-meta { margin-top: 6px; color: var(--muted); }
+canvas.hearing-plot { position: static; display: block; width: 100%; }
 
 /* Shader editor */
 .editor {
