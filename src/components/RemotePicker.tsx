@@ -7,12 +7,11 @@ import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { useApp, useUI } from '../app/AppContext';
 import type { PickerApi } from '../app/controller';
-import { HOTKEYS } from '../hotkeys/registry';
-import { Kbd } from '../hotkeys/Kbd';
 import { remoteSite, type Download } from '../remote/client';
 import { RemoteTrackSchema, type Progress, type RemoteTrack as Track, type SiteName } from '../remote/wire';
 import { readJSON, writeJSON, remove as removeKey } from '../state/persistence';
 import { HelpButton } from './Help';
+import { CloseButton } from './CloseButton';
 
 const RECENT_MAX = 25;
 
@@ -164,7 +163,7 @@ export function RemotePicker({ id, site, title, noun = 'track', recentKey, fetch
       <header>
         <strong>{title}</strong>
         <HelpButton topic={site} />
-        <button id={`${id}-close`} className="icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
+        <CloseButton id={`${id}-close`} />
       </header>
       <form id={`${id}-form`} onSubmit={(e) => { e.preventDefault(); void search(query); }}>
         <input id={`${id}-query`} ref={input} type="search" placeholder={placeholder} autoComplete="off" value={query}

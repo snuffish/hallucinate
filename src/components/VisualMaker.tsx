@@ -11,6 +11,7 @@ import { useHotkeyActions } from '../hooks/useAppHotkeys';
 import { Kbd } from '../hotkeys/Kbd';
 import { KEYS, debouncedWriter, readJSON } from '../state/persistence';
 import { HelpButton } from './Help';
+import { CloseButton } from './CloseButton';
 
 interface View { x: number; y: number; s: number }
 interface Pt { x: number; y: number }
@@ -259,7 +260,7 @@ export function VisualMaker() {
         <button className="ne-peek" title="Hide the graph to see the result" onClick={() => setPeek((p) => !p)}>Peek</button>
         <span className={`ne-status ${status.error ? 'error' : 'ok'}`}>{status.text}</span>
         <HelpButton topic="nodes" />
-        <button className="ne-close icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
+        <CloseButton className="ne-close" />
       </header>
       <nav className="ne-palette">
         {CATEGORIES.map((cat) => (

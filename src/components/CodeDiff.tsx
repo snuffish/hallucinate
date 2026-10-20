@@ -3,6 +3,7 @@
 
 import { useMemo } from 'react';
 import { diffLines, diffStat, hunks } from '../state/line-diff';
+import { plural } from '../app/plural';
 
 export function CodeDiff({ before, after, context = 3 }: { before: string; after: string; context?: number }) {
   const { parts, stat } = useMemo(() => {
@@ -16,7 +17,7 @@ export function CodeDiff({ before, after, context = 3 }: { before: string; after
       <pre>
         {parts.map((h, i) => (
           <span key={i}>
-            {h.skipped > 0 && <span className="skip">⋯ {h.skipped} unchanged line{h.skipped === 1 ? '' : 's'}{'\n'}</span>}
+            {h.skipped > 0 && <span className="skip">⋯ {plural(h.skipped, 'unchanged line')}{'\n'}</span>}
             {h.lines.map((l, j) => <span key={j} className={l.kind}>{l.kind === 'add' ? '+ ' : l.kind === 'del' ? '− ' : '  '}{l.text}{'\n'}</span>)}
           </span>
         ))}

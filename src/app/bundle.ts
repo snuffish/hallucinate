@@ -15,6 +15,7 @@ import { KEYS, commitRaw, flagText, readFlag, readString } from '../state/persis
 import { SceneEditsSchema, UserScenesSchema } from '../state/scene-list';
 import { ShowSchema } from './studio';
 import { PlayerSettingsSchema } from './transport';
+import { plural } from './plural';
 
 export const BUNDLE_FORMAT = 'hallucinate';
 export const BUNDLE_VERSION = 1;
@@ -121,8 +122,6 @@ export function parseBundle(text: string, builtins: readonly Scene[] = SCENES): 
   });
   return { ok: true, bundle: { writes, summary: describe(values) } };
 }
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 function describe(values: Partial<Record<SectionId, unknown>>): string {
   const parts: string[] = [];

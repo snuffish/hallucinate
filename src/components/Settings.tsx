@@ -10,6 +10,7 @@ import { Kbd } from '../hotkeys/Kbd';
 import { APPLIES, IDLE_SECONDS, PIXEL_RATIOS, RESOLUTION, setShowThinking, useShowThinking, type PrefKey } from '../state/prefs';
 import { HelpButton } from './Help';
 import { AssistantSettings } from './SettingsAssistant';
+import { CloseButton } from './CloseButton';
 
 const SECTIONS = { display: 'Display', audio: 'Audio', interface: 'Interface', assistant: 'Assistant', data: 'Data' } as const;
 type SectionId = keyof typeof SECTIONS;
@@ -22,7 +23,6 @@ const APPLIES_NOTE: Partial<Record<(typeof APPLIES)[PrefKey], string>> = {
 };
 
 export function Settings() {
-  const app = useApp();
   const open = useUI((ui) => ui.overlay === 'settings');
   const [section, setSection] = useState<SectionId>('display');
   return (
@@ -30,7 +30,7 @@ export function Settings() {
       <header>
         <strong>Settings</strong>
         <HelpButton topic="settings" />
-        <button id="settings-close" className="icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
+        <CloseButton id="settings-close" />
       </header>
       <div className="settings-body">
         <nav className="settings-nav" role="tablist" aria-label="Settings sections">

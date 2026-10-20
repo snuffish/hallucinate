@@ -25,6 +25,8 @@ import { rectOf } from './widgets/drop';
 import { isFixed, ownsPress, startsDrag } from './widgets/ownPress';
 import { usePointerDrag } from './widgets/usePointerDrag';
 import { Grip, useFloatPlacement, useNarrow } from './widgets/Widget';
+import { plural } from '../app/plural';
+import { CloseButton } from './CloseButton';
 
 
 const EXAMPLES: [label: string, prompt: string][] = [
@@ -363,7 +365,7 @@ export function Assistant() {
   const running = view.status === 'running';
   const idle = info?.backend === 'claude-code' ? 'Using your Claude subscription (via Claude Code)' : info?.backend === 'api' ? `Anthropic API${info.model ? ` · ${info.model}` : ''}` : '';
   const seconds = view.runStartedAt ? Math.max(0, Math.round((now - view.runStartedAt) / 1000)) : 0;
-  const status = running ? `Working… ${seconds} s${view.runTools ? ` · ${view.runTools} tool${view.runTools === 1 ? '' : 's'}` : ''}` : view.status === 'waiting' ? 'Waiting for a free slot…' : idle;
+  const status = running ? `Working… ${seconds} s${view.runTools ? ` · ${plural(view.runTools, 'tool')}` : ''}` : view.status === 'waiting' ? 'Waiting for a free slot…' : idle;
   const costLabel = info?.backend === 'claude-code' ? '≈ API-equivalent cost (not billed on a subscription)' : 'Cost';
   const usage = meta?.usage;
   const long = (meta?.lastPrompt ?? 0) >= LONG_CHAT_TOKENS;
@@ -399,7 +401,7 @@ export function Assistant() {
         <button id="ai-undo" title={undo.labels.length ? `Undo: ${undo.labels.at(-1)}${undoOwner ? ` (from “${undoOwner}”)` : ''}` : 'Nothing to undo'} disabled={!undo.labels.length || undoBusy} onClick={doUndo}>Undo</button>
         <button id="ai-thinking-toggle" className={`icon${showThinking ? ' on' : ''}`} aria-pressed={showThinking} title={showThinking ? 'Hide the assistant\'s reasoning' : 'Show the assistant\'s reasoning'} onClick={toggleThinking}>💭</button>
         <HelpButton topic="assistant" />
-        <button id="ai-close" className="icon" title="Close (Esc)" onClick={() => app.toggleAssistant(false)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
+        <CloseButton id="ai-close" onClose={() => app.toggleAssistant(false)} />
       </header>
       {listOpen
         ? <ChatList session={session} chats={sv.chats} live={sv.live} activeId={sv.activeId} storageOk={sv.storageOk} focusSearch={searchTick} onPick={pick} onExport={exportChat} />

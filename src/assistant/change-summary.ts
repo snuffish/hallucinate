@@ -3,6 +3,7 @@
 
 import type { Cue, ShowSnapshot } from '../app/studio';
 import type { Plan } from '../state/show-plan';
+import { plural } from '../app/plural';
 
 export interface ValueRow { key: string; before: unknown; after: unknown }
 
@@ -47,7 +48,7 @@ function cueChanges(was: Cue, now: Cue): string[] {
 function planLine(plan: Plan | null, names: Map<string, string>): string {
   if (!plan) return 'none';
   const steps = plan.steps.map((s) => `${names.get(s.cue) ?? s.cue} ${s.beats}`).join(' · ');
-  return `${plan.steps.length} step${plan.steps.length === 1 ? '' : 's'}${plan.loop ? ', looping' : ''}: ${steps}`;
+  return `${plural(plan.steps.length, 'step')}${plan.loop ? ', looping' : ''}: ${steps}`;
 }
 
 // What happened to the show, one line each.
