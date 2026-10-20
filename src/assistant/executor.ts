@@ -20,6 +20,7 @@ import type { z } from 'zod';
 import type { UndoStack } from './undo';
 import type { ChangeDraft, ChangeKind } from './change-log';
 import { TOOL_DEFINITIONS, type ContentParts, type ToolName } from './tools';
+import { hexToRgb } from '../engine/math';
 
 export interface AssistantContext { run: ToolRunner }
 // `call`: which of the model's tool calls this is, so what it changed can be shown under it.
@@ -57,8 +58,7 @@ function coerceParam(spec: ParamSpec, raw: unknown): ParamValue | undefined {
   if (spec.type === 'float') return Number.isFinite(Number(raw)) ? Number(raw) : undefined;
   const size = spec.def.length;
   if (typeof raw === 'string' && /^#[0-9a-f]{6}$/i.test(raw)) {
-    const n = parseInt(raw.slice(1), 16);
-    const rgb = [n >> 16, n >> 8, n].map((c) => (c & 255) / 255);
+    const rgb = hexToRgb(raw);
     return size === 4 ? [...rgb, 1] : size === 3 ? rgb : undefined;
   }
   if (Array.isArray(raw) && raw.length === size && raw.every((x) => Number.isFinite(Number(x)))) return raw.map(Number);

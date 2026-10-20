@@ -5,6 +5,7 @@
 
 import type { FrameLook } from '../engine/look';
 import type { Look, SliderKey } from './app-state';
+import { smoothstep } from '../engine/math';
 
 // What Randomize and Drift may pick from: laser-friendly territory (ADR 0002). Narrower than the
 // sliders' full range, which stays open for hand use.
@@ -31,8 +32,6 @@ const MAX_SECONDS = 22;
 
 interface Lane { from: number; to: number; t: number; seconds: number; written: number }
 
-const ease = (x: number) => x * x * (3 - 2 * x);
-
 export class LookDrift {
   private readonly lanes = new Map<DriftKey, Lane>();
   private readonly tempo = new Map<DriftKey, number>();
@@ -57,7 +56,7 @@ export class LookDrift {
         this.lanes.set(key, lane);
       }
       lane.t = Math.min(1, lane.t + (dt * speed * this.tempo.get(key)!) / lane.seconds);
-      look[key] = lane.from + (lane.to - lane.from) * ease(lane.t);
+      look[key] = lane.from + (lane.to - lane.from) * smoothstep(lane.t);
       lane.written = look[key];
       if (lane.t >= 1) this.next(key, lane, look[key]);
     }

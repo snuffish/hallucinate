@@ -16,6 +16,7 @@
 
 import { z } from 'zod';
 import { KEYS, debouncedWriter, readJSON, type DebouncedWriter } from '../state/persistence';
+import { hexToRgb } from './math';
 
 export const ParamTypeSchema = z.enum(['float', 'bool', 'vec2', 'vec3', 'vec4']);
 export type ParamType = z.infer<typeof ParamTypeSchema>;
@@ -89,8 +90,7 @@ function parseVector(raw: string | true | undefined, size: number): number[] | n
   if (raw == null || raw === true) return null;
   const text = String(raw).trim();
   if (/^#[0-9a-f]{6}$/i.test(text)) {
-    const n = parseInt(text.slice(1), 16);
-    return [n >> 16, n >> 8, n].map((c) => (c & 255) / 255).concat(size === 4 ? [1] : []);
+    return [...hexToRgb(text), ...(size === 4 ? [1] : [])];
   }
   const nums = text.replace(/^\w*\(|\)$/g, '').split(',').map(num);
   if (nums.some((n) => n === null)) return null;

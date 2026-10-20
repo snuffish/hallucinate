@@ -37,10 +37,10 @@ import { LiveSlot, type Shot } from './live-slot';
 import { MusicSource } from './music-source';
 import { SceneLibrary, type SceneChange } from './scene-library';
 import { Transport } from './transport';
+import { clamp01, fract } from '../engine/math';
 
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
 const LOOK_PUBLISH_FRAMES = 6;
-const fract = (x: number): number => x - Math.floor(x);
 const NOT_FOLLOWED = {};   // no slider follows the music   // the Look widget follows Drift and the hue on screen at ~10 Hz
 const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second, however slow the frames
 const HEARING_PUBLISH_FRAMES = 4;   // the Hearing monitor follows at ~15 Hz: its lights and traces move
@@ -690,7 +690,7 @@ export class AppController {
   setIntensity(x: number): void {
     const look = this.state.look;
     this.glide.stop();
-    look.intensity = Math.min(1, Math.max(0, x));
+    look.intensity = clamp01(x);
     for (const k of INTENSITY_KEYS) if (!look.locked.includes(k)) look[k] = intensityValue(k, look.intensity);
     this.publishLook();
   }

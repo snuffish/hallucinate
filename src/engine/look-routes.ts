@@ -9,6 +9,7 @@ import { LOOK_RANGES } from '../state/app-state';
 import { RANDOM_RANGES } from '../state/look-drift';
 import type { Hearing } from './listener';
 import type { FrameLook } from './look';
+import { clamp01 } from './math';
 
 export const ROUTE_SOURCES = ['bass', 'mid', 'high', 'level', 'kick', 'tone', 'mood'] as const;
 export type RouteSource = (typeof ROUTE_SOURCES)[number];
@@ -32,7 +33,7 @@ export const releaseOf = (r: Readonly<Route>): number => Math.max(MIN_ATTACK, r.
 // tone and the mood.
 function heard(h: Readonly<Hearing>, s: RouteSource): number {
   const v = s === 'kick' ? h.beat : s === 'tone' ? h.bright : h[s];
-  return Math.min(1, Math.max(0, v));
+  return clamp01(v);
 }
 
 // Where a followed slider sits: its hand value moved by the envelope, inside its range and never above

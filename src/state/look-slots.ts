@@ -11,6 +11,7 @@ import { SLIDER_KEYS, type Look, type SliderKey, type SlotOrder } from './app-st
 import { RANDOM_RANGES } from './look-drift';
 import { RoutesSchema, slider } from './look-store';
 import { KEYS, debouncedWriter, readJSON, type DebouncedWriter } from './persistence';
+import { clamp01, lerpHue, smoothstep } from '../engine/math';
 
 export const SLOT_NAMES = ['A', 'B', 'C', 'D'] as const;
 export type SlotLook = Record<SliderKey, number>;
@@ -42,8 +43,6 @@ export function nextSlot(slots: LookSlots, at: number, order: SlotOrder, random:
 }
 
 const RECALL_SECONDS = 1;
-const ease = (x: number) => x * x * (3 - 2 * x);
-const fract = (x: number) => x - Math.floor(x);
 
 // A recall in progress, stepped by the frame loop after Drift (so it wins while both run). No allocation
 // per frame.
@@ -65,10 +64,10 @@ export class LookGlide {
   step(look: Look, dt: number): void {
     if (!this.active) return;
     this.t = Math.min(1, this.t + dt / RECALL_SECONDS);
-    const e = ease(this.t);
+    const e = smoothstep(this.t);
     for (const k of SLIDER_KEYS) {
       const from = this.from[k], to = this.to[k];
-      look[k] = k === 'hue' ? fract(from + (fract(to - from + 0.5) - 0.5) * e) : from + (to - from) * e;
+      look[k] = k === 'hue' ? lerpHue(from, to, e) : from + (to - from) * e;
     }
   }
 }
@@ -77,5 +76,5 @@ export class LookGlide {
 export const INTENSITY_KEYS: readonly SliderKey[] = ['reactivity', 'trails', 'aberration'];
 export const intensityValue = (key: SliderKey, x: number): number => {
   const [min, max] = RANDOM_RANGES[key];
-  return min + (max - min) * Math.min(1, Math.max(0, x));
+  return min + (max - min) * clamp01(x);
 };

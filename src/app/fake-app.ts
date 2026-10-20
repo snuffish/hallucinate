@@ -17,6 +17,7 @@ import type { ControllerHooks } from './controller';
 import { EditorCore } from './editor';
 import { LiveSlot } from './live-slot';
 import { SceneLibrary, type Compiler } from './scene-library';
+import { clamp01 } from '../engine/math';
 
 export interface FakeAppOptions {
   scenes?: (Partial<Scene> & { name: string })[];
@@ -52,7 +53,7 @@ export function fakeApp(opts: FakeAppOptions = {}): FakeApp {
   };
   const setLook = (k: LookKey, v: number) => { const r = LOOK_RANGES[k]; look[k] = Math.min(r.max, Math.max(r.min, v)); };
   const setIntensity = (x: number) => {   // as the controller's
-    look.intensity = Math.min(1, Math.max(0, x));
+    look.intensity = clamp01(x);
     for (const k of INTENSITY_KEYS) if (!look.locked.includes(k)) look[k] = intensityValue(k, look.intensity);
   };
 

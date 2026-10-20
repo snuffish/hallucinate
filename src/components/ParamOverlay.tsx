@@ -12,6 +12,7 @@ import type { WidgetLayout } from '../state/layout';
 import { setOpen, toggleGroup, useOpenGroups } from '../state/param-groups';
 import { HelpButton } from './Help';
 import { Widget } from './widgets/Widget';
+import { clamp01, hexToRgb } from '../engine/math';
 
 const AXES = ['x', 'y', 'z', 'w'];
 
@@ -20,8 +21,7 @@ const fmt = (v: number, spec: { int: boolean; step: number }) => {
   const decimals = Math.max(0, Math.min(4, -Math.floor(Math.log10(spec.step || 0.01))));
   return v.toFixed(decimals);
 };
-const toHex = (rgb: number[]) => '#' + rgb.slice(0, 3).map((c) => Math.round(Math.min(1, Math.max(0, c)) * 255).toString(16).padStart(2, '0')).join('');
-const fromHex = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+const toHex = (rgb: number[]) => '#' + rgb.slice(0, 3).map((c) => Math.round(clamp01(c) * 255).toString(16).padStart(2, '0')).join('');
 
 function ParamsList() {
   const app = useApp();
@@ -116,7 +116,7 @@ export function ParamRow({ spec, value, onChange }: { spec: ParamSpec; value: Pa
         <div className="param-head">
           <span className="param-label" title={spec.name}>{spec.label}</span>
           <code>{hex}</code>
-          <input type="color" value={hex} onChange={(e) => onChange([...fromHex(e.target.value), ...current.slice(3)])} />
+          <input type="color" value={hex} onChange={(e) => onChange([...hexToRgb(e.target.value), ...current.slice(3)])} />
         </div>
         {spec.type === 'vec4' && (
           <Slider spec={{ ...(spec as VecParamSpec), min: 0, max: 1, step: 0.01 }} value={current[3] ?? 1} axis="alpha" onInput={(a) => onChange([...current.slice(0, 3), a])} />

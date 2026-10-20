@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { AudioEngine } from '../engine/audio';
 import { KEYS, readWithDefaults, writeJSON } from '../state/persistence';
 import type { TransportView } from '../state/ui-state';
+import { clamp01 } from '../engine/math';
 
 export const PlayerSettingsSchema = z.object({ volume: z.number().min(0).max(1).default(0.8), pitchFollows: z.boolean().default(false) });
 
@@ -74,7 +75,7 @@ export class Transport {
   setLoop(loop: boolean): void { this.el.loop = loop; this.emit(); }
 
   setVolume(v: number): number {
-    this.volume = Math.min(1, Math.max(0, v));
+    this.volume = clamp01(v);
     if (this.volume > 0) this.muted = false;
     this.applyVolume();
     this.save();

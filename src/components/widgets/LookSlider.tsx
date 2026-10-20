@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { useApp, useUI } from '../../app/AppContext';
 import { LASER_GRADIENT, laserCss } from '../../engine/laser-colour';
 import { LOOK_RANGES, defaultLook, type LookKey, type SliderKey } from '../../state/app-state';
+import { fract } from '../../engine/math';
 
 // How each Look value reads: shown as value × scale, typed back in the same units.
 export const LOOK_DISPLAY: Record<LookKey, { label: string; scale: number; unit: string; digits: number; hint: string }> = {
@@ -25,7 +26,6 @@ const THUMB = 8;           // half a range input's thumb, in px: where its track
 
 export const clampTo = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v));
 const snap = (v: number, step: number): number => Math.round(v / step) * step;
-const fract = (x: number): number => x - Math.floor(x);
 
 // Wheel steps: ten a notch, Shift one (macOS turns Shift+wheel sideways, so either axis counts). Only while
 // `active` says so, so scrolling the panel doesn't catch on a slider passing under the pointer.

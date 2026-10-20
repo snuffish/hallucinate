@@ -8,8 +8,7 @@ import { useApp, useUI } from '../../app/AppContext';
 import { laserCss } from '../../engine/laser-colour';
 import { PALETTE_MAX } from '../../state/app-state';
 import { FineRange } from './LookSlider';
-
-const fract = (x: number) => x - Math.floor(x);
+import { fract } from '../../engine/math';
 
 export function PaletteStrip() {
   const app = useApp();
