@@ -3,9 +3,9 @@
 // Read through the catalogue's clean-up, so a damaged value loads as what it can still mean.
 
 import { EffectStackSchema, NO_EFFECTS, type EffectStack } from '../engine/effects';
-import { KEYS, debouncedWriter, readJSON, type DebouncedWriter } from './persistence';
+import { KEYS, QUICK_WRITE_MS, debouncedWriter, readJSON, type DebouncedWriter } from './persistence';
 
 export const loadScreenEffects = (): EffectStack => readJSON(KEYS.screenEffects, EffectStackSchema, NO_EFFECTS);
 
 // Slider drags coalesce into one write.
-export const screenEffectsWriter = (read: () => EffectStack): DebouncedWriter => debouncedWriter(KEYS.screenEffects, read, 300);
+export const screenEffectsWriter = (read: () => EffectStack): DebouncedWriter => debouncedWriter(KEYS.screenEffects, read, QUICK_WRITE_MS);

@@ -19,7 +19,7 @@ import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, clampLook, MAX_SECONDS_P
 import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
-import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
+import { KEYS, QUICK_WRITE_MS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
 import { SceneHistory } from '../state/scene-history';
 import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
@@ -124,7 +124,7 @@ export class AppController {
   private readonly downloads = new Map<'sc' | 'yt', DownloadView>();
   private disposed = false;
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
-  private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
+  private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), QUICK_WRITE_MS);
   private readonly effectsWriter = screenEffectsWriter(() => this.state.effects);
   private readonly lookWriter = lookWriter(() => this.state.look);
   private lookSlots: LookSlots = loadLookSlots();

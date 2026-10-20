@@ -47,7 +47,7 @@ export class AudioEngine {
   // Tempo of the demo loop (files use playbackRate instead).
   setDemoRate(rate: number): void {
     this.demoRate = rate;
-    if (this.demo) this.demo.bpm = 124 * rate;
+    if (this.demo) this.demo.bpm = DEMO_BPM * rate;
   }
 
   async ready(): Promise<void> {
@@ -126,7 +126,7 @@ export class AudioEngine {
     await this.ready();
     this.detach();
     this.demo ??= new DemoSynth(this.ctx!);
-    this.demo.bpm = 124 * this.demoRate;
+    this.demo.bpm = DEMO_BPM * this.demoRate;
     this.demo.start();
     this.attach(this.demo.output, 'demo', true);
   }
@@ -152,10 +152,12 @@ export class AudioEngine {
   }
 }
 
+export const DEMO_BPM = 124;   // the demo beat's tempo at playback speed 1
+
 // A small generated techno loop so the visuals can be tried without any music file.
 class DemoSynth {
   readonly output: GainNode;
-  bpm = 124;
+  bpm = DEMO_BPM;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly noise: AudioBuffer;
   private step = 0;

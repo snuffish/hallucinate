@@ -14,11 +14,11 @@ import { Renderer, type ProgramState } from '../engine/renderer';
 import { applyRendererPrefs, type ScreenDetailed } from '../engine/output-link';
 import { outputPrefs, type Prefs } from '../state/prefs';
 import { listedScenes } from '../state/library-prefs';
-import { KEYS, debouncedWriter, readWithDefaults } from '../state/persistence';
+import { KEYS, QUICK_WRITE_MS, debouncedWriter, readWithDefaults } from '../state/persistence';
 import { paramKey } from '../state/scene-list';
 import { LIST_MAX_SECONDS, PlanSchema, type Plan, type PlanStep } from '../state/show-plan';
 import type { AppPort } from './app-port';
-import { NEUTRAL_TRIMS, type MasterTrims, type Shot } from './live-slot';
+import { NEUTRAL_TRIMS, trimRange, type MasterTrims, type Shot } from './live-slot';
 import { PaletteSchema } from '../state/look-store';
 
 const CueSchema = z.object({
@@ -32,23 +32,34 @@ const CueSchema = z.object({
   // entry is dropped instead of failing the whole show. An older app strips the field.
   effects: EffectStackSchema,
 });
+// The range each of the show's numbers may take: its control's, its setter's and a stored show's.
+export const STUDIO_LIMITS = {
+  seconds: { min: 0.2, max: 8 },
+  autoBeats: { min: 1, max: 1024 },
+  autoSeconds: { min: 5, max: 600 },
+  directorBeats: { min: 16, max: 1024 },
+  directorSeconds: { min: 15, max: 3600 },
+} as const;
+type Range = { readonly min: number; readonly max: number };
+const within = (r: Range, v: number): number => Math.min(r.max, Math.max(r.min, v));
 // A stored number, clamped to the range its control allows (an imported or hand-edited show can't, say,
 // run the autopilot every frame); a missing or non-number value falls back to the default.
-const bounded = (min: number, max: number, def: number) => z.number().catch(def).transform((v) => Math.min(max, Math.max(min, v)));
+const bounded = (r: Range, def: number) => z.number().catch(def).transform((v) => within(r, v));
 export const ShowSchema = z.object({
   cues: z.array(CueSchema).default([]),
   mode: z.enum(['cut', 'fade']).default('fade'),
-  seconds: bounded(0.2, 8, 1.5),
-  autoBeats: bounded(1, 1024, 32),
+  seconds: bounded(STUDIO_LIMITS.seconds, 1.5),
+  autoBeats: bounded(STUDIO_LIMITS.autoBeats, 32),
   autoUnit: z.enum(['beats', 'seconds']).default('beats'),
-  autoSeconds: bounded(5, 600, 30),
+  autoSeconds: bounded(STUDIO_LIMITS.autoSeconds, 30),
   plan: PlanSchema.nullable().default(null),
-  directorBeats: bounded(16, 1024, 128),
+  directorBeats: bounded(STUDIO_LIMITS.directorBeats, 128),
   directorUnit: z.enum(['beats', 'seconds']).default('beats'),
-  directorSeconds: bounded(15, 3600, 120),
+  directorSeconds: bounded(STUDIO_LIMITS.directorSeconds, 120),
   // Live's master trims (ADR 0006): neutral in a show saved before them.
   trims: z.object({
-    reactivity: bounded(0, 1, 1), speed: bounded(0, 1, 1), trails: bounded(0, 1, 1), aberration: bounded(0, 1, 1), hue: bounded(-0.5, 0.5, 0),
+    reactivity: bounded(trimRange('reactivity'), 1), speed: bounded(trimRange('speed'), 1), trails: bounded(trimRange('trails'), 1),
+    aberration: bounded(trimRange('aberration'), 1), hue: bounded(trimRange('hue'), 0),
   }).catch({ ...NEUTRAL_TRIMS }).default({ ...NEUTRAL_TRIMS }),
 });
 export type Cue = z.infer<typeof CueSchema>;
@@ -97,7 +108,7 @@ export class StudioSession {
   private readonly listeners = new Set<(event: StudioEvent) => void>();
   private previewRenderer: Renderer | null = null;
   private readonly shots = new WeakMap<Cue, Shot>();   // the Preview monitor's, per cue
-  private readonly writer = debouncedWriter(KEYS.show, () => this.serialised(), 300);
+  private readonly writer = debouncedWriter(KEYS.show, () => this.serialised(), QUICK_WRITE_MS);
   private open = false;
 
   constructor(private readonly app: AppPort, private readonly notify: () => void = () => {}) {
@@ -442,18 +453,18 @@ export class StudioSession {
   restoreLastPlan(): void { if (this.lastPlan) this.setPlan(this.lastPlan); }
 
   setAutopilot(on: boolean): void { this.autopilot.on = on; this.beatCount = 0; this.stepStart = this.app.state.clock.clock; this.changed(false); }
-  setAutoBeats(beats: number): void { this.autopilot.beats = Math.min(1024, Math.max(1, Math.round(beats))); this.changed(); }
+  setAutoBeats(beats: number): void { this.autopilot.beats = within(STUDIO_LIMITS.autoBeats, Math.round(beats)); this.changed(); }
   setAutoUnit(unit: AutoUnit): void { this.autopilot.unit = unit; this.beatCount = 0; this.stepStart = this.app.state.clock.clock; this.changed(); }
-  setAutoSeconds(seconds: number): void { this.autopilot.seconds = Math.min(600, Math.max(5, seconds)); this.changed(); }
-  setDirectorBeats(beats: number): void { this.directorBeats = Math.min(1024, Math.max(16, Math.round(beats))); this.changed(); }
+  setAutoSeconds(seconds: number): void { this.autopilot.seconds = within(STUDIO_LIMITS.autoSeconds, seconds); this.changed(); }
+  setDirectorBeats(beats: number): void { this.directorBeats = within(STUDIO_LIMITS.directorBeats, Math.round(beats)); this.changed(); }
   setDirectorUnit(unit: AutoUnit): void { this.directorUnit = unit; this.changed(); }
-  setDirectorSeconds(seconds: number): void { this.directorSeconds = Math.min(3600, Math.max(15, seconds)); this.changed(); }
+  setDirectorSeconds(seconds: number): void { this.directorSeconds = within(STUDIO_LIMITS.directorSeconds, seconds); this.changed(); }
   setParamTab(tab: ParamTab): void { this.paramTab = tab; this.changed(false); }
 
   // ---------- Transition & master ----------
 
   setMode(mode: 'cut' | 'fade'): void { this.mode = mode; this.changed(); }
-  setSeconds(seconds: number): void { this.seconds = Math.min(8, Math.max(0.2, seconds)); this.changed(); }
+  setSeconds(seconds: number): void { this.seconds = within(STUDIO_LIMITS.seconds, seconds); this.changed(); }
 
   setMaster(level: number): void {
     this.masterTarget = level;
@@ -463,7 +474,7 @@ export class StudioSession {
 
   // A master trim on Live (ADR 0006): ×0–1 for the sliders, ±0.5 of the wheel for the colour.
   setTrim(key: keyof MasterTrims, value: number): void {
-    const v = key === 'hue' ? Math.min(0.5, Math.max(-0.5, value)) : Math.min(1, Math.max(0, value));
+    const v = within(trimRange(key), value);
     this.trims = { ...this.trims, [key]: v };
     this.app.live.trims = this.trims;
     this.changed();

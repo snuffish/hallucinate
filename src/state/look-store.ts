@@ -6,7 +6,7 @@
 import { z } from 'zod';
 import { AUTO_SLOT_BEATS, DEFAULT_XY, PALETTE_MAX, clampLook, SLIDER_KEYS, WHEEL, defaultLook, type Look, type LookKey, type Palette, type SliderKey } from './app-state';
 import { ROUTE_SECONDS, ROUTE_SOURCES, ROUTE_TARGETS, type Routes } from '../engine/look-routes';
-import { KEYS, debouncedWriter, readWithDefaults, type DebouncedWriter } from './persistence';
+import { KEYS, QUICK_WRITE_MS, debouncedWriter, readWithDefaults, type DebouncedWriter } from './persistence';
 
 const DEFAULTS = defaultLook();
 
@@ -65,4 +65,4 @@ export const LookSchema = z.object({
 export const loadLook = (): Look => readWithDefaults(KEYS.look, LookSchema);
 
 // Slider drags and Drift's glides coalesce into one write; the page's hiding flushes the last one.
-export const lookWriter = (read: () => Look): DebouncedWriter => debouncedWriter(KEYS.look, read, 300);
+export const lookWriter = (read: () => Look): DebouncedWriter => debouncedWriter(KEYS.look, read, QUICK_WRITE_MS);

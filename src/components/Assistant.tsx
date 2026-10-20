@@ -15,7 +15,7 @@ import { formatTokens, totalTokens } from '../assistant/usage';
 import { HOTKEYS } from '../hotkeys/registry';
 import { useHotkeyActions } from '../hooks/useAppHotkeys';
 import { Kbd } from '../hotkeys/Kbd';
-import { chatPlacement, effective, type WidgetSize } from '../state/layout';
+import { CHAT_MIN_H, CHAT_MIN_W, chatPlacement, effective, type WidgetSize } from '../state/layout';
 import { setShowThinking, useShowThinking } from '../state/prefs';
 import { Store, useStore } from '../state/store';
 import { ChatList } from './assistant/ChatList';
@@ -258,8 +258,8 @@ function ChatGrip() {
         // Grow toward the free side, never past the screen's edge (8 px margin).
         const roomW = grow.x === 'left' ? s.left + s.w - 8 : window.innerWidth - s.left - 8;
         const roomH = grow.y === 'up' ? s.top + s.h - 8 : window.innerHeight - s.top - 8;
-        const w = Math.max(300, Math.min(s.w + (grow.x === 'left' ? -dx : dx), roomW));
-        const h = Math.max(260, Math.min(s.h + (grow.y === 'up' ? -dy : dy), roomH));
+        const w = Math.max(CHAT_MIN_W, Math.min(s.w + (grow.x === 'left' ? -dx : dx), roomW));
+        const h = Math.max(CHAT_MIN_H, Math.min(s.h + (grow.y === 'up' ? -dy : dy), roomH));
         el.style.width = `${w}px`;
         el.style.height = `${h}px`;
         if (floating()) {

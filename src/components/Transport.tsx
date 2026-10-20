@@ -6,6 +6,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import { formatTime } from '../app/transport';
+import { DEMO_BPM } from '../engine/audio';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { playerBar } from './widgets/drop';
@@ -103,7 +104,7 @@ function SpeedChip({ file, onChange }: { file: boolean; onChange: () => void }) 
   return (
     <>
       <button ref={chip} id="tp-rate-val" className="tp-rate-val" popoverTarget="tp-tempo"
-        title={file ? 'Playback speed ([ / ])' : `Playback speed: ${Math.round(124 * tr.rate)} BPM ([ / ])`}>{tr.rate.toFixed(2)}×</button>
+        title={file ? 'Playback speed ([ / ])' : `Playback speed: ${Math.round(DEMO_BPM * tr.rate)} BPM ([ / ])`}>{tr.rate.toFixed(2)}×</button>
       <div ref={pop} id="tp-tempo" className="tp-tempo" popover="auto" aria-label="Playback speed">
         <div className="tp-tempo-row">
           <span>Playback speed</span>

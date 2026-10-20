@@ -10,7 +10,7 @@ import type { Routes } from '../engine/look-routes';
 import { SLIDER_KEYS, type Look, type SliderKey, type SlotOrder } from './app-state';
 import { RANDOM_RANGES } from './look-drift';
 import { RoutesSchema, slider } from './look-store';
-import { KEYS, debouncedWriter, readJSON, type DebouncedWriter } from './persistence';
+import { KEYS, QUICK_WRITE_MS, debouncedWriter, readJSON, type DebouncedWriter } from './persistence';
 import { clamp01, lerpHue, smoothstep } from '../engine/math';
 
 export const SLOT_NAMES = ['A', 'B', 'C', 'D'] as const;
@@ -24,7 +24,7 @@ const SlotSchema = z.object({ ...Object.fromEntries(SLIDER_KEYS.map((k) => [k, s
 export const LookSlotsSchema = z.array(SlotSchema.nullable().catch(null)).length(SLOT_NAMES.length).catch(EMPTY.slice());
 
 export const loadLookSlots = (): LookSlots => readJSON(KEYS.lookSlots, LookSlotsSchema, EMPTY);
-export const lookSlotsWriter = (read: () => LookSlots): DebouncedWriter => debouncedWriter(KEYS.lookSlots, read, 300);
+export const lookSlotsWriter = (read: () => LookSlots): DebouncedWriter => debouncedWriter(KEYS.lookSlots, read, QUICK_WRITE_MS);
 
 export const slotOf = (look: Readonly<Look>): SlotLook => Object.fromEntries(SLIDER_KEYS.map((k) => [k, look[k]])) as SlotLook;
 // What a slot stores: the sliders and the routes, copied.

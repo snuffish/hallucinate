@@ -478,7 +478,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
       const s = studio();
       undoable('Changed the transition', transition(s), () => {
         if (mode === 'cut' || mode === 'fade') s.setMode(mode);
-        if (typeof seconds === 'number' && Number.isFinite(seconds)) s.setSeconds(Math.min(8, Math.max(0.2, seconds)));
+        if (typeof seconds === 'number' && Number.isFinite(seconds)) s.setSeconds(seconds);
       });
       return { transition: { mode: s.mode, seconds: s.seconds } };
     },
