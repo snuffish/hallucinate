@@ -1,12 +1,24 @@
 ---
 name: dry-principle
-description: Applies the Don't Repeat Yourself principle to avoid code duplication and improve maintainability, without over-abstracting. Use when reviewing or writing code, refactoring duplicated logic or constants, or asked to "apply DRY" / check for copy-paste in this repo.
+description: This rule enforces the Don't Repeat Yourself principle to avoid code duplication and improve maintainability.
+version: 1.1.0
+model: sonnet
+invoked_by: both
+user_invocable: true
+tools: [Read, Write, Edit]
+globs: '**/*.*'
+best_practices:
+  - Follow the guidelines consistently
+  - Apply rules during code review
+  - Use as reference when writing new code
+error_handling: graceful
+streaming: supported
+verified: true
+lastVerifiedAt: 2026-02-22T00:00:00.000Z
+source: builtin
+trust_score: 100
+provenance_sha: 374c1559342fd60e
 ---
-
-<!-- Adapted from the dry-principle skill (v1.1.0) in oimiragieo/agent-studio (MIT):
-     https://github.com/oimiragieo/agent-studio/tree/main/.claude/skills/dry-principle
-     Changes: frontmatter trimmed to Claude Code's fields; the agent-studio memory protocol replaced by
-     "In this repo". -->
 
 # Dry Principle Skill
 
@@ -28,7 +40,7 @@ When reviewing or writing code, apply these guidelines:
 - Follow the DRY (Don't Repeat Yourself) Principle and Avoid Duplicating Code or Logic.
 - Avoid writing the same code more than once. Instead, reuse your code using functions, classes, modules, libraries, or other abstractions.
 - Modify code in one place if you need to change or update it.
-</instructions>
+  </instructions>
 
 <examples>
 Example usage:
@@ -56,30 +68,14 @@ Agent: [Analyzes code against guidelines and provides specific feedback]
 | Same constant defined in multiple configuration files   | Values diverge silently; one-off changes cause hard-to-trace bugs                        | Single config module or environment variable; import everywhere                 |
 | DRY applied to test code (reducing fixture duplication) | Test setup that's too DRY becomes hard to read in isolation                              | Tests should be self-contained; some duplication in test setup is acceptable    |
 
-## In this repo
+## Memory Protocol (MANDATORY)
 
-Before adding a helper or a constant, look for the existing one (law 5):
+**Before starting:**
 
-| What                                               | Where                                                                                            |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `fract`, `clamp01`, `smoothstep`, `lerpHue`, `hexToRgb` | `src/engine/math.ts`                                                                        |
-| A Look slider's range and clamp (`clampLook`)      | `LOOK_RANGES` in `src/state/app-state.ts`                                                        |
-| Intensity and the sliders it moves                 | `applyIntensity` in `src/state/look-slots.ts`                                                    |
-| The Studio's number ranges, master-trim ranges     | `STUDIO_LIMITS` in `src/app/studio.ts`, `trimRange` in `src/app/live-slot.ts`                    |
-| Anything both the server and the browser read: URLs, event names, body shapes | a `*-wire.ts` leaf: `src/assistant/settings-wire.ts`, `relay-wire.ts`, `src/remote/wire.ts`, `src/log/log-wire.ts` |
-| JSON answers, event streams, request bodies (server) | `server/http.ts`                                                                               |
-| POSTing JSON (browser)                             | `postJSON` in `src/app/http.ts`                                                                  |
-| Saving to localStorage                             | `readJSON`, `writeJSON`, `debouncedWriter`, `QUICK_WRITE_MS` in `src/state/persistence.ts`       |
-| "3 scenes" counts                                  | `plural` in `src/app/plural.ts`                                                                  |
-| An overlay's ×                                     | `src/components/CloseButton.tsx`                                                                 |
+```bash
+cat .claude/context/memory/learnings.md
+```
 
-Duplication that is on purpose (laws 3 and 4):
+**After completing:** Record any new patterns or exceptions discovered.
 
-- **GLSL twins.** `src/scenes/header.ts` mirrors TypeScript helpers (`laser()`, the palette's hue walk) so shaders and controls agree. Their comments name the twin; change both.
-- **Scene shaders** (`src/scenes/*.ts`) are examples people copy and edit, and user scenes are compiled against the shared header. Keep each scene readable on its own. Adding a function to `header.ts` can clash with one a stored user scene already defines, so don't move per-scene GLSL helpers into the header.
-- **Test setup** (`*.test.ts`, `e2e/*.spec.ts`): per-spec helpers are fine; share only through `e2e/fixtures.ts` when a helper is genuinely the same fixture.
-- **The fake app** (`src/app/fake-app.ts`) should call the controller's shared pieces (as it does with `clampLook` and `applyIntensity`), not copy their bodies.
-
-Use the vocabulary in `GLOSSARY.md` when naming a shared helper, and check `docs/adr/` before merging two concepts an ADR keeps apart.
-
-After a DRY refactor run `npm run lint`, `npm run typecheck` and `npm test`. Run `npm run test:e2e` when a component or shader changed.
+> ASSUME INTERRUPTION: Your context may reset. If it's not in memory, it didn't happen.

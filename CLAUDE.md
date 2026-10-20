@@ -14,4 +14,4 @@ Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents
 
 ### DRY
 
-When writing, reviewing or refactoring code, follow `.claude/skills/dry-principle/SKILL.md`. It covers the rule of three, a single source of truth for each config value, where this repo's shared helpers live, and which duplication is on purpose.
+When writing, reviewing or refactoring code, follow `.claude/skills/dry-principle/SKILL.md`: the rule of three, and a single source of truth for each config value.
