@@ -78,6 +78,7 @@ export interface UIState {
   sceneVersion: number;     // bumps when the scene list changes (add/remove/edit), for lists
   look: Look;
   lookSlots: LookSlots;     // the Look slots A–D, null where empty
+  lookSlotAt: number;       // the slot last recalled or stored (-1: none), where auto-change goes on from
   followed: Partial<Record<RouteTarget, number>>;   // where each slider that follows the music sits now (ADR 0005)
   liveHue: number;          // the hue on screen now (Colour plus how far cycling has walked), 0–1, for the Colour swatch
   effects: EffectStack;     // the main screen's effects (the Effects widget)
@@ -122,6 +123,7 @@ export const initialUIState = (look: Look): UIState => ({
   sceneVersion: 0,
   look,
   lookSlots: [null, null, null, null],
+  lookSlotAt: -1,
   followed: {},
   liveHue: look.hue,
   effects: NO_EFFECTS,

@@ -15,7 +15,7 @@ import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, 
 import { Renderer, type ProgramState } from '../engine/renderer';
 import { readInputs, silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
 import { userSceneId, type Scene } from '../scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, PALETTE_MAX, SLIDER_KEYS, defaultClock, defaultLook, type AppState, type LookKey, type Palette, type SliderKey, type SourceButton, type XYAxes } from '../state/app-state';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, PALETTE_MAX, SLIDER_KEYS, defaultClock, defaultLook, type AppState, type AutoSlots, type LookKey, type Palette, type SliderKey, type SourceButton, type XYAxes } from '../state/app-state';
 import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
@@ -26,7 +26,7 @@ import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-l
 import { takeRenameReport } from '../state/scene-renames';
 import { ROUTE_TARGETS, followed, type Route, type RouteTarget } from '../engine/look-routes';
 import { loadLook, lookWriter } from '../state/look-store';
-import { INTENSITY_KEYS, LookGlide, SLOT_NAMES, intensityValue, loadLookSlots, lookSlotsWriter, slotOf, slotWithRoutes, type LookSlots } from '../state/look-slots';
+import { INTENSITY_KEYS, LookGlide, SLOT_NAMES, intensityValue, loadLookSlots, lookSlotsWriter, nextSlot, slotOf, slotWithRoutes, type LookSlots } from '../state/look-slots';
 import { loadScreenEffects, screenEffectsWriter } from '../state/screen-effects';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HearingView, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
@@ -130,6 +130,8 @@ export class AppController {
   private lookSlots: LookSlots = loadLookSlots();
   private readonly lookSlotsWriter = lookSlotsWriter(() => this.lookSlots);
   private readonly glide = new LookGlide();   // a slot being recalled
+  private slotAt = -1;      // the slot last recalled or stored, where auto-change goes on from
+  private slotBeats = 0;    // kicks since the last slot change, for auto-change
   // While a show scene crossfades in on the main screen, the stack the outgoing picture keeps; null once the
   // crossfade ends (or on a manual scene change), when the outgoing picture draws with the screen's own.
   private outgoingEffects: Effects.EffectStack | null = null;
@@ -688,23 +690,65 @@ export class AppController {
   saveLookSlot(i: number): void {
     if (i < 0 || i >= SLOT_NAMES.length) return;
     this.lookSlots = this.lookSlots.map((s, j) => (j === i ? slotWithRoutes(this.state.look) : s));
-    this.ui.set({ lookSlots: this.lookSlots });
+    this.slotAt = i;
+    this.ui.set({ lookSlots: this.lookSlots, lookSlotAt: i });
     this.lookSlotsWriter.schedule();
     this.toast(`Look stored in slot ${SLOT_NAMES[i]}`, 1200);
   }
 
+  // Empties slot `i`.
+  clearLookSlot(i: number): void {
+    if (!this.lookSlots[i]) return;
+    this.lookSlots = this.lookSlots.map((s, j) => (j === i ? null : s));
+    this.ui.set({ lookSlots: this.lookSlots });
+    this.lookSlotsWriter.schedule();
+    this.toast(`Slot ${SLOT_NAMES[i]} emptied`, 1200);
+  }
+
   // Glides to the look in slot `i` over a second. Shift+R comes back from it, as from a Randomize.
   recallLookSlot(i: number): void {
-    const slot = this.lookSlots[i];
-    if (!slot) { if (SLOT_NAMES[i]) this.toast(`Slot ${SLOT_NAMES[i]} is empty: Shift+click it to store the look`, 1800); return; }
+    if (!this.lookSlots[i]) { if (SLOT_NAMES[i]) this.toast(`Slot ${SLOT_NAMES[i]} is empty: Shift+click it to store the look`, 1800); return; }
     this.rememberForBack();
-    if (slot.routes) { this.state.look.routes = structuredClone(slot.routes); this.publishLook(); }   // the routes switch at once; the sliders glide
-    this.glide.start(slotOf(this.state.look), slot);
+    this.slotBeats = 0;   // auto-change counts on from here
+    this.goToSlot(i, false);
+  }
+
+  // Goes to slot `i`'s look: gliding over a second, or at once. The routes switch at once either way.
+  private goToSlot(i: number, instant: boolean): void {
+    const slot = this.lookSlots[i];
+    if (!slot) return;
+    const look = this.state.look;
+    if (slot.routes) look.routes = structuredClone(slot.routes);
+    this.slotAt = i;
+    if (instant) {
+      this.glide.stop();
+      for (const k of SLIDER_KEYS) look[k] = slot[k];
+    } else {
+      this.glide.start(slotOf(look), slot);
+    }
+    this.publishLook();
+  }
+
+  // The slot auto-change's settings: on or off, every how many kicks, in which order, gliding or switching.
+  setAutoSlots(change: Partial<AutoSlots>): void {
+    const look = this.state.look;
+    if (change.on && !look.autoSlots.on) this.slotBeats = 0;
+    look.autoSlots = { ...look.autoSlots, ...change };
+    this.publishLook();
+  }
+
+  // A kick while auto-change is on: every `beats` of them, the next slot. Not one Shift+R comes back from.
+  private autoSlotOnKick(): void {
+    const auto = this.state.look.autoSlots;
+    if (!auto.on || ++this.slotBeats < auto.beats) return;
+    this.slotBeats = 0;
+    const next = nextSlot(this.lookSlots, this.slotAt, auto.order);
+    if (next !== null) this.goToSlot(next, auto.transition === 'hard');
   }
 
   // The Look changed: the widget shows it, and it's kept for the next start.
   private publishLook(): void {
-    this.ui.set({ look: { ...this.state.look }, liveHue: fract(this.state.look.hue + this.state.clock.huePhase) });
+    this.ui.set({ look: { ...this.state.look }, liveHue: fract(this.state.look.hue + this.state.clock.huePhase), lookSlotAt: this.slotAt });
     this.lookWriter.schedule();
   }
 
@@ -902,6 +946,7 @@ export class AppController {
     if (h.kick) {
       c.beatsInScene++;
       if (this.autoSwitching() && c.beatsInScene >= BEATS_PER_SCENE) this.nextRandomScene();
+      this.autoSlotOnKick();
     }
     if (h.tick) this.hooks.onTempoBeat?.();
   }

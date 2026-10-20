@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 import type { Routes } from '../engine/look-routes';
-import { SLIDER_KEYS, type Look, type SliderKey } from './app-state';
+import { SLIDER_KEYS, type Look, type SliderKey, type SlotOrder } from './app-state';
 import { RANDOM_RANGES } from './look-drift';
 import { RoutesSchema, slider } from './look-store';
 import { KEYS, debouncedWriter, readJSON, type DebouncedWriter } from './persistence';
@@ -28,6 +28,18 @@ export const lookSlotsWriter = (read: () => LookSlots): DebouncedWriter => debou
 export const slotOf = (look: Readonly<Look>): SlotLook => Object.fromEntries(SLIDER_KEYS.map((k) => [k, look[k]])) as SlotLook;
 // What a slot stores: the sliders and the routes, copied.
 export const slotWithRoutes = (look: Readonly<Look>): Slot => ({ ...slotOf(look), routes: structuredClone(look.routes) });
+
+// The slot auto-change goes to next from slot `at` (-1: none yet): the next filled one after it, round again,
+// or a random filled one other than it. Null while fewer than two are filled.
+export function nextSlot(slots: LookSlots, at: number, order: SlotOrder, random: () => number = Math.random): number | null {
+  const filled = slots.flatMap((s, i) => (s ? [i] : []));
+  if (filled.length < 2) return null;
+  if (order === 'random') {
+    const others = filled.filter((i) => i !== at);
+    return others[Math.floor(random() * others.length)]!;
+  }
+  return filled.find((i) => i > at) ?? filled[0]!;
+}
 
 const RECALL_SECONDS = 1;
 const ease = (x: number) => x * x * (3 - 2 * x);

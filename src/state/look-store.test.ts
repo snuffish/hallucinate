@@ -49,6 +49,11 @@ describe('the Look, kept for the next start', () => {
     expect(loadLook().routes).toEqual({ trails: good });
   });
 
+  it('loads the slot auto-change field by field, falling back on what is not one of its choices', () => {
+    map.set(KEYS.look, JSON.stringify({ autoSlots: { on: true, beats: 12, order: 'random', transition: 'sideways' } }));
+    expect(loadLook().autoSlots).toEqual({ on: true, beats: 16, order: 'random', transition: 'soft' });
+  });
+
   it('loads as the laser look when what is stored is not a look', () => {
     map.set(KEYS.look, '{broken');
     expect(loadLook()).toEqual(defaultLook());

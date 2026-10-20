@@ -6,7 +6,7 @@ import { useApp, useUI } from '../../app/AppContext';
 import { STATIC_DEMO } from '../../app/static-demo';
 import { HOTKEYS } from '../../hotkeys/registry';
 import { Kbd } from '../../hotkeys/Kbd';
-import { SLIDER_KEYS, type SliderKey, type SourceButton } from '../../state/app-state';
+import { AUTO_SLOT_BEATS, SLIDER_KEYS, type AutoSlots, type SliderKey, type SourceButton } from '../../state/app-state';
 import { SOURCES } from '../StartScreen';
 import { laserCss } from '../../engine/laser-colour';
 import { SLOT_NAMES } from '../../state/look-slots';
@@ -153,25 +153,52 @@ const SLOT_HOTKEYS = [HOTKEYS.lookSlotA, HOTKEYS.lookSlotB, HOTKEYS.lookSlotC, H
 const INTENSITY = { label: 'Intensity', scale: 100, unit: '%', digits: 0 };
 
 // The Look slots A–D and Intensity, under the sliders. A slot glides to its look; an empty one, or
-// Shift+click, stores the look now. A filled slot shows its colour.
+// Shift+click, stores the look now; × empties it. A filled slot shows its colour.
 function LookSlotsAndIntensity() {
   const app = useApp();
   const slots = useUI((ui) => ui.lookSlots);
   const intensity = useUI((ui) => ui.look.intensity);
+  const auto = useUI((ui) => ui.look.autoSlots);
+  const at = useUI((ui) => ui.lookSlotAt);
+  const filled = slots.filter(Boolean).length;
+  const choice = <K extends 'order' | 'transition'>(key: K, value: AutoSlots[K], label: string, title: string) => (
+    <button type="button" className={auto[key] === value ? 'active' : undefined} aria-pressed={auto[key] === value} title={title}
+      onClick={() => app.setAutoSlots({ [key]: value })}>{label}</button>
+  );
   return (
     <>
       <div className="look-slots" role="group" aria-label="Look slots">
         {SLOT_NAMES.map((name, i) => {
           const slot = slots[i];
           return (
-            <button key={name} type="button" id={`look-slot-${name}`} className={`look-slot${slot ? ' filled' : ''}`}
-              style={slot ? { '--c': laserCss(slot.hue) } as CSSProperties : undefined}
-              title={slot ? `Glide to the look in slot ${name} · Shift+click: store the look now in it` : `Slot ${name} is empty: click to store the look now`}
-              onClick={(e) => (slot && !e.shiftKey ? app.recallLookSlot(i) : app.saveLookSlot(i))}>
-              {name}<Kbd hotkey={SLOT_HOTKEYS[i]!} />
-            </button>
+            <span key={name} className="look-slot-cell">
+              <button type="button" id={`look-slot-${name}`} className={`look-slot${slot ? ' filled' : ''}${slot && i === at ? ' current' : ''}`}
+                style={slot ? { '--c': laserCss(slot.hue) } as CSSProperties : undefined}
+                title={slot ? `Glide to the look in slot ${name} · Shift+click: store the look now in it` : `Slot ${name} is empty: click to store the look now`}
+                onClick={(e) => (slot && !e.shiftKey ? app.recallLookSlot(i) : app.saveLookSlot(i))}>
+                {name}<Kbd hotkey={SLOT_HOTKEYS[i]!} />
+              </button>
+              {slot && <button type="button" className="look-slot-clear" aria-label={`Empty slot ${name}`} title={`Empty slot ${name}`} onClick={() => app.clearLookSlot(i)}>×</button>}
+            </span>
           );
         })}
+      </div>
+      <div className="look-slot-auto" role="group" aria-label="Slot auto-change">
+        <label className="toggle" title="The slots take turns on their own while the music plays">
+          <input type="checkbox" id="slot-auto" checked={auto.on} onChange={(e) => app.setAutoSlots({ on: e.target.checked })} /> Auto-change
+        </label>
+        <select id="slot-auto-beats" aria-label="Change slots every" value={auto.beats} onChange={(e) => app.setAutoSlots({ beats: Number(e.target.value) })}>
+          {AUTO_SLOT_BEATS.map((b) => <option key={b} value={b}>every {b} kicks</option>)}
+        </select>
+        <span className="look-seg">
+          {choice('order', 'linear', 'Linear', 'A, B, C, D and round again, skipping empty slots')}
+          {choice('order', 'random', 'Random', 'Any other filled slot')}
+        </span>
+        <span className="look-seg">
+          {choice('transition', 'soft', 'Soft', 'Glide to the next slot over a second')}
+          {choice('transition', 'hard', 'Hard', 'Switch to the next slot at once')}
+        </span>
+        {auto.on && filled < 2 && <small>Store at least two slots for it to change.</small>}
       </div>
       <div className="look-row" title="Moves Reactivity, Trails and Fringing together, inside the ranges Randomize uses; locked ones stay">
         <span />

@@ -15,7 +15,9 @@
   which are locked.
 - A dot beside **Colour** shows the colour on screen now, cycling included.
 - **Look slots** A–D: click an empty slot (or Shift+click any) to store the look, click a filled one or press
-  Alt+1–4 to glide to it over a second. Shift+R comes back from a slot as from a Randomize. They go with an Export.
+  Alt+1–4 to glide to it over a second; the × on a filled slot's corner empties it.
+  **Auto-change** lets the filled slots take turns on their own every 8–64 kicks while the music plays, Linear or
+  Random, Soft (a glide) or Hard (a cut); the current slot is outlined. Shift+R comes back from a slot as from a Randomize. They go with an Export.
 - A **palette** under Colour: 2–5 colours on the laser wheel that every scene's colours walk instead of the whole
   wheel, blending or in steps (each step eases, so cycling never switches the colour in one frame). Show scenes keep
   it; `set_look` takes `palette` and `get_app_state` reports it. Scenes of your own follow it through `laser()`;

@@ -22,6 +22,7 @@ export interface Look {
   drift: boolean;         // the sliders wander on their own (src/state/look-drift.ts)
   driftSpeed: number;
   intensity: number;              // the Intensity control, 0–1 (src/state/look-slots.ts)
+  autoSlots: AutoSlots;           // the Look slots take turns on their own
   palette: Palette;               // the colours every scene draws through laser() (ADR 0004)
   routes: Routes;                 // sliders that follow the music (ADR 0005)
   locked: readonly SliderKey[];   // Randomize and Drift leave these alone
@@ -38,6 +39,13 @@ export interface XYAxes { x: SliderKey; y: SliderKey }
 // steps (ADR 0004). No hues: the whole wheel.
 export interface Palette { hues: readonly number[]; steps: boolean }
 export const PALETTE_MAX = 5;
+// Auto-change: the Look slots take turns on their own, every `beats` kicks while the music plays, in order (A
+// to D, round again, skipping empty ones) or at random, gliding there (soft) or switching at once (hard).
+export type SlotOrder = 'linear' | 'random';
+export type SlotTransition = 'soft' | 'hard';
+export interface AutoSlots { on: boolean; beats: number; order: SlotOrder; transition: SlotTransition }
+export const AUTO_SLOT_BEATS = [8, 16, 32, 64] as const;
+export const DEFAULT_AUTO_SLOTS: AutoSlots = { on: false, beats: 16, order: 'linear', transition: 'soft' };
 export const WHEEL: Palette = { hues: [], steps: false };
 export const LOOK_KEYS: readonly LookKey[] = ['hue', 'cycle', 'trails', 'speed', 'reactivity', 'aberration', 'synesthesia'];   // stored in show scenes
 export const LOOK_RANGES: Record<LookKey, { min: number; max: number; step: number }> = {
@@ -58,7 +66,7 @@ export const DEFAULT_XY: readonly XYAxes[] = [{ x: 'speed', y: 'reactivity' }, {
 export const defaultLook = (): Look => ({
   reactivity: 1, speed: 1, trails: 0.35, hue: 0, cycle: 0.2, aberration: 0,
   synesthesia: 0.3, auto: true, randomScene: false, drift: false, driftSpeed: 1,
-  intensity: 0.5, palette: WHEEL, routes: {}, locked: [], xyOpen: true, xy: DEFAULT_XY,
+  intensity: 0.5, autoSlots: DEFAULT_AUTO_SLOTS, palette: WHEEL, routes: {}, locked: [], xyOpen: true, xy: DEFAULT_XY,
 });
 
 export interface Clock {

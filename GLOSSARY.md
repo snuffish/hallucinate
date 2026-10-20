@@ -135,6 +135,11 @@ _Avoid_: master, macro, energy
 One of four places (A–D) that keep a Look's sliders to glide back to. They go with an export.
 _Avoid_: preset (a show scene is not one either), snapshot, bank
 
+**Auto-change**:
+The Look slots taking turns on their own every few kicks while the music plays, in order or at random, gliding or
+cutting between them.
+_Avoid_: autopilot (that is the studio's, for show scenes), slot cycling, sequencer
+
 **XY pad**:
 A square in the Look widget that moves two Look sliders at once, one across and one up, picked per pad.
 _Avoid_: XY controller, joystick, 2D slider

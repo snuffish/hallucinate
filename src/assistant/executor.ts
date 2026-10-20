@@ -318,7 +318,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
       const i = app.sceneIndex, s = app.currentScene, look = app.state.look, h = app.hearing, ui = app.ui.get();
       return {
         playing: { name: s.name, kind: kindOf(s), category: s.cat || null, description: s.desc || null, editedByUser: !!s.edited, parameters: paramSummary(i) },
-        look: { ...Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), autoSwitch: look.auto, drift: look.drift, driftSpeed: look.driftSpeed, randomizePicksScene: look.randomScene, locked: look.locked, intensity: look.intensity, palette: look.palette, followsTheMusic: look.routes, slots: SLOT_NAMES.filter((_, i) => ui.lookSlots[i]) },
+        look: { ...Object.fromEntries(LOOK_KEYS.map((k) => [k, look[k]])), autoSwitch: look.auto, drift: look.drift, driftSpeed: look.driftSpeed, randomizePicksScene: look.randomScene, locked: look.locked, intensity: look.intensity, palette: look.palette, followsTheMusic: look.routes, slotAutoChange: look.autoSlots, slots: SLOT_NAMES.filter((_, i) => ui.lookSlots[i]) },
         effects: app.state.effects,
         audio: soundNow(h, app.music.playing, app.state.activeSource),
         listening: app.music.playing ? { energy: round2(h.energy), bass: round2(h.bass), mid: round2(h.mid), high: round2(h.high) } : null,

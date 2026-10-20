@@ -4,7 +4,7 @@
 // of its range is clamped back into it.
 
 import { z } from 'zod';
-import { DEFAULT_XY, LOOK_RANGES, PALETTE_MAX, SLIDER_KEYS, WHEEL, defaultLook, type Look, type LookKey, type Palette, type SliderKey } from './app-state';
+import { AUTO_SLOT_BEATS, DEFAULT_XY, LOOK_RANGES, PALETTE_MAX, SLIDER_KEYS, WHEEL, defaultLook, type Look, type LookKey, type Palette, type SliderKey } from './app-state';
 import { ROUTE_SECONDS, ROUTE_SOURCES, ROUTE_TARGETS, type Routes } from '../engine/look-routes';
 import { KEYS, debouncedWriter, readWithDefaults, type DebouncedWriter } from './persistence';
 
@@ -52,6 +52,12 @@ export const LookSchema = z.object({
   drift: z.boolean().catch(DEFAULTS.drift),
   driftSpeed: slider('driftSpeed'),
   intensity: z.number().min(0).max(1).catch(DEFAULTS.intensity),
+  autoSlots: z.object({
+    on: z.boolean().catch(DEFAULTS.autoSlots.on),
+    beats: z.number().refine((b) => (AUTO_SLOT_BEATS as readonly number[]).includes(b)).catch(DEFAULTS.autoSlots.beats),
+    order: z.enum(['linear', 'random']).catch(DEFAULTS.autoSlots.order),
+    transition: z.enum(['soft', 'hard']).catch(DEFAULTS.autoSlots.transition),
+  }).catch(() => ({ ...DEFAULTS.autoSlots })),
   palette: PaletteSchema,
   routes: RoutesSchema,
   locked: z.array(z.unknown()).catch([]).transform((keys) => SLIDER_KEYS.filter((k) => keys.includes(k))),

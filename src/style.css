@@ -328,7 +328,22 @@ input.look-hue-track::-moz-range-thumb { width: 12px; height: 12px; border-radiu
 .master-look .look-row label { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .master-look > button { margin-top: 4px; font-size: 11px; }
 .look-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
+.look-slot-cell { position: relative; display: flex; }
+.look-slot-cell .look-slot { flex: 1; }
+.look-slot-clear { position: absolute; top: -6px; right: -5px; width: 15px; height: 15px; padding: 0; border-radius: 50%; font-size: 10px; line-height: 1; background: #1a1426; color: var(--muted); opacity: 0.55; transition: opacity 0.15s; }
+.look-slot-cell:hover .look-slot-clear, .look-slot-clear:focus-visible { opacity: 1; }
+.look-slot-clear:hover { color: var(--text); border-color: var(--accent); }
 .look-slot { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 3px 0; font-size: 11px; font-weight: 600; border-style: dashed; color: var(--muted); background: transparent; }
+.look-slot.current { outline: 1px solid var(--c); outline-offset: 2px; }
+.look-slot-auto { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11px; }
+.sliders .look-slot-auto .toggle { flex-wrap: nowrap; font-size: 11.5px; }
+.look-slot-auto select { padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; background: rgba(0, 0, 0, 0.35); color: var(--text); font-size: 11px; }
+.look-slot-auto small { flex-basis: 100%; color: var(--muted); }
+.look-seg { display: inline-flex; }
+.look-seg button { padding: 1px 6px; font-size: 10.5px; border-radius: 0; }
+.look-seg button:first-child { border-radius: 6px 0 0 6px; }
+.look-seg button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+.look-seg button.active { border-color: var(--accent); background: rgba(255, 79, 216, 0.22); color: var(--text); }
 .look-slot.filled { border-style: solid; border-color: var(--c); box-shadow: inset 0 -3px 0 var(--c); color: var(--text); }
 .xy-puck { position: absolute; width: 14px; height: 14px; margin: 0 0 -7px -7px; border: 2px solid #111; border-radius: 50%; background: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.6); pointer-events: none; }
 #mood-label { margin-left: auto; }

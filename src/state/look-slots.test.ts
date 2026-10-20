@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultLook } from './app-state';
 import { RANDOM_RANGES } from './look-drift';
-import { INTENSITY_KEYS, LookGlide, intensityValue, loadLookSlots, lookSlotsWriter, slotOf, type SlotLook } from './look-slots';
+import { INTENSITY_KEYS, LookGlide, intensityValue, loadLookSlots, lookSlotsWriter, nextSlot, slotOf, type SlotLook } from './look-slots';
 import { KEYS } from './persistence';
 
 describe('the Look slots A–D, kept with the setup', () => {
@@ -76,5 +76,30 @@ describe('Intensity', () => {
       expect(intensityValue(k, 3)).toBe(RANDOM_RANGES[k][1]);   // never past the tested ranges
     }
     expect(intensityValue('trails', 0.5)).toBeCloseTo(0.3, 9);
+  });
+});
+
+describe('auto-change: the next slot', () => {
+  const a = slotOf(defaultLook());
+  const slots = [a, null, a, a];   // A, C and D filled
+
+  it('goes in order, skipping empty slots and coming round again', () => {
+    expect(nextSlot(slots, -1, 'linear')).toBe(0);
+    expect(nextSlot(slots, 0, 'linear')).toBe(2);
+    expect(nextSlot(slots, 2, 'linear')).toBe(3);
+    expect(nextSlot(slots, 3, 'linear')).toBe(0);
+    expect(nextSlot(slots, 1, 'linear')).toBe(2);   // from a slot emptied since
+  });
+
+  it('picks any other filled slot at random, never the one it is on', () => {
+    for (const r of [0, 0.49, 0.5, 0.99]) {
+      const next = nextSlot(slots, 2, 'random', () => r);
+      expect([0, 3]).toContain(next);
+    }
+  });
+
+  it('has nowhere to go with fewer than two filled', () => {
+    expect(nextSlot([a, null, null, null], 0, 'linear')).toBeNull();
+    expect(nextSlot([null, null, null, null], -1, 'random')).toBeNull();
   });
 });
