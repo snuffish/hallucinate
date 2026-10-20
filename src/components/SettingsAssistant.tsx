@@ -6,13 +6,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useApp } from '../app/AppContext';
 import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
+import { postJSON } from '../app/http';
 import { ErrorBodySchema, SETTINGS_URL, SettingsViewSchema, type Backend, type BackendChoice, type Effort, type SettingsPatch, type SettingsView as View } from '../assistant/settings-wire';
 
 const DETECTED: Record<Backend, string> = { 'api': 'the Anthropic API', 'claude-code': 'your Claude subscription (Claude Code)', 'none': 'nothing yet: Claude isn\'t set up' };
 const BACKENDS: Record<BackendChoice, string> = { 'auto': 'Automatic: an API key if there is one, else Claude Code', 'api': 'Anthropic API key', 'claude-code': 'Claude subscription (Claude Code)' };
 
 async function request(patch?: SettingsPatch): Promise<View> {
-  const res = await fetch(SETTINGS_URL, patch && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
+  const res = await (patch ? postJSON(SETTINGS_URL, patch) : fetch(SETTINGS_URL));
   const json: unknown = await res.json().catch(() => ({}));
   if (!res.ok) {
     const e = ErrorBodySchema.safeParse(json);

@@ -6,15 +6,16 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { inspect } from 'node:util';
+import { LOG_EVENT, type LineOrigin, type LogLevel } from '../src/log/log-wire';
 import { isLoopbackHost, type Handler } from './guard';
+import { sendJSON, sseEvent, startEventStream } from './http';
 
-export type ServerLevel = 'error' | 'warn' | 'info' | 'debug';
-// Who said it: the server, or the desktop app's main process it runs in.
-export type LineOrigin = 'server' | 'desktop';
+export { LOG_EVENT, type LineOrigin };
+
+export type ServerLevel = LogLevel;
 export interface ServerLine { id: number; t: number; level: ServerLevel; origin: LineOrigin; text: string; detail?: string }
 
 export const SERVER_LOG_CAP = 500;
-export const LOG_EVENT = 'line';
 
 export class ServerLog {
   private lines: ServerLine[] = [];
@@ -67,21 +68,16 @@ declare module 'node:http' {
   interface IncomingMessage { originalUrl?: string }   // connect (the Vite servers) keeps the full path here
 }
 
-export const sseLine = (line: ServerLine): string => `event: ${LOG_EVENT}\ndata: ${JSON.stringify(line)}\n\n`;
-
-const refuse = (res: ServerResponse, status: number, error: string, headers: Record<string, string> = {}) => {
-  res.writeHead(status, { 'Content-Type': 'application/json', ...headers });
-  res.end(JSON.stringify({ error }));
-};
+export const sseLine = (line: ServerLine): string => sseEvent(LOG_EVENT, line);
 
 // GET /api/log: an event stream of the lines so far, then each new one, until the app goes away. Only on this
 // computer, like changing Settings: the lines carry the assistant's traffic and the links you fetched, which a
 // device reaching an app started with HOST=0.0.0.0 has no business reading.
 export function createLogRoute(log: ServerLog = serverLog): Handler {
   return (req: IncomingMessage, res: ServerResponse) => {
-    if (req.method !== 'GET') return refuse(res, 405, 'GET only', { Allow: 'GET' });
-    if (!isLoopbackHost(req.headers.host)) return refuse(res, 403, 'The server log is only shown on the computer the app runs on.');
-    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+    if (req.method !== 'GET') return sendJSON(res, 405, { error: 'GET only' }, { Allow: 'GET' });
+    if (!isLoopbackHost(req.headers.host)) return sendJSON(res, 403, { error: 'The server log is only shown on the computer the app runs on.' });
+    startEventStream(res);
     for (const line of log.backlog()) res.write(sseLine(line));
     const off = log.listen((line) => res.write(sseLine(line)));
     req.on('close', off);

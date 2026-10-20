@@ -20,6 +20,9 @@ export const ToolResultSchema = z.object({
 });
 export type ToolResult = z.infer<typeof ToolResultSchema>;
 
+// POST /api/assistant/new { threadId }: the panel deleted the conversation; its CLI session is forgotten.
+export const NEW_CHAT_URL = '/api/assistant/new';
+
 // POST /api/assistant/tool-result: the browser's answer to one event.
 export const TOOL_RESULT_URL = '/api/assistant/tool-result';
 export const ToolResultPostSchema = z.object({ threadId: z.string(), callId: z.string(), result: ToolResultSchema });

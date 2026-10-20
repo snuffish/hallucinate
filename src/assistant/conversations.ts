@@ -17,7 +17,7 @@ import { Store } from '../state/store';
 import { ChangeLog, type ChangeDraft } from './change-log';
 import { Chat, forgetThread } from './chat';
 import { createToolRunner, UndoConflict, type ToolRunner } from './executor';
-import type { Backend } from './settings-wire';
+import { ASSISTANT_URL, type Backend } from './settings-wire';
 import { HISTORY_CAP, indexedDBTranscripts, prune, readIndex, storedTranscript, writeIndex, type ChatMeta, type StoredTranscript, type TranscriptBackend } from './history-store';
 import { createLock, serialized, type Lock } from './lock';
 import { codeHash, resumeNote, sceneNote, undoNote, withNotes, type ScreenNow } from './notes';
@@ -235,7 +235,7 @@ export class AssistantSession {
     this.lockTools = opts.lock ?? createLock();
     this.changes = opts.changes ?? new ChangeLog();
     this.transcripts = opts.transcripts ?? indexedDBTranscripts();
-    const base: ConnectConnectionAdapter = opts.connection ?? fetchServerSentEvents('/api/assistant');
+    const base: ConnectConnectionAdapter = opts.connection ?? fetchServerSentEvents(ASSISTANT_URL);
     // Not resumable on purpose (no joinRun): a run is never rejoined, only sealed. Old screenshots stay home.
     this.connection = { connect: (messages, ...rest) => base.connect(prepareForSend(messages as UIMessage[]), ...rest) };
     this.locks = opts.locks !== undefined ? opts.locks : ((typeof navigator !== 'undefined' && (navigator as { locks?: LockManagerLike }).locks) || null);

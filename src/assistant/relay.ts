@@ -4,6 +4,7 @@
 
 import { TOOL_CALL_EVENT, TOOL_RESULT_URL, ToolCallEventSchema, type ToolResult, type ToolResultPost } from './relay-wire';
 import { ContentPartsSchema } from './tools';
+import { postJSON } from '../app/http';
 
 // executor.ts's ToolRunner, said again so that the server's tests can load the relay without the app.
 type ToolRunner = (name: string, input: unknown, call?: { toolCallId?: string }) => Promise<unknown>;
@@ -26,7 +27,7 @@ export function relayToolCalls(runner: ToolRunner): (type: string, data: unknown
     runner(name, (input ?? {}) as Record<string, unknown>, { toolCallId })
       .then(toToolResult)
       .catch((err: Error): ToolResult => ({ content: [{ type: 'text', text: err.message }], isError: true }))
-      .then((result) => fetch(TOOL_RESULT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId, callId, result } satisfies ToolResultPost) }))
+      .then((result) => postJSON(TOOL_RESULT_URL, { threadId, callId, result } satisfies ToolResultPost))
       .catch(() => {});
   };
 }

@@ -9,6 +9,7 @@
 import { z } from 'zod';
 
 export const SETTINGS_URL = '/api/settings';
+export const ASSISTANT_URL = '/api/assistant';
 export const INFO_URL = '/api/assistant/info';
 
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;   // `claude --effort`, and TanStack's reasoning levels

@@ -4,13 +4,14 @@
 // reconnect's backlog skips the lines already here.
 
 import { z } from 'zod';
+import { LEVELS, LINE_ORIGINS, LOG_EVENT, LOG_URL } from './log-wire';
 import type { SystemLog } from './system-log';
 
-export const LOG_URL = '/api/log';
+export { LOG_URL };
 
 const ServerLineSchema = z.object({
-  id: z.number(), t: z.number(), level: z.enum(['error', 'warn', 'info', 'debug']), text: z.string(), detail: z.string().optional(),
-  origin: z.enum(['server', 'desktop']).catch('server'),   // the desktop app's main process writes into the server's log
+  id: z.number(), t: z.number(), level: z.enum(LEVELS), text: z.string(), detail: z.string().optional(),
+  origin: z.enum(LINE_ORIGINS).catch('server'),   // the desktop app's main process writes into the server's log
 });
 
 // Whether a line from the stream is new here. The server numbers its lines; a server started again
@@ -26,7 +27,7 @@ export function followServer(log: SystemLog, url = LOG_URL): () => void {
   if (typeof EventSource === 'undefined') return () => {};
   const source = new EventSource(url);
   source.addEventListener('open', () => { unavailable = false; });
-  source.addEventListener('line', (e) => {
+  source.addEventListener(LOG_EVENT, (e) => {
     let data: unknown;
     try { data = JSON.parse((e as MessageEvent<string>).data); } catch { return; }
     const line = ServerLineSchema.safeParse(data);
