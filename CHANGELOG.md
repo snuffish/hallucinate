@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — move and resize every panel (2026-10-20)
+
+### Changed
+
+- Every widget drags by any part that isn't a control, not only its title bar: a label, the meters, the space
+  between sliders. Sliders, the XY pads, buttons and fields keep their own drags. Double-click such a part to put it back.
+- The **Hallucinate** widget resizes like the other widgets.
+- The **performance monitor** (Shift+P) drags anywhere like the Hearing monitor and the System log, and opens there
+  next time. All three monitors resize by their corner; a double-click puts one back in the corner at its natural size.
+- The assistant's **chat window** drags by its frame to a place of its own, kept across a reload; a double-click on
+  the frame puts it back beside the bubble.
+
 ## Unreleased — a more customizable Look (2026-10-20)
 
 ### Added

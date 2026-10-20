@@ -71,7 +71,7 @@ function WidgetFor({ id, entry, actions: a }: { id: WidgetId; entry: WidgetLayou
 function HubWidget({ entry }: { entry: WidgetLayout }) {
   const app = useApp();
   return (
-    <Widget id="hub" domId="hub" entry={entry} title="Hallucinate" closable={false} collapse={false} resizable={false}
+    <Widget id="hub" domId="hub" entry={entry} title="Hallucinate" closable={false} collapse={false}
       tools={<>
         <WidgetsMenu />
         <button id="settings-btn" className="icon" title="Settings (,)" aria-label="Settings" onClick={() => app.toggleOverlay('settings')}>⚙<Kbd hotkey={HOTKEYS.settings} /></button>

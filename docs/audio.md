@@ -75,8 +75,9 @@ changes anything. Its **?** explains each part; on a short screen it stops above
   double-time reading comes from.
 - **Tone, energy, mood** – the spectral centroid in kHz and the two values (see below).
 
-Drag it anywhere, by any part but its buttons, chips and slider; it opens there again next time (the spot is kept
-with the widget layout, and Reset layout puts it back). A double-click puts it back in the corner, where it stacks
+Drag it anywhere, by any part but its buttons, chips and slider, and resize it by its corner; it opens there again
+next time (the spot and size are kept with the widget layout, and Reset layout puts them back). A double-click puts
+it back in the corner at its natural size, where it stacks
 under the performance monitor (Shift+P) when both are open. Research notes behind it:
 [audio reactivity](research/audio-reactivity.md).
 

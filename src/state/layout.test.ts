@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KEYS } from './persistence';
 import {
-  DEFAULT_LAYOUT, DROP_EDGE, WIDGET_IDS, chatPlacement, dock, dropTarget, type DockView, effective, float, floatToPx, loadLayout, moveBubble, moveHearing, moveMonitor, parseLayout,
-  CHAT_MIN_H, CHAT_MIN_W, DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetHearing, resetLayout, resetMonitor, resetWidget, resize, resizeChat, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
+  DEFAULT_LAYOUT, DROP_EDGE, WIDGET_IDS, chatPlacement, dock, dropTarget, type DockView, effective, float, floatToPx, loadLayout, moveBubble, moveChat, moveHearing, moveMonitor, parseLayout,
+  CHAT_MIN_H, CHAT_MIN_W, DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetChat, resetHearing, resetLayout, resetMonitor, resetWidget, resize, resizeChat, resizeMonitor, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
 } from './layout';
 
 const VIEW = { width: 1280, height: 720 };
@@ -254,6 +254,48 @@ describe('the chat window size', () => {
     const chat = { width: 400, height: 500 };
     expect(chatPlacement({ left: 20, top: 640, width: 54, height: 54 }, chat, VIEW)).toMatchObject({ growX: 'right', growY: 'up' });
     expect(chatPlacement({ left: 1200, top: 20, width: 54, height: 54 }, chat, VIEW)).toMatchObject({ growX: 'left', growY: 'down' });
+  });
+});
+
+describe('the monitors', () => {
+  it('keeps the performance overlay where it was dropped, like the other monitors', () => {
+    expect(DEFAULT_LAYOUT.perf).toEqual({ kind: 'auto' });
+    const l = moveMonitor(resetLayout(), 'perf', { left: 900, top: 40, width: 380, height: 300 }, VIEW);
+    expect(l.perf).toEqual({ kind: 'float', ax: 'r', ay: 't', dx: 1280 - 900 - 380, dy: 40 });
+    expect(parseLayout(JSON.parse(JSON.stringify(l))).perf).toEqual(l.perf);
+    expect(effective(l, true).perf).toEqual({ kind: 'auto' });
+  });
+
+  it('stores a dragged size, clamped to a usable minimum, that a reset clears', () => {
+    let l = resizeMonitor(resetLayout(), 'hearing', { w: 500, h: 400 });
+    expect(l.monitorSize.hearing).toEqual({ w: 500, h: 400 });
+    expect(l.monitorSize.log).toEqual({ w: null, h: null });
+    l = resizeMonitor(l, 'log', { w: 10, h: 5 });
+    expect(l.monitorSize.log).toEqual({ w: MIN_W, h: MIN_H });
+    expect(resizeMonitor(l, 'log', { w: null }).monitorSize.log).toEqual({ w: null, h: MIN_H });
+    expect(resetMonitor(l, 'hearing').monitorSize.hearing).toEqual({ w: null, h: null });
+    expect(effective(l, true).monitorSize.hearing).toEqual({ w: null, h: null });
+  });
+
+  it('keeps the sizes across a reload, and falls back to the natural size when one is broken or missing', () => {
+    const stored = JSON.parse(JSON.stringify(resizeMonitor(resizeMonitor(resetLayout(), 'perf', { w: 420, h: 300 }), 'log', { h: 500 })));
+    expect(parseLayout(stored).monitorSize).toEqual({ perf: { w: 420, h: 300 }, hearing: { w: null, h: null }, log: { w: null, h: 500 } });
+    expect(parseLayout({ ...stored, monitorSize: { perf: { w: 'wide' } } }).monitorSize.perf).toEqual({ w: null, h: null });
+    const { monitorSize: _gone, perf: _perf, ...older } = stored;
+    expect(parseLayout(older).monitorSize).toEqual(DEFAULT_LAYOUT.monitorSize);   // written before monitors could be resized
+    expect(parseLayout(older).perf).toEqual({ kind: 'auto' });
+  });
+});
+
+describe('the chat window place', () => {
+  it('stays where it was dropped across a reload; a reset or a phone puts it beside the bubble', () => {
+    expect(DEFAULT_LAYOUT.chatPlace).toEqual({ kind: 'auto' });
+    const l = moveChat(resetLayout(), { left: 600, top: 100, width: 400, height: 500 }, VIEW);
+    expect(l.chatPlace).toEqual({ kind: 'float', ax: 'r', ay: 't', dx: 1280 - 600 - 400, dy: 100 });
+    expect(parseLayout(JSON.parse(JSON.stringify(l))).chatPlace).toEqual(l.chatPlace);
+    expect(parseLayout({ ...JSON.parse(JSON.stringify(l)), chatPlace: { kind: 'float' } }).chatPlace).toEqual({ kind: 'auto' });
+    expect(resetChat(l).chatPlace).toEqual({ kind: 'auto' });
+    expect(effective(l, true).chatPlace).toEqual({ kind: 'auto' });
   });
 });
 

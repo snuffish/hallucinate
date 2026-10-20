@@ -188,3 +188,69 @@ test('layout: widgets and docks resize, and keep their size after a reload', asy
   await page.locator('#w-scene > .grip.corner').dblclick();
   await expect.poll(async () => Math.round((await box(page.locator('#w-scene'))).width)).toBe(Math.round(before.width));
 });
+
+test('layout: a widget drags by any part of its body, but not by its controls', async ({ page }) => {
+  await page.goto('/');
+  await start(page);
+  // The Audio widget's meters are not controls: dragging them floats the widget where it is dropped.
+  await dragTo(page, page.locator('#w-audio .meters'), 800, 300);
+  await expect(page.locator('#w-audio')).toHaveClass(/\bfloating\b/);
+  const audio = await box(page.locator('#w-audio'));
+  expect(audio.x).toBeGreaterThan(600);
+
+  // A Look slider takes the press itself: the widget stays docked.
+  const slider = page.locator('#w-look input[type="range"]').first();
+  await slider.scrollIntoViewIfNeeded();
+  const s = await box(slider);
+  await page.mouse.move(s.x + 10, s.y + s.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(s.x + 200, s.y + 200, { steps: 10 });
+  await page.mouse.up();
+  await expect(page.locator('.dock-zone.left #w-look')).toBeVisible();
+  await expect(page.locator('#w-look')).not.toHaveClass(/\bfloating\b/);
+
+  // A double-click on the body puts it back.
+  await page.locator('#w-audio .meters').dblclick();
+  await expect(page.locator('.dock-zone.left #w-audio')).toBeVisible();
+});
+
+test('layout: the Hallucinate widget resizes like the others', async ({ page }) => {
+  await page.goto('/');
+  await start(page);
+  const hub = await box(page.locator('#hub'));
+  await dragBy(page, page.locator('#hub > .grip.height'), 0, 60);
+  await expect.poll(async () => Math.round((await box(page.locator('#hub'))).height - hub.height)).toBe(60);
+  await page.reload();
+  await start(page);
+  expect(Math.round((await box(page.locator('#hub'))).height - hub.height)).toBe(60);
+});
+
+test('layout: the chat window drags by its frame, stays there after a reload, and a double-click puts it back beside the bubble', async ({ page }) => {
+  await page.goto('/');
+  await start(page);
+  await page.keyboard.press('i');
+  const chat = page.locator('#ai');
+  await expect(chat).toBeVisible();
+  const beside = await box(chat);
+  // Its padding is part of no control.
+  await page.mouse.move(beside.x + 5, beside.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(beside.x + 100, beside.y + 5, { steps: 4 });
+  await page.mouse.move(beside.x + 405, beside.y + 25, { steps: 10 });
+  await page.mouse.up();
+  await expect(chat).toHaveClass(/\bmoved\b/);
+  const moved = await box(chat);
+  expect(moved.x).toBeCloseTo(beside.x + 400, -1);
+
+  await page.reload();
+  await start(page);
+  await page.keyboard.press('i');
+  await expect(chat).toBeVisible();
+  const again = await box(chat);
+  expect(again.x).toBeCloseTo(moved.x, 0);
+  expect(again.y).toBeCloseTo(moved.y, 0);
+
+  await page.mouse.dblclick(again.x + 5, again.y + 5);
+  await expect(chat).not.toHaveClass(/\bmoved\b/);
+  expect((await box(chat)).x).toBeCloseTo(beside.x, 0);
+});
