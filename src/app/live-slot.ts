@@ -47,6 +47,8 @@ const output = (): FullFrame => ({ program: programState(), params: {} });
 // changes nothing; trims below 1 only lower what the safety rules checked.
 export interface MasterTrims { reactivity: number; speed: number; trails: number; aberration: number; hue: number }
 export const NEUTRAL_TRIMS: Readonly<MasterTrims> = { reactivity: 1, speed: 1, trails: 1, aberration: 1, hue: 0 };
+// ×0–1 for the sliders, ±0.5 of the wheel for the colour.
+export const trimRange = (key: keyof MasterTrims): { min: number; max: number } => (key === 'hue' ? { min: -0.5, max: 0.5 } : { min: 0, max: 1 });
 
 export class LiveSlot {
   trims: Readonly<MasterTrims> = NEUTRAL_TRIMS;

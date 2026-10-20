@@ -15,6 +15,7 @@ import { textOf } from '../../assistant/transcript';
 import { addUsage, formatCost, formatTokens, newInput, NO_USAGE, type Usage } from '../../assistant/usage';
 import { useStore } from '../../state/store';
 import { AiChange } from './AiChange';
+import { plural } from '../../app/plural';
 
 type Part = UIMessage['parts'][number];
 
@@ -63,7 +64,7 @@ function Thinking({ content, live, open }: { content: string; live: boolean; ope
   const n = words(content);
   return (
     <details className={`ai-thinking${live ? ' live' : ''}`} open={open}>
-      <summary>{live ? 'Thinking…' : 'Thought about it'} <span className="ai-thinking-count">· {n} word{n === 1 ? '' : 's'}</span></summary>
+      <summary>{live ? 'Thinking…' : 'Thought about it'} <span className="ai-thinking-count">· {plural(n, 'word')}</span></summary>
       <div className="ai-thinking-body" ref={body}>
         <Markdown components={MD_COMPONENTS}>{content}</Markdown>
         {!live && <CopyButton text={() => content} label="Copy reasoning" className="ai-copy-thinking" />}

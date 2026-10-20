@@ -3,6 +3,7 @@
 
 import { z } from 'zod';
 import { AUDIO_HELP, AUDIO_OUTPUTS } from './scene-inputs';
+import { hexToRgb } from './math';
 
 export type PortType = 'float' | 'vec2' | 'vec3';
 export interface NodeInput { name: string; type: PortType; def: number | number[] | string }
@@ -261,8 +262,7 @@ function glslFloat(v: string | number | undefined): string {
 }
 
 function hexToVec3(hex: string): string {
-  const n = parseInt(hex.slice(1), 16);
-  return `vec3(${[16, 8, 0].map((sh) => glslFloat(((n >> sh) & 255) / 255).slice(0, 5)).join(', ')})`;
+  return `vec3(${hexToRgb(hex).map((c) => glslFloat(c).slice(0, 5)).join(', ')})`;
 }
 
 function literal(input: NodeInput, value: number | undefined): string {

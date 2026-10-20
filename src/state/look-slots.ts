@@ -10,7 +10,8 @@ import type { Routes } from '../engine/look-routes';
 import { SLIDER_KEYS, type Look, type SliderKey, type SlotOrder } from './app-state';
 import { RANDOM_RANGES } from './look-drift';
 import { RoutesSchema, slider } from './look-store';
-import { KEYS, debouncedWriter, readJSON, type DebouncedWriter } from './persistence';
+import { KEYS, QUICK_WRITE_MS, debouncedWriter, readJSON, type DebouncedWriter } from './persistence';
+import { clamp01, lerpHue, smoothstep } from '../engine/math';
 
 export const SLOT_NAMES = ['A', 'B', 'C', 'D'] as const;
 export type SlotLook = Record<SliderKey, number>;
@@ -23,7 +24,7 @@ const SlotSchema = z.object({ ...Object.fromEntries(SLIDER_KEYS.map((k) => [k, s
 export const LookSlotsSchema = z.array(SlotSchema.nullable().catch(null)).length(SLOT_NAMES.length).catch(EMPTY.slice());
 
 export const loadLookSlots = (): LookSlots => readJSON(KEYS.lookSlots, LookSlotsSchema, EMPTY);
-export const lookSlotsWriter = (read: () => LookSlots): DebouncedWriter => debouncedWriter(KEYS.lookSlots, read, 300);
+export const lookSlotsWriter = (read: () => LookSlots): DebouncedWriter => debouncedWriter(KEYS.lookSlots, read, QUICK_WRITE_MS);
 
 export const slotOf = (look: Readonly<Look>): SlotLook => Object.fromEntries(SLIDER_KEYS.map((k) => [k, look[k]])) as SlotLook;
 // What a slot stores: the sliders and the routes, copied.
@@ -42,8 +43,6 @@ export function nextSlot(slots: LookSlots, at: number, order: SlotOrder, random:
 }
 
 const RECALL_SECONDS = 1;
-const ease = (x: number) => x * x * (3 - 2 * x);
-const fract = (x: number) => x - Math.floor(x);
 
 // A recall in progress, stepped by the frame loop after Drift (so it wins while both run). No allocation
 // per frame.
@@ -65,10 +64,10 @@ export class LookGlide {
   step(look: Look, dt: number): void {
     if (!this.active) return;
     this.t = Math.min(1, this.t + dt / RECALL_SECONDS);
-    const e = ease(this.t);
+    const e = smoothstep(this.t);
     for (const k of SLIDER_KEYS) {
       const from = this.from[k], to = this.to[k];
-      look[k] = k === 'hue' ? fract(from + (fract(to - from + 0.5) - 0.5) * e) : from + (to - from) * e;
+      look[k] = k === 'hue' ? lerpHue(from, to, e) : from + (to - from) * e;
     }
   }
 }
@@ -77,5 +76,10 @@ export class LookGlide {
 export const INTENSITY_KEYS: readonly SliderKey[] = ['reactivity', 'trails', 'aberration'];
 export const intensityValue = (key: SliderKey, x: number): number => {
   const [min, max] = RANDOM_RANGES[key];
-  return min + (max - min) * Math.min(1, Math.max(0, x));
+  return min + (max - min) * clamp01(x);
 };
+// Sets Intensity to `x` and moves the unlocked INTENSITY_KEYS with it.
+export function applyIntensity(look: Look, x: number): void {
+  look.intensity = clamp01(x);
+  for (const k of INTENSITY_KEYS) if (!look.locked.includes(k)) look[k] = intensityValue(k, look.intensity);
+}

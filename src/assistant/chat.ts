@@ -9,6 +9,8 @@ import type { ToolRunner } from './executor';
 import { relayToolCalls } from './relay';
 import { sealInterrupted } from './transcript';
 import { contextOf, usageOf, type Usage } from './usage';
+import { postJSON } from '../app/http';
+import { NEW_CHAT_URL } from './relay-wire';
 
 // Browser-run tools continue a run after its stream ends: a run is over once the stream is closed
 // and no tool is running, for this long.
@@ -140,5 +142,5 @@ export class Chat {
 
 // The subscription backend keeps a CLI session per thread: this drops it.
 export function forgetThread(threadId: string): void {
-  fetch('/api/assistant/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId }) }).catch(() => {});
+  postJSON(NEW_CHAT_URL, { threadId }).catch(() => {});
 }

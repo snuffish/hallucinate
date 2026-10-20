@@ -12,6 +12,7 @@ import { KEYS, readJSON, readWithDefaults, writeJSON } from '../state/persistenc
 import { useStore } from '../state/store';
 import { HelpButton } from './Help';
 import { useMonitorDrag } from './widgets/useMonitorDrag';
+import { plural } from '../app/plural';
 
 const SHOWN = 500;            // the newest lines drawn; Copy and Export take every line that matches
 const HISTORY = 50;           // commands kept for ↑ / ↓
@@ -100,11 +101,11 @@ function LogPanel() {
   const say = (level: LogLevel, text: string, detail?: string) => log.push({ level, source: 'command', text, detail });
   const copy = () => {
     const text = toText(matching);
-    navigator.clipboard.writeText(text).then(() => say('info', `Copied ${matching.length} line${matching.length === 1 ? '' : 's'}`), (err: Error) => say('error', `Couldn't copy: ${err.message}`));
+    navigator.clipboard.writeText(text).then(() => say('info', `Copied ${plural(matching.length, 'line')}`), (err: Error) => say('error', `Couldn't copy: ${err.message}`));
   };
   const save = () => {
     downloadFile(new Blob([toText(matching)], { type: 'text/plain' }), `hallucinate-${fileStamp()}.log`);
-    say('info', `Saved ${matching.length} line${matching.length === 1 ? '' : 's'}`);
+    say('info', `Saved ${plural(matching.length, 'line')}`);
   };
   const clear = () => { log.clear(); setPaused(null); setOpen(new Set()); };
   // The last change a tool made, from here or the assistant: they share one undo stack.

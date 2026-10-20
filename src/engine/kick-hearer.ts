@@ -15,6 +15,8 @@
 //   kickHearer.signal(now)                   the rises and the pulses due, for the Hearing monitor
 //   kickHearer.candidates()                  ... and the pulses the rises could be, as last read
 
+import { clamp01 } from './math';
+
 const KICK_HZ = [20, 280] as const;   // the kick's body and its top, which still rises when the sub is clipped
 const KICK_STRENGTH = 0.15;           // a kick rises at least this much of the rise usually heard on the pulse ...
 const KICK_MIN_RISE = 8;              // ... and at least this much at all (byte steps over the kick's bins)
@@ -265,14 +267,14 @@ export class KickHearer {
       let sum = 0, terms = 0;
       for (let m = 1; m <= PULSE_MULTIPLES && m * lag <= reach; m++) { sum += acf[m * lag]! / m; terms += 1 / m; }
       const prior = preference(lag);
-      this.strengths[lag] = Math.min(1, Math.max(0, sum / terms / energy));
+      this.strengths[lag] = clamp01(sum / terms / energy);
       if (acf[lag]! > 0 && (sum / terms) * prior > best) { best = (sum / terms) * prior; bestLag = lag; }
     }
     // A grid of kicks repeats at twice its period as strongly as at its period: the multiples can't tell 174
     // from 87. Where the rises repeat as strongly at half the lag, the pulse is that.
     const half = Math.round(bestLag / 2);
     if (half >= lo && acf[half]! >= acf[bestLag]! * PULSE_HALVED) bestLag = half;
-    this.clarity = bestLag ? Math.min(1, Math.max(0, acf[bestLag]! / energy)) : 0;
+    this.clarity = bestLag ? clamp01(acf[bestLag]! / energy) : 0;
     if (!bestLag || acf[bestLag]! / energy < PULSE_CLARITY) { this.lose(now); return; }
     this.pulseHeardAt = now;
     // The period to a fraction of a cell: from the peak at the furthest multiple in reach, divided back.

@@ -6,6 +6,7 @@
 // Adding an input is one row here, plus its field on ProgramState and the code that fills it.
 
 import type { Hearing } from './listener';
+import { clamp01 } from './math';
 
 const BAND = '0…1, up to 1.5 at high reactivity';
 const SLOW = '0…1, changes over seconds, not scaled by reactivity';
@@ -73,7 +74,7 @@ export function stillSpectrum(): Uint8Array {
   const spectrum = new Uint8Array(512);
   for (let i = 0; i < 256; i++) {
     const x = i / 255;
-    spectrum[i * 2] = 255 * Math.min(1, Math.max(0, 0.85 - x * 0.55 + 0.15 * Math.sin(i * 0.21)));
+    spectrum[i * 2] = 255 * clamp01(0.85 - x * 0.55 + 0.15 * Math.sin(i * 0.21));
     spectrum[i * 2 + 1] = 128 + 90 * Math.sin(x * 25) * Math.cos(x * 7);
   }
   return spectrum;

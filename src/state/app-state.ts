@@ -58,6 +58,7 @@ export const LOOK_RANGES: Record<LookKey, { min: number; max: number; step: numb
   aberration: { min: 0, max: 0.04, step: 0.001 },
   driftSpeed: { min: 0.2, max: 4, step: 0.05 },
 };
+export const clampLook = (key: LookKey, v: number): number => Math.min(LOOK_RANGES[key].max, Math.max(LOOK_RANGES[key].min, v));
 
 // The XY pads start on the pairs a performer reaches for together: how fast and how hard, and where the
 // colour sits and how fast it walks.

@@ -8,6 +8,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { isIP } from 'node:net';
+import { sendJSON } from './http';
 
 export type Handler = (req: IncomingMessage, res: ServerResponse) => unknown;
 
@@ -57,8 +58,7 @@ export function guarded(handler: Handler, extra: readonly string[] = allowedHost
   return (req, res) => {
     const reason = refusal(req, extra);
     if (!reason) return handler(req, res);
-    res.writeHead(403, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: reason }));
+    sendJSON(res, 403, { error: reason });
   };
 }
 

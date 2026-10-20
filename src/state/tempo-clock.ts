@@ -6,6 +6,8 @@
 //   clock.advance(now)           once per frame: how many ticks fell due since last time
 //   clock.phase(now)             how far through the current tick: 0 on the tick, rising towards 1
 
+import { clamp01 } from '../engine/math';
+
 export class TempoClock {
   private interval = 0;     // seconds per beat; 0 = no tempo yet
   private next = 0;         // when the next tick is due
@@ -40,7 +42,7 @@ export class TempoClock {
   // How far `now` is through the current tick, 0..1 (0 with no tempo yet).
   phase(now: number): number {
     if (!this.interval) return 0;
-    return Math.min(1, Math.max(0, (now - this.last) / this.interval));
+    return clamp01((now - this.last) / this.interval);
   }
 
   // Ticks that fell due by `now`. After a long stall (tab hidden) it catches up by at most one.

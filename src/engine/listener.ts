@@ -11,6 +11,7 @@
 
 import { TempoClock } from '../state/tempo-clock';
 import { KickHearer, type KickSignal, type PulseCandidates } from './kick-hearer';
+import { clamp01 } from './math';
 
 const BANDS = { bass: [25, 140], mid: [140, 2000], high: [2000, 12000] } as const;
 const BAND_KEYS = ['bass', 'mid', 'high', 'level'] as const;
@@ -99,7 +100,6 @@ export interface HearingDiagnostics {
 }
 
 type Bands = Record<(typeof BAND_KEYS)[number], number>;
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const ease = (dt: number, seconds: number) => 1 - Math.exp(-dt / seconds);
 
 export class Listener {

@@ -1,5 +1,5 @@
-// What every /api handler does at the HTTP edge: answer with JSON, read a request body, and see the
-// path the client asked for.
+// What every /api handler does at the HTTP edge: answer with JSON or an event stream, read a request body,
+// and see the path the client asked for.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
@@ -11,6 +11,14 @@ export function sendJSON(res: ServerResponse, status: number, body?: unknown, he
   res.writeHead(status, { 'Content-Type': 'application/json', ...headers });
   res.end(JSON.stringify(body));
 }
+
+// Starts a server-sent event stream (unbuffered, so each event leaves at once); write `sseEvent`s to it.
+export function startEventStream(res: ServerResponse): void {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+}
+
+// One server-sent event: its name and one JSON line of data.
+export const sseEvent = (event: string, data: unknown): string => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 
 // The body as text. Past `maxBytes` the request is cut off and this rejects with `tooLarge`.
 export function readBody(req: IncomingMessage, maxBytes: number, tooLarge = 'too large'): Promise<string> {

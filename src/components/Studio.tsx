@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useApp, useUI } from '../app/AppContext';
 import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
 import { useSessions } from '../app/sessions';
-import { AUTO_BEATS, AUTO_SECONDS, type AutoUnit, type Cue } from '../app/studio';
+import { AUTO_BEATS, AUTO_SECONDS, STUDIO_LIMITS, type AutoUnit, type Cue } from '../app/studio';
 import { DIRECTOR_BEATS, DIRECTOR_SECONDS } from '../director/director';
 import { laserCss } from '../engine/laser-colour';
 import { HOTKEYS, CUE_DIGITS } from '../hotkeys/registry';
@@ -15,7 +15,7 @@ import { StudioParams } from './ParamOverlay';
 import { DirectorChanges } from './DirectorChanges';
 import { HelpButton } from './Help';
 import { FineRange, NumberField } from './widgets/LookSlider';
-import { NEUTRAL_TRIMS, type MasterTrims } from '../app/live-slot';
+import { NEUTRAL_TRIMS, trimRange, type MasterTrims } from '../app/live-slot';
 import type { StudioSession } from '../app/studio';
 
 export function Studio() {
@@ -100,7 +100,7 @@ export function Studio() {
             <button id="st-fade" className={studio.mode === 'fade' ? 'active' : undefined} onClick={() => studio.setMode('fade')}>Fade</button>
           </div>
           <label>Fade <output id="st-dur-val">{studio.seconds.toFixed(1)} s</output>
-            <input type="range" id="st-dur" min={0.2} max={8} step={0.1} value={studio.seconds} disabled={studio.mode === 'cut'} onChange={(e) => studio.setSeconds(Number(e.target.value))} />
+            <input type="range" id="st-dur" min={STUDIO_LIMITS.seconds.min} max={STUDIO_LIMITS.seconds.max} step={0.1} value={studio.seconds} disabled={studio.mode === 'cut'} onChange={(e) => studio.setSeconds(Number(e.target.value))} />
           </label>
         </div>
         <figure className="monitor program">
@@ -247,12 +247,12 @@ export function Studio() {
 
 // Live's master trims (ADR 0006): turn down what each show scene's look sets, and shift its colour, on Live
 // and the Preview monitor. Double-click one to put it back.
-const TRIMS: { key: keyof MasterTrims; label: string; scale: number; unit: string; min: number; max: number }[] = [
-  { key: 'reactivity', label: 'Reactivity', scale: 100, unit: '%', min: 0, max: 1 },
-  { key: 'speed', label: 'Speed', scale: 100, unit: '%', min: 0, max: 1 },
-  { key: 'trails', label: 'Trails', scale: 100, unit: '%', min: 0, max: 1 },
-  { key: 'aberration', label: 'Fringing', scale: 100, unit: '%', min: 0, max: 1 },
-  { key: 'hue', label: 'Colour shift', scale: 360, unit: '°', min: -0.5, max: 0.5 },
+const TRIMS: { key: keyof MasterTrims; label: string; scale: number; unit: string }[] = [
+  { key: 'reactivity', label: 'Reactivity', scale: 100, unit: '%' },
+  { key: 'speed', label: 'Speed', scale: 100, unit: '%' },
+  { key: 'trails', label: 'Trails', scale: 100, unit: '%' },
+  { key: 'aberration', label: 'Fringing', scale: 100, unit: '%' },
+  { key: 'hue', label: 'Colour shift', scale: 360, unit: '°' },
 ];
 
 function MasterLook({ studio }: { studio: StudioSession }) {
@@ -264,7 +264,7 @@ function MasterLook({ studio }: { studio: StudioSession }) {
         <div key={t.key} className="look-row">
           <span />
           <label htmlFor={`st-trim-${t.key}`}>{t.label}</label>
-          <FineRange id={`st-trim-${t.key}`} label={`Master ${t.label}`} value={studio.trims[t.key]} r={{ min: t.min, max: t.max, step: 0.01 }}
+          <FineRange id={`st-trim-${t.key}`} label={`Master ${t.label}`} value={studio.trims[t.key]} r={{ ...trimRange(t.key), step: 0.01 }}
             onSet={(v) => studio.setTrim(t.key, v)} onReset={() => studio.setTrim(t.key, NEUTRAL_TRIMS[t.key])} />
           <NumberField d={{ label: `Master ${t.label}`, scale: t.scale, unit: t.unit, digits: 0 }} value={studio.trims[t.key]} onSet={(v) => studio.setTrim(t.key, v)} />
         </div>

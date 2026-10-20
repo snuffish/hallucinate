@@ -8,6 +8,7 @@ import { HearingWorkbench } from './HearingWorkbench';
 import { Plot, type Draw } from './HearingPlot';
 import { COLOURS } from './hearing-workbench';
 import { useMonitorDrag } from './widgets/useMonitorDrag';
+import { clamp01 } from '../engine/math';
 
 const BAND_EDGES_HZ = [25, 140, 2000, 12000];   // the Listener's bands: bass, mid, high
 const BAND_NAMES = ['bass', 'mid', 'high'];       // between those edges
@@ -96,7 +97,7 @@ function drawCandidates(cand: HearingDiagnostics['candidates'], heard: number | 
   };
 }
 
-const bar = (v: number) => ({ transform: `scaleX(${Math.min(1, Math.max(0, v))})` });
+const bar = (v: number) => ({ transform: `scaleX(${clamp01(v)})` });
 
 // Shift+L: what the Listener hears and why, and what the scene gets from it, ~15 Hz while open (see docs/audio.md).
 export function HearingMonitor() {

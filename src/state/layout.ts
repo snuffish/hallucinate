@@ -155,12 +155,15 @@ export function setCollapsed(layout: Layout, id: WidgetId, collapsed: boolean): 
   return withWidget(layout, id, { collapsed });
 }
 
+// `cur` with the dimensions `size` gives: each clamped, null back to automatic, a missing one left as it was.
+function applySize(cur: WidgetSize, size: Partial<WidgetSize>, clampW: (w: number) => number, clampH: (h: number) => number): WidgetSize {
+  const dim = (v: number | null | undefined, was: number | null, clamp: (v: number) => number) => (v === undefined ? was : v === null ? null : clamp(v));
+  return { w: dim(size.w, cur.w, clampW), h: dim(size.h, cur.h, clampH) };
+}
+
 // A dragged size; null puts that dimension back to automatic.
 export function resize(layout: Layout, id: WidgetId, size: Partial<WidgetSize>): Layout {
-  const cur = layout.widgets[id].size;
-  const w = size.w === undefined ? cur.w : size.w === null ? null : clampW(size.w);
-  const h = size.h === undefined ? cur.h : size.h === null ? null : clampH(size.h);
-  return withWidget(layout, id, { size: { w, h } });
+  return withWidget(layout, id, { size: applySize(layout.widgets[id].size, size, clampW, clampH) });
 }
 
 export function setDockWidth(layout: Layout, zone: SideZone, width: number): Layout {
@@ -187,10 +190,7 @@ export function setBubbleShown(layout: Layout, shown: boolean): Layout {
 
 // The chat window's dragged size; null puts that dimension back to the stylesheet's.
 export function resizeChat(layout: Layout, size: Partial<WidgetSize>): Layout {
-  const cur = layout.chatSize;
-  const w = size.w === undefined ? cur.w : size.w === null ? null : clampTo(size.w, CHAT_MIN_W, Infinity);
-  const h = size.h === undefined ? cur.h : size.h === null ? null : clampTo(size.h, CHAT_MIN_H, Infinity);
-  return { ...layout, chatSize: { w, h } };
+  return { ...layout, chatSize: applySize(layout.chatSize, size, (w) => clampTo(w, CHAT_MIN_W, Infinity), (h) => clampTo(h, CHAT_MIN_H, Infinity)) };
 }
 
 export function moveBubble(layout: Layout, rect: Rect, viewport: Size): Layout {
@@ -208,10 +208,7 @@ export function resetMonitor(layout: Layout, id: MonitorId): Layout {
 
 // A monitor's dragged size; null puts that dimension back to the stylesheet's.
 export function resizeMonitor(layout: Layout, id: MonitorId, size: Partial<WidgetSize>): Layout {
-  const cur = layout.monitorSize[id];
-  const w = size.w === undefined ? cur.w : size.w === null ? null : clampW(size.w);
-  const h = size.h === undefined ? cur.h : size.h === null ? null : clampH(size.h);
-  return { ...layout, monitorSize: { ...layout.monitorSize, [id]: { w, h } } };
+  return { ...layout, monitorSize: { ...layout.monitorSize, [id]: applySize(layout.monitorSize[id], size, clampW, clampH) } };
 }
 
 // The chat window floats where it was dropped; reset puts it back beside the bubble.
@@ -274,7 +271,7 @@ export function parseLayout(raw: unknown): Layout {
     const entry = WidgetLayoutSchema.safeParse(stored.data.widgets[id]);
     if (!entry.success) continue;
     const size = entry.data.size ?? AUTO;
-    layout.widgets[id] = { ...entry.data, size: { w: size.w === null ? null : clampW(size.w), h: size.h === null ? null : clampH(size.h) } };
+    layout.widgets[id] = { ...entry.data, size: applySize(AUTO, size, clampW, clampH) };
   }
   layout.widgets.hub.open = true;
   const bubble = AutoOrFloatSchema.safeParse(stored.data.bubble);

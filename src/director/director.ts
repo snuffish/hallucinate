@@ -12,6 +12,7 @@ import { DIRECTOR_CHAT, type ChangeDraft, type ChangeLog } from '../assistant/ch
 import { createToolRunner, type ToolRunner } from '../assistant/executor';
 import { createLock, serialized, type Lock } from '../assistant/lock';
 import type { Usage } from '../assistant/usage';
+import { ASSISTANT_URL } from '../assistant/settings-wire';
 import { soundNow } from '../engine/listener';
 import { Store } from '../state/store';
 import { buildDigest, type DigestInput } from './digest';
@@ -142,7 +143,7 @@ export class Director {
     this.history.markCycle();
     const planBefore = this.studio.plan;
     this.store.set({ cycling: true, error: null });
-    const chat = new Chat({ connection: this.opts.connection ?? fetchServerSentEvents('/api/assistant'), runner: this.runner, threadId, body: { mode: 'director' } }, {
+    const chat = new Chat({ connection: this.opts.connection ?? fetchServerSentEvents(ASSISTANT_URL), runner: this.runner, threadId, body: { mode: 'director' } }, {
       usage: (u) => this.countUsage(u),
       error: (message) => this.store.set({ error: message }),
     });

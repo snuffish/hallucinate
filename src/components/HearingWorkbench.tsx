@@ -10,6 +10,7 @@ import {
   AXIS_HEIGHT, COLOURS, GROUPS, PRESETS, SIGNALS, SPANS, lanesFor, loadWorkbench, peaksOver, presetOf, sampleAt, saveWorkbench, toggleSignal,
   type Lane, type Signal, type WorkbenchSettings,
 } from './hearing-workbench';
+import { clamp01 } from '../engine/math';
 
 const WATCH = 6;          // seconds of rises, due windows and threshold the Listener keeps
 const KICK_NEAR = 0.06;   // seconds: a kick this close to the hovered moment is "here"
@@ -23,7 +24,7 @@ function drawLine(c: CanvasRenderingContext2D, samples: readonly HearingSample[]
   let [lo, hi] = s.range ?? [Infinity, -Infinity];
   if (!s.range) for (const v of values) if (v !== null) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
   if (!(hi > lo)) hi = lo + 1;
-  const y = (v: number) => lane.top + lane.height - 1 - Math.min(1, Math.max(0, (v - lo) / (hi - lo))) * (lane.height - 2);
+  const y = (v: number) => lane.top + lane.height - 1 - clamp01((v - lo) / (hi - lo)) * (lane.height - 2);
   c.strokeStyle = s.colour;
   c.beginPath();
   let drawing = false;
@@ -151,7 +152,7 @@ export function HearingWorkbench({ view }: { view: HearingView }) {
         ))}
       </div>
 
-      <div className="hearing-bench-plot" onPointerMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHover(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))); }} onPointerLeave={() => setHover(null)}>
+      <div className="hearing-bench-plot" onPointerMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHover(clamp01((e.clientX - r.left) / r.width)); }} onPointerLeave={() => setHover(null)}>
         {height
           ? <Plot label="Signals" height={height} draw={drawWorkbench(shown, signals, span, hover, whatIf)} />
           : <div className="hearing-meta">Pick a signal or a preset above</div>}

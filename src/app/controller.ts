@@ -15,18 +15,18 @@ import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, 
 import { Renderer, type ProgramState } from '../engine/renderer';
 import { readInputs, silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
 import { userSceneId, type Scene } from '../scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, PALETTE_MAX, SLIDER_KEYS, defaultClock, defaultLook, type AppState, type AutoSlots, type LookKey, type Palette, type SliderKey, type SourceButton, type XYAxes } from '../state/app-state';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, clampLook, MAX_SECONDS_PER_SCENE, PALETTE_MAX, SLIDER_KEYS, defaultClock, defaultLook, type AppState, type AutoSlots, type LookKey, type Palette, type SliderKey, type SourceButton, type XYAxes } from '../state/app-state';
 import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
-import { KEYS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
+import { KEYS, QUICK_WRITE_MS, debouncedWriter, flushAll, freeze, readFlag, readString, remove, unfreeze, writeFlag, writeJSON, writeString } from '../state/persistence';
 import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, type Prefs } from '../state/prefs';
 import { SceneHistory } from '../state/scene-history';
 import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
 import { takeRenameReport } from '../state/scene-renames';
 import { ROUTE_TARGETS, followed, type Route, type RouteTarget } from '../engine/look-routes';
 import { loadLook, lookWriter } from '../state/look-store';
-import { INTENSITY_KEYS, LookGlide, SLOT_NAMES, intensityValue, loadLookSlots, lookSlotsWriter, nextSlot, slotOf, slotWithRoutes, type LookSlots } from '../state/look-slots';
+import { LookGlide, SLOT_NAMES, applyIntensity, loadLookSlots, lookSlotsWriter, nextSlot, slotOf, slotWithRoutes, type LookSlots } from '../state/look-slots';
 import { loadScreenEffects, screenEffectsWriter } from '../state/screen-effects';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HearingView, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
@@ -37,10 +37,10 @@ import { LiveSlot, type Shot } from './live-slot';
 import { MusicSource } from './music-source';
 import { SceneLibrary, type SceneChange } from './scene-library';
 import { Transport } from './transport';
+import { fract } from '../engine/math';
 
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
 const LOOK_PUBLISH_FRAMES = 6;
-const fract = (x: number): number => x - Math.floor(x);
 const NOT_FOLLOWED = {};   // no slider follows the music   // the Look widget follows Drift and the hue on screen at ~10 Hz
 const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second, however slow the frames
 const HEARING_PUBLISH_FRAMES = 4;   // the Hearing monitor follows at ~15 Hz: its lights and traces move
@@ -124,7 +124,7 @@ export class AppController {
   private readonly downloads = new Map<'sc' | 'yt', DownloadView>();
   private disposed = false;
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
-  private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
+  private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), QUICK_WRITE_MS);
   private readonly effectsWriter = screenEffectsWriter(() => this.state.effects);
   private readonly lookWriter = lookWriter(() => this.state.look);
   private lookSlots: LookSlots = loadLookSlots();
@@ -634,9 +634,7 @@ export class AppController {
   // Any change to a slider (a hand, a take, the assistant) ends a slot's glide there.
   setLook(key: LookKey, value: number): void {
     this.glide.stop();
-    const r = LOOK_RANGES[key];
-    const v = Math.min(r.max, Math.max(r.min, value));
-    this.state.look[key] = v;
+    this.state.look[key] = clampLook(key, value);
     this.publishLook();
   }
 
@@ -690,8 +688,7 @@ export class AppController {
   setIntensity(x: number): void {
     const look = this.state.look;
     this.glide.stop();
-    look.intensity = Math.min(1, Math.max(0, x));
-    for (const k of INTENSITY_KEYS) if (!look.locked.includes(k)) look[k] = intensityValue(k, look.intensity);
+    applyIntensity(look, x);
     this.publishLook();
   }
 

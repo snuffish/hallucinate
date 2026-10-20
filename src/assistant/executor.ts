@@ -13,13 +13,14 @@ import type { Scene } from '../scenes';
 import { soundNow } from '../engine/listener';
 import { HELP_TOPICS, shortcutRows, type HelpTopic } from '../help/topics';
 import { ROUTE_TARGETS, type Route, type RouteTarget, type Routes } from '../engine/look-routes';
-import { LOOK_KEYS, LOOK_RANGES, type LookKey, type Palette } from '../state/app-state';
+import { LOOK_KEYS, LOOK_RANGES, clampLook, type LookKey, type Palette } from '../state/app-state';
 import { INTENSITY_KEYS, SLOT_NAMES } from '../state/look-slots';
 import { MAX_PLAN_STEP_SECONDS, PlanSchema, type Plan } from '../state/show-plan';
 import type { z } from 'zod';
 import type { UndoStack } from './undo';
 import type { ChangeDraft, ChangeKind } from './change-log';
 import { TOOL_DEFINITIONS, type ContentParts, type ToolName } from './tools';
+import { hexToRgb } from '../engine/math';
 
 export interface AssistantContext { run: ToolRunner }
 // `call`: which of the model's tool calls this is, so what it changed can be shown under it.
@@ -57,8 +58,7 @@ function coerceParam(spec: ParamSpec, raw: unknown): ParamValue | undefined {
   if (spec.type === 'float') return Number.isFinite(Number(raw)) ? Number(raw) : undefined;
   const size = spec.def.length;
   if (typeof raw === 'string' && /^#[0-9a-f]{6}$/i.test(raw)) {
-    const n = parseInt(raw.slice(1), 16);
-    const rgb = [n >> 16, n >> 8, n].map((c) => (c & 255) / 255);
+    const rgb = hexToRgb(raw);
     return size === 4 ? [...rgb, 1] : size === 3 ? rgb : undefined;
   }
   if (Array.isArray(raw) && raw.length === size && raw.every((x) => Number.isFinite(Number(x)))) return raw.map(Number);
@@ -104,8 +104,7 @@ function coerceLook(raw: unknown): Record<string, number> {
   for (const [k, v] of Object.entries((raw ?? {}) as Record<string, unknown>)) {
     const key = k as LookKey;
     if (!LOOK_KEYS.includes(key) || !Number.isFinite(Number(v))) continue;
-    const r = LOOK_RANGES[key];
-    look[key] = Math.min(r.max, Math.max(r.min, Number(v)));
+    look[key] = clampLook(key, Number(v));
   }
   return look;
 }
@@ -138,6 +137,10 @@ function nearMiss(code: string, find: string): string {
 // Parameter values as the model gets them back after a change: name → value, numbers rounded.
 const round = (v: ParamValue): ParamValue => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : Array.isArray(v) ? v.map((x) => Math.round(x * 1000) / 1000) : v);
 const round2 = (x: number) => Math.round(x * 100) / 100;
+
+// A scene's or show scene's name as the model gives it: trimmed and cut to a length the panels can show.
+const NAME_MAX = 60;
+const nameOf = (name: unknown): string => String(name).trim().slice(0, NAME_MAX);
 
 // A plan's wall-clock ceilings, raised so each step can play all its beats at `bpm` (with a quarter
 // to spare, for a tempo that drifts): a ceiling under the step's own length cuts it short while the
@@ -349,7 +352,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
     },
 
     create_scene({ name, code }) {
-      const n = String(name).trim().slice(0, 60);
+      const n = nameOf(name);
       const out = app.library.add(n, String(code), { origin: { by: 'assistant', label: `Created "${n}"`, chatId: undo.chatId, toolCallId: current.toolCallId } });
       if ('error' in out) throw new Error(out.error.includes('exists') ? `${out.error} Pick another name, or edit it with write_scene_code.` : `It didn't compile, so nothing was created:\n${out.error}`);
       app.setScene(out.index);
@@ -432,7 +435,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
       if (scenes()[i]!.kind) throw new Error(`"${String(scene)}" can't be a show scene (only visual scenes can).`);
       const coerced = coerceValues(app.library.specs(i), values);
       const cue = undoable(`Added "${String(name ?? scene)}" to the show`, show(s), () =>
-        s.add({ name: String(name ?? scene).trim().slice(0, 60) || String(scene), scene: String(scene), values: coerced.values, look: coerceLook(look) }));
+        s.add({ name: nameOf(name ?? scene) || String(scene), scene: String(scene), values: coerced.values, look: coerceLook(look) }));
       return { added: cueView(s, cue), ...(coerced.problems.length && { problems: coerced.problems }), showScenes: s.cues.length };
     },
 
@@ -440,7 +443,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
       const s = studio();
       const cue = findCue(s, ref);
       const patch: Partial<Omit<Cue, 'id'>> = {};
-      if (typeof name === 'string' && name.trim()) patch.name = name.trim().slice(0, 60);
+      if (typeof name === 'string' && name.trim()) patch.name = nameOf(name);
       let sceneIndex = s.sceneIndex(cue);
       if (typeof scene === 'string') {
         sceneIndex = app.sceneByName(scene);
@@ -479,7 +482,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
       const s = studio();
       undoable('Changed the transition', transition(s), () => {
         if (mode === 'cut' || mode === 'fade') s.setMode(mode);
-        if (typeof seconds === 'number' && Number.isFinite(seconds)) s.setSeconds(Math.min(8, Math.max(0.2, seconds)));
+        if (typeof seconds === 'number' && Number.isFinite(seconds)) s.setSeconds(seconds);
       });
       return { transition: { mode: s.mode, seconds: s.seconds } };
     },

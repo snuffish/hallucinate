@@ -12,7 +12,7 @@ import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, extname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { requestUrl, sendJSON } from './http';
+import { requestUrl, sendJSON, sseEvent, startEventStream } from './http';
 import { filePath, sitePrefix, type FetchEvent, type FetchEventName, type Progress, type RemoteTrack, type SearchResponse, type SiteName } from '../src/remote/wire';
 
 const TYPES: Record<string, string> = {
@@ -172,8 +172,8 @@ export function createBridge(name: SiteName, { ytdlp = 'yt-dlp', env, run = spaw
   }
 
   function streamFetch(req: IncomingMessage, res: ServerResponse, link: string): void {
-    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-    const send = <K extends FetchEventName>(event: K, data: FetchEvent<K>) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    startEventStream(res);
+    const send = <K extends FetchEventName>(event: K, data: FetchEvent<K>) => res.write(sseEvent(event, data));
     let j: Job;
     try {
       j = job(link);

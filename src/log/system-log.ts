@@ -3,9 +3,9 @@
 // badge can count while it is closed. Pure: no DOM, so it is tested in node.
 
 import { Store } from '../state/store';
+import { LEVELS, type LogLevel } from './log-wire';
 
-export const LEVELS = ['error', 'warn', 'info', 'debug'] as const;
-export type LogLevel = (typeof LEVELS)[number];
+export { LEVELS, type LogLevel };
 // Where a line came from: the page's console (and its uncaught errors), the local server, the desktop app's
 // main process (Electron), the app's own events (scenes, music, tempo, the GPU), or a command typed into the
 // log and its answer.

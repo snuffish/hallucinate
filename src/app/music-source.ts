@@ -3,7 +3,7 @@
 // <audio> player), pauses here, and ends here, including when the audio engine lets go of it by itself
 // (a shared tab stops sharing, the microphone is unplugged). The only writer of `activeSource`.
 
-import type { AudioKind } from '../engine/audio';
+import { DEMO_BPM, type AudioKind } from '../engine/audio';
 import type { AppState, SourceButton } from '../state/app-state';
 import type { Transport } from './transport';
 
@@ -30,7 +30,7 @@ export interface MusicDeps {
   started(source: SourceButton): void;   // a source began playing (the controller resets the tempo, …)
 }
 
-const LABELS: Record<LiveSource, string> = { mic: 'Microphone / line-in', display: 'Tab / system audio', demo: 'Demo beat (124 BPM)' };
+const LABELS: Record<LiveSource, string> = { mic: 'Microphone / line-in', display: 'Tab / system audio', demo: `Demo beat (${DEMO_BPM} BPM)` };
 const ENDED: Partial<Record<AudioKind, string>> = {
   display: '❚❚ Tab audio stopped — share it again or pick another source',
   mic: '❚❚ The microphone stopped — pick a source',

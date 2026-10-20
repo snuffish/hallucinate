@@ -10,10 +10,9 @@ import { SCENE_INPUTS } from '../engine/scene-inputs';
 import { SCENES, TEMPLATE } from '../scenes';
 import type { Origin, Version } from '../state/scene-history';
 import { paramKey } from '../state/scene-list';
-import { HOTKEYS } from '../hotkeys/registry';
-import { Kbd } from '../hotkeys/Kbd';
 import { HelpButton } from './Help';
 import { relativeTime, SceneHistoryPanel } from './SceneHistoryPanel';
+import { CloseButton } from './CloseButton';
 
 const TITLES: Record<EditorTarget['kind'], string> = {
   custom: 'Your own scene',
@@ -139,7 +138,7 @@ export function Editor() {
         <button id="ed-history" title="Earlier versions of this scene's code, and who changed it" aria-pressed={historyOpen} hidden={readOnly} onClick={() => { flush(); setHistoryOpen(!historyOpen); }}>History</button>
         <button id="ed-save" title="Save this code as a new scene in the library" onClick={save}>Save to library</button>
         <HelpButton topic="editor" />
-        <button id="ed-close" className="icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
+        <CloseButton id="ed-close" />
       </header>
       {historyOpen && !readOnly && (
         <section id="ed-history-panel" aria-label="History">

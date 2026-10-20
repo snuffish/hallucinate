@@ -4,6 +4,7 @@ import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { HelpButton } from './Help';
 import { useMonitorDrag } from './widgets/useMonitorDrag';
+import { plural } from '../app/plural';
 
 const ms = (v: number) => v.toFixed(1);
 
@@ -54,7 +55,7 @@ function PerfPanel({ perf }: { perf: PerfReport }) {
       <div className="perf-meta">
         {w}×{h} canvas · scenes at ×{perf.scale.toFixed(2)}
         {perf.preview && ' · Preview monitor on'}
-        {perf.projectors > 0 && ` · ${perf.projectors} projector${perf.projectors === 1 ? '' : 's'}`}
+        {perf.projectors > 0 && ` · ${plural(perf.projectors, 'projector')}`}
         {perf.trace && ' · DevTools spans on'}
       </div>
       <div className="perf-fill">

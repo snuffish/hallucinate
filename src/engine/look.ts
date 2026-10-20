@@ -11,6 +11,7 @@ import { ROUTE_TARGETS, followMusic, type Routes } from './look-routes';
 import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
 import { stillHearing, type SnapshotUniforms } from './scene-inputs';
+import { smoothstep } from './math';
 
 // The sliders a frame is composed with: a show scene stores them (LOOK_KEYS); one saved before it kept
 // synesthesia takes the app's.
@@ -124,8 +125,6 @@ export function composeStill(scene: number, inputs: Readonly<SnapshotUniforms>, 
   const end = (then ?? inputs).uTime;
   return play({ ...start(), time: end - elapsed.time, turn: end - elapsed.turn });
 }
-
-export const smoothstep = (x: number): number => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 
 // A crossfade from `prevScene`, `fade` seconds long from `transitionStart`.
 export interface Transition { prevScene: number; transitionStart: number; fade: number }

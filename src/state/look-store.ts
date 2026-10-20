@@ -4,17 +4,14 @@
 // of its range is clamped back into it.
 
 import { z } from 'zod';
-import { AUTO_SLOT_BEATS, DEFAULT_XY, LOOK_RANGES, PALETTE_MAX, SLIDER_KEYS, WHEEL, defaultLook, type Look, type LookKey, type Palette, type SliderKey } from './app-state';
+import { AUTO_SLOT_BEATS, DEFAULT_XY, PALETTE_MAX, clampLook, SLIDER_KEYS, WHEEL, defaultLook, type Look, type LookKey, type Palette, type SliderKey } from './app-state';
 import { ROUTE_SECONDS, ROUTE_SOURCES, ROUTE_TARGETS, type Routes } from '../engine/look-routes';
-import { KEYS, debouncedWriter, readWithDefaults, type DebouncedWriter } from './persistence';
+import { KEYS, QUICK_WRITE_MS, debouncedWriter, readWithDefaults, type DebouncedWriter } from './persistence';
 
 const DEFAULTS = defaultLook();
 
 // A slider's stored value: the default when it isn't a number, clamped into its range when it is.
-export const slider = (key: LookKey) => {
-  const r = LOOK_RANGES[key];
-  return z.number().catch(DEFAULTS[key]).transform((v) => Math.min(r.max, Math.max(r.min, v)));
-};
+export const slider = (key: LookKey) => z.number().catch(DEFAULTS[key]).transform((v) => clampLook(key, v));
 // A palette (ADR 0004): 2–5 hues on the wheel, each wrapped into 0–1, or none (the whole wheel); fewer than
 // two hues read as none, extra ones are dropped.
 export const PaletteSchema = z.object({
@@ -68,4 +65,4 @@ export const LookSchema = z.object({
 export const loadLook = (): Look => readWithDefaults(KEYS.look, LookSchema);
 
 // Slider drags and Drift's glides coalesce into one write; the page's hiding flushes the last one.
-export const lookWriter = (read: () => Look): DebouncedWriter => debouncedWriter(KEYS.look, read, 300);
+export const lookWriter = (read: () => Look): DebouncedWriter => debouncedWriter(KEYS.look, read, QUICK_WRITE_MS);

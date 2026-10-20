@@ -6,6 +6,7 @@ import { toolDefinition, type SchemaInput } from '@tanstack/ai';
 import { z } from 'zod';
 import { ROUTE_SECONDS, ROUTE_SOURCES, ROUTE_TARGETS } from '../engine/look-routes';
 import { PlanSchema } from '../state/show-plan';
+import { plural } from '../app/plural';
 
 const sceneName = z.string().describe('Exact scene name. Omit for the scene on screen.');
 const record = z.record(z.string(), z.unknown());
@@ -79,7 +80,7 @@ export const TOOLS = [
     }),
     outputSchema: record,
     running: (i) => `Editing ${sceneLabel(i)}`,
-    done: (i) => { const n = Array.isArray(i.edits) ? i.edits.length : 0; return `Edited ${sceneLabel(i)}${n ? ` (${n} change${n === 1 ? '' : 's'})` : ''}`; },
+    done: (i) => { const n = Array.isArray(i.edits) ? i.edits.length : 0; return `Edited ${sceneLabel(i)}${n ? ` (${plural(n, 'change')})` : ''}`; },
   }),
   tool({
     name: 'create_scene',

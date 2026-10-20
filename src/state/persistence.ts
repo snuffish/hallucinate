@@ -124,6 +124,10 @@ export interface DebouncedWriter {
 const writers = new Set<DebouncedWriter>();
 export function flushAll(): void { for (const w of writers) w.flush(); }
 
+// The delay for state that changes while a control is dragged (the Look, the show, preferences): short, so a
+// reload right after loses little.
+export const QUICK_WRITE_MS = 300;
+
 export function debouncedWriter(key: string, read: () => unknown, delay = 500): DebouncedWriter {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let dirty = false;

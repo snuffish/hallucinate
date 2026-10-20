@@ -11,6 +11,7 @@ import { useHotkeyActions } from '../hooks/useAppHotkeys';
 import { Kbd } from '../hotkeys/Kbd';
 import { SPECIAL_TABS, inRotation, isFav, libraryTabs, listedScenes, togglePref } from '../state/library-prefs';
 import { HelpButton } from './Help';
+import { CloseButton } from './CloseButton';
 
 // Stand-in audio for the previews, so they look like the scene mid-song rather than silent.
 const THUMB_UNIFORMS = stillUniforms();
@@ -131,7 +132,7 @@ export function Library({ onEdit }: { onEdit: (index: number) => void }) {
           onChange={(e) => { setQuery(e.target.value); setFocused(-1); if (e.target.value.trim()) setFilter('All'); }} />
         <Kbd hotkey={HOTKEYS.librarySearch} />
         <HelpButton topic="library" />
-        <button id="lib-close" className="icon" title="Close (Esc)" onClick={() => app.setOverlay(null)}>×<Kbd hotkey={HOTKEYS.closeOverlay} /></button>
+        <CloseButton id="lib-close" />
       </header>
       <nav id="lib-filters" className="lib-filters">
         {tabs.map((tab) => <button key={tab} className={tab === activeFilter ? 'active' : undefined} onClick={() => { setFilter(tab); setFocused(-1); }}>{tab}</button>)}

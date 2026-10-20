@@ -2,8 +2,9 @@
 // controls that show a colour (the Look's Colour swatch and XY pad, the studio's cue swatches), and the
 // Look's palette over it (ADR 0004).
 
-const fract = (x: number): number => x - Math.floor(x);
-const channel = (t: number, offset: number): number => Math.min(1, Math.max(0, Math.abs(fract(t + offset / 3) * 6 - 3) - 1));
+import { clamp01, fract, lerpHue, smoothstep } from './math';
+
+const channel = (t: number, offset: number): number => clamp01(Math.abs(fract(t + offset / 3) * 6 - 3) - 1);
 
 // laser(t): pure, fully saturated colours, red -> yellow -> green -> cyan -> blue -> magenta -> red, every 1.0.
 export const laserRgb = (t: number): [number, number, number] => [channel(t, 0), channel(t, 2), channel(t, 1)];
@@ -24,8 +25,8 @@ export function paletteHue(t: number, palette: { readonly hues: readonly number[
   const i = Math.min(n - 1, Math.floor(p));
   let f = p - i;
   const a = palette.hues[i]!, b = palette.hues[(i + 1) % n]!;
-  if (palette.steps) { const x = Math.min(1, Math.max(0, (f - (1 - STEP_EASE)) / STEP_EASE)); f = x * x * (3 - 2 * x); }
-  return fract(a + (fract(b - a + 0.5) - 0.5) * f);
+  if (palette.steps) f = smoothstep((f - (1 - STEP_EASE)) / STEP_EASE);
+  return lerpHue(a, b, f);
 }
 
 // A palette as the shaders read it (uniform vec4 uPalette[2]): the hues, then how many, then whether it steps.

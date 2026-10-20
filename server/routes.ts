@@ -1,6 +1,8 @@
 // The /api handlers, mounted the same way by the Vite dev / preview server (vite.config.ts) and the
 // desktop app's server (desktop/server.ts). Each handler owns everything under its prefix.
 
+import { ASSISTANT_URL, SETTINGS_URL } from '../src/assistant/settings-wire';
+import { LOG_URL } from '../src/log/log-wire';
 import { assistantConfig } from './adapters';
 import { createAssistant } from './assistant';
 import { CliBridge } from './cli-bridge';
@@ -26,12 +28,12 @@ export function apiRoutes({ env = {}, config = fileConfigStore(defaultConfigPath
   const assistant = assistantConfig(config, { claudeBin });
   const routes: [string, Handler][] = [
     ...Object.keys(SITES).map((site): [string, Handler] => [`/api/${site}`, guarded(createBridge(site as keyof typeof SITES, { ytdlp, env, cacheBytes: ytdlpCacheBytes }))]),
-    ['/api/assistant', guarded(createAssistant(assistant, new CliBridge({ claudeBin })))],
-    ['/api/settings', guarded(createSettingsRoute(config, {
+    [ASSISTANT_URL, guarded(createAssistant(assistant, new CliBridge({ claudeBin })))],
+    [SETTINGS_URL, guarded(createSettingsRoute(config, {
       backend: { get: assistant.backend, reset: assistant.resetBackend },
       paths: { claudeBin, ytdlp },
     }))],
   ];
   // Every request is a line in the System log, except the log's own stream (it would only talk about itself).
-  return [...routes.map(([prefix, handler]): [string, Handler] => [prefix, logged(handler)]), ['/api/log', guarded(createLogRoute())]];
+  return [...routes.map(([prefix, handler]): [string, Handler] => [prefix, logged(handler)]), [LOG_URL, guarded(createLogRoute())]];
 }
