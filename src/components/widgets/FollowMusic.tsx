@@ -4,6 +4,7 @@
 // the minimum attack) are the engine's: src/engine/look-routes.ts.
 
 import { useApp } from '../../app/AppContext';
+import { clamp } from '../../engine/math';
 import { HUE_MIN_ATTACK, MIN_ATTACK, NEW_ROUTE, ROUTE_SECONDS, ROUTE_SOURCES, type Route, type RouteSource, type RouteTarget } from '../../engine/look-routes';
 import { FineRange, LOOK_DISPLAY, NumberField } from './LookSlider';
 
@@ -41,17 +42,17 @@ export function FollowEditor({ target, route }: { target: RouteTarget; route: Ro
           <div className="look-row" title={`How far ${label} moves with it, up or (below 0) down; never above the higher of where you set it and the top of the Randomize range`}>
             <span /><label htmlFor={`follow-${target}-depth`}>Depth</label>
             <FineRange id={`follow-${target}-depth`} label={`${label} depth`} value={r.depth} r={{ min: -1, max: 1, step: 0.01 }} onSet={(v) => set({ depth: v })} onReset={() => set({ depth: NEW_ROUTE.depth })} />
-            <NumberField d={{ ...DEPTH, label: `${label} depth` }} value={r.depth} onSet={(v) => set({ depth: Math.min(1, Math.max(-1, v)) })} />
+            <NumberField d={{ ...DEPTH, label: `${label} depth` }} value={r.depth} onSet={(v) => set({ depth: clamp(v, -1, 1) })} />
           </div>
           <div className="look-row" title={`How fast it rises (at least ${minAttack * 1000} ms)`}>
             <span /><label htmlFor={`follow-${target}-attack`}>Attack</label>
             <FineRange id={`follow-${target}-attack`} label={`${label} attack`} value={r.attack} r={{ ...ROUTE_SECONDS, min: minAttack }} onSet={(v) => set({ attack: v })} onReset={() => set({ attack: Math.max(minAttack, NEW_ROUTE.attack) })} />
-            <NumberField d={{ ...ATTACK, label: `${label} attack` }} value={r.attack} onSet={(v) => set({ attack: Math.min(ROUTE_SECONDS.max, Math.max(minAttack, v)) })} />
+            <NumberField d={{ ...ATTACK, label: `${label} attack` }} value={r.attack} onSet={(v) => set({ attack: clamp(v, minAttack, ROUTE_SECONDS.max) })} />
           </div>
           <div className="look-row" title="How fast it falls back">
             <span /><label htmlFor={`follow-${target}-release`}>Release</label>
             <FineRange id={`follow-${target}-release`} label={`${label} release`} value={r.release} r={ROUTE_SECONDS} onSet={(v) => set({ release: v })} onReset={() => set({ release: NEW_ROUTE.release })} />
-            <NumberField d={{ ...RELEASE, label: `${label} release` }} value={r.release} onSet={(v) => set({ release: Math.min(ROUTE_SECONDS.max, Math.max(ROUTE_SECONDS.min, v)) })} />
+            <NumberField d={{ ...RELEASE, label: `${label} release` }} value={r.release} onSet={(v) => set({ release: clamp(v, ROUTE_SECONDS.min, ROUTE_SECONDS.max) })} />
           </div>
         </>
       )}

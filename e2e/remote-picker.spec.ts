@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, silentWav, test, type Page } from './fixtures';
 
 // The SoundCloud picker against a stubbed /api/soundcloud: what the bridge answers (src/remote/wire.ts),
 // without yt-dlp or the network.
@@ -8,21 +8,10 @@ const LIVE = { url: 'https://soundcloud.com/someone/live-set', title: 'Live set'
 
 const event = (name: string, data: object) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
 
-// One second of silence, for the picked track to play.
-function silentWav(): Buffer {
-  const rate = 8000, samples = rate;
-  const b = Buffer.alloc(44 + samples);
-  b.write('RIFF', 0); b.writeUInt32LE(36 + samples, 4); b.write('WAVEfmt ', 8);
-  b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22);
-  b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34);
-  b.write('data', 36); b.writeUInt32LE(samples, 40); b.fill(128, 44);
-  return b;
-}
-
 async function openAndSearch(page: Page, fetchBody: string) {
   await page.route('**/api/soundcloud/search?**', (r) => r.fulfill({ json: { results: [NIGHT, LIVE] } }));
   await page.route('**/api/soundcloud/fetch?**', (r) => r.fulfill({ contentType: 'text/event-stream', body: fetchBody }));
-  await page.route('**/api/soundcloud/file/**', (r) => r.fulfill({ contentType: 'audio/wav', body: silentWav() }));
+  await page.route('**/api/soundcloud/file/**', (r) => r.fulfill({ contentType: 'audio/wav', body: silentWav(1) }));
   await page.goto('/');
   await page.locator('#start [data-source="soundcloud"]').click();
   await page.locator('#sc-query').fill('night');

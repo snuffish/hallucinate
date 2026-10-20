@@ -3,6 +3,8 @@
 // the last few decisions with their notes. `energy` is the steady loudness (the one the mood uses), so
 // a build-up reads as rising; the bass is against its last few seconds.
 
+import { roundTo } from '../engine/math';
+
 export interface EnergySample { energy: number; bass: number; bright: number }
 export interface Decision { at: number; note: string }   // `at` in set seconds
 
@@ -14,7 +16,7 @@ export type Direction = 'rising' | 'falling' | 'steady' | 'unknown';
 export interface Trend { energy: number[]; bass: number[]; bright: number[]; direction: Direction }
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
-const round = (x: number) => Math.round(x * 100) / 100;
+const round = (x: number) => roundTo(x, 2);
 
 export class DirectorHistory {
   private samples: EnergySample[] = [];

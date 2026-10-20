@@ -8,7 +8,7 @@ import { toolLabel } from './tools';
 
 export const NOT_RUN = 'Not run: the app was closed before this finished.';
 export const OMITTED = '(screenshot omitted)';
-export const KEEP_IMAGES = 3;
+const KEEP_IMAGES = 3;
 
 type Part = UIMessage['parts'][number];
 type ToolCall = Extract<Part, { type: 'tool-call' }>;

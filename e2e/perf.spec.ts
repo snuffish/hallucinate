@@ -1,20 +1,14 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, startDemo, test, type Page } from './fixtures';
 import { EFFECTS, strongest, type EffectStack } from '../src/engine/effects';
 import type { ProfilerApi } from '../src/engine/profiler';
 import { DEFAULT_PREFS } from '../src/state/prefs';
 
 const overlay = (page: Page) => page.locator('#perf');
 
-async function start(page: Page, url = '/') {
-  await page.goto(url);
-  await page.getByRole('button', { name: 'Play demo beat' }).click();
-  await expect(page.locator('#now')).toContainText('Demo beat');
-}
-
 const report = (page: Page) => page.evaluate(() => (window as { __profiler?: { report(): { scale: number; size: number[] } | null } }).__profiler?.report() ?? null);
 
 test('perf: Shift+P shows where the frame time goes, and hides it again', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await expect(overlay(page)).toBeHidden();
   await page.keyboard.press('Shift+P');
   await expect(overlay(page)).toBeVisible();
@@ -30,7 +24,7 @@ test('perf: Shift+P shows where the frame time goes, and hides it again', async 
 });
 
 test('perf: its ? explains the verdict, the stages and Test GPU', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+P');
   await overlay(page).getByRole('button', { name: 'Help: Performance monitor' }).click();
   const pop = page.locator('#help-pop');
@@ -39,14 +33,14 @@ test('perf: its ? explains the verdict, the stages and Test GPU', async ({ page 
 });
 
 test('perf: ?perf starts with it on and offers window.__profiler', async ({ page }) => {
-  await start(page, '/?perf');
+  await startDemo(page, '/?perf');
   await expect(overlay(page)).toBeVisible();
   const r = await report(page);
   expect(r?.size[0]).toBeGreaterThan(0);
 });
 
 test('perf: Test GPU measures at half resolution and puts the resolution back', async ({ page }) => {
-  await start(page, '/?perf');
+  await startDemo(page, '/?perf');
   await expect(overlay(page)).toBeVisible();
   const before = await report(page);
   await overlay(page).getByRole('button', { name: 'Test GPU' }).click();
@@ -63,7 +57,7 @@ test('perf: Test GPU measures at half resolution and puts the resolution back', 
 // and few frames keep it to seconds under software WebGL (PERF.md has the GPU numbers, from
 // perf/measure.mjs).
 async function reportsCost(page: Page, what: string, effects: EffectStack) {
-  await start(page, '/?perf');
+  await startDemo(page, '/?perf');
   const cost = await page.evaluate((effects) => (window as unknown as { __profiler: ProfilerApi }).__profiler.effectsCost(effects, { size: [480, 270], frames: 4, rounds: 3 }), effects);
   console.log(`${what}: ${cost.with.toFixed(2)} ms a frame against ${cost.none.toFixed(2)} ms without effects (+${cost.extra.toFixed(2)} ms) at ${cost.size.join('×')}, resolution ${cost.scale}`);
   expect(cost.scale).toBe(DEFAULT_PREFS.resolution);
@@ -84,7 +78,7 @@ test('perf: the profiler reports what all the effects stacked cost per frame at 
 
 test('perf: drag it by any part but its buttons, resize it by its corner; both are kept after a reload, and a double-click puts it back', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1000 });
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+P');
   await expect(overlay(page)).toBeVisible();
   const corner = (await overlay(page).boundingBox())!;
@@ -107,7 +101,7 @@ test('perf: drag it by any part but its buttons, resize it by its corner; both a
   await expect.poll(async () => Math.round((await overlay(page).boundingBox())!.width - moved.width)).toBe(80);
   const sized = (await overlay(page).boundingBox())!;
 
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+P');
   const again = (await overlay(page).boundingBox())!;
   expect(again.x).toBeCloseTo(sized.x, 0);

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { AudioEngine } from '../engine/audio';
 import { KEYS, readWithDefaults, writeJSON } from '../state/persistence';
 import type { TransportView } from '../state/ui-state';
-import { clamp01 } from '../engine/math';
+import { clamp, clamp01, roundTo } from '../engine/math';
 
 export const PlayerSettingsSchema = z.object({ volume: z.number().min(0).max(1).default(0.8), pitchFollows: z.boolean().default(false) });
 
@@ -97,7 +97,7 @@ export class Transport {
   }
 
   setRate(rate: number): number {
-    this.rate = Math.round(Math.min(2, Math.max(0.5, rate)) * 100) / 100;
+    this.rate = roundTo(clamp(rate, 0.5, 2), 2);
     this.applyRate();
     return this.rate;
   }

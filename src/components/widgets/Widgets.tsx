@@ -18,7 +18,7 @@ import { EffectsBody } from './EffectsBody';
 import { ActionsBody, AudioBody, LookBody, MediaBody, SceneBody, ScreenBody, SourceBody, type PanelActions } from './sections';
 import { Widget, useNarrow } from './Widget';
 
-export const WIDGET_LABELS: Record<WidgetId, string> = {
+const WIDGET_LABELS: Record<WidgetId, string> = {
   hub: 'Hallucinate', source: 'Source', media: 'Media', audio: 'Audio', scene: 'Scene', look: 'Look', effects: 'Effects', actions: 'Actions', screen: 'Screen', params: 'Parameters',
 };
 

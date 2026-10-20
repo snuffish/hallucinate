@@ -24,10 +24,12 @@ export function hostName(host: string): string {
   return h.replace(/:\d+$/, '');
 }
 
+const isLocalName = (name: string): boolean => LOOPBACK.has(name) || name.endsWith('.localhost');
+
 export function hostAllowed(host: string | undefined, extra: readonly string[] = []): boolean {
   if (!host) return false;
   const name = hostName(host);
-  return LOOPBACK.has(name) || name.endsWith('.localhost') || isIP(name) !== 0 || extra.includes(name);
+  return isLocalName(name) || isIP(name) !== 0 || extra.includes(name);
 }
 
 // This computer by name or address, as opposed to a device on the network reaching an app started with
@@ -35,7 +37,7 @@ export function hostAllowed(host: string | undefined, extra: readonly string[] =
 export function isLoopbackHost(host: string | undefined): boolean {
   if (!host) return false;
   const name = hostName(host);
-  return LOOPBACK.has(name) || name.endsWith('.localhost') || /^127\.\d+\.\d+\.\d+$/.test(name) || name === '::ffff:127.0.0.1';
+  return isLocalName(name) || /^127\.\d+\.\d+\.\d+$/.test(name) || name === '::ffff:127.0.0.1';
 }
 
 // Why a request is refused, or null when it may go through.

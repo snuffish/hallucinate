@@ -10,6 +10,7 @@ import { HOTKEYS } from '../hotkeys/registry';
 import { useHotkeyActions } from '../hooks/useAppHotkeys';
 import { Kbd } from '../hotkeys/Kbd';
 import { KEYS, debouncedWriter, readJSON } from '../state/persistence';
+import { clamp } from '../engine/math';
 import { HelpButton } from './Help';
 import { CloseButton } from './CloseButton';
 
@@ -226,7 +227,7 @@ export function VisualMaker() {
       const r = vp.getBoundingClientRect();
       const mx = e.clientX - r.left, my = e.clientY - r.top;
       setView((v) => {
-        const s = Math.min(1.6, Math.max(0.3, v.s * Math.exp(-e.deltaY * 0.0015)));
+        const s = clamp(v.s * Math.exp(-e.deltaY * 0.0015), 0.3, 1.6);
         return { s, x: mx - (mx - v.x) * (s / v.s), y: my - (my - v.y) * (s / v.s) };
       });
     };

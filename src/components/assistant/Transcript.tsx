@@ -27,7 +27,7 @@ function imagesOf(output: unknown): string[] {
   return parts.success ? parts.data.filter((p): p is Extract<typeof p, { type: 'image' }> => p.type === 'image').map((p) => `data:${p.source.mimeType};base64,${p.source.value}`) : [];
 }
 
-export async function copyText(text: string): Promise<boolean> {
+async function copyText(text: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
 }
 

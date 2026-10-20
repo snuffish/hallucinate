@@ -35,7 +35,6 @@ export const ParamSpecSchema = z.discriminatedUnion('type', [
   SpecBase.extend({ type: z.literal('vec4'), def: z.array(z.number()).length(4) }).extend(NumericSpec.shape),
 ]);
 export type ParamSpec = z.infer<typeof ParamSpecSchema>;
-export type BoolParamSpec = Extract<ParamSpec, { type: 'bool' }>;
 export type FloatParamSpec = Extract<ParamSpec, { type: 'float' }>;
 export type VecParamSpec = Extract<ParamSpec, { type: 'vec2' | 'vec3' | 'vec4' }>;
 
@@ -134,10 +133,6 @@ export type UniformValue = number | number[] | Float32Array;
 export function toUniform(spec: ParamSpec, value: ParamValue): UniformValue {
   if (spec.type === 'bool') return value ? 1 : 0;
   return value as number | number[];
-}
-
-export function defaultValues(specs: readonly ParamSpec[]): ParamValues {
-  return Object.fromEntries(specs.map((s) => [s.name, s.def]));
 }
 
 // The value shape a spec accepts: a stored or incoming value that doesn't fit is replaced by the default.

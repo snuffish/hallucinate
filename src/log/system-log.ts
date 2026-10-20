@@ -31,7 +31,7 @@ export interface LogInput { level: LogLevel; source: LogSource; text: string; de
 // What React follows: `version` bumps when the lines change; `unseenErrors` counts errors since the log was last open.
 export interface LogStats { version: number; unseenErrors: number }
 
-export const LOG_CAP = 2000;
+const LOG_CAP = 2000;
 const PUBLISH_MS = 250;   // a burst of lines re-renders the log at most 4 times a second
 
 export class SystemLog {

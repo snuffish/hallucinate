@@ -23,8 +23,7 @@ export type SideZone = 'left' | 'right';
 export type BubblePlace = { kind: 'auto' } | FloatPlace;
 // A monitor (the performance overlay, the Hearing monitor, the System log): `auto` keeps it in the monitors' corner, a float pins it.
 export type MonitorPlace = { kind: 'auto' } | FloatPlace;
-export type HearingPlace = MonitorPlace;
-export const MONITOR_IDS = ['perf', 'hearing', 'log'] as const;
+const MONITOR_IDS = ['perf', 'hearing', 'log'] as const;
 export type MonitorId = (typeof MONITOR_IDS)[number];
 // `dockWidth`: the left and right docks are one column each, as wide as this.
 // `bubbleShown`: the assistant bubble can be switched off from the Widgets menu like a widget.
@@ -114,7 +113,7 @@ export function dock(layout: Layout, id: WidgetId, zone: Zone, index: number): L
 }
 
 // The nearest corner of `rect` and its distance from it.
-export function anchorFor(rect: Rect, viewport: Size): FloatPlace {
+function anchorFor(rect: Rect, viewport: Size): FloatPlace {
   const ax = rect.left + rect.width / 2 < viewport.width / 2 ? 'l' : 'r';
   const ay = rect.top + rect.height / 2 < viewport.height / 2 ? 't' : 'b';
   return {
@@ -219,9 +218,6 @@ export function moveChat(layout: Layout, rect: Rect, viewport: Size): Layout {
 export function resetChat(layout: Layout): Layout {
   return { ...layout, chatPlace: { kind: 'auto' } };
 }
-
-export const moveHearing = (layout: Layout, rect: Rect, viewport: Size): Layout => moveMonitor(layout, 'hearing', rect, viewport);
-export const resetHearing = (layout: Layout): Layout => resetMonitor(layout, 'hearing');
 
 // Phones: one column on the left in the default order and natural sizes, the bubble and the monitors
 // in their default spots. The stored layout is untouched, so the desktop arrangement comes back on a wider window.

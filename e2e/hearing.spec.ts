@@ -1,19 +1,13 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, startDemo, test, type Page } from './fixtures';
 import { SCENE_INPUTS } from '../src/engine/scene-inputs';
 
 const monitor = (page: Page) => page.locator('#hearing');
-
-async function start(page: Page) {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Play demo beat' }).click();
-  await expect(page.locator('#now')).toContainText('Demo beat');
-}
 
 // Which tempo is heard is the Listener's tests' business: a loaded runner at a low frame rate misses kicks,
 // and the monitor then shows exactly that. Here: that it shows a tempo, a state and the delay at all.
 test('hearing: Shift+L shows the demo beat\'s tempo and how it is heard, with the delay to the speakers, and hides it again', async ({ page }) => {
   test.slow();   // tempo detection is slow on a loaded runner
-  await start(page);
+  await startDemo(page);
   await expect(monitor(page)).toBeHidden();
   await page.keyboard.press('Shift+L');
   await expect(monitor(page)).toBeVisible();
@@ -28,7 +22,7 @@ test('hearing: Shift+L shows the demo beat\'s tempo and how it is heard, with th
 
 test('hearing: it shows every scene input as the screen\'s scene gets it, the frames it hears and how late the ticks land', async ({ page }) => {
   test.slow();   // tempo detection is slow on a loaded runner
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+L');
   const inputs = monitor(page).locator('#hearing-inputs [data-input]');
   await expect(inputs).toHaveCount(SCENE_INPUTS.length);
@@ -41,7 +35,7 @@ test('hearing: it shows every scene input as the screen\'s scene gets it, the fr
 });
 
 test('hearing: on a short screen it stops above the player bar and scrolls', async ({ page }) => {
-  await start(page);   // 1280×720
+  await startDemo(page);   // 1280×720
   await page.keyboard.press('Shift+L');
   await expect(monitor(page)).toBeVisible();
   const box = (await monitor(page).boundingBox())!;
@@ -53,7 +47,7 @@ test('hearing: on a short screen it stops above the player bar and scrolls', asy
 });
 
 test('hearing: the signals picked for its plot and how far back it looks are kept across a reload', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+L');
   const chip = (id: string) => monitor(page).locator(`[data-signal="${id}"]`);
   await expect(chip('rise')).toHaveAttribute('aria-pressed', 'true');   // the Overview preset to start
@@ -64,7 +58,7 @@ test('hearing: the signals picked for its plot and how far back it looks are kep
   await chip('bass').click();
   await monitor(page).getByRole('button', { name: '20 s' }).click();
 
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+L');
   for (const id of ['rise', 'uBeat', 'uTick', 'bass']) await expect(chip(id)).toHaveAttribute('aria-pressed', 'true');
   await expect(monitor(page).getByRole('button', { name: '20 s' })).toHaveAttribute('aria-pressed', 'true');
@@ -73,7 +67,7 @@ test('hearing: the signals picked for its plot and how far back it looks are kep
 });
 
 test('hearing: hovering its plot reads the values then, and the what-if threshold only shows what it would let through', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+L');
   const plot = monitor(page).getByRole('img', { name: 'Signals' });
   await expect(monitor(page).locator('[data-signal="bass"] output')).toBeVisible();   // a second of samples to read
@@ -88,7 +82,7 @@ test('hearing: hovering its plot reads the values then, and the what-if threshol
 
 test('hearing: drag it by any part but its controls; it opens there again after a reload, and a double-click puts it back', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1200 });   // room below it to move into
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+L');
   const corner = (await monitor(page).boundingBox())!;
   const grab = (await page.locator('#hearing-latency').boundingBox())!;   // the body, not the top
@@ -102,7 +96,7 @@ test('hearing: drag it by any part but its controls; it opens there again after 
   expect(moved.x).toBeCloseTo(corner.x + 200, -1);
   expect(moved.y - corner.y).toBeGreaterThan(100);   // where it was let go, or as near as keeps it above the player bar
 
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+L');
   const again = (await monitor(page).boundingBox())!;
   expect(again.x).toBeCloseTo(moved.x, 0);
@@ -118,7 +112,7 @@ test('hearing: drag it by any part but its controls; it opens there again after 
 });
 
 test('hearing: its ? explains what the monitor shows', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+L');
   await monitor(page).getByRole('button', { name: 'Help: Hearing monitor' }).click();
   const pop = page.locator('#help-pop');
@@ -127,7 +121,7 @@ test('hearing: its ? explains what the monitor shows', async ({ page }) => {
 });
 
 test('hearing: the Hearing monitor and the performance monitor open together, one above the other', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+P');
   await page.keyboard.press('Shift+L');
   await expect(page.locator('#perf')).toBeVisible();
@@ -138,7 +132,7 @@ test('hearing: the Hearing monitor and the performance monitor open together, on
 });
 
 test('hearing: the shortcut sheet lists it, and it and the player call [ and ] the playback speed, not the tempo', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await expect(page.locator('#tp-rate-val')).toHaveAttribute('title', /^Playback speed: 124 BPM/);
   await page.locator('#tp-rate-val').click();
   await expect(page.getByRole('slider', { name: 'Playback speed' })).toBeVisible();

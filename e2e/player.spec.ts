@@ -1,23 +1,12 @@
-import { expect, test, type Locator, type Page } from './fixtures';
+import { expect, silentWav, test, type Locator, type Page } from './fixtures';
 
 type Box = { x: number; y: number; width: number; height: number };
 const box = async (l: Locator) => (await l.boundingBox()) as Box;
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
-// 20 s of 8-bit silence: long enough to seek ±10 s.
-function silentWav(seconds = 20): Buffer {
-  const rate = 8000, samples = rate * seconds;
-  const b = Buffer.alloc(44 + samples);
-  b.write('RIFF', 0); b.writeUInt32LE(36 + samples, 4); b.write('WAVEfmt ', 8);
-  b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22);
-  b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34);
-  b.write('data', 36); b.writeUInt32LE(samples, 40); b.fill(128, 44);
-  return b;
-}
-
 async function playFile(page: Page) {
   await page.goto('/');
-  await page.locator('#file').setInputFiles({ name: 'quiet.wav', mimeType: 'audio/wav', buffer: silentWav() });
+  await page.locator('#file').setInputFiles({ name: 'quiet.wav', mimeType: 'audio/wav', buffer: silentWav(20) });
   await expect(page.locator('#tp-dur')).toHaveText('0:20');
 }
 

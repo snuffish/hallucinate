@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { useApp, useUI } from '../../app/AppContext';
 import { LASER_GRADIENT, laserCss } from '../../engine/laser-colour';
 import { LOOK_RANGES, defaultLook, type LookKey, type SliderKey } from '../../state/app-state';
-import { fract } from '../../engine/math';
+import { clamp, fract } from '../../engine/math';
 
 // How each Look value reads: shown as value × scale, typed back in the same units.
 export const LOOK_DISPLAY: Record<LookKey, { label: string; scale: number; unit: string; digits: number; hint: string }> = {
@@ -24,7 +24,6 @@ export const LOOK_DISPLAY: Record<LookKey, { label: string; scale: number; unit:
 export const FINE = 0.1;   // Shift: how much finer a drag goes
 const THUMB = 8;           // half a range input's thumb, in px: where its track starts and ends
 
-export const clampTo = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v));
 const snap = (v: number, step: number): number => Math.round(v / step) * step;
 
 // Wheel steps: ten a notch, Shift one (macOS turns Shift+wheel sideways, so either axis counts). Only while
@@ -86,9 +85,9 @@ export function FineRange({ id, label, value, r, onSet, onReset, hue, ghost }: {
 }) {
   const span = r.max - r.min;
   const drag = useRef<{ x: number; v: number } | null>(null);
-  const set = (v: number) => onSet(snap(clampTo(v, r.min, r.max), r.step));
+  const set = (v: number) => onSet(snap(clamp(v, r.min, r.max), r.step));
   const wheel = useWheelStep<HTMLInputElement>((by) => set(value + by * r.step), (el) => document.activeElement === el);
-  const at = (b: DOMRect, x: number) => r.min + clampTo((x - b.left - THUMB) / (b.width - 2 * THUMB), 0, 1) * span;
+  const at = (b: DOMRect, x: number) => r.min + clamp((x - b.left - THUMB) / (b.width - 2 * THUMB), 0, 1) * span;
   const input = (
     <input ref={wheel} type="range" id={id} className={hue ? 'look-hue-track' : undefined} min={r.min} max={r.max} step={r.step} value={value}
       aria-label={label} title={`${onReset ? 'Double-click to reset · ' : ''}Shift-drag: finer · wheel steps once it has focus`}
@@ -110,7 +109,7 @@ export function FineRange({ id, label, value, r, onSet, onReset, hue, ghost }: {
         const d = drag.current;
         if (!d) return;
         const b = e.currentTarget.getBoundingClientRect();
-        d.v = clampTo(d.v + ((e.clientX - d.x) / (b.width - 2 * THUMB)) * span * (e.shiftKey ? FINE : 1), r.min, r.max);
+        d.v = clamp(d.v + ((e.clientX - d.x) / (b.width - 2 * THUMB)) * span * (e.shiftKey ? FINE : 1), r.min, r.max);
         d.x = e.clientX;
         set(d.v);
       }}
@@ -120,7 +119,7 @@ export function FineRange({ id, label, value, r, onSet, onReset, hue, ghost }: {
       onDoubleClick={onReset} />
   );
   if (ghost === undefined) return input;
-  const pos = clampTo(((hue ? fract(ghost) : ghost) - r.min) / span, 0, 1);   // Colour wraps round the wheel
+  const pos = clamp(((hue ? fract(ghost) : ghost) - r.min) / span, 0, 1);   // Colour wraps round the wheel
   return (
     <span className="look-range">
       {input}
@@ -138,7 +137,7 @@ function LockIcon({ locked }: { locked: boolean }) {
   );
 }
 
-export function LookLock({ k, locked }: { k: SliderKey; locked: boolean }) {
+function LookLock({ k, locked }: { k: SliderKey; locked: boolean }) {
   const app = useApp();
   const label = LOOK_DISPLAY[k].label;
   return (
@@ -149,7 +148,7 @@ export function LookLock({ k, locked }: { k: SliderKey; locked: boolean }) {
 }
 
 // The hue on screen now: Colour plus how far cycling has walked.
-export function LiveSwatch() {
+function LiveSwatch() {
   const hue = useUI((ui) => ui.liveHue);
   return <i className="look-swatch" style={{ '--c': laserCss(hue) } as CSSProperties} title={`On screen now: ${Math.round(hue * 360)}°`} />;
 }

@@ -32,7 +32,7 @@ export type Command =
   | { kind: 'error'; message: string };
 
 const TOOL_NAMES: readonly string[] = TOOL_DEFINITIONS.map((d) => d.name);
-export const COMMAND_NAMES: readonly string[] = [...Object.keys(BUILTINS), ...TOOL_NAMES];
+const COMMAND_NAMES: readonly string[] = [...Object.keys(BUILTINS), ...TOOL_NAMES];
 
 // Words, keeping "quoted strings" (with \" inside) and {…} / […] JSON together.
 export function words(line: string): string[] {

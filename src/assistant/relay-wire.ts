@@ -11,7 +11,7 @@ export const ToolCallEventSchema = z.object({ threadId: z.string(), callId: z.st
 export type ToolCallEvent = z.infer<typeof ToolCallEventSchema>;
 
 // A tool's answer in MCP's content form, which the bridge hands the CLI as the `tools/call` result.
-export const ToolResultSchema = z.object({
+const ToolResultSchema = z.object({
   content: z.array(z.union([
     z.object({ type: z.literal('text'), text: z.string() }),
     z.object({ type: z.literal('image'), data: z.string(), mimeType: z.string() }),

@@ -1,8 +1,9 @@
 import { chromium } from '@playwright/test';
-const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+import { SOFTWARE_GL_ARGS } from '../scripts/chromium-args.mjs';
+const browser = await chromium.launch({ args: SOFTWARE_GL_ARGS });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 await page.addInitScript(() => { window.__lt = []; new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lt.push({ start: Math.round(e.startTime), dur: Math.round(e.duration) }); }).observe({ type: 'longtask', buffered: true }); });
-await page.goto(process.argv[2] ?? 'http://localhost:5198/');
+await page.goto(process.argv[2] ?? 'http://localhost:5199/');
 await page.click('#start [data-source="demo"]');
 await page.waitForTimeout(1500);
 const cdp = await page.context().newCDPSession(page);

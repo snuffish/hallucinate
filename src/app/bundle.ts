@@ -17,7 +17,7 @@ import { ShowSchema } from './studio';
 import { PlayerSettingsSchema } from './transport';
 import { plural } from './plural';
 
-export const BUNDLE_FORMAT = 'hallucinate';
+const BUNDLE_FORMAT = 'hallucinate';
 export const BUNDLE_VERSION = 1;
 export const MAX_BUNDLE_BYTES = 5_000_000;
 

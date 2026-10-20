@@ -7,7 +7,8 @@ import { useRef, type CSSProperties } from 'react';
 import { useApp, useUI } from '../../app/AppContext';
 import { LASER_GRADIENT, laserCss } from '../../engine/laser-colour';
 import { LOOK_RANGES, SLIDER_KEYS, defaultLook, type SliderKey, type XYAxes } from '../../state/app-state';
-import { FINE, LOOK_DISPLAY, clampTo, useWheelStep } from './LookSlider';
+import { clamp } from '../../engine/math';
+import { FINE, LOOK_DISPLAY, useWheelStep } from './LookSlider';
 
 const INSET = 7;   // px: the puck's radius, so it stays whole at the pad's edges
 
@@ -63,8 +64,8 @@ export function XYPad({ index, axes }: { index: number; axes: XYAxes }) {
           let vx = look[x], vy = look[y];
           if (!e.shiftKey) {
             const b = e.currentTarget.getBoundingClientRect();
-            vx = rx.min + clampTo((e.clientX - b.left - INSET) / (b.width - 2 * INSET), 0, 1) * (rx.max - rx.min);
-            vy = ry.min + clampTo(1 - (e.clientY - b.top - INSET) / (b.height - 2 * INSET), 0, 1) * (ry.max - ry.min);
+            vx = rx.min + clamp((e.clientX - b.left - INSET) / (b.width - 2 * INSET), 0, 1) * (rx.max - rx.min);
+            vy = ry.min + clamp(1 - (e.clientY - b.top - INSET) / (b.height - 2 * INSET), 0, 1) * (ry.max - ry.min);
             set(x, vx); set(y, vy);
           }
           drag.current = { px: e.clientX, py: e.clientY, vx, vy };
@@ -73,8 +74,8 @@ export function XYPad({ index, axes }: { index: number; axes: XYAxes }) {
           const d = drag.current;
           if (!d) return;
           const b = e.currentTarget.getBoundingClientRect(), f = e.shiftKey ? FINE : 1;
-          d.vx = clampTo(d.vx + ((e.clientX - d.px) / (b.width - 2 * INSET)) * (rx.max - rx.min) * f, rx.min, rx.max);
-          d.vy = clampTo(d.vy - ((e.clientY - d.py) / (b.height - 2 * INSET)) * (ry.max - ry.min) * f, ry.min, ry.max);
+          d.vx = clamp(d.vx + ((e.clientX - d.px) / (b.width - 2 * INSET)) * (rx.max - rx.min) * f, rx.min, rx.max);
+          d.vy = clamp(d.vy - ((e.clientY - d.py) / (b.height - 2 * INSET)) * (ry.max - ry.min) * f, ry.min, ry.max);
           d.px = e.clientX; d.py = e.clientY;
           set(x, d.vx); set(y, d.vy);
         }}

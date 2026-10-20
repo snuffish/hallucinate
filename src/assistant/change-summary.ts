@@ -4,6 +4,7 @@
 import type { Cue, ShowSnapshot } from '../app/studio';
 import type { Plan } from '../state/show-plan';
 import { plural } from '../app/plural';
+import { roundTo } from '../engine/math';
 
 export interface ValueRow { key: string; before: unknown; after: unknown }
 
@@ -14,7 +15,7 @@ export function valueRows(before: unknown, after: unknown): ValueRow[] {
   return keys.filter((k) => JSON.stringify(b[k]) !== JSON.stringify(a[k])).map((key) => ({ key, before: b[key], after: a[key] }));
 }
 
-const round = (x: number) => Math.round(x * 1000) / 1000;
+const round = (x: number) => roundTo(x, 3);
 export function formatValue(v: unknown): string {
   if (v === undefined || v === null) return '—';
   if (typeof v === 'number') return String(round(v));

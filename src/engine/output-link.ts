@@ -137,7 +137,7 @@ export class OutputLink {
     const size = screen
       ? `left=${screen.availLeft},top=${screen.availTop},width=${screen.availWidth},height=${screen.availHeight}`
       : 'width=1280,height=720';
-    const win = window.open('output.html', 'hallucinate-output', `popup,${size}`);
+    const win = window.open('output.html', CHANNEL, `popup,${size}`);
     if (!win) throw new Error('The projector window was blocked. Allow pop-ups for this site and try again.');
     if (screen) { win.moveTo(screen.availLeft, screen.availTop); win.resizeTo(screen.availWidth, screen.availHeight); }
     win.focus();

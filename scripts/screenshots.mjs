@@ -3,12 +3,13 @@
 // Headless Chromium renders WebGL with SwiftShader, so give scenes a moment to build up trails.
 import { chromium } from '@playwright/test';
 import fs from 'node:fs/promises';
+import { SOFTWARE_GL_ARGS } from './chromium-args.mjs';
 
 const url = process.argv[2] ?? 'http://localhost:5199/';
 const out = 'docs/screenshots';
 await fs.mkdir(out, { recursive: true });
 
-const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ args: SOFTWARE_GL_ARGS });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 const shot = (name, opts = {}) => page.screenshot({ path: `${out}/${name}.jpg`, type: 'jpeg', quality: 86, ...opts });
 const settle = (ms) => page.waitForTimeout(ms);

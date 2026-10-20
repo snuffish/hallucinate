@@ -4,9 +4,11 @@
 // backends (the subscription backend sends only the latest user message). The panel shows them as
 // small notes, not as part of what the user typed.
 
-export const UNDO_PREFIX = '(The user pressed Undo and reverted your change: ';
-export const RESUME_PREFIX = '(This conversation was reopened on ';
-export const SCENE_PREFIX = '(The scene on screen changed since your last reply: ';
+import { roundTo } from '../engine/math';
+
+const UNDO_PREFIX = '(The user pressed Undo and reverted your change: ';
+const RESUME_PREFIX = '(This conversation was reopened on ';
+const SCENE_PREFIX = '(The scene on screen changed since your last reply: ';
 
 export const undoNote = (label: string) => `${UNDO_PREFIX}${label}.)`;
 
@@ -22,7 +24,7 @@ export function resumeNote(date: Date, seen?: Screen | null, now?: ScreenNow | n
   const head = `${RESUME_PREFIX}${date.toLocaleString()}. Your earlier changes can no longer be undone from the panel`;
   if (!seen || !now) return `${head}, and the app may have changed since: call get_app_state before changing anything.)`;
   const what = now.scene !== seen.scene ? 'a different scene than at your last reply' : now.hash === seen.hash ? 'the scene from your last reply, its code unchanged since' : 'the scene from your last reply, but its code changed since: read it before editing';
-  const values = JSON.stringify(now.values, (_k, v: unknown) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v));
+  const values = JSON.stringify(now.values, (_k, v: unknown) => (typeof v === 'number' ? roundTo(v, 3) : v));
   const params = values.length <= MAX_VALUES ? `; its parameters are ${values}` : '';
   return `${head}. On screen: ${JSON.stringify(now.scene)}, ${what}${params}. Call get_app_state only if you need more.)`;
 }

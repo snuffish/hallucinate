@@ -35,7 +35,7 @@ export const ErrorBodySchema = z.object({ error: z.string() });
 // `starting` is the client's own, shown before the first event arrives. A video download fetches `video`,
 // then `sound`, then is `merging`; a single stream is `audio`, then `finishing`.
 export const STAGES = ['starting', 'audio', 'video', 'sound', 'merging', 'finishing'] as const;
-export const ProgressSchema = z.object({
+const ProgressSchema = z.object({
   percent: z.number(),
   stage: z.enum(STAGES),
   bytes: z.number().nullish(),

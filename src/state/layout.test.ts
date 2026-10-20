@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KEYS } from './persistence';
 import {
-  DEFAULT_LAYOUT, DROP_EDGE, WIDGET_IDS, chatPlacement, dock, dropTarget, type DockView, effective, float, floatToPx, loadLayout, moveBubble, moveChat, moveHearing, moveMonitor, parseLayout,
-  CHAT_MIN_H, CHAT_MIN_W, DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetChat, resetHearing, resetLayout, resetMonitor, resetWidget, resize, resizeChat, resizeMonitor, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
+  DEFAULT_LAYOUT, DROP_EDGE, WIDGET_IDS, chatPlacement, dock, dropTarget, type DockView, effective, float, floatToPx, loadLayout, moveBubble, moveChat, moveMonitor, parseLayout,
+  CHAT_MIN_H, CHAT_MIN_W, DOCK_MAX, DOCK_MIN, MIN_H, MIN_W, resetChat, resetLayout, resetMonitor, resetWidget, resize, resizeChat, resizeMonitor, setBubbleShown, setDockWidth, setOpen, zoneWidgets, type DockPlace, type FloatPlace,
 } from './layout';
 
 const VIEW = { width: 1280, height: 720 };
@@ -103,11 +103,11 @@ describe('layout', () => {
 
   it('floats the Hearing monitor where it was dropped, keeps it on phones in its corner, and puts it back on reset', () => {
     expect(DEFAULT_LAYOUT.hearing).toEqual({ kind: 'auto' });
-    const l = moveHearing(resetLayout(), { left: 900, top: 400, width: 620, height: 300 }, VIEW);
+    const l = moveMonitor(resetLayout(), 'hearing', { left: 900, top: 400, width: 620, height: 300 }, VIEW);
     expect(l.hearing).toEqual({ kind: 'float', ax: 'r', ay: 'b', dx: 1280 - 900 - 620, dy: 720 - 400 - 300 });
     expect(effective(l, true).hearing).toEqual({ kind: 'auto' });
     expect(effective(l, true).hearing).toBe(effective(l, true).hearing);   // selected from the store: a new object each time loops
-    expect(resetHearing(l).hearing).toEqual({ kind: 'auto' });
+    expect(resetMonitor(l, 'hearing').hearing).toEqual({ kind: 'auto' });
     expect(resetLayout().hearing).toEqual({ kind: 'auto' });
   });
 
@@ -178,7 +178,7 @@ describe('layout storage', () => {
   });
 
   it('keeps where the Hearing monitor was dropped across a reload, and its corner for layouts saved before it moved', () => {
-    const moved = moveHearing(resetLayout(), { left: 40, top: 300, width: 620, height: 300 }, VIEW);
+    const moved = moveMonitor(resetLayout(), 'hearing', { left: 40, top: 300, width: 620, height: 300 }, VIEW);
     expect(parseLayout(JSON.parse(JSON.stringify(moved))).hearing).toEqual(moved.hearing);
     const old = JSON.parse(JSON.stringify(resetLayout())) as Record<string, unknown>;
     delete old.hearing;

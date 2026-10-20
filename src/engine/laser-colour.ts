@@ -17,7 +17,7 @@ export const laserCss = (t: number): string => {
 // The hue laser(t) shows under `palette` (ADR 0004), the twin of GLSL laser() in src/scenes/header.ts: the whole
 // wheel without hues; otherwise t walks the hues, each to the next the short way round the wheel, smoothly or
 // in steps that ease over the last STEP_EASE of each.
-export const STEP_EASE = 0.3;
+const STEP_EASE = 0.3;
 export function paletteHue(t: number, palette: { readonly hues: readonly number[]; readonly steps: boolean }): number {
   const n = palette.hues.length;
   if (n < 1) return fract(t);

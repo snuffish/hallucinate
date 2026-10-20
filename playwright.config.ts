@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+import { SOFTWARE_GL_ARGS } from './scripts/chromium-args.mjs';
 
 const port = 5199;
 
@@ -13,8 +14,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     launchOptions: {
-      // Software WebGL2 for headless runs; AudioContext without a user gesture.
-      args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+      args: SOFTWARE_GL_ARGS,
     },
   },
   webServer: {

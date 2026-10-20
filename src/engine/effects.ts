@@ -11,6 +11,7 @@
 
 import { z } from 'zod';
 import { INPUT_DECLARATIONS } from './scene-inputs';
+import { clamp } from './math';
 
 export interface EffectSetting {
   readonly key: string;
@@ -204,9 +205,9 @@ export const PASS_SCALES: readonly number[] = [...new Set(EFFECTS.flatMap((e) =>
 const decimals = (step: number): number => (String(step).split('.')[1] ?? '').length;
 
 // A setting's value as the effect can take it: a number inside its range, on its step.
-export function clampSetting(s: EffectSetting, value: unknown): number {
+function clampSetting(s: EffectSetting, value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return s.default;
-  const v = Math.min(s.max, Math.max(s.min, value));
+  const v = clamp(value, s.min, s.max);
   return Math.min(s.max, Number((s.min + Math.round((v - s.min) / s.step) * s.step).toFixed(decimals(s.step))));
 }
 

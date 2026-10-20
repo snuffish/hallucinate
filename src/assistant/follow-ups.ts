@@ -4,7 +4,6 @@
 
 import { z } from 'zod';
 
-export const FOLLOW_UPS_MARKER = 'FOLLOW-UPS:';
 const FollowUpsSchema = z.array(z.string().trim().min(1).max(120)).max(5);
 const LINE = /^[ \t]*FOLLOW-UPS:[ \t]*(\[[\s\S]*?\])?[ \t]*$/m;
 

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { useApp, useUI } from '../app/AppContext';
 import type { PickerApi } from '../app/controller';
+import { formatTime } from '../app/transport';
 import { remoteSite, type Download } from '../remote/client';
 import { RemoteTrackSchema, type Progress, type RemoteTrack as Track, type SiteName } from '../remote/wire';
 import { readJSON, writeJSON, remove as removeKey } from '../state/persistence';
@@ -193,7 +194,7 @@ export function RemotePicker({ id, site, title, noun = 'track', recentKey, fetch
 }
 
 // "Downloading (video) 45% · 120.3 MB of 280.1 MB · 8.2 MB/s · 0:18 left"
-export function progressText(verb: string, track: Track, p: Progress): string {
+function progressText(verb: string, track: Track, p: Progress): string {
   const pct = `${Math.floor(p.percent)}%`;
   if (p.stage === 'starting') return `${verb} "${track.title}"…`;
   if (p.stage === 'merging') return `Merging video and sound… ${pct}`;
@@ -207,9 +208,4 @@ export function progressText(verb: string, track: Track, p: Progress): string {
 
 const mb = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(2)} GB` : `${(bytes / 1e6).toFixed(1)} MB`);
 
-function formatDuration(seconds: number | null | undefined): string {
-  if (!seconds) return '';
-  const s = Math.round(seconds);
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, '0');
-  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
-}
+const formatDuration = (seconds: number | null | undefined): string => (seconds ? formatTime(Math.round(seconds)) : '');

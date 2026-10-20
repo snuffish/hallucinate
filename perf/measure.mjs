@@ -7,15 +7,13 @@
 import { chromium } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { AUTOPLAY_ARG, SOFTWARE_GL_ARGS } from '../scripts/chromium-args.mjs';
 
 const gpu = process.argv.includes('--gpu');
 const [url = 'http://localhost:5199/', out = 'perf/results/result.json'] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const results = {};
 
-const autoplay = '--autoplay-policy=no-user-gesture-required';
-const browser = await chromium.launch(gpu
-  ? { headless: false, args: [autoplay] }
-  : { args: [autoplay, '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch(gpu ? { headless: false, args: [AUTOPLAY_ARG] } : { args: SOFTWARE_GL_ARGS });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 await page.addInitScript(() => {
   window.__perf = { lsWrites: 0, longTasks: [] };

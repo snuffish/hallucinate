@@ -39,7 +39,7 @@ function run<R>(store: StoreName, mode: IDBTransactionMode, act: (s: IDBObjectSt
   }));
 }
 
-export function indexedDBStore<T extends Keyed>(name: StoreName): RecordStore<T> {
+function indexedDBStore<T extends Keyed>(name: StoreName): RecordStore<T> {
   return {
     all: () => run<T[]>(name, 'readonly', (s) => s.getAll() as IDBRequest<T[]>).then((r) => r ?? []),
     put: (record) => run(name, 'readwrite', (s) => { s.put(record); }).then(() => {}),

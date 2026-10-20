@@ -9,7 +9,7 @@ import { LOOK_RANGES } from '../state/app-state';
 import { RANDOM_RANGES } from '../state/look-drift';
 import type { Hearing } from './listener';
 import type { FrameLook } from './look';
-import { clamp01 } from './math';
+import { clamp, clamp01 } from './math';
 
 export const ROUTE_SOURCES = ['bass', 'mid', 'high', 'level', 'kick', 'tone', 'mood'] as const;
 export type RouteSource = (typeof ROUTE_SOURCES)[number];
@@ -25,9 +25,9 @@ export const ROUTE_SECONDS = { min: MIN_ATTACK, max: 2, step: 0.01 } as const;  
 export const NEW_ROUTE: Route = { source: 'bass', depth: 0.5, attack: 0.1, release: 0.4 };
 
 // What depth 1 moves a slider by: its whole Randomize range; Colour, ±HUE_SPAN of the wheel.
-export const routeSpan = (t: RouteTarget): number => (t === 'hue' ? HUE_SPAN : RANDOM_RANGES[t][1] - RANDOM_RANGES[t][0]);
-export const attackOf = (t: RouteTarget, r: Readonly<Route>): number => Math.max(t === 'hue' ? HUE_MIN_ATTACK : MIN_ATTACK, r.attack);
-export const releaseOf = (r: Readonly<Route>): number => Math.max(MIN_ATTACK, r.release);
+const routeSpan = (t: RouteTarget): number => (t === 'hue' ? HUE_SPAN : RANDOM_RANGES[t][1] - RANDOM_RANGES[t][0]);
+const attackOf = (t: RouteTarget, r: Readonly<Route>): number => Math.max(t === 'hue' ? HUE_MIN_ATTACK : MIN_ATTACK, r.attack);
+const releaseOf = (r: Readonly<Route>): number => Math.max(MIN_ATTACK, r.release);
 
 // The music a route follows, 0–1: the bands as heard (not scaled by Reactivity), the kick's pulse, the
 // tone and the mood.
@@ -39,10 +39,10 @@ function heard(h: Readonly<Hearing>, s: RouteSource): number {
 // Where a followed slider sits: its hand value moved by the envelope, inside its range and never above
 // the higher of the hand value and the top of the Randomize range. Colour wraps round the wheel instead.
 export function followed(t: RouteTarget, base: number, r: Readonly<Route>, env: number): number {
-  const v = base + Math.min(1, Math.max(-1, r.depth)) * env * routeSpan(t);
+  const v = base + clamp(r.depth, -1, 1) * env * routeSpan(t);
   if (t === 'hue') return v;
   const top = Math.min(LOOK_RANGES[t].max, Math.max(base, RANDOM_RANGES[t][1]));
-  return Math.min(top, Math.max(LOOK_RANGES[t].min, v));
+  return clamp(v, LOOK_RANGES[t].min, top);
 }
 
 // `look` with its routes applied, written into `out` (a reused object), the envelopes in `env` stepped

@@ -1,5 +1,5 @@
 import { EDGE_FULL, EFFECTS, effectDef, passesOf } from '../src/engine/effects';
-import { expect, seedScenes, solidScene, test, type Page } from './fixtures';
+import { expect, seedScenes, solidScene, startDemo, test, type Page } from './fixtures';
 
 // How far the main screen's picture is from symmetric, left to right and top to bottom: the share of
 // pixels, away from the edges (where effects fade back to the scene's own picture), that differ from
@@ -68,9 +68,7 @@ async function press(page: Page, key: string) {
 }
 
 async function start(page: Page) {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Play demo beat' }).click();
-  await expect(page.locator('#now')).toContainText('Demo beat');
+  await startDemo(page);
   await page.locator('#auto').uncheck();   // auto-switch must not change the scene under the test
 }
 

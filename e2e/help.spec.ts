@@ -1,16 +1,10 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, startDemo, test, type Page } from './fixtures';
 
 const pop = (page: Page) => page.locator('#help-pop');
 const openPopovers = (page: Page) => page.locator(':popover-open');
 
-async function start(page: Page) {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Play demo beat' }).click();
-  await expect(page.locator('#now')).toContainText('Demo beat');
-}
-
 test('help: ? opens the shortcut sheet, Esc closes it, the first start hints at it', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await expect(page.locator('#toast')).toContainText('Press ? for help');
 
   await page.keyboard.press('?');
@@ -29,7 +23,7 @@ test('help: ? opens the shortcut sheet, Esc closes it, the first start hints at 
 });
 
 test('help: a panel ? opens its topic and closes with the panel (H)', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.getByRole('button', { name: 'Help: Sound sources' }).click();
   await expect(pop(page)).toBeVisible();
   await expect(pop(page)).toContainText('Tab / system audio');
@@ -41,7 +35,7 @@ test('help: a panel ? opens its topic and closes with the panel (H)', async ({ p
 });
 
 test('help: switching overlays closes help; Esc closes only help', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('l');
   await expect(page.locator('#library')).toBeVisible();
   await page.getByRole('button', { name: 'Help: Scene library' }).click();
@@ -62,7 +56,7 @@ test('help: switching overlays closes help; Esc closes only help', async ({ page
 });
 
 test('help: a click outside closes it', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.getByRole('button', { name: 'Help: The look' }).click();
   await expect(pop(page)).toBeVisible();
   await page.mouse.click(900, 600);

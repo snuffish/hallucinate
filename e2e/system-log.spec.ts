@@ -1,14 +1,8 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, startDemo, test, type Page } from './fixtures';
 
 const panel = (page: Page) => page.locator('#system-log');
 const lines = (page: Page) => panel(page).locator('.syslog-line');
 const command = (page: Page) => panel(page).getByRole('textbox', { name: 'Command' });
-
-async function start(page: Page) {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Play demo beat' }).click();
-  await expect(page.locator('#now')).toContainText('Demo beat');
-}
 
 async function run(page: Page, line: string) {
   await command(page).fill(line);
@@ -16,7 +10,7 @@ async function run(page: Page, line: string) {
 }
 
 test('system log: Shift+S shows what the app and the console said before it opened, and hides it again', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await expect(panel(page)).toBeHidden();
   await page.evaluate(() => console.warn('a warning from the page'));
   await page.keyboard.press('Shift+S');
@@ -28,7 +22,7 @@ test('system log: Shift+S shows what the app and the console said before it open
 });
 
 test('system log: while closed, a badge counts the errors; opening the log sees them', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   const badge = page.locator('#log-badge');
   await expect(badge).toBeHidden();
   await page.evaluate(() => { console.error('boom'); console.error(new Error('bang')); });
@@ -43,7 +37,7 @@ test('system log: while closed, a badge counts the errors; opening the log sees 
 });
 
 test('system log: the levels, the source and the search narrow it; clear empties it', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+S');
   await page.evaluate(() => { console.error('needle error'); console.info('needle info'); console.info('hay'); });
   await expect(lines(page).filter({ hasText: 'needle info' })).toBeVisible();
@@ -63,7 +57,7 @@ test('system log: the levels, the source and the search narrow it; clear empties
 });
 
 test('system log: commands run the assistant\'s tools by name, and ↑ brings a command back after a reload', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+S');
   await run(page, 'help switch_scene');
   await expect(lines(page).filter({ hasText: 'help switch_scene' }).last()).toBeVisible();
@@ -78,7 +72,7 @@ test('system log: commands run the assistant\'s tools by name, and ↑ brings a 
   await run(page, 'nonsense');
   await expect(lines(page).filter({ hasText: 'Unknown command "nonsense"' })).toBeVisible();
 
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+S');
   await command(page).press('ArrowUp');
   await command(page).press('ArrowUp');
@@ -86,7 +80,7 @@ test('system log: commands run the assistant\'s tools by name, and ↑ brings a 
 });
 
 test('system log: it follows the local server\'s lines', async ({ page }) => {
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+S');
   await page.evaluate(() => fetch('/api/settings'));
   await expect(lines(page).filter({ hasText: 'GET /api/settings' }).first()).toHaveAttribute('data-source', 'server');
@@ -94,7 +88,7 @@ test('system log: it follows the local server\'s lines', async ({ page }) => {
 
 test('system log: drag it by its top; it opens there again after a reload, and a double-click puts it back', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1200 });
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+S');
   const corner = (await panel(page).boundingBox())!;
   const grab = (await panel(page).locator('.syslog-head b').boundingBox())!;
@@ -107,7 +101,7 @@ test('system log: drag it by its top; it opens there again after a reload, and a
   const moved = (await panel(page).boundingBox())!;
   expect(moved.x).toBeCloseTo(corner.x + 200, -1);
 
-  await start(page);
+  await startDemo(page);
   await page.keyboard.press('Shift+S');
   const again = (await panel(page).boundingBox())!;
   expect(again.x).toBeCloseTo(moved.x, 0);

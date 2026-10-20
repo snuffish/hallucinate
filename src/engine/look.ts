@@ -47,10 +47,11 @@ const KICK_HUE_SECONDS = 0.05;
 const COOL = [0.7, 0.85, 1.35];
 const WARM = [1.3, 1.05, 0.7];
 
-// Moves `motion` on by `dt` (the show's seconds) and writes this frame's sound, grade and look into `p`.
-// Leaves the scene, the crossfade, the master and the media to the caller.
 // The Look with its sliders following the music, this frame (reused: composeFrame never runs twice at once).
 const followedLook: FrameLook = { reactivity: 1, speed: 1, cycle: 0, hue: 0, trails: 0, aberration: 0, synesthesia: 0 };
+
+// Moves `motion` on by `dt` (the show's seconds) and writes this frame's sound, grade and look into `p`.
+// Leaves the scene, the crossfade, the master and the media to the caller.
 
 export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearing>, given: Readonly<FrameLook>, sceneTrails: number, dt: number): void {
   const look = given.routes ? followMusic(followedLook, given, motion.routeEnv ??= new Float32Array(ROUTE_TARGETS.length), h, dt) : given;

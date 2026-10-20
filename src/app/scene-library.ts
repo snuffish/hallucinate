@@ -39,7 +39,7 @@ const HEADER_LINES = COMMON.split('\n').length - 1;
 const NONE: readonly ParamSpec[] = [];
 
 // "ERROR: 0:57: 'foo' : undeclared identifier" -> "Line 3: 'foo' : undeclared identifier"
-export function formatError(message: string): string {
+function formatError(message: string): string {
   return message
     .split('\n')
     .filter((l) => l.startsWith('ERROR'))

@@ -26,8 +26,6 @@ export interface HearingHistory {
   ticks: readonly number[];            // when each tick came, oldest first
 }
 
-export const NO_HISTORY: HearingHistory = { samples: [], kicks: [], ticks: [] };
-
 export class HearingRecorder {
   private samples: HearingSample[] = [];
   private kicks: number[] = [];

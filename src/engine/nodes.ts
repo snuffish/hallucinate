@@ -232,7 +232,6 @@ export const GraphSchema = z.object({ nodes: z.array(GraphNodeSchema), links: z.
   return links.length === g.links.length ? g : { ...g, links };
 });
 export type GraphNode = z.infer<typeof GraphNodeSchema>;
-export type GraphLink = z.infer<typeof GraphLinkSchema>;
 export type Graph = z.infer<typeof GraphSchema>;
 
 // What a new block of this type starts with.

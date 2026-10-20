@@ -99,7 +99,7 @@ export function StudioParams() {
   );
 }
 
-export function ParamRow({ spec, value, onChange }: { spec: ParamSpec; value: ParamValue; onChange: (v: ParamValue) => void }) {
+function ParamRow({ spec, value, onChange }: { spec: ParamSpec; value: ParamValue; onChange: (v: ParamValue) => void }) {
   if (spec.type === 'bool') {
     return (
       <div className="param param-bool">

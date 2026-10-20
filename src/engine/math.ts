@@ -3,7 +3,13 @@
 
 export const fract = (x: number): number => x - Math.floor(x);
 
-export const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
+// x held inside lo..hi (hi wins when lo > hi).
+export const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
+
+export const clamp01 = (x: number): number => clamp(x, 0, 1);
+
+// x rounded to `places` decimals.
+export const roundTo = (x: number, places: number): number => { const f = 10 ** places; return Math.round(x * f) / f; };
 
 // Eased 0 -> 1, flat at both ends; x is clamped to 0..1 first.
 export const smoothstep = (x: number): number => { x = clamp01(x); return x * x * (3 - 2 * x); };

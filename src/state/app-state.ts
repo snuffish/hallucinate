@@ -4,6 +4,7 @@
 import type { EffectStack } from '../engine/effects';
 import type { Routes } from '../engine/look-routes';
 import type { Scene } from '../scenes';
+import { clamp } from '../engine/math';
 
 export const BEATS_PER_SCENE = 32;
 export const MAX_SECONDS_PER_SCENE = 45;
@@ -45,7 +46,7 @@ export type SlotOrder = 'linear' | 'random';
 export type SlotTransition = 'soft' | 'hard';
 export interface AutoSlots { on: boolean; beats: number; order: SlotOrder; transition: SlotTransition }
 export const AUTO_SLOT_BEATS = [8, 16, 32, 64] as const;
-export const DEFAULT_AUTO_SLOTS: AutoSlots = { on: false, beats: 16, order: 'linear', transition: 'soft' };
+const DEFAULT_AUTO_SLOTS: AutoSlots = { on: false, beats: 16, order: 'linear', transition: 'soft' };
 export const WHEEL: Palette = { hues: [], steps: false };
 export const LOOK_KEYS: readonly LookKey[] = ['hue', 'cycle', 'trails', 'speed', 'reactivity', 'aberration', 'synesthesia'];   // stored in show scenes
 export const LOOK_RANGES: Record<LookKey, { min: number; max: number; step: number }> = {
@@ -58,7 +59,7 @@ export const LOOK_RANGES: Record<LookKey, { min: number; max: number; step: numb
   aberration: { min: 0, max: 0.04, step: 0.001 },
   driftSpeed: { min: 0.2, max: 4, step: 0.05 },
 };
-export const clampLook = (key: LookKey, v: number): number => Math.min(LOOK_RANGES[key].max, Math.max(LOOK_RANGES[key].min, v));
+export const clampLook = (key: LookKey, v: number): number => clamp(v, LOOK_RANGES[key].min, LOOK_RANGES[key].max);
 
 // The XY pads start on the pairs a performer reaches for together: how fast and how hard, and where the
 // colour sits and how fast it walks.

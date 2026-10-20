@@ -5,6 +5,7 @@
 import { toolDefinition, type SchemaInput } from '@tanstack/ai';
 import { z } from 'zod';
 import { ROUTE_SECONDS, ROUTE_SOURCES, ROUTE_TARGETS } from '../engine/look-routes';
+import { LOOK_KEYS, PALETTE_MAX, type SliderKey } from '../state/app-state';
 import { PlanSchema } from '../state/show-plan';
 import { plural } from '../app/plural';
 
@@ -15,11 +16,11 @@ const cueValues = z.record(z.string(), z.unknown()).describe('Parameter values f
 const cueLook = z.record(z.string(), z.number()).describe('Look sliders stored with the show scene: hue 0-1, cycle 0-2, trails 0-0.97 (afterglow), speed 0-2.5, reactivity 0-2, aberration 0-0.04 (fringing), synesthesia 0-1.');
 
 // A picture the tool hands back to the model, in TanStack's content-part shape.
-export const ImagePartSchema = z.object({
+const ImagePartSchema = z.object({
   type: z.literal('image'),
   source: z.object({ type: z.literal('data'), value: z.string(), mimeType: z.string() }),
 });
-export const TextPartSchema = z.object({ type: z.literal('text'), content: z.string() });
+const TextPartSchema = z.object({ type: z.literal('text'), content: z.string() });
 export const ContentPartsSchema = z.array(z.union([TextPartSchema, ImagePartSchema]));
 export type ContentParts = z.infer<typeof ContentPartsSchema>;
 
@@ -38,9 +39,7 @@ function tool<TInput extends SchemaInput, TOutput extends SchemaInput, TName ext
   return { definition: toolDefinition(definition), running, done, director };
 }
 
-const lookKeys = ['hue', 'cycle', 'trails', 'speed', 'reactivity', 'aberration', 'synesthesia'] as const;
-
-export const TOOLS = [
+const TOOLS = [
   tool({
     name: 'get_app_state',
     description: 'Get what is on screen now: the playing scene (name, kind, description, live parameters with their ranges and values), the look sliders and switches (autoSwitch: whether the screen moves to another scene by itself; drift: whether the sliders wander; locked: the sliders Randomize and Drift leave alone; intensity: the Intensity control 0-1; palette: the hues every scene\'s colours walk ([] = the whole wheel) and whether it steps; followsTheMusic: the sliders that follow the music and how; slotAutoChange: whether the Look slots take turns on their own, every how many kicks, linear or random, soft (glide) or hard (cut); slots: the Look slots A-D that hold a look), the main screen\'s effects (in the order they run), the audio source, BPM, mood and tone, the live levels while music plays (energy, bass, mid, high, 0-1), whether media is loaded, whether Live is pinned and what the screen shows then, and every scene name by category (a mark after a name: * edited by the user, (mine), (visual maker); unmarked ones are built-in). Call this when you need to know the current situation or the exact scene names.',
@@ -104,7 +103,7 @@ export const TOOLS = [
   tool({
     name: 'set_look',
     description: 'Adjust the global look sliders that apply to every scene. hue 0-1 (colour shift), cycle 0-2 (colour cycling speed), trails 0-0.97 (afterglow: how long a line keeps glowing where it was drawn, fading in place; 0 = none), speed 0-2.5 (animation speed), reactivity 0-2 (how strongly visuals follow the music), aberration 0-0.04 (fringing: how far each line splits into red, green and blue copies; 0 = none), synesthesia 0-1 (how much the music tints the colours: the sound\'s tone warms or cools them and the music\'s mood is always part of it; 0 = off), intensity 0-1 (the Intensity control: sets reactivity, trails and aberration together inside the Randomize ranges, leaving locked ones; a slider given alongside it wins), palette { hues: 2-5 hues 0-1 on the laser wheel that every scene\'s colours walk instead of the whole wheel, or [] for the whole wheel; steps: hold each colour and ease to the next instead of blending }, routes { per slider (speed, trails, hue, synesthesia, aberration): { source: bass|mid|high|level|kick|tone|mood, depth -1..1 of its Randomize range (hue: of ±0.1), attack and release in seconds 0.05-2 (hue rises no faster than 0.15) }, or null to stop it following the music; a followed slider never goes above the higher of its own value and the top of its Randomize range }.',
-    inputSchema: z.object({ ...Object.fromEntries(lookKeys.map((k) => [k, z.number().optional()])) as Record<(typeof lookKeys)[number], z.ZodOptional<z.ZodNumber>>, intensity: z.number().optional(), palette: z.object({ hues: z.array(z.number().min(0).max(1)).max(5), steps: z.boolean().optional() }).optional(), routes: z.partialRecord(z.enum(ROUTE_TARGETS), z.object({ source: z.enum(ROUTE_SOURCES), depth: z.number().min(-1).max(1), attack: z.number().min(ROUTE_SECONDS.min).max(ROUTE_SECONDS.max), release: z.number().min(ROUTE_SECONDS.min).max(ROUTE_SECONDS.max) }).nullable()).optional() }),
+    inputSchema: z.object({ ...Object.fromEntries(LOOK_KEYS.map((k) => [k, z.number().optional()])) as Record<SliderKey, z.ZodOptional<z.ZodNumber>>, intensity: z.number().optional(), palette: z.object({ hues: z.array(z.number().min(0).max(1)).max(PALETTE_MAX), steps: z.boolean().optional() }).optional(), routes: z.partialRecord(z.enum(ROUTE_TARGETS), z.object({ source: z.enum(ROUTE_SOURCES), depth: z.number().min(-1).max(1), attack: z.number().min(ROUTE_SECONDS.min).max(ROUTE_SECONDS.max), release: z.number().min(ROUTE_SECONDS.min).max(ROUTE_SECONDS.max) }).nullable()).optional() }),
     outputSchema: record,
     running: () => 'Adjusting the look',
     done: () => 'Adjusted the look',

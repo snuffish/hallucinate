@@ -21,7 +21,7 @@ export interface ParkedScenes {
 }
 
 export const loadUserScenes = () => readJSON(KEYS.userScenes, UserScenesSchema, []);
-export const loadSceneEdits = () => readJSON(KEYS.sceneEdits, SceneEditsSchema, {});
+const loadSceneEdits = () => readJSON(KEYS.sceneEdits, SceneEditsSchema, {});
 
 export function userScene(name: string, body: string): Scene {
   const { code, params } = parseParams(body);

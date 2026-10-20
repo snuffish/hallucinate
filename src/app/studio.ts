@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { EffectStackSchema, NO_EFFECTS } from '../engine/effects';
 import { type ParamSpec, type ParamValue, ParamValueSchema, type ParamValues } from '../engine/params';
 import { Renderer, type ProgramState } from '../engine/renderer';
+import { clamp } from '../engine/math';
 import { applyRendererPrefs, type ScreenDetailed } from '../engine/output-link';
 import { outputPrefs, type Prefs } from '../state/prefs';
 import { listedScenes } from '../state/library-prefs';
@@ -41,7 +42,7 @@ export const STUDIO_LIMITS = {
   directorSeconds: { min: 15, max: 3600 },
 } as const;
 type Range = { readonly min: number; readonly max: number };
-const within = (r: Range, v: number): number => Math.min(r.max, Math.max(r.min, v));
+const within = (r: Range, v: number): number => clamp(v, r.min, r.max);
 // A stored number, clamped to the range its control allows (an imported or hand-edited show can't, say,
 // run the autopilot every frame); a missing or non-number value falls back to the default.
 const bounded = (r: Range, def: number) => z.number().catch(def).transform((v) => within(r, v));
