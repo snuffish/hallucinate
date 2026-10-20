@@ -81,3 +81,44 @@ test('perf: the profiler reports what a Glow costs per frame at the default reso
 test('perf: the profiler reports what all the effects stacked cost per frame at the default resolution, against none', async ({ page }) => {
   await reportsCost(page, `All ${EFFECTS.length} effects at their strongest`, EFFECTS.flatMap((e) => strongest(e.id)));
 });
+
+test('perf: drag it by any part but its buttons, resize it by its corner; both are kept after a reload, and a double-click puts it back', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await start(page);
+  await page.keyboard.press('Shift+P');
+  await expect(overlay(page)).toBeVisible();
+  const corner = (await overlay(page).boundingBox())!;
+  const grab = (await overlay(page).locator('.perf-meta').boundingBox())!;
+  await page.mouse.move(grab.x + 10, grab.y + grab.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grab.x + 210, grab.y + 160, { steps: 12 });
+  await page.mouse.up();
+  await expect(overlay(page)).toHaveClass(/\bmoved\b/);
+  const moved = (await overlay(page).boundingBox())!;
+  expect(moved.x).toBeCloseTo(corner.x + 200, -1);
+  expect(moved.y).toBeCloseTo(corner.y + 160, -1);
+
+  const grip = (await overlay(page).locator('.grip.corner').boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2 + 80, grip.y + grip.height / 2 + 60, { steps: 10 });
+  await page.mouse.up();
+  await expect(overlay(page)).toHaveClass(/\bsized\b/);
+  await expect.poll(async () => Math.round((await overlay(page).boundingBox())!.width - moved.width)).toBe(80);
+  const sized = (await overlay(page).boundingBox())!;
+
+  await start(page);
+  await page.keyboard.press('Shift+P');
+  const again = (await overlay(page).boundingBox())!;
+  expect(again.x).toBeCloseTo(sized.x, 0);
+  expect(again.y).toBeCloseTo(sized.y, 0);
+  expect(again.width).toBeCloseTo(sized.width, 0);
+  expect(again.height).toBeCloseTo(sized.height, 0);
+
+  await overlay(page).locator('.perf-meta').dblclick();
+  await expect(overlay(page)).not.toHaveClass(/\bmoved\b/);
+  await expect(overlay(page)).not.toHaveClass(/\bsized\b/);
+  const back = (await overlay(page).boundingBox())!;
+  expect(back.x).toBeCloseTo(corner.x, 0);
+  expect(back.width).toBeCloseTo(corner.width, 0);
+});

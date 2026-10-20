@@ -69,7 +69,7 @@ function LogPanel() {
   const app = useApp();
   const { assistant } = useSessions();
   const log = app.log;
-  const { root, moved, narrow, ...drag } = useMonitorDrag('log', '.syslog-lines');
+  const { root, moved, sized, narrow, grip, style, ...drag } = useMonitorDrag('log', '.syslog-lines');
   const dragging = useUI((ui) => ui.dragging === 'log');
   useStore(log.stats, (s) => s.version);   // re-render as lines come in
   const [view, setView] = useView();
@@ -116,7 +116,7 @@ function LogPanel() {
   };
 
   return (
-    <div id="system-log" ref={root} className={`syslog${moved ? ' moved' : ''}${dragging ? ' dragging' : ''}`} data-draggable={!narrow || undefined} {...drag}>
+    <div id="system-log" ref={root} className={`syslog${moved ? ' moved' : ''}${sized ? ' sized' : ''}${dragging ? ' dragging' : ''}`} style={style} data-draggable={!narrow || undefined} {...drag}>
       <div className="syslog-head">
         <b>System log</b>
         <div className="syslog-levels" role="group" aria-label="Levels">
@@ -173,6 +173,7 @@ function LogPanel() {
         }}
       />
       <div className="syslog-hint">Close with <Kbd hotkey={HOTKEYS.systemLog} /> · type <code>help</code> below for commands</div>
+      {grip}
     </div>
   );
 }

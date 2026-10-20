@@ -106,12 +106,12 @@ export function HearingMonitor() {
 }
 
 function HearingPanel({ view }: { view: HearingView }) {
-  const { root, moved, narrow, ...drag } = useMonitorDrag('hearing');
+  const { root, moved, sized, narrow, grip, style, ...drag } = useMonitorDrag('hearing');
   const dragging = useUI((ui) => ui.dragging === 'hearing');
   const { diagnostics: d } = view;
   const t = d.tempo, fps = frameRateLabel(d.frameRate);
   return (
-    <div id="hearing" ref={root} className={`hearing${moved ? ' moved' : ''}${dragging ? ' dragging' : ''}`} data-draggable={!narrow || undefined} {...drag}>
+    <div id="hearing" ref={root} className={`hearing${moved ? ' moved' : ''}${sized ? ' sized' : ''}${dragging ? ' dragging' : ''}`} style={style} data-draggable={!narrow || undefined} {...drag}>
       <div className="hearing-head">
         <b id="hearing-tempo">{tempoLabel(t)}</b>
         <span className="hearing-light kick" title="Kick" style={{ opacity: 0.15 + view.beat * 0.85 }} />
@@ -143,7 +143,8 @@ function HearingPanel({ view }: { view: HearingView }) {
       <div className="hearing-meta">
         tone {(view.centroid / 1000).toFixed(1)} kHz · energy {view.energy.toFixed(2)} · mood {view.mood.toFixed(2)}
       </div>
-      <div className="perf-hint">{narrow ? '' : moved ? 'Double-click it to put it back · ' : 'Drag it to move it · '}Close with <Kbd hotkey={HOTKEYS.hearingMonitor} /></div>
+      <div className="perf-hint">{narrow ? '' : moved || sized ? 'Double-click it to put it back · ' : 'Drag it to move or its corner to resize it · '}Close with <Kbd hotkey={HOTKEYS.hearingMonitor} /></div>
+      {grip}
     </div>
   );
 }

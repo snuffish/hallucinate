@@ -45,7 +45,7 @@ next, as buttons under the reply, like the examples on an empty chat.
   remembered.
 - **Type while it works**: your message waits (dimmed, × to drop it) and goes out when the reply is done. **Retry**
   after an error; **Copy** on replies and code blocks. Drag the panel's corner to resize it (double-click for the
-  natural size).
+  natural size), and its frame to move it away from the bubble (double-click the frame to bring it back).
 
 ## Setup
 

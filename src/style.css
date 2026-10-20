@@ -120,8 +120,12 @@ body.idle { cursor: none; }
 .widget.floating { position: fixed; z-index: var(--z-float); width: 290px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); }
 .widget.widget-params.floating { width: 270px; }
 .widget.dragging { z-index: var(--z-drag); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); opacity: 0.92; transition: none; pointer-events: none; }
-.widget > header { flex: none; display: flex; align-items: center; gap: 6px; min-height: 22px; cursor: grab; touch-action: none; user-select: none; }
-.widget.dragging > header { cursor: grabbing; }
+.widget > header { flex: none; display: flex; align-items: center; gap: 6px; min-height: 22px; touch-action: none; }
+/* Dragged by any part that doesn't take the press itself (see src/components/widgets/ownPress.ts). The body
+   still scrolls on touch; a sideways swipe there moves the widget. */
+.widget[data-draggable] { cursor: grab; user-select: none; }
+.widget[data-draggable] :is(input, textarea, select, [contenteditable]) { cursor: auto; user-select: text; }
+.widget.dragging, .widget.dragging * { cursor: grabbing; }
 .widget-title { flex: 1; min-width: 0; color: var(--muted); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .widget-hub .widget-title { color: var(--text); font-size: 15px; font-weight: 700; text-transform: none; letter-spacing: 0; }
 .widget-params .widget-title { color: var(--text); font-size: 13px; font-weight: 700; text-transform: none; letter-spacing: 0; }
@@ -419,6 +423,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   pointer-events: none;
 }
 .perf { width: min(380px, 100%); box-sizing: border-box; }
+.perf.sized { overflow-y: auto; overscroll-behavior: contain; }
 .hearing { width: 100%; box-sizing: border-box; }
 .perf, .hearing, .syslog {
   background: var(--glass);
@@ -431,6 +436,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   pointer-events: none;
 }
 .perf[hidden], .hearing[hidden], .syslog[hidden] { display: none; }
+/* Dragged by any part but its buttons; moved, it floats where it was dropped (the layout keeps the spot). */
+.perf[data-draggable] { cursor: grab; touch-action: none; user-select: none; pointer-events: auto; }
+.perf.moved { position: fixed; max-height: calc(100vh - var(--player-bar) - 32px); overflow-y: auto; }
+.perf.dragging { box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.perf.dragging, .perf.dragging * { cursor: grabbing; }
+/* Every monitor's resize grip: kept in the bottom-right corner even while the monitor scrolls, without
+   taking a line of its own. A resized monitor keeps its size wherever it sits. */
+:is(.perf, .hearing, .syslog) > .grip.corner { position: sticky; bottom: 2px; display: block; flex: none; align-self: flex-end; margin: -14px -10px -8px auto; }
+:is(.perf, .hearing, .syslog):hover > .grip.corner, :is(.perf, .hearing, .syslog).resizing > .grip { opacity: 0.8; }
+:is(.perf, .hearing, .syslog).resizing { user-select: none; }
 .perf-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
 .perf-head b { font-size: 16px; }
 .perf-head span { color: var(--muted); }
@@ -1204,6 +1219,12 @@ canvas.hearing-plot { position: static; display: block; width: 100%; }
 .ai header { display: flex; align-items: center; gap: 6px; }
 .ai { max-width: calc(100vw - 16px); max-height: calc(100vh - var(--dock-bottom) - 94px); }   /* beside the bubble's default spot it grows upward */
 .ai.sized { min-width: 300px; min-height: 260px; }
+/* Dragged by any part but its controls and its messages (text to select); dropped, it stays there. */
+.ai[data-draggable] { cursor: grab; }
+.ai[data-draggable] :is(.ai-log, .ai-chats) { cursor: auto; }
+.ai.moved { bottom: auto; max-height: calc(100vh - 16px); }
+.ai.dragging { box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); }
+.ai.dragging, .ai.dragging * { cursor: grabbing; }
 .ai header strong { font-size: 15px; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai header .ai-switcher { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 3px 8px; background: transparent; border-color: transparent; text-align: left; }
 .ai header .ai-switcher:hover, .ai header .ai-switcher.active { border-color: var(--line); background: rgba(255, 255, 255, 0.05); }

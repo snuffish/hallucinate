@@ -3,6 +3,7 @@ import { STAGE_LABELS, type PerfReport } from '../engine/profiler';
 import { HOTKEYS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { HelpButton } from './Help';
+import { useMonitorDrag } from './widgets/useMonitorDrag';
 
 const ms = (v: number) => v.toFixed(1);
 
@@ -15,14 +16,20 @@ function fillText(perf: PerfReport): string {
 }
 
 // Shift+P: where each frame's time goes, and what is holding the frame rate back. Updated ~2 Hz by
-// the frame loop (FrameProfiler); see PERF.md for how to read it.
+// the frame loop (FrameProfiler); see PERF.md for how to read it. Dragged and resized like the other monitors.
 export function PerfOverlay() {
-  const app = useApp();
   const perf = useUI((ui) => ui.perf);
   if (!perf) return <div id="perf" className="perf" hidden />;
+  return <PerfPanel perf={perf} />;
+}
+
+function PerfPanel({ perf }: { perf: PerfReport }) {
+  const app = useApp();
+  const { root, moved, sized, narrow, grip, style, ...drag } = useMonitorDrag('perf');
+  const dragging = useUI((ui) => ui.dragging === 'perf');
   const [w, h] = perf.size;
   return (
-    <div id="perf" className="perf">
+    <div id="perf" ref={root} className={`perf${moved ? ' moved' : ''}${sized ? ' sized' : ''}${dragging ? ' dragging' : ''}`} style={style} data-draggable={!narrow || undefined} {...drag}>
       <div className="perf-head">
         <b>{Math.round(perf.fps)} fps</b>
         <span>frame {ms(perf.frameP50)} · p95 {ms(perf.frameP95)} ms</span>
@@ -54,7 +61,8 @@ export function PerfOverlay() {
         <button type="button" disabled={perf.fillRunning} onClick={() => void app.runFillTest()}>{perf.fillRunning ? 'Testing GPU…' : 'Test GPU'}</button>
         <span id="perf-fill-result">{fillText(perf)}</span>
       </div>
-      <div className="perf-hint">Close with <Kbd hotkey={HOTKEYS.perf} /></div>
+      <div className="perf-hint">{narrow ? '' : moved || sized ? 'Double-click it to put it back · ' : 'Drag it to move or its corner to resize it · '}Close with <Kbd hotkey={HOTKEYS.perf} /></div>
+      {grip}
     </div>
   );
 }

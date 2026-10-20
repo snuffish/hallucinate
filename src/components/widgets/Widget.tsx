@@ -1,5 +1,6 @@
-// The frame every control widget shares: a header that drags it (to an edge to dock it there, or
-// anywhere to float it), double-click to put it back, collapse and close buttons, and the body.
+// The frame every control widget shares: dragged by any part that doesn't take the press itself (to an
+// edge to dock it there, or anywhere to float it), double-click there to put it back, a header with
+// collapse and close buttons, and the body.
 // Where it sits comes from the layout store; a floating widget is placed from its stored corner
 // offset and fitted back on screen whenever the window, fullscreen or its own size changes.
 
@@ -11,6 +12,7 @@ import { DOCK_WIDTH, clampDock, clampH, clampW, floatToPx, type FloatPlace, type
 import type { HelpId } from '../../state/ui-state';
 import { HelpButton } from '../Help';
 import { dockInsets, dropTargetAt, rectOf, setDropTarget, setZoneStyle, zoneStyle, zoneWidth } from './drop';
+import { ownsPress, startsDrag } from './ownPress';
 import { usePointerDrag } from './usePointerDrag';
 
 const NARROW = '(max-width: 600px)';
@@ -65,6 +67,17 @@ export function Grip({ className, title, onStart, onMove, onEnd, onCancel, onRes
   );
 }
 
+// A corner grip's new size for a box that started at `s` (its rect when the press began), the pointer
+// `dx` / `dy` from where it started. `up`: the grip is on the top edge (the box grows upward). The
+// dragged edge stops at the screen's edge (8 px in). Shared by the widgets and the monitors.
+export function cornerSize(s: { w: number; h: number; left: number; top: number; bottom: number }, dx: number, dy: number, up = false): { w: number; h: number } {
+  const view = viewport();
+  const w = Math.min(clampW(s.w + dx, view), Math.max(s.w, view.width - s.left - 8));
+  const room = up ? s.bottom - 8 : view.height - s.top - 8;
+  const h = Math.min(clampH(s.h + (up ? -dy : dy), view), Math.max(s.h, room));
+  return { w, h };
+}
+
 // What the grips of a widget resize, by where it sits: a float or a top/bottom widget by its corner
 // (a bottom-docked one grows upward), a side-docked one by its bottom edge (its height) and its inner
 // edge (the whole dock's width, like a sidebar).
@@ -89,7 +102,6 @@ export function Widget({ id, entry, title, domId, help, tools, hidden, closable 
   const app = useApp();
   const narrow = useNarrow();
   const root = useRef<HTMLElement>(null);
-  const header = useRef<HTMLElement>(null);
   const isFloat = entry.place.kind === 'float';
   const draggingThis = useUI((ui) => ui.dragging === id);
   useFloatPlacement(root, entry.place.kind === 'float' ? entry.place : null);
@@ -106,10 +118,10 @@ export function Widget({ id, entry, title, domId, help, tools, hidden, closable 
   };
   const handlers = usePointerDrag({
     onStart: (_e, grab) => {
-      const el = root.current, h = header.current;
-      if (!el || !h) return;
-      const r = el.getBoundingClientRect(), hr = h.getBoundingClientRect();
-      drag.current = { dx: grab.x + hr.left - r.left, dy: grab.y + hr.top - r.top, style: el.style.cssText };
+      const el = root.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      drag.current = { dx: grab.x, dy: grab.y, style: el.style.cssText };   // `grab`: where it was pressed
       Object.assign(el.style, { position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, margin: '0' });
       el.classList.add('dragging');
       app.setDragging(id);
@@ -146,15 +158,13 @@ export function Widget({ id, entry, title, domId, help, tools, hidden, closable 
     el.classList.add('resizing');
     app.setDragging('resize');
   };
-  const viewportSize = viewport();
   const moveResize = (mode: GripMode) => (dx: number, dy: number) => {
     const el = root.current, s = sized.current;
     if (!el || !s) return;
     if (mode === 'width' && side) { setZoneStyle(side, { width: clampDock(s.dock + (side === 'left' ? dx : -dx)) }); return; }
-    // The dragged edge stops at the screen's edge (8 px in).
-    if (mode !== 'height') el.style.width = `${Math.min(clampW(s.w + dx, viewportSize), Math.max(s.w, viewportSize.width - s.left - 8))}px`;
-    const room = mode === 'corner-up' ? s.bottom - 8 : viewportSize.height - s.top - 8;
-    el.style.height = `${Math.min(clampH(s.h + (mode === 'corner-up' ? -dy : dy), viewportSize), Math.max(s.h, room))}px`;
+    const { w, h } = cornerSize(s, dx, dy, mode === 'corner-up');
+    if (mode !== 'height') el.style.width = `${w}px`;
+    el.style.height = `${h}px`;
   };
   const endResize = (mode: GripMode) => () => {
     const el = root.current, s = sized.current;
@@ -193,10 +203,11 @@ export function Widget({ id, entry, title, domId, help, tools, hidden, closable 
   const classes = ['widget', `widget-${id}`, isFloat ? 'floating' : 'docked', entry.collapsed ? 'collapsed' : '', draggingThis ? 'dragging' : '',
     entry.size.h !== null && !entry.collapsed ? 'sized' : ''].filter(Boolean).join(' ');
   return (
-    <section ref={root} id={domId ?? `w-${id}`} data-widget={id} className={classes} hidden={hidden} style={style} aria-label={typeof title === 'string' ? title : undefined}>
-      <header ref={header} title={narrow ? undefined : 'Drag to move · drop on an edge to dock · double-click to put it back'}
-        onPointerDown={handlers.onPointerDown} onClickCapture={handlers.onClickCapture}
-        onDoubleClick={(e) => { if (!narrow && !(e.target as HTMLElement).closest('button, input')) app.resetWidget(id); }}>
+    <section ref={root} id={domId ?? `w-${id}`} data-widget={id} data-draggable={!narrow || undefined} className={classes} hidden={hidden} style={style}
+      aria-label={typeof title === 'string' ? title : undefined}
+      onPointerDown={(e) => { if (startsDrag(e)) handlers.onPointerDown(e); }} onClickCapture={handlers.onClickCapture}
+      onDoubleClick={(e) => { if (!narrow && !ownsPress(e)) app.resetWidget(id); }}>
+      <header title={narrow ? undefined : 'Drag anywhere on the widget to move it · drop on an edge to dock · double-click to put it back'}>
         <strong className="widget-title">{title}</strong>
         {tools}
         {help && <HelpButton topic={help} />}

@@ -1,6 +1,7 @@
-// A pointer drag on one handle element: pointer capture, a few pixels of slack before it counts as a
-// drag (so a click stays a click), Esc to cancel, and the click that follows a real drag swallowed
-// (so dragging a button doesn't also press it). Shared by the widget headers and the assistant bubble.
+// A pointer drag on one handle element: a few pixels of slack before it counts as a drag (so a click
+// stays a click, on whatever part of the handle was pressed), then pointer capture, Esc to cancel, and
+// the click that follows a real drag swallowed (so dragging a button doesn't also press it). Shared by
+// the widgets, the monitors, the chat window, the resize grips and the assistant bubble.
 
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 
@@ -36,24 +37,30 @@ export function usePointerDrag(handlers: DragHandlers, { enabled = true, ignoreB
     const start = { x: e.clientX, y: e.clientY };
     const grab = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     let dragging = false;
-    handle.setPointerCapture(e.pointerId);
 
     const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
       if (!dragging) {
         if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < SLACK) return;
         dragging = true;
+        handle.setPointerCapture(e.pointerId);
         latest.current.onStart(ev, grab);
       }
       latest.current.onMove(ev);
     };
     const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
       done();
       if (!dragging) return;
       swallowClick.current = true;
       setTimeout(() => { swallowClick.current = false; }, 0);   // in case no click follows
       latest.current.onEnd(ev);
     };
-    const cancel = () => { done(); if (dragging) latest.current.onCancel(); };
+    const cancel = (ev?: PointerEvent) => {
+      if (ev && ev.pointerId !== e.pointerId) return;
+      done();
+      if (dragging) latest.current.onCancel();
+    };
     // Esc cancels the drag and nothing else (it would otherwise close an overlay too).
     const key = (ev: KeyboardEvent) => {
       if (ev.key !== 'Escape' || !dragging) return;
@@ -62,16 +69,17 @@ export function usePointerDrag(handlers: DragHandlers, { enabled = true, ignoreB
       cancel();
     };
     const done = () => {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
-      handle.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
       window.removeEventListener('keydown', key, true);
       if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
       cleanup.current = null;
     };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
-    handle.addEventListener('pointercancel', cancel);
+    // On the window: until the drag starts, the pointer isn't captured and may leave the handle.
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
     window.addEventListener('keydown', key, true);
     cleanup.current = cancel;
   };

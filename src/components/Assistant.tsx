@@ -22,6 +22,7 @@ import { ChatList } from './assistant/ChatList';
 import { Transcript, usageLabel, usageTitle } from './assistant/Transcript';
 import { HelpButton } from './Help';
 import { rectOf } from './widgets/drop';
+import { isFixed, ownsPress, startsDrag } from './widgets/ownPress';
 import { usePointerDrag } from './widgets/usePointerDrag';
 import { Grip, useFloatPlacement, useNarrow } from './widgets/Widget';
 
@@ -36,15 +37,19 @@ const EXAMPLES: [label: string, prompt: string][] = [
 const DEFAULT_CHAT_H = 640;
 
 // A moved bubble opens the chat beside itself, toward the side with more room. With the bubble in
-// its default spot (beside the left dock) the stylesheet places both. `chatGrow` says which corner
-// faces away from the bubble: the resize grip sits there.
+// its default spot (beside the left dock) the stylesheet places both. A chat dragged somewhere of its
+// own (`moved`) stays there instead, and grows down and right. `chatGrow` says which corner faces
+// away from the bubble: the resize grip sits there.
 const chatBox = createRef<HTMLElement>();
 const chatGrow = new Store<{ x: 'left' | 'right'; y: 'up' | 'down' }>({ x: 'right', y: 'up' });
 
 // `sizedH`: the height the user gave the panel (null: the stylesheet's). Placement owns `height` only
 // while the panel floats beside a moved bubble; otherwise it puts the stored height back.
+const chatMoved = () => !!chatBox.current?.classList.contains('moved');
+const MOVED_GROW = { x: 'right', y: 'down' } as const;
 function placeChat(bubble: HTMLElement | null, sizedH: number | null): void {
   const chat = chatBox.current;
+  if (chatMoved()) { chatGrow.set(MOVED_GROW); return; }
   if (!chat || !bubble || chat.hidden) return;
   const p = chatPlacement(rectOf(bubble), { width: chat.offsetWidth, height: Math.min(sizedH ?? DEFAULT_CHAT_H, window.innerHeight - 32) }, { width: window.innerWidth, height: window.innerHeight });
   Object.assign(chat.style, { left: `${p.left}px`, top: `${p.top}px`, bottom: 'auto', height: `${p.maxHeight}px`, maxHeight: 'none' });
@@ -52,6 +57,7 @@ function placeChat(bubble: HTMLElement | null, sizedH: number | null): void {
 }
 function unplaceChat(sizedH: number | null): void {
   const chat = chatBox.current;
+  if (chatMoved()) { chatGrow.set(MOVED_GROW); return; }
   if (chat) Object.assign(chat.style, { left: '', top: '', bottom: '', maxHeight: '', height: sizedH === null ? '' : `${sizedH}px` });
   chatGrow.set({ x: 'right', y: 'up' });
 }
@@ -103,6 +109,7 @@ export function AssistantBubble() {
   const narrow = useNarrow();
   const place = useLayout((l) => effective(l, narrow).bubble);
   const chatH = useLayout((l) => effective(l, narrow).chatSize.h);
+  const chatMovedKind = useLayout((l) => effective(l, narrow).chatPlace.kind);   // a moved chat stays put; back beside the bubble, it is placed again
   const dragging = useUI((ui) => ui.dragging === 'bubble');
   const shown = useLayout((l) => l.bubbleShown);
   const root = useRef<HTMLButtonElement>(null);
@@ -149,7 +156,7 @@ export function AssistantBubble() {
     window.addEventListener('resize', fit);
     document.addEventListener('fullscreenchange', fit);
     return () => { window.removeEventListener('resize', fit); document.removeEventListener('fullscreenchange', fit); };
-  }, [place, open, started, shown, chatH]);
+  }, [place, open, started, shown, chatH, chatMovedKind]);
 
   if (!started || !shown) return null;
   const busy = running > 0 && !open;
@@ -171,6 +178,62 @@ export function AssistantBubble() {
 
 // ---------------------------------------------------------------------------------------------
 
+// The chat window is dragged by any part that doesn't take the press itself (its messages are text to
+// select); it then stays where it was dropped (stored in the layout) until a double-click there puts it
+// back beside the bubble. Phones keep it beside the bubble.
+const CHAT_TEXT = '.ai-log, .ai-chats';
+function useChatDrag(open: boolean) {
+  const app = useApp();
+  const narrow = useNarrow();
+  const place = useLayout((l) => effective(l, narrow).chatPlace);
+  const dragging = useUI((ui) => ui.dragging === 'chat');
+  const sizedH = useLayout((l) => effective(l, narrow).chatSize.h);
+  // Moved, it drops the height it was given beside the bubble (its own, or the stylesheet's, again).
+  useLayoutEffect(() => {
+    const el = chatBox.current;
+    if (el && open && place.kind === 'float') Object.assign(el.style, { maxHeight: '', height: sizedH === null ? '' : `${sizedH}px` });
+  }, [open, place, sizedH]);
+  useFloatPlacement(chatBox, open && place.kind === 'float' ? place : null);
+  const drag = useRef<{ dx: number; dy: number; style: string } | null>(null);
+  const restore = () => {
+    const el = chatBox.current;
+    if (el && drag.current) el.style.cssText = drag.current.style;
+    drag.current = null;
+    app.setDragging(null);
+  };
+  const handlers = usePointerDrag({
+    onStart: (_e, grab) => {
+      const el = chatBox.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      drag.current = { dx: grab.x, dy: grab.y, style: el.style.cssText };   // `grab`: where it was pressed
+      Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, bottom: 'auto', width: `${r.width}px`, height: `${r.height}px`, maxHeight: 'none' });
+      app.setDragging('chat');
+    },
+    onMove: (e) => {
+      const el = chatBox.current, d = drag.current;
+      if (!el || !d) return;
+      el.style.left = `${Math.min(Math.max(0, e.clientX - d.dx), window.innerWidth - el.offsetWidth)}px`;
+      el.style.top = `${Math.min(Math.max(0, e.clientY - d.dy), window.innerHeight - el.offsetHeight)}px`;
+    },
+    onEnd: () => {
+      const el = chatBox.current;
+      if (!el || !drag.current) return restore();
+      const rect = rectOf(el);
+      restore();
+      app.moveChat(rect);
+    },
+    onCancel: restore,
+  }, { enabled: !narrow });
+  return {
+    moved: place.kind === 'float',
+    dragging,
+    onPointerDown: (e: React.PointerEvent<HTMLElement>) => { if (startsDrag(e, CHAT_TEXT)) handlers.onPointerDown(e); },
+    onClickCapture: handlers.onClickCapture,
+    onDoubleClick: (e: React.MouseEvent) => { if (place.kind === 'float' && !ownsPress(e) && !isFixed(e, CHAT_TEXT)) app.resetChat(); },
+  };
+}
+
 // The panel's resize grip, on the corner facing away from the bubble. The new size shows live and
 // is stored on release; a double-click goes back to the natural size.
 function ChatGrip() {
@@ -186,6 +249,7 @@ function ChatGrip() {
         if (!el) return;
         const r = el.getBoundingClientRect();
         start.current = { w: r.width, h: r.height, left: r.left, top: r.top, style: el.style.cssText };
+        el.classList.add('resizing');
         app.setDragging('resize');
       }}
       onMove={(dx, dy) => {
@@ -208,12 +272,14 @@ function ChatGrip() {
         start.current = null;
         app.setDragging(null);
         if (!el) return;
+        el.classList.remove('resizing');
         const r = el.getBoundingClientRect();
         app.resizeChat({ w: Math.round(r.width), h: Math.round(r.height) });
+        if (chatMoved()) app.moveChat(rectOf(el));   // re-anchored from its new rectangle, so the grip's corner stays where it was let go
       }}
       onCancel={() => {
         const el = chatBox.current;
-        if (el && start.current) el.style.cssText = start.current.style;
+        if (el && start.current) { el.style.cssText = start.current.style; el.classList.remove('resizing'); }
         start.current = null;
         app.setDragging(null);
       }}
@@ -240,6 +306,7 @@ export function Assistant() {
   const [now, setNow] = useState(() => Date.now());
   const log = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const move = useChatDrag(open);
 
   useEffect(() => {
     if (STATIC_DEMO) return;
@@ -317,8 +384,9 @@ export function Assistant() {
   );
 
   return (
-    <aside id="ai" ref={chatBox} className={`ai${size.w !== null || size.h !== null ? ' sized' : ''}`} hidden={!open}
-      style={{ width: size.w ?? undefined, ...(size.h !== null && { height: size.h }) }}>
+    <aside id="ai" ref={chatBox} className={`ai${size.w !== null || size.h !== null ? ' sized' : ''}${move.moved ? ' moved' : ''}${move.dragging ? ' dragging' : ''}`} hidden={!open}
+      style={{ width: size.w ?? undefined, ...(size.h !== null && { height: size.h }) }} data-draggable={!narrow || undefined}
+      onPointerDown={move.onPointerDown} onClickCapture={move.onClickCapture} onDoubleClick={move.onDoubleClick}>
       <header>
         <button type="button" id="ai-chats-toggle" className={`ai-switcher${listOpen ? ' active' : ''}`} aria-expanded={listOpen} aria-controls="ai-chats"
           title={`Conversations (${HOTKEYS.assistantSearch.label}: ${HOTKEYS.assistantSearch.keys}, previous / next: Alt+↑ / Alt+↓)`} onClick={() => setListOpen((v) => !v)}>

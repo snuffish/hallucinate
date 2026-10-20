@@ -36,8 +36,9 @@ export type Overlay = 'library' | 'editor' | 'nodes' | 'studio' | 'soundcloud' |
 // A panel's help popover, or the sheet with every shortcut.
 export type HelpId = HelpTopicId | 'sheet';
 
-// What is being dragged around the screen ('hearing': the Hearing monitor; 'log': the System log; 'resize': a widget's or a dock's resize grip).
-export type DragId = WidgetId | 'bubble' | 'hearing' | 'log' | 'resize';
+// What is being dragged around the screen ('perf': the performance overlay; 'hearing': the Hearing monitor; 'log': the System log;
+// 'chat': the assistant's chat window; 'resize': a resize grip).
+export type DragId = WidgetId | 'bubble' | 'chat' | 'perf' | 'hearing' | 'log' | 'resize';
 
 export interface Meters { bass: number; mid: number; high: number; bright: number; beat: number }
 export type MoodLabel = '' | `mood: ${MoodWord}`;

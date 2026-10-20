@@ -8,11 +8,12 @@
 
 The controls are separate widgets: Hallucinate, Source, Media, Audio, Scene, Look, Effects, Actions, Screen and
 Parameters (Screen chooses what the main screen shows; see [Studio](studio.md)). Drag one by
-its title bar onto an edge of the screen to dock it there (a preview shows where it lands, and you can reorder a dock), or
+any part that isn't a control (its title bar, a label, the meters, the space between sliders) onto an edge of the screen to dock it there (a preview shows where it lands, and you can reorder a dock), or
 drop it anywhere else to float it. The [audio player](audio.md#-audio-player) runs along the bottom of the screen
 and the bottom dock sits on top of it. Floating widgets resize by their corner, docked ones by their bottom edge, and a
-dock's inner edge sets its width. Double-click a title bar to put that widget back where it started. The assistant
-bubble can be dragged anywhere too, and the chat opens beside it.
+dock's inner edge sets its width; the Hallucinate widget resizes like the rest. Double-click such a part to put that
+widget back where it started. The assistant bubble can be dragged anywhere too, and the chat opens beside it; drag the
+chat by its frame to put it somewhere of its own (a double-click on the frame puts it back beside the bubble).
 
 **☰** shows or hides each widget and the assistant bubble, and *Reset layout* (Shift+H) restores the default
 arrangement. The layout is remembered. H hides all the controls, and they also hide on their own after 3 s without
@@ -82,4 +83,5 @@ badge in the monitors' corner counts the errors you haven't seen, and a click on
   step through the commands you typed before, even after a reload; Tab completes a name.
 
 It sits under the other monitors (Shift+P, Shift+L) and moves like the Hearing monitor: drag it by any part but its
-buttons, fields and lines, and it opens there next time; a double-click puts it back in the corner.
+buttons, fields and lines, and it opens there next time; its corner resizes it. A double-click puts it back in the
+corner at its natural size.

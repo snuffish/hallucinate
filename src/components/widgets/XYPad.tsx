@@ -52,7 +52,7 @@ export function XYPad({ index, axes }: { index: number; axes: XYAxes }) {
   return (
     <div className="xy">
       <div className="xy-axes"><span aria-hidden="true">↕</span>{axisPicker('y')}<span aria-hidden="true">↔</span>{axisPicker('x')}</div>
-      <div ref={pad} className="xy-pad" role="group" tabIndex={0} aria-label={`${name}: ${across} across, ${up} up`}
+      <div ref={pad} className="xy-pad" data-own-press role="group" tabIndex={0} aria-label={`${name}: ${across} across, ${up} up`}
         title="Drag to set both · Shift-drag: finer · wheel steps ↕ · arrow keys step · double-click resets both"
         style={{ background: background(axes) }}
         onPointerDown={(e) => {

@@ -410,9 +410,18 @@ export class AppController {
   resetWidget(id: L.WidgetId): void { this.setLayout(L.resetWidget(this.layout.get(), id)); }
   setWidgetOpen(id: L.WidgetId, open: boolean): void { this.setLayout(L.setOpen(this.layout.get(), id, open)); }
   moveBubble(rect: L.Rect): void { this.setLayout(L.moveBubble(this.layout.get(), rect, viewport())); }
-  // A monitor (the Hearing monitor, the System log) floats where it was dropped; reset puts it back in the monitors' corner.
+  // A monitor (the performance overlay, the Hearing monitor, the System log) floats where it was dropped; reset puts it back
+  // in the monitors' corner at its natural size. Resizing re-anchors a moved one from its new rectangle, like a widget.
   moveMonitor(id: L.MonitorId, rect: L.Rect): void { this.setLayout(L.moveMonitor(this.layout.get(), id, rect, viewport())); }
   resetMonitor(id: L.MonitorId): void { this.setLayout(L.resetMonitor(this.layout.get(), id)); }
+  resizeMonitor(id: L.MonitorId, size: Partial<L.WidgetSize>, rect?: L.Rect): void {
+    let next = L.resizeMonitor(this.layout.get(), id, size);
+    if (rect && next[id].kind === 'float') next = L.moveMonitor(next, id, rect, viewport());
+    this.setLayout(next);
+  }
+  // The chat window floats where it was dropped; reset puts it back beside the bubble.
+  moveChat(rect: L.Rect): void { this.setLayout(L.moveChat(this.layout.get(), rect, viewport())); }
+  resetChat(): void { this.setLayout(L.resetChat(this.layout.get())); }
   // Hiding the assistant's bubble closes the chat too (I still opens it).
   setBubbleShown(shown: boolean): void {
     this.setLayout(L.setBubbleShown(this.layout.get(), shown));
