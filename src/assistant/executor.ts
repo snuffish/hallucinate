@@ -138,6 +138,10 @@ function nearMiss(code: string, find: string): string {
 const round = (v: ParamValue): ParamValue => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : Array.isArray(v) ? v.map((x) => Math.round(x * 1000) / 1000) : v);
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
+// A scene's or show scene's name as the model gives it: trimmed and cut to a length the panels can show.
+const NAME_MAX = 60;
+const nameOf = (name: unknown): string => String(name).trim().slice(0, NAME_MAX);
+
 // A plan's wall-clock ceilings, raised so each step can play all its beats at `bpm` (with a quarter
 // to spare, for a tempo that drifts): a ceiling under the step's own length cuts it short while the
 // ticks are still coming. Returns the steps it raised.
@@ -348,7 +352,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
     },
 
     create_scene({ name, code }) {
-      const n = String(name).trim().slice(0, 60);
+      const n = nameOf(name);
       const out = app.library.add(n, String(code), { origin: { by: 'assistant', label: `Created "${n}"`, chatId: undo.chatId, toolCallId: current.toolCallId } });
       if ('error' in out) throw new Error(out.error.includes('exists') ? `${out.error} Pick another name, or edit it with write_scene_code.` : `It didn't compile, so nothing was created:\n${out.error}`);
       app.setScene(out.index);
@@ -431,7 +435,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
       if (scenes()[i]!.kind) throw new Error(`"${String(scene)}" can't be a show scene (only visual scenes can).`);
       const coerced = coerceValues(app.library.specs(i), values);
       const cue = undoable(`Added "${String(name ?? scene)}" to the show`, show(s), () =>
-        s.add({ name: String(name ?? scene).trim().slice(0, 60) || String(scene), scene: String(scene), values: coerced.values, look: coerceLook(look) }));
+        s.add({ name: nameOf(name ?? scene) || String(scene), scene: String(scene), values: coerced.values, look: coerceLook(look) }));
       return { added: cueView(s, cue), ...(coerced.problems.length && { problems: coerced.problems }), showScenes: s.cues.length };
     },
 
@@ -439,7 +443,7 @@ export function createToolRunner(app: AppPort, undo: ToolSink, getStudio: () => 
       const s = studio();
       const cue = findCue(s, ref);
       const patch: Partial<Omit<Cue, 'id'>> = {};
-      if (typeof name === 'string' && name.trim()) patch.name = name.trim().slice(0, 60);
+      if (typeof name === 'string' && name.trim()) patch.name = nameOf(name);
       let sceneIndex = s.sceneIndex(cue);
       if (typeof scene === 'string') {
         sceneIndex = app.sceneByName(scene);
