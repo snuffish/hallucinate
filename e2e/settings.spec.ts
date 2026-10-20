@@ -98,13 +98,15 @@ test.describe('on a 2× screen', () => {
   test('pixel density caps what the main canvas renders', async ({ page }) => {
     await openApp(page);
     const ratio = () => page.locator('#gl').evaluate((c: HTMLCanvasElement) => c.width / c.clientWidth);
-    await expect.poll(ratio).toBeCloseTo(2, 1);
+    // 15 s: the canvas takes the new size on a later frame, and a 2× frame under software WebGL can take seconds.
+    const settled = { timeout: 15_000 };
+    await expect.poll(ratio, settled).toBeCloseTo(2, 1);
 
     await page.keyboard.press(',');
     await page.locator('#pref-pixel-ratio').selectOption('1');
-    await expect.poll(ratio).toBeCloseTo(1, 1);
+    await expect.poll(ratio, settled).toBeCloseTo(1, 1);
     await page.locator('#pref-pixel-ratio').selectOption('1.5');
-    await expect.poll(ratio).toBeCloseTo(1.5, 1);
+    await expect.poll(ratio, settled).toBeCloseTo(1.5, 1);
   });
 });
 

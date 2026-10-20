@@ -6,6 +6,9 @@ export default defineConfig({
   testDir: 'e2e',
   timeout: 60_000,
   retries: 0,
+  // One at a time on CI: every page renders with software WebGL, and two workers on the runner's CPUs
+  // starve the timing checks (the built-in scenes' job below exists for the same reason).
+  workers: process.env.CI ? 1 : undefined,
   use: {
     baseURL: `http://localhost:${port}/`,
     viewport: { width: 1280, height: 720 },
