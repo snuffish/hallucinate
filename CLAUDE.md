@@ -11,3 +11,7 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 ### Domain docs
 
 Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### DRY
+
+When writing, reviewing or refactoring code, follow `.claude/skills/dry-principle/SKILL.md`. It covers the rule of three, a single source of truth for each config value, where this repo's shared helpers live, and which duplication is on purpose.
