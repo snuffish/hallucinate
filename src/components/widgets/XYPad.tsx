@@ -26,7 +26,7 @@ export function XYPad({ index, axes }: { index: number; axes: XYAxes }) {
   const { x, y } = axes;
   const rx = LOOK_RANGES[x], ry = LOOK_RANGES[y];
   const drag = useRef<{ px: number; py: number; vx: number; vy: number } | null>(null);
-  const set = (k: SliderKey, v: number) => app.setLook(k, clampTo(v, LOOK_RANGES[k].min, LOOK_RANGES[k].max));
+  const set = (k: SliderKey, v: number) => app.setLook(k, v);
   const pad = useWheelStep<HTMLDivElement>((by) => set(y, look[y] + by * ry.step));
   const tx = fraction(x, look[x]), ty = fraction(y, look[y]);
   const name = `XY pad ${index + 1}`;

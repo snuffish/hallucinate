@@ -13,7 +13,7 @@ import type { Scene } from '../scenes';
 import { soundNow } from '../engine/listener';
 import { HELP_TOPICS, shortcutRows, type HelpTopic } from '../help/topics';
 import { ROUTE_TARGETS, type Route, type RouteTarget, type Routes } from '../engine/look-routes';
-import { LOOK_KEYS, LOOK_RANGES, type LookKey, type Palette } from '../state/app-state';
+import { LOOK_KEYS, LOOK_RANGES, clampLook, type LookKey, type Palette } from '../state/app-state';
 import { INTENSITY_KEYS, SLOT_NAMES } from '../state/look-slots';
 import { MAX_PLAN_STEP_SECONDS, PlanSchema, type Plan } from '../state/show-plan';
 import type { z } from 'zod';
@@ -104,8 +104,7 @@ function coerceLook(raw: unknown): Record<string, number> {
   for (const [k, v] of Object.entries((raw ?? {}) as Record<string, unknown>)) {
     const key = k as LookKey;
     if (!LOOK_KEYS.includes(key) || !Number.isFinite(Number(v))) continue;
-    const r = LOOK_RANGES[key];
-    look[key] = Math.min(r.max, Math.max(r.min, Number(v)));
+    look[key] = clampLook(key, Number(v));
   }
   return look;
 }

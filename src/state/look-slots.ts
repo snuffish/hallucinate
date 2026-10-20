@@ -78,3 +78,8 @@ export const intensityValue = (key: SliderKey, x: number): number => {
   const [min, max] = RANDOM_RANGES[key];
   return min + (max - min) * clamp01(x);
 };
+// Sets Intensity to `x` and moves the unlocked INTENSITY_KEYS with it.
+export function applyIntensity(look: Look, x: number): void {
+  look.intensity = clamp01(x);
+  for (const k of INTENSITY_KEYS) if (!look.locked.includes(k)) look[k] = intensityValue(k, look.intensity);
+}
