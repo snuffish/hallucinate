@@ -6,12 +6,14 @@ import { stillHearing, stillUniforms } from '../src/engine/scene-inputs';
 import { SCENES } from '../src/scenes';
 import { defaultLook } from '../src/state/app-state';
 import { STRONGEST_LOOK } from '../src/state/look-drift';
+import { STRONGEST_ROUTES } from '../src/engine/look-routes';
 
 // The checklist every built-in scene is written to (#23, ADR 0001), checked for each one in the scene
 // list: a scene joins this spec just by being listed in src/scenes/index.ts. It renders still frames
 // through `window.__profiler` with inputs it chooses, so the music can be silent or kick on cue.
 // The safety rules (black edges, strobe) are checked with the Look applied, as the audience sees it
-// (ADR 0002): once at the default Look and once at the strongest one Randomize or Drift can reach.
+// (ADR 0002): at the default Look, at the strongest one Randomize or Drift can reach, and at that one with
+// every slider that can follow the music following the kick (ADR 0005).
 // Each scene and Look is a test of its own: every still with a Look is a burst of frames at 1280×720,
 // which under software WebGL takes a minute or so per pair, so they get a timeout each and share the
 // workers. CI runs this spec in a job of its own (e2e-scenes), off the runner the timing specs use.
@@ -37,9 +39,12 @@ const GLOW_SCENE = 'Ring Run';           // thin lines with wide black between t
 // Thin lines that hold still whatever the music does, for watching an effect's own movement.
 const STILL_GRID = { name: 'Still grid', body: 'void main() { vec2 g = abs(fract(centered() * 8.) - .5); fragColor = vec4(vec3(smoothstep(.03, .0, min(g.x, g.y))), 1.); }' };
 
+// The strongest Look also with every slider that can follow the music following the kick at full depth,
+// as fast as it may (ADR 0005): the sliders and the kick then move together.
 const LOOKS: { name: string; look: FrameLook }[] = [
   { name: 'default Look', look: defaultLook() },
   { name: 'strongest Look', look: STRONGEST_LOOK },
+  { name: 'strongest Look following the kick', look: { ...STRONGEST_LOOK, routes: STRONGEST_ROUTES } },
 ];
 
 test.describe.configure({ mode: 'parallel' });   // the scene × Look tests share the workers
@@ -127,6 +132,19 @@ for (const { name: sceneName } of SCENES) for (const { name, look } of LOOKS) {
     test.setTimeout(4 * 60_000);
     const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
     judge(await verdict(page, scene.index, look), `${sceneName} at the ${name}`);
+  });
+}
+
+// A stepped palette across the widest brightness gap on the wheel, blue to yellow, at the strongest Look
+// (ADR 0004): the hue sits in the middle of the step's ease, where a kick moves the colour the most in one
+// frame. Two scenes, not every one: the step is the palette's, the same in every scene that uses laser().
+const STEPPED_BLUE_YELLOW = { hues: [2 / 3, 1 / 6], steps: true };
+for (const sceneName of ['Light Sheet', 'Beam Fan']) {
+  test(`${sceneName} with a stepped blue and yellow palette at the strongest Look: a strobe-safe kick and tick across a step`, async ({ page }) => {
+    test.setTimeout(4 * 60_000);
+    const scene = (await openProfiler(page)).find((s) => s.name === sceneName)!;
+    const look: FrameLook = { ...STRONGEST_LOOK, hue: 0.425, palette: STEPPED_BLUE_YELLOW };   // 0.35–0.5 eases blue into yellow
+    judge(await verdict(page, scene.index, look), `${sceneName} with a stepped blue and yellow palette`);
   });
 }
 
@@ -433,7 +451,7 @@ const MOMENTS = { before: KICK_AT - 0.02, kicked: KICK_AT + 0.05, fading: KICK_A
 
 // The effects' turn at each moment of a second with a kick at KICK_AT (or without it), at `look`.
 function heardTurns(look: FrameLook, kick: boolean): Record<keyof typeof MOMENTS, number> {
-  const motion = { time: 0, timeRate: look.speed, huePhase: 0, turn: 0 }, p = programState();
+  const motion = { time: 0, timeRate: look.speed, huePhase: 0, hueKick: 0, turn: 0 }, p = programState();
   const out = {} as Record<keyof typeof MOMENTS, number>;
   for (let i = 1; i <= 60; i++) {
     const t = i / 60, beat = kick && t >= KICK_AT ? Math.exp(-5 * (t - KICK_AT)) : 0;

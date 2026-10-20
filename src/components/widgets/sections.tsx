@@ -1,13 +1,20 @@
 // The bodies of the control widgets: sources, media, meters, scene, look sliders,
 // actions. Each reads its own slice of the store; the widget frame (title, drag, dock) is `Widget`.
 
-import type { CSSProperties } from 'react';
+import { Fragment, useState, type CSSProperties } from 'react';
 import { useApp, useUI } from '../../app/AppContext';
 import { STATIC_DEMO } from '../../app/static-demo';
 import { HOTKEYS } from '../../hotkeys/registry';
 import { Kbd } from '../../hotkeys/Kbd';
-import { LOOK_RANGES, type LookKey, type SourceButton } from '../../state/app-state';
+import { AUTO_SLOT_BEATS, SLIDER_KEYS, type AutoSlots, type SliderKey, type SourceButton } from '../../state/app-state';
 import { SOURCES } from '../StartScreen';
+import { laserCss } from '../../engine/laser-colour';
+import { SLOT_NAMES } from '../../state/look-slots';
+import { FineRange, LookSlider, NumberField } from './LookSlider';
+import { PaletteStrip } from './PaletteStrip';
+import { FollowButton, FollowEditor } from './FollowMusic';
+import { ROUTE_TARGETS, type RouteTarget } from '../../engine/look-routes';
+import { XYPad } from './XYPad';
 
 export interface PanelActions {
   onSource: (kind: SourceButton) => void;
@@ -140,28 +147,97 @@ export function ScreenBody() {
   );
 }
 
-const SLIDERS: { key: LookKey; label: string; hint?: string }[] = [
-  { key: 'reactivity', label: 'Reactivity' },
-  { key: 'speed', label: 'Speed' },
-  { key: 'trails', label: 'Trails' },
-  { key: 'hue', label: 'Colour' },
-  { key: 'cycle', label: 'Colour cycling' },
-  { key: 'synesthesia', label: 'Synesthesia', hint: 'dark sound → dim & cool · bright sound → light & warm · energetic mood → vivid & warm' },
-];
+const isTarget = (k: SliderKey): k is RouteTarget => (ROUTE_TARGETS as readonly string[]).includes(k);
 
+const SLOT_HOTKEYS = [HOTKEYS.lookSlotA, HOTKEYS.lookSlotB, HOTKEYS.lookSlotC, HOTKEYS.lookSlotD];
+const INTENSITY = { label: 'Intensity', scale: 100, unit: '%', digits: 0 };
+
+// The Look slots A–D and Intensity, under the sliders. A slot glides to its look; an empty one, or
+// Shift+click, stores the look now; × empties it. A filled slot shows its colour.
+function LookSlotsAndIntensity() {
+  const app = useApp();
+  const slots = useUI((ui) => ui.lookSlots);
+  const intensity = useUI((ui) => ui.look.intensity);
+  const auto = useUI((ui) => ui.look.autoSlots);
+  const at = useUI((ui) => ui.lookSlotAt);
+  const filled = slots.filter(Boolean).length;
+  const choice = <K extends 'order' | 'transition'>(key: K, value: AutoSlots[K], label: string, title: string) => (
+    <button type="button" className={auto[key] === value ? 'active' : undefined} aria-pressed={auto[key] === value} title={title}
+      onClick={() => app.setAutoSlots({ [key]: value })}>{label}</button>
+  );
+  return (
+    <>
+      <div className="look-slots" role="group" aria-label="Look slots">
+        {SLOT_NAMES.map((name, i) => {
+          const slot = slots[i];
+          return (
+            <span key={name} className="look-slot-cell">
+              <button type="button" id={`look-slot-${name}`} className={`look-slot${slot ? ' filled' : ''}${slot && i === at ? ' current' : ''}`}
+                style={slot ? { '--c': laserCss(slot.hue) } as CSSProperties : undefined}
+                title={slot ? `Glide to the look in slot ${name} · Shift+click: store the look now in it` : `Slot ${name} is empty: click to store the look now`}
+                onClick={(e) => (slot && !e.shiftKey ? app.recallLookSlot(i) : app.saveLookSlot(i))}>
+                {name}<Kbd hotkey={SLOT_HOTKEYS[i]!} />
+              </button>
+              {slot && <button type="button" className="look-slot-clear" aria-label={`Empty slot ${name}`} title={`Empty slot ${name}`} onClick={() => app.clearLookSlot(i)}>×</button>}
+            </span>
+          );
+        })}
+      </div>
+      <div className="look-slot-auto" role="group" aria-label="Slot auto-change">
+        <label className="toggle" title="The slots take turns on their own while the music plays">
+          <input type="checkbox" id="slot-auto" checked={auto.on} onChange={(e) => app.setAutoSlots({ on: e.target.checked })} /> Auto-change
+        </label>
+        <select id="slot-auto-beats" aria-label="Change slots every" value={auto.beats} onChange={(e) => app.setAutoSlots({ beats: Number(e.target.value) })}>
+          {AUTO_SLOT_BEATS.map((b) => <option key={b} value={b}>every {b} kicks</option>)}
+        </select>
+        <span className="look-seg">
+          {choice('order', 'linear', 'Linear', 'A, B, C, D and round again, skipping empty slots')}
+          {choice('order', 'random', 'Random', 'Any other filled slot')}
+        </span>
+        <span className="look-seg">
+          {choice('transition', 'soft', 'Soft', 'Glide to the next slot over a second')}
+          {choice('transition', 'hard', 'Hard', 'Switch to the next slot at once')}
+        </span>
+        {auto.on && filled < 2 && <small>Store at least two slots for it to change.</small>}
+      </div>
+      <div className="look-row" title="Moves Reactivity, Trails and Fringing together, inside the ranges Randomize uses; locked ones stay">
+        <span />
+        <label htmlFor="intensity">Intensity</label>
+        <FineRange id="intensity" label="Intensity" value={intensity} r={{ min: 0, max: 1, step: 0.01 }} onSet={(v) => app.setIntensity(v)} onReset={() => app.setIntensity(0.5)} />
+        <NumberField d={INTENSITY} value={intensity} onSet={(v) => app.setIntensity(v)} />
+      </div>
+    </>
+  );
+}
+
+// The Look widget: its XY pads (each moves two sliders), then every slider as a row, the slots and
+// Intensity, then Drift.
 export function LookBody() {
   const app = useApp();
   const look = useUI((ui) => ui.look);
-  const slider = (key: LookKey) => {
-    const r = LOOK_RANGES[key];
-    return <input type="range" id={key} min={r.min} max={r.max} step={r.step} value={look[key]} onChange={(e) => app.setLook(key, Number(e.target.value))} />;
-  };
+  const followed = useUI((ui) => ui.followed);
+  const [following, setFollowing] = useState<RouteTarget | null>(null);   // whose ♪ row is open
+  // The XY pad axis each slider is also on: "1↔" is pad 1 across.
+  const tags = new Map<SliderKey, string[]>();
+  if (look.xyOpen) look.xy.forEach((a, i) => { for (const [k, arrow] of [[a.x, '↔'], [a.y, '↕']] as const) tags.set(k, [...(tags.get(k) ?? []), `${i + 1}${arrow}`]); });
   return (
     <>
-      {SLIDERS.map((s) => <label key={s.key}>{s.label} {s.hint && <small>{s.hint}</small>}{slider(s.key)}</label>)}
-      <label>Fringing {slider('aberration')}</label>
+      <button type="button" id="xy-toggle" className="look-xy-toggle" aria-expanded={look.xyOpen} onClick={() => app.setLookFlag('xyOpen', !look.xyOpen)}>
+        {look.xyOpen ? '▾' : '▸'} XY pads
+      </button>
+      {look.xyOpen && <div className="look-xy">{look.xy.map((axes, i) => <XYPad key={i} index={i} axes={axes} />)}</div>}
+      {SLIDER_KEYS.map((k) => (
+        <Fragment key={k}>
+          <LookSlider k={k} value={look[k]} lock={look.locked.includes(k)} ghost={isTarget(k) ? followed[k] : undefined}
+            tag={tags.has(k) && <em className="look-tag" title="Also on this XY pad axis">{tags.get(k)!.join(' ')}</em>}
+            follow={isTarget(k) && <FollowButton target={k} route={look.routes[k]} open={following === k} onToggle={() => setFollowing(following === k ? null : k)} />} />
+          {isTarget(k) && following === k && <FollowEditor target={k} route={look.routes[k]} />}
+          {k === 'hue' && <PaletteStrip />}
+        </Fragment>
+      ))}
+      <LookSlotsAndIntensity />
       <label className="toggle"><input type="checkbox" id="drift" checked={look.drift} onChange={(e) => app.setLookFlag('drift', e.target.checked)} /> Drift <small>sliders glide to random values, each at its own pace</small></label>
-      {look.drift && <label>Drift speed {slider('driftSpeed')}</label>}
+      {look.drift && <LookSlider k="driftSpeed" value={look.driftSpeed} />}
     </>
   );
 }

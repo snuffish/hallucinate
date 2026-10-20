@@ -52,6 +52,18 @@ describe('LookDrift', () => {
     expect(Math.abs(look.speed - 1.55)).toBeLessThan(0.01);
   });
 
+  it('leaves a locked slider where it is, and glides it on from there once it is unlocked', () => {
+    const look = defaultLook();
+    const drift = new LookDrift(seeded(5));
+    for (let i = 0; i < 600; i++) drift.step(look, 1 / 60, 2, ['hue', 'trails']);
+    expect(look.hue).toBe(defaultLook().hue);
+    expect(look.trails).toBe(defaultLook().trails);
+    expect(look.speed).not.toBe(defaultLook().speed);   // the rest drifted
+    look.hue = 0.5;   // set by hand while locked
+    drift.step(look, 1 / 60, 2);
+    expect(Math.abs(look.hue - 0.5)).toBeLessThan(0.01);   // unlocked: no snap back to an old glide
+  });
+
   it('moves faster at a higher drift speed', () => {
     const slow = defaultLook(), fast = defaultLook();
     const a = new LookDrift(seeded(3)), b = new LookDrift(seeded(3));

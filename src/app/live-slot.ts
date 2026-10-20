@@ -15,12 +15,13 @@ import { toUniform, type ParamSpec, type ParamValues } from '../engine/params';
 import type { Hearing } from '../engine/listener';
 import { composeFrame, copyMotion, crossfade, programState, type FrameLook, type Motion, type Transition } from '../engine/look';
 import type { ProgramState, SceneUniforms } from '../engine/renderer';
-import { LOOK_KEYS, type AppState } from '../state/app-state';
+import { LOOK_KEYS, type AppState, type Palette } from '../state/app-state';
 import type { Store } from '../state/store';
 import type { ScreenMode, UIState } from '../state/ui-state';
 
 // A show scene on an output: a scene, its parameter values, its look sliders and its effects.
-export interface Shot { scene: number; values: ParamValues; look: Readonly<Record<string, number>>; effects: EffectStack }
+// `palette` absent: the app's (a show scene saved before palettes, or one the assistant wrote).
+export interface Shot { scene: number; values: ParamValues; look: Readonly<Record<string, number>>; palette?: Readonly<Palette>; effects: EffectStack }
 
 // What one renderer draws this frame. `params` stands in for the stored @param values of the scenes it
 // lists (Renderer.render's second argument).
@@ -41,7 +42,14 @@ export interface LiveSlotDeps {
 // A frame state and its params table: one per output, refilled every frame.
 const output = (): FullFrame => ({ program: programState(), params: {} });
 
+// Live's master trims (ADR 0006), set in the studio: they turn down what each show scene's look sets, ×0–1,
+// and shift its colour, on Live and on the Preview monitor (which shows what Take puts on Live). Neutral
+// changes nothing; trims below 1 only lower what the safety rules checked.
+export interface MasterTrims { reactivity: number; speed: number; trails: number; aberration: number; hue: number }
+export const NEUTRAL_TRIMS: Readonly<MasterTrims> = { reactivity: 1, speed: 1, trails: 1, aberration: 1, hue: 0 };
+
 export class LiveSlot {
+  trims: Readonly<MasterTrims> = NEUTRAL_TRIMS;
   // What is pinned, and the show scene it crossfades from (`prevScene` is released when the fade ends).
   private pin: (Transition & { shot: Shot; from: Shot | null }) | null = null;
   private readonly live = output();
@@ -50,8 +58,8 @@ export class LiveSlot {
   private readonly mainProjector = output();
   private readonly routed: Routed = { screen: this.mainScreen, projector: null };
   private readonly look: FrameLook = { reactivity: 1, speed: 1, cycle: 0, hue: 0, trails: 0.86, aberration: 0, synesthesia: 0 };
-  private readonly liveMotion: Motion = { time: 0, timeRate: 1, huePhase: 0, turn: 0 };
-  private readonly previewMotion: Motion = { time: 0, timeRate: 1, huePhase: 0, turn: 0 };
+  private readonly liveMotion: Motion = { time: 0, timeRate: 1, huePhase: 0, hueKick: 0, turn: 0 };
+  private readonly previewMotion: Motion = { time: 0, timeRate: 1, huePhase: 0, hueKick: 0, turn: 0 };
   private previewShot: Shot | null = null;   // what Preview's motion runs for
   // A show scene's uniforms, per values object (a show scene's values are replaced, never edited, so the
   // object names one set of values): the outputs reuse them instead of rebuilding them every frame.
@@ -71,7 +79,7 @@ export class LiveSlot {
     const from = this.pin && this.pin.shot.scene !== shot.scene ? this.pin.shot : null;
     if (!this.pin) copyMotion(this.liveMotion, this.deps.state.clock);   // Live goes on from the screen
     this.pin = {
-      shot: { scene: shot.scene, values: shot.values, look, effects: shot.effects },
+      shot: { scene: shot.scene, values: shot.values, look, palette: shot.palette ?? now.palette, effects: shot.effects },
       from,
       prevScene: from?.scene ?? -1,
       transitionStart: this.deps.state.clock.clock,
@@ -158,7 +166,7 @@ export class LiveSlot {
     const p = this.fill(f, base);
     p.scene = shot.scene; p.prevScene = from?.scene ?? -1; p.mix = mix;
     p.effects = shot.effects; p.prevEffects = from?.effects ?? NO_EFFECTS;   // each picture keeps its own
-    composeFrame(p, motion, this.deps.hearing, this.frameLook(shot.look), this.deps.state.scenes[shot.scene]?.trails ?? 1, dt);
+    composeFrame(p, motion, this.deps.hearing, this.frameLook(shot), this.deps.state.scenes[shot.scene]?.trails ?? 1, dt);
     const params = f.params;
     for (const k in params) delete params[k];
     params[shot.scene] = this.uniforms(shot.scene, shot.values);
@@ -166,16 +174,19 @@ export class LiveSlot {
     return f;
   }
 
-  // A show scene's look, with the app's sliders for what it doesn't store (as Take does). Reused object.
-  private frameLook(look: Readonly<Record<string, number>>): FrameLook {
-    const app = this.deps.state.look, l = this.look;
-    l.reactivity = look.reactivity ?? app.reactivity;
-    l.speed = look.speed ?? app.speed;
+  // A show scene's look, with the app's sliders for what it doesn't store (as Take does), under the master
+  // trims. Reused object.
+  private frameLook({ look, palette }: Shot): FrameLook {
+    const app = this.deps.state.look, l = this.look, t = this.trims;
+    l.palette = palette ?? app.palette;
+    l.routes = app.routes;   // the screen's: show scenes don't keep routes yet
+    l.reactivity = (look.reactivity ?? app.reactivity) * t.reactivity;
+    l.speed = (look.speed ?? app.speed) * t.speed;
     l.cycle = look.cycle ?? app.cycle;
-    l.hue = look.hue ?? app.hue;
-    l.trails = look.trails ?? app.trails;
-    l.aberration = look.aberration ?? app.aberration;
-    l.synesthesia = app.synesthesia;
+    l.hue = (look.hue ?? app.hue) + t.hue;
+    l.trails = (look.trails ?? app.trails) * t.trails;
+    l.aberration = (look.aberration ?? app.aberration) * t.aberration;
+    l.synesthesia = look.synesthesia ?? app.synesthesia;
     return l;
   }
 

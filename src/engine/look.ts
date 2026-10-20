@@ -4,23 +4,33 @@
 // move. Every rule from the sound to the picture lives here: reactivity, the clock's pace, the hue's walk,
 // the synesthesia grade, the trails' afterglow and fringing.
 
+import { WHEEL, type Palette } from '../state/app-state';
 import { NO_EFFECTS, type EffectStack } from './effects';
+import { PALETTE_FLOATS, packPalette } from './laser-colour';
+import { ROUTE_TARGETS, followMusic, type Routes } from './look-routes';
 import type { Hearing } from './listener';
 import type { ProgramState } from './renderer';
 import { stillHearing, type SnapshotUniforms } from './scene-inputs';
 
-// The sliders a frame is composed with: a show scene stores the numbers it keeps (LOOK_KEYS), the rest
-// (synesthesia) is the app's.
+// The sliders a frame is composed with: a show scene stores them (LOOK_KEYS); one saved before it kept
+// synesthesia takes the app's.
 export interface FrameLook {
   reactivity: number; speed: number; cycle: number;
   hue: number; trails: number; aberration: number; synesthesia: number;
+  palette?: Readonly<Palette>;   // none: the whole laser wheel
+  routes?: Readonly<Routes>;     // sliders that follow the music (ADR 0005)
 }
 
 // Where an output's picture is in its own time: the clock the shaders see, how fast it runs (it eases
-// with the music), how far the hue has walked and how far the effects have turned. Each output keeps one.
-export interface Motion { time: number; timeRate: number; huePhase: number; turn: number }
+// with the music), how far the hue has walked (and how much further the kicks still move it), how far
+// the effects have turned, and where the envelopes of the sliders that follow the music are (made on the
+// first frame that has one). Each output keeps one.
+export interface Motion { time: number; timeRate: number; huePhase: number; hueKick: number; turn: number; routeEnv?: Float32Array }
 
-export const copyMotion = (to: Motion, from: Readonly<Motion>): void => { to.time = from.time; to.timeRate = from.timeRate; to.huePhase = from.huePhase; to.turn = from.turn; };
+export const copyMotion = (to: Motion, from: Readonly<Motion>): void => {
+  to.time = from.time; to.timeRate = from.timeRate; to.huePhase = from.huePhase; to.hueKick = from.hueKick; to.turn = from.turn;
+  if (from.routeEnv) (to.routeEnv ??= new Float32Array(from.routeEnv.length)).set(from.routeEnv);
+};
 
 // The effects' turn (uTurn, radians at an effect's full spin): it only ever runs on, at a steady pace
 // plus the bass, plus the beat, so each kick leaves it a step further on (the beat fades out within half
@@ -28,12 +38,21 @@ export const copyMotion = (to: Motion, from: Readonly<Motion>): void => { to.tim
 // Reactivity the bass's and the kick's share (they arrive scaled).
 const TURN = { pace: 0.15, bass: 0.2, beat: 1 } as const;
 
+// How far a kick moves the hue at Colour cycling 1, and how it gets there: eased in with this time constant
+// (about 95% within 150 ms), so a kick never changes the colour in one frame.
+const KICK_HUE = 0.05;
+const KICK_HUE_SECONDS = 0.05;
+
 const COOL = [0.7, 0.85, 1.35];
 const WARM = [1.3, 1.05, 0.7];
 
 // Moves `motion` on by `dt` (the show's seconds) and writes this frame's sound, grade and look into `p`.
 // Leaves the scene, the crossfade, the master and the media to the caller.
-export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearing>, look: Readonly<FrameLook>, sceneTrails: number, dt: number): void {
+// The Look with its sliders following the music, this frame (reused: composeFrame never runs twice at once).
+const followedLook: FrameLook = { reactivity: 1, speed: 1, cycle: 0, hue: 0, trails: 0, aberration: 0, synesthesia: 0 };
+
+export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearing>, given: Readonly<FrameLook>, sceneTrails: number, dt: number): void {
+  const look = given.routes ? followMusic(followedLook, given, motion.routeEnv ??= new Float32Array(ROUTE_TARGETS.length), h, dt) : given;
   const R = look.reactivity;
   const bass = Math.min(1.5, h.bass * R);
   const mid = Math.min(1.5, h.mid * R);
@@ -45,8 +64,11 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
   const targetRate = look.speed * (0.55 + level * 0.9 + beat * 0.35);
   motion.timeRate += (targetRate - motion.timeRate) * (1 - Math.exp(-dt * 3));
   motion.time += dt * motion.timeRate;
-  // Colour cycling sets both the hue's walk and how far a kick jumps it, so at 0 the colour holds.
-  motion.huePhase += look.cycle * (dt * 0.06 + (h.kick ? 0.05 : 0));
+  // Colour cycling sets both the hue's walk and how far a kick moves it, so at 0 the colour holds.
+  if (h.kick) motion.hueKick += look.cycle * KICK_HUE;
+  const kicked = motion.hueKick * (1 - Math.exp(-dt / KICK_HUE_SECONDS));
+  motion.hueKick -= kicked;
+  motion.huePhase += look.cycle * dt * 0.06 + kicked;
   motion.turn += dt * look.speed * (TURN.pace + TURN.bass * bass + TURN.beat * beat);
 
   p.time = motion.time;
@@ -60,6 +82,7 @@ export function composeFrame(p: ProgramState, motion: Motion, h: Readonly<Hearin
   // trails), bright sound is crisp (shorter trails, more fringing).
   const s = look.synesthesia;
   p.hue = look.hue + motion.huePhase;
+  packPalette(p.palette, look.palette ?? WHEEL);
   p.feedback = Math.min(0.97, look.trails * sceneTrails * (1 + s * (0.5 - p.bright) * 0.12));
   p.aberration = look.aberration * (1 + p.beat * 1.5) * (1 + s * (p.bright - 0.5) * 1.2);
 }
@@ -96,7 +119,7 @@ export function composeStill(scene: number, inputs: Readonly<SnapshotUniforms>, 
     composeFrame(p, motion, h, look, sceneTrails, BURST_DT);
     return p;
   });
-  const start = (): Motion => ({ time: 0, timeRate: look.speed, huePhase: inputs.uHue, turn: 0 });
+  const start = (): Motion => ({ time: 0, timeRate: look.speed, huePhase: inputs.uHue, hueKick: 0, turn: 0 });
   const elapsed = play(start()).at(-1)!;   // the clock's pace eases with the sound: measure it, then start early by that much
   const end = (then ?? inputs).uTime;
   return play({ ...start(), time: end - elapsed.time, turn: end - elapsed.turn });
@@ -119,7 +142,7 @@ export function crossfade(t: Transition, now: number): number {
 export function programState(spectrum: Uint8Array = new Uint8Array(512)): ProgramState {
   return {
     scene: -1, prevScene: -1, effects: NO_EFFECTS, prevEffects: NO_EFFECTS, mix: 1, time: 0, turn: 0, bass: 0, mid: 0, high: 0, level: 0, beat: 0, tickPhase: 0, ticks: 0, hue: 0,
-    spectrum, bright: 0.5, mood: 0.5,
+    palette: new Float32Array(PALETTE_FLOATS), spectrum, bright: 0.5, mood: 0.5,
     grade: { exposure: 1, contrast: 1, saturation: 1, tint: [1, 1, 1] },
     feedback: 0.86, aberration: 0, master: 1,
   };

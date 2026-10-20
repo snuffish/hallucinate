@@ -18,7 +18,8 @@ import { KEYS, debouncedWriter, readWithDefaults } from '../state/persistence';
 import { paramKey } from '../state/scene-list';
 import { LIST_MAX_SECONDS, PlanSchema, type Plan, type PlanStep } from '../state/show-plan';
 import type { AppPort } from './app-port';
-import type { Shot } from './live-slot';
+import { NEUTRAL_TRIMS, type MasterTrims, type Shot } from './live-slot';
+import { PaletteSchema } from '../state/look-store';
 
 const CueSchema = z.object({
   id: z.string(),
@@ -26,6 +27,7 @@ const CueSchema = z.object({
   scene: z.string(),
   values: z.record(z.string(), ParamValueSchema).default({}),
   look: z.record(z.string(), z.number()).default({}),
+  palette: PaletteSchema.optional(),   // ADR 0004; absent in a show saved before palettes (the app's then). An older app strips it.
   // Cleaned up through the effect catalogue: a show saved before effects reads as none, and a broken
   // entry is dropped instead of failing the whole show. An older app strips the field.
   effects: EffectStackSchema,
@@ -44,6 +46,10 @@ export const ShowSchema = z.object({
   directorBeats: bounded(16, 1024, 128),
   directorUnit: z.enum(['beats', 'seconds']).default('beats'),
   directorSeconds: bounded(15, 3600, 120),
+  // Live's master trims (ADR 0006): neutral in a show saved before them.
+  trims: z.object({
+    reactivity: bounded(0, 1, 1), speed: bounded(0, 1, 1), trails: bounded(0, 1, 1), aberration: bounded(0, 1, 1), hue: bounded(-0.5, 0.5, 0),
+  }).catch({ ...NEUTRAL_TRIMS }).default({ ...NEUTRAL_TRIMS }),
 });
 export type Cue = z.infer<typeof CueSchema>;
 export type ParamTab = 'preview' | 'live';
@@ -78,6 +84,7 @@ export class StudioSession {
   screens: ScreenDetailed[] = [];
   master = 1;
   masterTarget = 1;
+  trims: Readonly<MasterTrims> = NEUTRAL_TRIMS;
   version = 0;
   // Bumps whenever the show itself (its scenes or its plan) changes, whoever changed it: an undo only
   // restores a snapshot when nothing changed the show after the step it undoes.
@@ -103,6 +110,8 @@ export class StudioSession {
     this.directorBeats = saved.directorBeats;
     this.directorUnit = saved.directorUnit;
     this.directorSeconds = saved.directorSeconds;
+    this.trims = saved.trims;
+    app.live.trims = this.trims;
     this.previewId = this.cues[0]?.id ?? null;
     this.lastShow = { cues: this.cues, plan: this.plan };
   }
@@ -211,7 +220,7 @@ export class StudioSession {
   save(): void { this.writer.schedule(); }
 
   private serialised() {
-    return { cues: this.cues, mode: this.mode, seconds: this.seconds, autoBeats: this.autopilot.beats, autoUnit: this.autopilot.unit, autoSeconds: this.autopilot.seconds, plan: this.plan, directorBeats: this.directorBeats, directorUnit: this.directorUnit, directorSeconds: this.directorSeconds };
+    return { cues: this.cues, mode: this.mode, seconds: this.seconds, autoBeats: this.autopilot.beats, autoUnit: this.autopilot.unit, autoSeconds: this.autopilot.seconds, plan: this.plan, directorBeats: this.directorBeats, directorUnit: this.directorUnit, directorSeconds: this.directorSeconds, trims: this.trims };
   }
 
   // ---------- Show scenes ----------
@@ -227,9 +236,9 @@ export class StudioSession {
   // A show scene = a scene, its parameter values, the look sliders and the effects, as they are on Live now.
   capture(): Omit<Cue, 'id'> {
     const app = this.app;
-    const { scene, values, look, effects } = app.captureScene();
+    const { scene, values, look, palette, effects } = app.captureScene();
     const { name } = app.state.scenes[scene]!;
-    return { name, scene: name, values, look: { ...look }, effects };
+    return { name, scene: name, values, look: { ...look }, ...(palette && { palette: { hues: [...palette.hues], steps: palette.steps } }), effects };
   }
 
   addFromSelect(value: string): void {
@@ -452,6 +461,20 @@ export class StudioSession {
     this.changed(false);
   }
 
+  // A master trim on Live (ADR 0006): ×0–1 for the sliders, ±0.5 of the wheel for the colour.
+  setTrim(key: keyof MasterTrims, value: number): void {
+    const v = key === 'hue' ? Math.min(0.5, Math.max(-0.5, value)) : Math.min(1, Math.max(0, value));
+    this.trims = { ...this.trims, [key]: v };
+    this.app.live.trims = this.trims;
+    this.changed();
+  }
+
+  resetTrims(): void {
+    this.trims = { ...NEUTRAL_TRIMS };
+    this.app.live.trims = this.trims;
+    this.changed();
+  }
+
   blackout(): void {
     this.setMaster(this.masterTarget > 0 ? 0 : this.lastLevel);
     if (!this.open) this.app.toast(this.masterTarget ? 'Back on' : 'Blackout — press B to restore', 1500);
@@ -488,7 +511,7 @@ export class StudioSession {
   private shot(cue: Cue, index: number): Shot {
     const hit = this.shots.get(cue);
     if (hit && hit.scene === index) return hit;
-    const shot = { scene: index, values: cue.values, look: cue.look, effects: cue.effects };
+    const shot = { scene: index, values: cue.values, look: cue.look, palette: cue.palette, effects: cue.effects };
     this.shots.set(cue, shot);
     return shot;
   }

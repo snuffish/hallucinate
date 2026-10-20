@@ -1,5 +1,49 @@
 # Changelog
 
+## Unreleased — a more customizable Look (2026-10-20)
+
+### Added
+
+- Every **Look** slider shows its value (Reactivity, Trails, Synesthesia and Fringing in %, Colour in degrees,
+  Speed and Colour cycling as ×). Click the value to type one; double-click a slider to put it back.
+- **Fine tuning** on every Look control: Shift while dragging moves ten times finer, even when pressed halfway
+  through a drag; the wheel steps a slider once it has focus (Shift: one step), and so do the arrow keys.
+- Two **XY pads** above the sliders, each moving two of them at once, one across and one up, picked per pad
+  (Speed and Reactivity, Colour and Colour cycling to start). A tag on a slider says which pad axis it is also on.
+  The pads fold away.
+- A **lock** beside each slider keeps Randomize, Shift+R and Drift off it. `get_app_state` tells the assistant
+  which are locked.
+- A dot beside **Colour** shows the colour on screen now, cycling included.
+- **Look slots** A–D: click an empty slot (or Shift+click any) to store the look, click a filled one or press
+  Alt+1–4 to glide to it over a second; the × on a filled slot's corner empties it.
+  **Auto-change** lets the filled slots take turns on their own every 8–64 kicks while the music plays, Linear or
+  Random, Soft (a glide) or Hard (a cut); the current slot is outlined. Shift+R comes back from a slot as from a Randomize. They go with an Export.
+- A **palette** under Colour: 2–5 colours on the laser wheel that every scene's colours walk instead of the whole
+  wheel, blending or in steps (each step eases, so cycling never switches the colour in one frame). Show scenes keep
+  it; `set_look` takes `palette` and `get_app_state` reports it. Scenes of your own follow it through `laser()`;
+  `laserWheel()` is the whole wheel ([ADR 0004](docs/adr/0004-palettes-are-hues-on-the-laser-wheel.md)).
+- **Master look** in the studio, under the master fader: Live's master trims turn down what every show scene sets
+  (Reactivity, Speed, Trails, Fringing, 0–100%) and shift its colour (±180°), on Live and the Preview monitor, without
+  editing a show scene. Kept with the show; a show saved before them opens neutral
+  ([ADR 0006](docs/adr/0006-master-trims-turn-down-live.md)).
+- Sliders that **follow the music**: the ♪ beside Speed, Trails, Colour, Synesthesia or Fringing makes it move with
+  the bass, mids, highs, level, kick, tone or mood, by a depth either way, with an attack and a release. It never goes
+  above the higher of where you set it and the top of the Randomize range, rises no faster than 50 ms (Colour 150 ms,
+  ±0.1 of the wheel), and a mark shows where it sits now. The Look slots keep it; show scenes don't yet. `set_look`
+  takes `routes`. The built-in scenes' strobe check gains a third Look: every slider following the kick
+  ([ADR 0005](docs/adr/0005-look-sliders-follow-the-music-within-a-checked-ceiling.md)).
+- **Intensity**: one control that moves Reactivity, Trails and Fringing together, from the gentlest to the strongest
+  look Randomize can reach. `set_look` takes `intensity`; `get_app_state` reports it and the filled slots.
+
+### Changed
+
+- The Look stays as you left it the next time the app opens: sliders, locks, switches and pads (stored on this
+  computer, not exported; show scenes still carry their own look).
+- Synesthesia's explanation moved from under its label to its tooltip and the help.
+- The studio's cue swatches show the laser palette's colour for the cue's hue.
+- A kick's colour change eases in over about 150 ms instead of landing in one frame. It goes as far as before.
+- Show scenes keep **Synesthesia** with the rest of their look. One saved before takes the app's, as it did.
+
 ## Unreleased — System log (2026-10-19)
 
 ### Added

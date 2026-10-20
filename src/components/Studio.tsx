@@ -7,12 +7,16 @@ import { STATIC_DEMO, STATIC_DEMO_NOTE } from '../app/static-demo';
 import { useSessions } from '../app/sessions';
 import { AUTO_BEATS, AUTO_SECONDS, type AutoUnit, type Cue } from '../app/studio';
 import { DIRECTOR_BEATS, DIRECTOR_SECONDS } from '../director/director';
+import { laserCss } from '../engine/laser-colour';
 import { HOTKEYS, CUE_DIGITS } from '../hotkeys/registry';
 import { Kbd } from '../hotkeys/Kbd';
 import { useStore } from '../state/store';
 import { StudioParams } from './ParamOverlay';
 import { DirectorChanges } from './DirectorChanges';
 import { HelpButton } from './Help';
+import { FineRange, NumberField } from './widgets/LookSlider';
+import { NEUTRAL_TRIMS, type MasterTrims } from '../app/live-slot';
+import type { StudioSession } from '../app/studio';
 
 export function Studio() {
   const app = useApp();
@@ -121,7 +125,7 @@ export function Studio() {
                 onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) studio.setPreview(cue); }}
                 onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) studio.take(cue); }}>
                 {n < 9 ? <Kbd hotkey={CUE_DIGITS[n]!} title={`Preview cue ${n + 1}`} /> : <kbd>·</kbd>}
-                <i className="cue-swatch" style={{ background: `hsl(${Math.round(((cue.look.hue ?? 0) % 1) * 360)} 80% 60%)` }} />
+                <i className="cue-swatch" style={{ background: laserCss(cue.look.hue ?? 0) }} />
                 <div className="cue-text">
                   <strong>{cue.name}</strong>
                   <span>{missing(cue) ? `missing scene "${cue.scene}"` : cue.scene}</span>
@@ -230,6 +234,7 @@ export function Studio() {
           <label className="dock-field">Master <output id="st-master-val">{Math.round(studio.masterTarget * 100)}%</output>
             <input type="range" id="st-master" min={0} max={1} step={0.01} value={studio.masterTarget} onChange={(e) => studio.setMaster(Number(e.target.value))} />
           </label>
+          <MasterLook studio={studio} />
           <button id="st-blackout" className={`blackout${studio.masterTarget === 0 ? ' active' : ''}`} title="Fade Live to black (B)" onClick={() => studio.blackout()}>
             {studio.masterTarget === 0 ? 'Blacked out — click to restore' : 'Blackout'}<Kbd hotkey={HOTKEYS.blackout} />
           </button>
@@ -237,5 +242,34 @@ export function Studio() {
         </section>
       </div>
     </section>
+  );
+}
+
+// Live's master trims (ADR 0006): turn down what each show scene's look sets, and shift its colour, on Live
+// and the Preview monitor. Double-click one to put it back.
+const TRIMS: { key: keyof MasterTrims; label: string; scale: number; unit: string; min: number; max: number }[] = [
+  { key: 'reactivity', label: 'Reactivity', scale: 100, unit: '%', min: 0, max: 1 },
+  { key: 'speed', label: 'Speed', scale: 100, unit: '%', min: 0, max: 1 },
+  { key: 'trails', label: 'Trails', scale: 100, unit: '%', min: 0, max: 1 },
+  { key: 'aberration', label: 'Fringing', scale: 100, unit: '%', min: 0, max: 1 },
+  { key: 'hue', label: 'Colour shift', scale: 360, unit: '°', min: -0.5, max: 0.5 },
+];
+
+function MasterLook({ studio }: { studio: StudioSession }) {
+  const trimmed = TRIMS.some((t) => studio.trims[t.key] !== NEUTRAL_TRIMS[t.key]);
+  return (
+    <details id="st-master-look" className="dock-field master-look">
+      <summary>Master look {trimmed && <small>trimmed</small>}</summary>
+      {TRIMS.map((t) => (
+        <div key={t.key} className="look-row">
+          <span />
+          <label htmlFor={`st-trim-${t.key}`}>{t.label}</label>
+          <FineRange id={`st-trim-${t.key}`} label={`Master ${t.label}`} value={studio.trims[t.key]} r={{ min: t.min, max: t.max, step: 0.01 }}
+            onSet={(v) => studio.setTrim(t.key, v)} onReset={() => studio.setTrim(t.key, NEUTRAL_TRIMS[t.key])} />
+          <NumberField d={{ label: `Master ${t.label}`, scale: t.scale, unit: t.unit, digits: 0 }} value={studio.trims[t.key]} onSet={(v) => studio.setTrim(t.key, v)} />
+        </div>
+      ))}
+      {trimmed && <button type="button" onClick={() => studio.resetTrims()}>Back to the show scenes' own look</button>}
+    </details>
   );
 }

@@ -22,7 +22,8 @@ Press **?** in the app for the same list. Every button with a shortcut also show
 | N | visual maker (node graph; Delete or Backspace removes a block) |
 | A | toggle auto-switch |
 | R | randomize the look (also the scene with *Randomize also picks a random scene* ticked) |
-| Shift+R | back to the look before the last randomize (again to step further back) |
+| Shift+R | back to the look before the last randomize or Look slot (again to step further back) |
+| Alt+1 – Alt+4 | glide to Look slot A–D |
 | C | start / stop recording (downloads a .webm with audio) |
 | F | fullscreen |
 | H | hide the controls (they also auto-hide after 3 s of no mouse movement; change that in Settings) |

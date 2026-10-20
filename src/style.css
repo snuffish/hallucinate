@@ -5,6 +5,7 @@
   --muted: #a99fc4;
   --accent: #ff4fd8;
   --accent2: #4fe3ff;
+  --locked: #ffd84f;   /* a locked Look slider */
   /* One stacking order for everything that floats over the canvas (low to high). */
   --z-editor: 10;
   --z-nodes: 10;
@@ -270,6 +271,81 @@ body.idle { cursor: none; }
 .sliders label small { font-size: 10.5px; opacity: 0.75; }
 .sliders .toggle { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 8px; color: var(--text); }
 .sliders .toggle small { flex-basis: 100%; padding-left: 21px; color: var(--muted); }
+/* The Look widget: a row per slider (lock, label, slider, typed value), under its XY pads. */
+.look-row { display: grid; grid-template-columns: 18px minmax(0, 104px) 1fr auto; align-items: center; gap: 4px; min-height: 22px; }
+.sliders .look-row label { flex-direction: row; align-items: center; gap: 5px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+.look-row.locked label { color: var(--locked); }
+.look-row.locked input[type="range"] { accent-color: var(--locked); }
+.look-lock { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); opacity: 0.35; }
+.look-lock:hover, .look-lock:focus-visible { opacity: 0.9; }
+.look-lock.on { opacity: 1; color: var(--locked); }
+.look-value { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 1px; }
+.look-value input {
+  width: 5.2ch; padding: 1px 2px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text);
+  font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; text-align: right;
+}
+.look-value input:hover { border-color: var(--line); }
+.look-value input:focus { outline: none; border-color: var(--accent); background: rgba(0, 0, 0, 0.4); }
+.look-value i { width: 1.4ch; color: var(--muted); font-size: 10px; font-style: normal; }
+.look-swatch { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.look-tag { padding: 0 3px; border-radius: 3px; color: var(--accent2); background: rgba(79, 227, 255, 0.12); font: 600 9px ui-monospace, monospace; font-style: normal; }
+input.look-hue-track { -webkit-appearance: none; appearance: none; height: 8px; border-radius: 4px; }
+input.look-hue-track::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid #111; box-shadow: 0 0 6px rgba(255, 255, 255, 0.7); }
+input.look-hue-track::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid #111; }
+.look-xy-toggle { align-self: flex-start; padding: 1px 4px; border: 0; background: transparent; color: var(--muted); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.look-xy { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.xy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.xy-axes { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 4px; color: var(--muted); font-size: 10px; }
+.xy-axes select { min-width: 0; padding: 1px 2px; border: 1px solid var(--line); border-radius: 4px; background: rgba(0, 0, 0, 0.35); color: var(--text); font-size: 10px; }
+.xy-pad {
+  position: relative; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; cursor: crosshair; touch-action: none;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px) 0 0 / 25% 25%,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px) 0 0 / 25% 25%, rgba(0, 0, 0, 0.35);
+}
+.xy-pad:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+.xy-line { position: absolute; background: rgba(255, 79, 216, 0.35); pointer-events: none; }
+.xy-line.across { left: 0; right: 0; height: 1px; }
+.xy-line.up { top: 0; bottom: 0; width: 1px; }
+.palette { display: flex; flex-direction: column; gap: 4px; padding-left: 22px; }
+.palette-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.palette-row button { padding: 1px 6px; font-size: 10.5px; }
+.palette-row button.active { border-color: var(--accent); background: rgba(255, 79, 216, 0.22); color: var(--text); }
+.palette-swatch { width: 18px; height: 18px; padding: 0 !important; border-radius: 4px; border: 1px solid var(--line); }
+.palette-swatch.picked { outline: 2px solid #fff; outline-offset: 1px; }
+.look-follow { margin-left: auto; padding: 0 4px; border: 0; background: transparent; color: var(--muted); opacity: 0.4; font-size: 11px; line-height: 1; }
+.look-follow:hover, .look-follow:focus-visible, .look-follow[aria-expanded="true"] { opacity: 1; }
+.look-follow.on { opacity: 1; color: var(--accent2); }
+.look-range { position: relative; display: block; min-width: 0; }
+.look-ghost { position: absolute; top: 50%; width: 2px; height: 14px; margin: -7px 0 0 -1px; border-radius: 1px; background: var(--accent2); box-shadow: 0 0 6px var(--accent2); pointer-events: none; }
+.look-follow-edit { display: flex; flex-direction: column; gap: 2px; margin: 0 0 4px 22px; padding: 4px 6px; border-left: 2px solid rgba(79, 227, 255, 0.4); background: rgba(79, 227, 255, 0.05); border-radius: 0 6px 6px 0; }
+.look-follow-head { display: flex; gap: 6px; align-items: center; }
+.look-follow-head select { flex: 1; min-width: 0; padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; background: rgba(0, 0, 0, 0.35); color: var(--text); font-size: 11px; }
+.look-follow-head button { padding: 1px 6px; font-size: 10.5px; }
+.look-follow-edit .look-row { grid-template-columns: 0 56px 1fr auto; }
+.master-look summary { cursor: pointer; }
+.master-look summary small { margin-left: 6px; color: var(--locked); }
+.master-look .look-row label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.master-look > button { margin-top: 4px; font-size: 11px; }
+.look-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
+.look-slot-cell { position: relative; display: flex; }
+.look-slot-cell .look-slot { flex: 1; }
+.look-slot-clear { position: absolute; top: -6px; right: -5px; width: 15px; height: 15px; padding: 0; border-radius: 50%; font-size: 10px; line-height: 1; background: #1a1426; color: var(--muted); opacity: 0.55; transition: opacity 0.15s; }
+.look-slot-cell:hover .look-slot-clear, .look-slot-clear:focus-visible { opacity: 1; }
+.look-slot-clear:hover { color: var(--text); border-color: var(--accent); }
+.look-slot { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 3px 0; font-size: 11px; font-weight: 600; border-style: dashed; color: var(--muted); background: transparent; }
+.look-slot.current { outline: 1px solid var(--c); outline-offset: 2px; }
+.look-slot-auto { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11px; }
+.sliders .look-slot-auto .toggle { flex-wrap: nowrap; font-size: 11.5px; }
+.look-slot-auto select { padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; background: rgba(0, 0, 0, 0.35); color: var(--text); font-size: 11px; }
+.look-slot-auto small { flex-basis: 100%; color: var(--muted); }
+.look-seg { display: inline-flex; }
+.look-seg button { padding: 1px 6px; font-size: 10.5px; border-radius: 0; }
+.look-seg button:first-child { border-radius: 6px 0 0 6px; }
+.look-seg button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+.look-seg button.active { border-color: var(--accent); background: rgba(255, 79, 216, 0.22); color: var(--text); }
+.look-slot.filled { border-style: solid; border-color: var(--c); box-shadow: inset 0 -3px 0 var(--c); color: var(--text); }
+.xy-puck { position: absolute; width: 14px; height: 14px; margin: 0 0 -7px -7px; border: 2px solid #111; border-radius: 50%; background: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.6); pointer-events: none; }
 #mood-label { margin-left: auto; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 

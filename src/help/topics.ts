@@ -49,10 +49,18 @@ export const HELP_TOPICS = {
     body: [
       'These sliders apply to every scene: how strongly it reacts, how fast it moves, how long the afterglow of its trails lasts, its colour, and Fringing, how far each line splits into red, green and blue.',
       'Synesthesia grades the picture by the sound: dark sound goes dim and cool, bright sound light and warm, and an energetic mood more vivid. At 0 it is off.',
+      'Each slider shows its value: click it to type one (Enter sets it, Escape doesn\'t). Double-click a slider to put it back. Drag with Shift held for a ten times finer move, even halfway through a drag; once a slider has focus the wheel steps it (Shift: one step), and so do the arrow keys. The dot beside Colour is the colour on screen now, cycling included.',
+      'The XY pads each move two sliders at once, one across and one up: pick which with the menus above a pad. A tag on a slider (1↔, 2↕) says which pad axis it is also on. Drag on a pad to set both, Shift for finer; the wheel steps the one going up; double-click resets both. Fold the pads away with XY pads.',
+      'The lock beside a slider keeps Randomize, Shift+R, Drift and Intensity off it. A show scene you take, a slot, the assistant and your own hand still move it.',
+      'Intensity moves Reactivity, Trails and Fringing together, from the gentlest to the strongest look Randomize can reach.',
+      'The ♪ beside Speed, Trails, Colour, Synesthesia or Fringing makes it follow the music: pick what it follows (Bass, Mids, Highs, Level, Kick, Tone or Mood), how far (Depth, below 0 it moves down) and how fast it rises and falls back (Attack, Release). A mark on the slider shows where it sits now. It never goes above where you set it or the top of the Randomize range, whichever is higher, and Colour moves at most a tenth of the wheel. The slots keep it; show scenes don\'t yet.',
+      'Under Colour, the palette: Wheel lets the colours walk the whole laser wheel; + makes a palette of 2–5 colours they walk instead. Pick a colour and set it on the bar below it, × removes it, Steps holds each colour and eases to the next instead of blending. Colour still shifts where the colours start, and Colour cycling walks the palette. Show scenes keep their palette.',
+      'The slots A–D keep looks to come back to: click an empty one (or Shift+click any) to store the look now, click a filled one (or press Alt+1–4) to glide to it over a second, and the × on its corner empties it. Auto-change lets the filled slots take turns on their own every 8–64 kicks while the music plays: Linear goes A, B, C, D and round again, Random picks any other; Soft glides there, Hard switches at once. A slot glided to by hand is where it goes on from; Shift+R doesn\'t step back through the automatic changes. Shift+R comes back from a slot as from a Randomize. They go with an Export.',
       'Drift lets the sliders glide to new random values (within the same laser-friendly ranges as Randomize) on their own, each at its own pace, for a look that keeps slowly changing; Drift speed sets how fast. Move a slider yourself and it drifts on from there.',
+      'The Look stays as you left it the next time the app opens.',
       'If the frame rate drops, lower Resolution in Settings → Display & performance.',
     ],
-    hotkeys: ['randomize', 'randomizeBack', 'auto'],
+    hotkeys: ['randomize', 'randomizeBack', 'lookSlotA', 'lookSlotB', 'lookSlotC', 'lookSlotD', 'auto'],
   },
   effects: {
     id: 'effects',
@@ -103,6 +111,7 @@ export const HELP_TOPICS = {
     body: [
       'Run a show: click a show scene to put it in Preview (green), then Take sends it to Live (red) with a cut or a fade.',
       'Open a projector window on another display: it renders the show itself at its own resolution. Blackout fades Live to black.',
+      'Master look, under the master fader, turns down what every show scene sets on Live (Reactivity, Speed, Trails, Fringing, 0–100%) and shifts its colour, without editing a show scene. Double-click one to put it back; it is kept with the show.',
       'Autopilot takes the next scene every few beats (or seconds).',
       ...(STATIC_DEMO ? ['The Director, which plans the show with Claude, needs the local server.'] : ['The Director lets Claude plan the show from the music.']),
     ],

@@ -373,3 +373,19 @@ describe('StudioSession Preview monitor', () => {
     expect(previewScales.at(-1)).toBe(0.5);
   });
 });
+
+describe("Live's master trims (ADR 0006)", () => {
+  it('start neutral, also for a show saved before them, and are kept with the show', () => {
+    const app = app3();
+    const s = session(app, { cues: [cue('Alpha')] });
+    expect(s.trims).toEqual({ reactivity: 1, speed: 1, trails: 1, aberration: 1, hue: 0 });
+    s.setTrim('trails', 0.5);
+    s.setTrim('hue', 0.9);   // clamped to half the wheel
+    s.setTrim('speed', 3);   // trims only turn down
+    expect(app.live.trims).toEqual({ reactivity: 1, speed: 1, trails: 0.5, aberration: 1, hue: 0.5 });
+    flushAll();
+    expect(session(app3()).trims).toMatchObject({ trails: 0.5, hue: 0.5 });
+    s.resetTrims();
+    expect(app.live.trims).toEqual({ reactivity: 1, speed: 1, trails: 1, aberration: 1, hue: 0 });
+  });
+});

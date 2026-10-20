@@ -22,10 +22,10 @@ async function expectResolutionUntouched(page: import('@playwright/test').Page) 
   await page.keyboard.press('Escape');
 }
 
-test('a fresh start opens with the laser look: Reactivity to Fringing, then Drift', async ({ page }) => {
+test('a fresh start opens with the laser look: Reactivity to Fringing, the slots, Intensity, then Drift', async ({ page }) => {
   await page.goto('/');
   const labels = await page.locator('#w-look label').evaluateAll((els) => els.map((e) => [...e.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim())?.textContent?.trim()));
-  expect(labels).toEqual(['Reactivity', 'Speed', 'Trails', 'Colour', 'Colour cycling', 'Synesthesia', 'Fringing', 'Drift']);
+  expect(labels).toEqual(['Reactivity', 'Speed', 'Trails', 'Colour', 'Colour cycling', 'Synesthesia', 'Fringing', 'Auto-change', 'Intensity', 'Drift']);
   expect(await rolledValues(page)).toEqual({ reactivity: 1, speed: 1, trails: 0.35, hue: 0, cycle: 0.2, synesthesia: 0.3, aberration: 0 });
 });
 
@@ -37,7 +37,7 @@ test('randomize: rolls the look without changing scene unless the random-scene b
   await page.locator('#auto').uncheck();   // auto-switch must not change the scene under the test
   await expect(page.locator('#random-scene')).not.toBeChecked();
   await expect(page.locator('#mood')).toHaveCount(0);   // mood always feeds Synesthesia: no toggle to flip
-  await expect(page.locator('#w-look')).toContainText('energetic mood');
+  await expect(page.locator('#w-look label[for="synesthesia"]')).toHaveAttribute('title', /energetic mood/);
 
   const scene = await page.locator('#scene-name').textContent();
   const before = await lookValues(page);

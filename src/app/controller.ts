@@ -15,7 +15,7 @@ import { FrameProfiler, Stage, installGlobal, uninstallGlobal, type FillResult, 
 import { Renderer, type ProgramState } from '../engine/renderer';
 import { readInputs, silentSpectrum, stillSpectrum, stillUniforms } from '../engine/scene-inputs';
 import { userSceneId, type Scene } from '../scenes';
-import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, defaultClock, defaultLook, type AppState, type LookKey, type SourceButton } from '../state/app-state';
+import { BEATS_PER_SCENE, CROSSFADE_SECONDS, LOOK_KEYS, LOOK_RANGES, MAX_SECONDS_PER_SCENE, PALETTE_MAX, SLIDER_KEYS, defaultClock, defaultLook, type AppState, type AutoSlots, type LookKey, type Palette, type SliderKey, type SourceButton, type XYAxes } from '../state/app-state';
 import { DRIFT_KEYS, LookDrift, RANDOM_RANGES, type DriftKey } from '../state/look-drift';
 import { loadLibraryPrefs, rotation, saveLibraryPrefs, type LibraryPrefs } from '../state/library-prefs';
 import * as L from '../state/layout';
@@ -24,6 +24,9 @@ import { DEFAULT_PREFS, loadPrefs, micConstraints, outputPrefs, type PrefKey, ty
 import { SceneHistory } from '../state/scene-history';
 import { buildSceneList, isBuiltin, paramKey, stepScene } from '../state/scene-list';
 import { takeRenameReport } from '../state/scene-renames';
+import { ROUTE_TARGETS, followed, type Route, type RouteTarget } from '../engine/look-routes';
+import { loadLook, lookWriter } from '../state/look-store';
+import { INTENSITY_KEYS, LookGlide, SLOT_NAMES, intensityValue, loadLookSlots, lookSlotsWriter, nextSlot, slotOf, slotWithRoutes, type LookSlots } from '../state/look-slots';
 import { loadScreenEffects, screenEffectsWriter } from '../state/screen-effects';
 import { Store } from '../state/store';
 import { initialUIState, type DownloadView, type DragId, type HearingView, type HelpId, type MoodLabel, type Overlay, type UIState } from '../state/ui-state';
@@ -36,7 +39,9 @@ import { SceneLibrary, type SceneChange } from './scene-library';
 import { Transport } from './transport';
 
 const RANDOM_HISTORY = 20;   // how many Randomize presses Shift+R can step back through
-const DRIFT_PUBLISH_FRAMES = 6;
+const LOOK_PUBLISH_FRAMES = 6;
+const fract = (x: number): number => x - Math.floor(x);
+const NOT_FOLLOWED = {};   // no slider follows the music   // the Look widget follows Drift and the hue on screen at ~10 Hz
 const PERF_PUBLISH_MS = 500;   // the performance overlay updates twice a second, however slow the frames
 const HEARING_PUBLISH_FRAMES = 4;   // the Hearing monitor follows at ~15 Hz: its lights and traces move
 
@@ -113,7 +118,7 @@ export class AppController {
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly drift = new LookDrift();
-  private driftFrames = 0;
+  private lookFrames = 0;
   private readonly beforeRandom: { look: Record<DriftKey, number>; scene: number }[] = [];   // Shift+R steps back through these
   private toastKey = 0;
   private readonly downloads = new Map<'sc' | 'yt', DownloadView>();
@@ -121,6 +126,12 @@ export class AppController {
   private readonly layoutWriter = debouncedWriter(KEYS.layout, () => this.layout.get());
   private readonly prefsWriter = debouncedWriter(KEYS.prefs, () => this.prefs.get(), 300);
   private readonly effectsWriter = screenEffectsWriter(() => this.state.effects);
+  private readonly lookWriter = lookWriter(() => this.state.look);
+  private lookSlots: LookSlots = loadLookSlots();
+  private readonly lookSlotsWriter = lookSlotsWriter(() => this.lookSlots);
+  private readonly glide = new LookGlide();   // a slot being recalled
+  private slotAt = -1;      // the slot last recalled or stored, where auto-change goes on from
+  private slotBeats = 0;    // kicks since the last slot change, for auto-change
   // While a show scene crossfades in on the main screen, the stack the outgoing picture keeps; null once the
   // crossfade ends (or on a manual scene change), when the outgoing picture draws with the screen's own.
   private outgoingEffects: Effects.EffectStack | null = null;
@@ -194,10 +205,10 @@ export class AppController {
     this.paramStore = new ParamStore();
     this.state = {
       scenes: list.scenes, customIndex: list.customIndex, nodesIndex: list.nodesIndex, keyedScenes: list.keyedScenes,
-      look: defaultLook(), effects: loadScreenEffects(), clock: defaultClock(), activeSource: null,
+      look: loadLook(), effects: loadScreenEffects(), clock: defaultClock(), activeSource: null,
     };
     this.ui = new Store(initialUIState(this.state.look));
-    this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, effects: this.state.effects });
+    this.ui.set({ startupErrors: list.errors, mediaSound: this.mediaSound, effects: this.state.effects, lookSlots: this.lookSlots });
     this.renderer.setMedia(this.media);
     this.output = new OutputLink(list.scenes, (outputs) => { this.ui.set({ outputs }); this.logOutputs(outputs.length); }, outputPrefs(this.prefs.get()));
     for (const r of list.renamed) this.history.rename(userSceneId(r.from), userSceneId(r.to));
@@ -269,6 +280,8 @@ export class AppController {
     this.layoutWriter.dispose();
     this.prefsWriter.dispose();
     this.effectsWriter.dispose();
+    this.lookWriter.dispose();
+    this.lookSlotsWriter.dispose();
     this.transport.dispose();
     this.output.dispose();
     this.paramStore.dispose();
@@ -548,12 +561,12 @@ export class AppController {
 
   // ---------- A scene as a whole: which one, its parameter values, the look ----------
 
-  // A scene as a show scene keeps it: its parameter values, the look sliders and the screen's effects, as
-  // they are now.
+  // A scene as a show scene keeps it: its parameter values, the look sliders, the palette and the screen's
+  // effects, as they are now.
   captureScene(i = this.state.clock.scene): Shot {
     const look: Record<string, number> = {};
     for (const k of LOOK_KEYS) look[k] = this.state.look[k];
-    return { scene: i, values: this.library.values(i), look, effects: this.state.effects };
+    return { scene: i, values: this.library.values(i), look, palette: this.state.look.palette, effects: this.state.effects };
   }
 
   // Puts a scene on screen in one step, as the studio takes it: the look sliders it has, its values, its
@@ -564,6 +577,7 @@ export class AppController {
     const scene = this.state.scenes[snap.scene];
     if (!scene || scene.removed) return;
     for (const k of LOOK_KEYS) if (snap.look[k] !== undefined) this.setLook(k, snap.look[k]!);
+    if (snap.palette) this.setPalette(snap.palette);
     this.library.replaceValues(snap.scene, snap.values);
     const outgoing = this.state.effects, before = this.state.clock.scene;
     this.setEffects(snap.effects);
@@ -608,17 +622,134 @@ export class AppController {
 
   // ---------- Look ----------
 
+  // Any change to a slider (a hand, a take, the assistant) ends a slot's glide there.
   setLook(key: LookKey, value: number): void {
+    this.glide.stop();
     const r = LOOK_RANGES[key];
     const v = Math.min(r.max, Math.max(r.min, value));
     this.state.look[key] = v;
-    this.ui.set({ look: { ...this.state.look } });
+    this.publishLook();
   }
 
-  setLookFlag(key: 'auto' | 'randomScene' | 'drift', value: boolean): void {
+  setLookFlag(key: 'auto' | 'randomScene' | 'drift' | 'xyOpen', value: boolean): void {
     if (key === 'drift' && value) this.drift.reset();   // start from the sliders as they are
     this.state.look[key] = value;
-    this.ui.set({ look: { ...this.state.look } });
+    this.publishLook();
+  }
+
+  // A locked slider is left alone by Randomize (and Shift+R) and Drift; a Take, the assistant and a hand
+  // still move it.
+  setLookLock(key: SliderKey, locked: boolean): void {
+    const now = this.state.look.locked;
+    this.state.look.locked = SLIDER_KEYS.filter((k) => (k === key ? locked : now.includes(k)));
+    this.publishLook();
+  }
+
+  // The palette every scene draws through laser() (ADR 0004): 2–5 hues on the wheel, or none for the whole
+  // wheel. Randomize and Drift leave it alone.
+  setPalette(palette: Readonly<Palette>): void {
+    const hues = palette.hues.length >= 2 ? palette.hues.slice(0, PALETTE_MAX).map(fract) : [];
+    this.state.look.palette = { hues, steps: palette.steps };
+    this.publishLook();
+  }
+
+  // Makes a slider follow the music (ADR 0005), or stop (null).
+  setRoute(target: RouteTarget, route: Readonly<Route> | null): void {
+    const routes = { ...this.state.look.routes };
+    if (route) routes[target] = { ...route }; else delete routes[target];
+    this.state.look.routes = routes;
+    this.publishLook();
+  }
+
+  // Where each slider that follows the music sits on the main screen now, for the widget's marks.
+  private followedNow(): Partial<Record<RouteTarget, number>> {
+    const { routes } = this.state.look, env = this.state.clock.routeEnv;
+    if (!env || !Object.keys(routes).length) return NOT_FOLLOWED;
+    const out: Partial<Record<RouteTarget, number>> = {};
+    ROUTE_TARGETS.forEach((t, i) => { const r = routes[t]; if (r) out[t] = followed(t, this.state.look[t], r, env[i]!); });
+    return out;
+  }
+
+  // What XY pad `i` moves across and up.
+  setXYAxes(i: number, axes: XYAxes): void {
+    if (!this.state.look.xy[i] || axes.x === axes.y) return;
+    this.state.look.xy = this.state.look.xy.map((a, j) => (j === i ? { ...axes } : a));
+    this.publishLook();
+  }
+
+  // Intensity: Reactivity, Trails and Fringing together, inside the Randomize ranges; locked ones stay.
+  setIntensity(x: number): void {
+    const look = this.state.look;
+    this.glide.stop();
+    look.intensity = Math.min(1, Math.max(0, x));
+    for (const k of INTENSITY_KEYS) if (!look.locked.includes(k)) look[k] = intensityValue(k, look.intensity);
+    this.publishLook();
+  }
+
+  // Stores the look now in slot `i` (A–D).
+  saveLookSlot(i: number): void {
+    if (i < 0 || i >= SLOT_NAMES.length) return;
+    this.lookSlots = this.lookSlots.map((s, j) => (j === i ? slotWithRoutes(this.state.look) : s));
+    this.slotAt = i;
+    this.ui.set({ lookSlots: this.lookSlots, lookSlotAt: i });
+    this.lookSlotsWriter.schedule();
+    this.toast(`Look stored in slot ${SLOT_NAMES[i]}`, 1200);
+  }
+
+  // Empties slot `i`.
+  clearLookSlot(i: number): void {
+    if (!this.lookSlots[i]) return;
+    this.lookSlots = this.lookSlots.map((s, j) => (j === i ? null : s));
+    this.ui.set({ lookSlots: this.lookSlots });
+    this.lookSlotsWriter.schedule();
+    this.toast(`Slot ${SLOT_NAMES[i]} emptied`, 1200);
+  }
+
+  // Glides to the look in slot `i` over a second. Shift+R comes back from it, as from a Randomize.
+  recallLookSlot(i: number): void {
+    if (!this.lookSlots[i]) { if (SLOT_NAMES[i]) this.toast(`Slot ${SLOT_NAMES[i]} is empty: Shift+click it to store the look`, 1800); return; }
+    this.rememberForBack();
+    this.slotBeats = 0;   // auto-change counts on from here
+    this.goToSlot(i, false);
+  }
+
+  // Goes to slot `i`'s look: gliding over a second, or at once. The routes switch at once either way.
+  private goToSlot(i: number, instant: boolean): void {
+    const slot = this.lookSlots[i];
+    if (!slot) return;
+    const look = this.state.look;
+    if (slot.routes) look.routes = structuredClone(slot.routes);
+    this.slotAt = i;
+    if (instant) {
+      this.glide.stop();
+      for (const k of SLIDER_KEYS) look[k] = slot[k];
+    } else {
+      this.glide.start(slotOf(look), slot);
+    }
+    this.publishLook();
+  }
+
+  // The slot auto-change's settings: on or off, every how many kicks, in which order, gliding or switching.
+  setAutoSlots(change: Partial<AutoSlots>): void {
+    const look = this.state.look;
+    if (change.on && !look.autoSlots.on) this.slotBeats = 0;
+    look.autoSlots = { ...look.autoSlots, ...change };
+    this.publishLook();
+  }
+
+  // A kick while auto-change is on: every `beats` of them, the next slot. Not one Shift+R comes back from.
+  private autoSlotOnKick(): void {
+    const auto = this.state.look.autoSlots;
+    if (!auto.on || ++this.slotBeats < auto.beats) return;
+    this.slotBeats = 0;
+    const next = nextSlot(this.lookSlots, this.slotAt, auto.order);
+    if (next !== null) this.goToSlot(next, auto.transition === 'hard');
+  }
+
+  // The Look changed: the widget shows it, and it's kept for the next start.
+  private publishLook(): void {
+    this.ui.set({ look: { ...this.state.look }, liveHue: fract(this.state.look.hue + this.state.clock.huePhase), lookSlotAt: this.slotAt });
+    this.lookWriter.schedule();
   }
 
   // ---------- Effects (the main screen's: they stay through scene changes, like the Look) ----------
@@ -644,22 +775,29 @@ export class AppController {
     return this.state.look.auto;
   }
 
-  // Rolls the Look widget's values, within ranges that stay watchable. The scene only changes when
-  // "Also pick a random scene" is on.
+  // Rolls the Look widget's values, within ranges that stay watchable, except the locked ones. The scene
+  // only changes when "Also pick a random scene" is on.
   randomize(): void {
     const look = this.state.look;
-    this.beforeRandom.push({ look: Object.fromEntries(DRIFT_KEYS.map((k) => [k, look[k]])) as Record<DriftKey, number>, scene: this.state.clock.scene });
-    if (this.beforeRandom.length > RANDOM_HISTORY) this.beforeRandom.shift();
-    for (const key of DRIFT_KEYS) { const [min, max] = RANDOM_RANGES[key]; this.setLook(key, min + Math.random() * (max - min)); }
+    this.rememberForBack();
+    this.glide.stop();
+    for (const key of DRIFT_KEYS) if (!look.locked.includes(key)) { const [min, max] = RANDOM_RANGES[key]; this.setLook(key, min + Math.random() * (max - min)); }
     if (this.state.look.randomScene) this.nextRandomScene();
   }
 
-  // Shift+R: the look (and scene, if Randomize changed it) from before the last Randomize. Again for
-  // the one before that.
+  // What Shift+R comes back to: the look and the scene before a Randomize or a slot recall.
+  private rememberForBack(): void {
+    this.beforeRandom.push({ look: slotOf(this.state.look), scene: this.state.clock.scene });
+    if (this.beforeRandom.length > RANDOM_HISTORY) this.beforeRandom.shift();
+  }
+
+  // Shift+R: the look (and scene, if Randomize changed it) from before the last Randomize or slot recall,
+  // locked sliders aside. Again for the one before that.
   randomizeBack(): void {
     const prev = this.beforeRandom.pop();
     if (!prev) { this.toast('No earlier random look to go back to', 1500); return; }
-    for (const key of DRIFT_KEYS) this.setLook(key, prev.look[key]);
+    this.glide.stop();
+    for (const key of DRIFT_KEYS) if (!this.state.look.locked.includes(key)) this.setLook(key, prev.look[key]);
     if (prev.scene !== this.state.clock.scene) this.setScene(prev.scene);
     const left = this.beforeRandom.length;
     this.toast(`Back to the previous look${left ? ` (${left} more)` : ''}`, 1500);
@@ -808,6 +946,7 @@ export class AppController {
     if (h.kick) {
       c.beatsInScene++;
       if (this.autoSwitching() && c.beatsInScene >= BEATS_PER_SCENE) this.nextRandomScene();
+      this.autoSlotOnKick();
     }
     if (h.tick) this.hooks.onTempoBeat?.();
   }
@@ -976,9 +1115,14 @@ export class AppController {
     const f = this.listener.hear(this.audio.read(), this.music.playing, elapsed, now / 1000);
     this.onBeats(f);
     this.profiler.lap(Stage.audio);
-    if (look.drift) {
-      this.drift.step(look, dt, look.driftSpeed);
-      if (++this.driftFrames % DRIFT_PUBLISH_FRAMES === 0) this.ui.set({ look: { ...look } });   // the sliders follow at ~10 Hz
+    if (look.drift) this.drift.step(look, dt, look.driftSpeed, look.locked);
+    const gliding = this.glide.active;
+    this.glide.step(look, dt);
+    if (++this.lookFrames % LOOK_PUBLISH_FRAMES === 0 || (gliding && !this.glide.active)) {
+      const liveHue = fract(look.hue + c.huePhase);
+      const followed = this.followedNow();
+      if (look.drift || gliding) { this.ui.set({ look: { ...look }, liveHue, followed }); this.lookWriter.schedule(); }
+      else if (liveHue !== this.ui.get().liveHue || followed !== this.ui.get().followed) this.ui.set({ liveHue, followed });
     }
     if (this.state.activeSource === 'media') this.media.follow(this.player);
 

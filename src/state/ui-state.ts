@@ -9,6 +9,8 @@ import type { HearingHistory } from '../engine/hearing-history';
 import type { HearingDiagnostics, MoodWord } from '../engine/listener';
 import type { InputUniform } from '../engine/scene-inputs';
 import type { HelpTopicId } from '../help/topics';
+import type { RouteTarget } from '../engine/look-routes';
+import type { LookSlots } from './look-slots';
 import type { Look, SourceButton } from './app-state';
 import type { WidgetId } from './layout';
 
@@ -75,6 +77,10 @@ export interface UIState {
   sceneName: string;        // "3 · Ring Run"
   sceneVersion: number;     // bumps when the scene list changes (add/remove/edit), for lists
   look: Look;
+  lookSlots: LookSlots;     // the Look slots A–D, null where empty
+  lookSlotAt: number;       // the slot last recalled or stored (-1: none), where auto-change goes on from
+  followed: Partial<Record<RouteTarget, number>>;   // where each slider that follows the music sits now (ADR 0005)
+  liveHue: number;          // the hue on screen now (Colour plus how far cycling has walked), 0–1, for the Colour swatch
   effects: EffectStack;     // the main screen's effects (the Effects widget)
   meters: Meters;
   bpm: number | null;
@@ -116,6 +122,10 @@ export const initialUIState = (look: Look): UIState => ({
   sceneName: '',
   sceneVersion: 0,
   look,
+  lookSlots: [null, null, null, null],
+  lookSlotAt: -1,
+  followed: {},
+  liveHue: look.hue,
   effects: NO_EFFECTS,
   meters: { bass: 0, mid: 0, high: 0, bright: 0.5, beat: 0 },
   bpm: null,

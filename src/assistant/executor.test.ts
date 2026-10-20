@@ -61,6 +61,39 @@ describe('tool runner', () => {
     expect(studio.mode).toBe('cut');
   });
 
+  it('set_look sets Intensity, leaving locked sliders, lets a slider given alongside win, and undoes it all', async () => {
+    const { run, app, undo } = setup();
+    app.state.look.locked = ['trails'];
+    const out = await run('set_look', { intensity: 1, aberration: 0.002 }) as { applied: Record<string, number> };
+    expect(app.state.look).toMatchObject({ intensity: 1, reactivity: 1.4, trails: 0.35, aberration: 0.002 });
+    expect(out.applied).toEqual({ intensity: 1, reactivity: 1.4, trails: 0.35, aberration: 0.002 });
+    undo.pop()!.undo();
+    expect(app.state.look).toMatchObject({ intensity: 0.5, reactivity: 1, trails: 0.35, aberration: 0 });
+  });
+
+  it('set_look sets a palette, keeps its steps when not given, and undoes back to the wheel', async () => {
+    const { run, app, undo } = setup();
+    await run('set_look', { palette: { hues: [0.6, 0.1], steps: true } });
+    expect(app.state.look.palette).toEqual({ hues: [0.6, 0.1], steps: true });
+    await run('set_look', { palette: { hues: [0.2, 0.3, 0.4] } });
+    expect(app.state.look.palette).toEqual({ hues: [0.2, 0.3, 0.4], steps: true });
+    undo.pop()!.undo();
+    undo.pop()!.undo();
+    expect(app.state.look.palette).toEqual({ hues: [], steps: false });
+  });
+
+  it('set_look makes sliders follow the music and stop, and undoes it', async () => {
+    const { run, app, undo } = setup();
+    const kick = { source: 'kick' as const, depth: 0.8, attack: 0.1, release: 0.5 };
+    await run('set_look', { routes: { trails: kick, speed: { ...kick, source: 'bass' } } });
+    expect(app.state.look.routes).toEqual({ trails: kick, speed: { ...kick, source: 'bass' } });
+    await run('set_look', { routes: { speed: null } });
+    expect(app.state.look.routes).toEqual({ trails: kick });
+    await expect(run('set_look', { routes: { reactivity: kick } })).rejects.toThrow();   // Reactivity can't follow
+    undo.pop()!.undo();
+    expect(app.state.look.routes).toEqual({ trails: kick, speed: { ...kick, source: 'bass' } });
+  });
+
   it('undoes a show change, but not once something else changed the show after it', async () => {
     const { run, studio, undo } = setup();
     await run('add_show_scene', { scene: 'Alpha' });
@@ -302,11 +335,12 @@ describe('scene code and parameter tools', () => {
     expect(out.scenes).toEqual({ Fractal: 'Alpha (mine), Beta*', Mine: 'Maker (visual maker)' });
   });
 
-  it('get_app_state reports the switches, the effects and, while music plays, the live levels', async () => {
+  it('get_app_state reports the switches, the locks, the effects and, while music plays, the live levels', async () => {
     const { run, app } = setup();
     app.state.effects = [{ id: 'mirror', on: true, settings: { axis: 0 } }];
+    app.state.look.locked = ['hue'];
     const out = await run('get_app_state', {}) as { look: Record<string, unknown>; effects: unknown; listening: unknown; livePinned?: unknown };
-    expect(out.look).toMatchObject({ autoSwitch: true, drift: false, driftSpeed: 1, randomizePicksScene: false });
+    expect(out.look).toMatchObject({ autoSwitch: true, drift: false, driftSpeed: 1, randomizePicksScene: false, locked: ['hue'], intensity: 0.5, slots: [], synesthesia: 0.3 });
     expect(out.effects).toEqual([{ id: 'mirror', on: true, settings: { axis: 0 } }]);
     expect(out.listening).toBeNull();   // nothing plays
     expect(out.livePinned).toBeUndefined();

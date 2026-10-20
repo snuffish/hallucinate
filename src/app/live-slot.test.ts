@@ -101,7 +101,7 @@ describe('LiveSlot', () => {
     const p = live.route(base, true, 0).projector!.program;
     expect(p.hue).toBeCloseTo(0.75);
     expect(p.feedback).toBeCloseTo(0.5);
-    expect(live.unpin()).toEqual({ scene: 1, values: glow(2), look: expect.objectContaining({ hue: 0.75, trails: 0.5 }), effects: [] });
+    expect(live.unpin()).toEqual({ scene: 1, values: glow(2), look: expect.objectContaining({ hue: 0.75, trails: 0.5 }), palette: { hues: [], steps: false }, effects: [] });
   });
 
   it('unpinning hands back what was pinned and the main program returns everywhere', () => {
@@ -161,6 +161,39 @@ describe('LiveSlot', () => {
     expect(live.preview(base, shot, 1 / 60).program.bass).toBeCloseTo(0.2);
     live.take(shot, 'Gamma');
     expect(live.route(base, true, 1 / 60).projector!.program.bass).toBeCloseTo(0.2);
+  });
+
+  it("grades Live with its show scene's own synesthesia, and the app's for one saved before it kept it", () => {
+    const { live, base, state, hearing } = slot();
+    hearing.bright = 1;
+    state.look.synesthesia = 1;
+    live.take({ scene: 1, values: glow(2), look: { synesthesia: 0 }, effects: [] }, 'Beta plain');
+    expect(live.route(base, true, 0).projector!.program.grade.exposure).toBe(1);   // synesthesia 0: no grade
+    live.take({ scene: 2, values: glow(2), look: {}, effects: [] }, 'Gamma, an older show');
+    expect(live.route(base, true, 0).projector!.program.grade.exposure).toBeGreaterThan(1);   // the app's 1
+  });
+
+  it("draws Live through its show scene's palette, and the screen's for one saved before palettes", () => {
+    const { live, base, state } = slot();
+    state.look.palette = { hues: [0.1, 0.2], steps: false };
+    live.take({ scene: 1, values: glow(2), look: {}, palette: { hues: [0.5, 0.6, 0.7], steps: true }, effects: [] }, 'Beta cool');
+    expect([...live.route(base, true, 0).projector!.program.palette.slice(5, 7)]).toEqual([3, 1]);
+    live.take({ scene: 2, values: glow(2), look: {}, effects: [] }, 'Gamma, an older show');
+    expect([...live.route(base, true, 0).projector!.program.palette.slice(5, 7)]).toEqual([2, 0]);
+  });
+
+  it('turns down what a show scene sets on Live and Preview by the master trims, and shifts its colour', () => {
+    const { live, base, state } = slot();
+    state.look.synesthesia = 0;
+    const shot = { scene: 1, values: glow(2), look: { reactivity: 1, trails: 0.5, aberration: 0.004, hue: 0.2 }, effects: [] };
+    live.trims = { reactivity: 0.5, speed: 1, trails: 0.5, aberration: 0, hue: 0.1 };
+    live.take(shot, 'Beta');
+    const p = live.route(base, true, 0).projector!.program;
+    expect(p.bass).toBeCloseTo(0.4);              // the hearing's 0.8 at reactivity 1 × 0.5
+    expect(p.feedback).toBeCloseTo(0.25);         // trails 0.5 × 0.5
+    expect(p.aberration).toBe(0);
+    expect(p.hue).toBeCloseTo(0.3);
+    expect(live.preview(base, shot, 0).program.feedback).toBeCloseTo(0.25);
   });
 
   it('grades each output on its own: Live never writes into the main frame', () => {

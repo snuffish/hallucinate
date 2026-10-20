@@ -112,10 +112,47 @@ _Avoid_: colour grade (that is what it does)
 The Look sliders wandering to random values on their own, each at its own pace, within the Randomize ranges.
 _Avoid_: auto-look, wander
 
+**Lock**:
+A Look slider that Randomize, Shift+R, Drift and Intensity leave alone. A take, a Look slot, the assistant and your
+hand still move it.
+_Avoid_: pin (that is Live's), freeze, hold
+
+**Follow (the music)**:
+A Look slider moving with one part of the music (a band, the kick, the tone or the mood) by a depth, through an attack
+and a release, never above the higher of its own value and the top of its Randomize range.
+_Avoid_: route (the code's name for it), modulation, LFO, sidechain
+
+**Master trim**:
+One of Live's controls in the studio's Master look: it turns down what every show scene's look sets on Live (or shifts
+its colour), kept with the show.
+_Avoid_: master look (that is the row), grand master, offset
+
+**Intensity**:
+One Look control that moves Reactivity, Trails and Fringing together, inside the ranges Randomize uses.
+_Avoid_: master, macro, energy
+
+**Look slot**:
+One of four places (A–D) that keep a Look's sliders to glide back to. They go with an export.
+_Avoid_: preset (a show scene is not one either), snapshot, bank
+
+**Auto-change**:
+The Look slots taking turns on their own every few kicks while the music plays, in order or at random, gliding or
+cutting between them.
+_Avoid_: autopilot (that is the studio's, for show scenes), slot cycling, sequencer
+
+**XY pad**:
+A square in the Look widget that moves two Look sliders at once, one across and one up, picked per pad.
+_Avoid_: XY controller, joystick, 2D slider
+
 **Laser palette**:
 The wheel of pure, fully saturated colours that the built-in scenes colour their lines from. Your own scenes can use
 it, or the softer rainbow.
 _Avoid_: rainbow (that is the softer one)
+
+**Palette**:
+2–5 hues on the laser palette that every scene's colours walk instead of the whole wheel, blending or in steps. Part
+of the Look, kept by show scenes.
+_Avoid_: colour scheme, gradient, colour preset
 
 **Show scene**:
 A scene with its parameter values, its effects and the look it keeps, as the studio plays it.

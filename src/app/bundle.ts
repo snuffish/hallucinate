@@ -10,6 +10,7 @@ import { ParamDataSchema } from '../engine/params';
 import { SCENES, type Scene } from '../scenes';
 import { StoredLayoutSchema, parseLayout } from '../state/layout';
 import { PrefsSchema } from '../state/library-prefs';
+import { LookSlotsSchema } from '../state/look-slots';
 import { KEYS, commitRaw, flagText, readFlag, readString } from '../state/persistence';
 import { SceneEditsSchema, UserScenesSchema } from '../state/scene-list';
 import { ShowSchema } from './studio';
@@ -33,6 +34,7 @@ export const SECTIONS = {
   nodeGraph: { key: KEYS.nodeGraph, storage: 'json', schema: GraphSchema },
   params: { key: KEYS.params, storage: 'json', schema: ParamDataSchema },
   show: { key: KEYS.show, storage: 'json', schema: ShowSchema },
+  lookSlots: { key: KEYS.lookSlots, storage: 'json', schema: LookSlotsSchema },
   library: { key: KEYS.library, storage: 'json', schema: PrefsSchema },
   player: { key: KEYS.player, storage: 'json', schema: PlayerSettingsSchema },
   layout: { key: KEYS.layout, storage: 'json', schema: StoredLayoutSchema, normalise: parseLayout },
@@ -133,6 +135,8 @@ function describe(values: Partial<Record<SectionId, unknown>>): string {
   if (values.params) parts.push('parameter values');
   const show = values.show as z.infer<typeof ShowSchema> | undefined;
   if (show) parts.push(`a show with ${plural(show.cues.length, 'cue')}`);
+  const slots = values.lookSlots as unknown[] | undefined;
+  if (slots?.some(Boolean)) parts.push(plural(slots.filter(Boolean).length, 'Look slot'));
   if (values.library) parts.push('favourites');
   if (values.player || values.mediaSound !== undefined) parts.push('player settings');
   if (values.layout) parts.push('layout');
